@@ -58,7 +58,7 @@ pub async fn agents(
 
 /// The name a child answers to: its title, or its id when it has none.
 pub fn name_of(child: &SessionSummary) -> &str {
-    child.title.as_deref().unwrap_or_else(|| child.id.as_str())
+    bingo_collab::name::of_session(child)
 }
 
 /// The names of the caller's children, in the order the host lists them.

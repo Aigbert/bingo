@@ -205,3 +205,39 @@ mod voice_tests {
         assert_eq!(super::origin(None).voice, Some(bingo_sdk::Voice::Quiet));
     }
 }
+
+/// A direct message retains the current view; reopening is limited to a child.
+pub async fn send(
+    host: &bingo_sdk::HostHandle,
+    session: &bingo_sdk::SessionId,
+    name: &str,
+    text: &str,
+    reopen: bool,
+) -> Result<String, bingo_sdk::KernelError> {
+    if text.trim().is_empty() {
+        return Err(bingo_sdk::KernelError::new(
+            bingo_sdk::ErrorCode::InvalidInput,
+            "a message needs text",
+        ));
+    }
+    let to = if reopen {
+        names::child(host, session, name).await?
+    } else {
+        names::resolve(host, session, name).await?
+    };
+    if to.driver != Driver::Model {
+        return Err(bingo_sdk::KernelError::new(
+            bingo_sdk::ErrorCode::InvalidInput,
+            "name an agent, not a room",
+        ));
+    }
+    let from = names::speaker(host, session).await;
+    host.deliver(
+        &to.id,
+        IntentId::mint(),
+        Input::text(text, origin(Some(from))),
+        Delivery::Wake,
+    )
+    .await?;
+    Ok(receipt(name, to.driver))
+}

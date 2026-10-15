@@ -24,7 +24,7 @@ pub async fn resolve(
     caller: &SessionSummary,
     asked: &str,
 ) -> Result<(SessionId, Room), KernelError> {
-    let title = name::title(name::check_room(asked.trim().trim_start_matches('#'))?);
+    let title = name::title(name::room_address(asked.trim().trim_start_matches('#'))?);
     let reachable = reachable(host, caller).await;
     reachable
         .iter()

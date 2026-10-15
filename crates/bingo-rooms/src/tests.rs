@@ -291,6 +291,11 @@ impl Fleet {
 
     fn script_sessions(&self, host: &bingo_sdk::testing::TestHost) {
         let fixture = self.clone();
+        host.on_summary(move |session| {
+            let fixture = fixture.clone();
+            async move { Ok(fixture.summary(&session)) }
+        });
+        let fixture = self.clone();
         host.on_sessions(move |filter| {
             let fixture = fixture.clone();
             async move {

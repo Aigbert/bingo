@@ -58,18 +58,22 @@ impl Tool for TaskCreateTool {
             Ok(board) => board,
             Err(error) => return crate::misaddressed(error),
         };
-        let mut tasks = journal::read(&cx.host, &board.session)
+        add(&cx.host, &board.session, args.draft)
             .await
-            .map_err(failed)?;
-        let task = task::create(&mut tasks, args.draft);
-        journal::write(&cx.host, &board.session, &tasks)
-            .await
-            .map_err(failed)?;
-        Ok(ToolOutput::text(format!(
-            "Created #{}: {}",
-            task.id, task.subject
-        )))
+            .map(ToolOutput::text)
+            .map_err(failed)
     }
+}
+
+pub(crate) async fn add(
+    host: &bingo_sdk::HostHandle,
+    session: &bingo_sdk::SessionId,
+    draft: Draft,
+) -> Result<String, bingo_sdk::KernelError> {
+    let mut tasks = journal::read(host, session).await?;
+    let task = task::create(&mut tasks, draft);
+    journal::write(host, session, &tasks).await?;
+    Ok(format!("Created #{}: {}", task.id, task.subject))
 }
 
 #[cfg(test)]

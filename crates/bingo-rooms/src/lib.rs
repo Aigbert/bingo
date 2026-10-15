@@ -50,6 +50,7 @@ mod listen;
 mod mentions;
 use bingo_collab::name;
 
+mod control;
 mod owed;
 mod placement;
 mod post;
@@ -106,6 +107,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "tool:Listen",
         "context:rooms",
         bingo_services::room_post::CAPABILITY,
+        bingo_services::rooms_control::CAPABILITY,
         "service:bingo.rooms.pages",
     ],
     requires: &[],
@@ -156,6 +158,12 @@ impl Plugin for RoomsPlugin {
             writer.clone(),
             Some(bingo_services::room_post::wire(writer)),
         ));
+        let control: Arc<dyn bingo_services::rooms_control::RoomsControl> = self.writer.clone();
+        registrar.add(Contribution::service(
+            &bingo_services::rooms_control::KEY,
+            control.clone(),
+            Some(bingo_services::rooms_control::wire(control)),
+        ));
         registrar.add(guide::contribution(registrar));
         Ok(())
     }
@@ -195,6 +203,7 @@ mod plugin_tests {
                 "tool:Listen",
                 "context:rooms",
                 bingo_services::room_post::CAPABILITY,
+                bingo_services::rooms_control::CAPABILITY,
                 &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
             ]
         );
@@ -223,7 +232,7 @@ mod plugin_tests {
         assert!(matches!(&contributions[5], Contribution::Tool(t) if t.spec().name == "CloseRoom"));
         assert!(matches!(&contributions[6], Contribution::Tool(t) if t.spec().name == "Listen"));
         assert!(matches!(&contributions[7], Contribution::Context(c) if c.id() == "rooms"));
-        match &contributions[9] {
+        match &contributions[10] {
             Contribution::Service { key, wire, .. } => {
                 assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
@@ -279,3 +288,6 @@ mod plugin_tests {
         second.stop().await.unwrap();
     }
 }
+
+#[cfg(test)]
+mod control_tests;

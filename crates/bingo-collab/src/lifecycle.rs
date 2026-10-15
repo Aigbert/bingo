@@ -6,6 +6,7 @@ pub enum Lifecycle {
     Working,
     Asking,
     Idle,
+    Stopped,
     Stored,
     Unseated,
 }
@@ -41,6 +42,7 @@ impl Lifecycle {
             Self::Working => "working",
             Self::Asking => "asking",
             Self::Idle => "idle",
+            Self::Stopped => "stopped",
             Self::Stored => "stored",
             Self::Unseated => "not seated",
         }
@@ -54,6 +56,22 @@ impl Lifecycle {
             asking: !state.interactions.is_empty(),
             working: state.busy(),
         })
+    }
+
+    pub fn activity(summary: &SessionSummary, live: Option<&SessionState>) -> Option<Self> {
+        let lifecycle = live.map_or_else(|| Self::of_summary(summary), Self::of_state);
+        if lifecycle == Some(Self::Idle)
+            && live.is_some_and(|state| {
+                matches!(
+                    state.last_status(),
+                    Some(bingo_sdk::TurnStatus::Interrupted { .. })
+                )
+            })
+        {
+            Some(Self::Stopped)
+        } else {
+            lifecycle
+        }
     }
 
     pub fn of_summary(summary: &SessionSummary) -> Option<Self> {

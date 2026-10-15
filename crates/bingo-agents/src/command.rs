@@ -27,8 +27,15 @@ impl Command for AgentsCommand {
             name: "agents".into(),
             aliases: Vec::new(),
             hint: "the sub-agents this session started, or stop or dismiss one".into(),
-            args: ArgSpec::Free {
-                hint: format!("[{STOP} <name> | {DISMISS} <name>]"),
+            args: ArgSpec::Words {
+                then: None,
+                alone: vec![],
+                values: ["stop", "dismiss", "message", "reopen"]
+                    .map(str::to_string)
+                    .to_vec(),
+                person: ["stop", "dismiss", "message", "reopen"]
+                    .map(str::to_string)
+                    .to_vec(),
             },
             // Reading the session tree touches nothing a turn is using, and
             // the two verbs reach another session's actor, never this one's.
@@ -46,6 +53,16 @@ impl Command for AgentsCommand {
         let message = match verb {
             STOP => stop::stop(&cx.host, &cx.session, named(verb, name)?).await?,
             DISMISS => dismiss::dismiss(&cx.host, &cx.session, named(verb, name)?).await?,
+            "message" | "reopen" => {
+                let name = named(verb, name)?;
+                let text = args
+                    .trim()
+                    .splitn(3, char::is_whitespace)
+                    .nth(2)
+                    .unwrap_or_default()
+                    .trim();
+                crate::message::send(&cx.host, &cx.session, name, text, verb == "reopen").await?
+            }
             other => {
                 return Err(KernelError::new(
                     ErrorCode::InvalidInput,
@@ -183,12 +200,9 @@ mod tests {
         let spec = AgentsCommand.spec();
         assert_eq!(spec.name, "agents");
         assert!(spec.instant, "reading the tree never waits for a turn");
-        assert_eq!(
-            spec.args,
-            ArgSpec::Free {
-                hint: "[stop <name> | dismiss <name>]".into()
-            }
-        );
+        for verb in ["stop", "dismiss", "message", "reopen"] {
+            assert!(spec.person_only(verb));
+        }
         assert_eq!(spec.family, "agents");
     }
 }

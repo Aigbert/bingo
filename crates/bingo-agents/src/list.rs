@@ -70,7 +70,7 @@ pub fn rows(children: &[SessionSummary]) -> Vec<Vec<String>> {
 
 /// What a session is doing, in the one word every roster shows.
 pub fn state(child: &SessionSummary) -> &'static str {
-    Lifecycle::of_summary(child).map_or("", Lifecycle::word)
+    Lifecycle::activity(child, None).map_or("", Lifecycle::word)
 }
 
 /// The roster as the model reads it, one agent per line: the caller's own

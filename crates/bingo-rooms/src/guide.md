@@ -15,7 +15,7 @@ Post into a room with `SendMessage` to `#name`.
 ## Opening one
 
 `OpenRoom` takes `name` (one word, no slashes — `close` is not one, it is the
-word that ends a room), `purpose`, `members`, `listeners` and `shared`.
+word that ends a room), `seat`, `unseat`, `purpose`, `members`, `listeners` and `shared`.
 
 `purpose` is required and is the whole discipline: every member reads it above
 every reading, and **when the work moves on you open another room rather than
@@ -107,3 +107,7 @@ design` ends a room of the person's own.
 A project's `rooms` declares rooms that are seated when the person's own
 session opens: `name`, `purpose`, `members` and `listeners`, read from the
 nearest such file at or above the working directory.
+
+Existing rooms named after a newly reserved verb keep their journals.
+Use the name as an explicit argument, such as `/rooms close seat`, or use
+the crew controls. Opening a new room under a reserved word is refused.

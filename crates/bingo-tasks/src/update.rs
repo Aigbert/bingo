@@ -75,18 +75,33 @@ impl Tool for TaskUpdateTool {
                 Err(error) => return crate::misaddressed(error),
             }
         }
-        let (id, claimed) = (args.change.id, args.claims());
-        let mut tasks = journal::read(&cx.host, &board.session)
-            .await
-            .map_err(failed)?;
-        let Some(task) = task::update(&mut tasks, args.change) else {
-            return Ok(crate::unknown(id));
-        };
-        journal::write(&cx.host, &board.session, &tasks)
-            .await
-            .map_err(failed)?;
-        Ok(ToolOutput::text(receipt(&task, claimed)))
+        let claimed = args.claims();
+        match change(&cx.host, &board.session, args.change, claimed).await {
+            Ok(message) => Ok(ToolOutput::text(message)),
+            Err(error) if error.code == bingo_sdk::ErrorCode::InvalidInput => {
+                Ok(ToolOutput::error(error.message))
+            }
+            Err(error) => Err(failed(error)),
+        }
     }
+}
+
+pub(crate) async fn change(
+    host: &bingo_sdk::HostHandle,
+    session: &bingo_sdk::SessionId,
+    change: Change,
+    claimed: bool,
+) -> Result<String, bingo_sdk::KernelError> {
+    let id = change.id;
+    let mut tasks = journal::read(host, session).await?;
+    let task = task::update(&mut tasks, change).ok_or_else(|| {
+        bingo_sdk::KernelError::new(
+            bingo_sdk::ErrorCode::InvalidInput,
+            format!("No task #{id}. TaskList shows what there is."),
+        )
+    })?;
+    journal::write(host, session, &tasks).await?;
+    Ok(receipt(&task, claimed))
 }
 
 /// What the call answers with. A claim names the owner it stamped: the caller

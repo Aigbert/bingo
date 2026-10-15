@@ -36,6 +36,11 @@ impl Command for TasksCommand {
     }
 
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        if let Some(message) = write(args, cx).await? {
+            return Ok(CommandOutcome::Applied {
+                message: Some(message),
+            });
+        }
         let asked = In::spoken(args)?;
         let board = board::of(&cx.host, &cx.session, &asked).await?;
         let tasks = journal::read(&cx.host, &board.session).await?;
@@ -52,6 +57,64 @@ impl Command for TasksCommand {
             },
         })
     }
+}
+
+async fn write(args: &str, cx: &CommandContext) -> Result<Option<String>, KernelError> {
+    let (verb, rest) = args
+        .trim()
+        .split_once(char::is_whitespace)
+        .unwrap_or((args.trim(), ""));
+    let message = match verb {
+        "add" => {
+            let (subject, owner) = rest
+                .rsplit_once(" @")
+                .map_or((rest, None), |(subject, owner)| {
+                    (subject, Some(owner.into()))
+                });
+            if subject.trim().is_empty() {
+                return Err(invalid("/tasks add <subject> [@owner]"));
+            }
+            crate::create::add(
+                &cx.host,
+                &cx.session,
+                crate::Draft {
+                    subject: subject.into(),
+                    owner,
+                    ..Default::default()
+                },
+            )
+            .await?
+        }
+        "done" | "open" | "assign" => {
+            let (id, owner) = rest
+                .trim()
+                .split_once(char::is_whitespace)
+                .unwrap_or((rest.trim(), ""));
+            let id = id.parse().map_err(|_| invalid("name a numeric task id"))?;
+            let mut change = crate::Change {
+                id,
+                ..Default::default()
+            };
+            if verb == "assign" {
+                if owner.trim().is_empty() {
+                    return Err(invalid("/tasks assign <id> <owner>"));
+                }
+                change.owner = Some(owner.trim().trim_start_matches('@').into());
+            } else {
+                change.status = Some(if verb == "done" {
+                    crate::Status::Completed
+                } else {
+                    crate::Status::Pending
+                });
+            }
+            crate::update::change(&cx.host, &cx.session, change, false).await?
+        }
+        _ => return Ok(None),
+    };
+    Ok(Some(message))
+}
+fn invalid(text: &str) -> KernelError {
+    KernelError::new(bingo_sdk::ErrorCode::InvalidInput, text)
 }
 
 /// Which empty list it was: a person who asked about a room is told about that

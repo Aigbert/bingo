@@ -44,6 +44,7 @@ mod message;
 mod models;
 mod names;
 
+mod control;
 mod note;
 mod service;
 mod spawn;
@@ -92,6 +93,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "command:team",
         team_service::CAPABILITY,
         "service:bingo.agents.agent",
+        bingo_services::agents_control::CAPABILITY,
         "service:bingo.agents.pages",
     ],
     requires: &[],
@@ -175,7 +177,13 @@ impl Plugin for AgentsPlugin {
         registrar.add(Contribution::service(
             &service::KEY,
             service.clone(),
-            Some(service),
+            Some(service.clone()),
+        ));
+        let control: Arc<dyn bingo_services::agents_control::AgentsControl> = service.clone();
+        registrar.add(Contribution::service(
+            &bingo_services::agents_control::KEY,
+            control.clone(),
+            Some(bingo_services::agents_control::wire(control)),
         ));
         registrar.add(guide::contribution(registrar));
         Ok(())
@@ -296,6 +304,7 @@ mod plugin_tests {
             [
                 (team_service::KEY.name(), true),
                 (service::KEY.name(), true),
+                (bingo_services::agents_control::KEY.name(), true),
                 (page.name(), false)
             ],
             "the team file has both faces; the page stays in process"
@@ -325,3 +334,6 @@ mod plugin_tests {
 }
 
 mod report;
+
+#[cfg(test)]
+mod control_tests;

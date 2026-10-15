@@ -33,6 +33,7 @@ pub mod guide;
 mod journal;
 mod list;
 mod render;
+mod service;
 mod task;
 mod update;
 
@@ -64,6 +65,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "command:tasks",
         "context:tasks",
         "service:bingo.tasks.pages",
+        bingo_services::tasks_write::CAPABILITY,
     ],
     requires: &[],
     // A task list is a session's own state, not a setting.
@@ -112,8 +114,10 @@ pub(crate) fn misaddressed(error: KernelError) -> Result<ToolOutput, ToolError> 
 /// Registers the four tools, the prompt block and `/tasks`. It keeps nothing
 /// of its own: every one of them reaches the journal through the host it is
 /// handed at the call.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct TasksPlugin;
+#[derive(Default)]
+pub struct TasksPlugin {
+    writer: Arc<service::Writer>,
+}
 
 #[async_trait]
 impl Plugin for TasksPlugin {
@@ -121,6 +125,10 @@ impl Plugin for TasksPlugin {
         &MANIFEST
     }
 
+    async fn start(&self, host: bingo_sdk::HostHandle) -> Result<(), PluginError> {
+        self.writer.bind(&host);
+        Ok(())
+    }
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         registrar.tool(Arc::new(TaskCreateTool) as Arc<dyn Tool>);
         registrar.tool(Arc::new(TaskUpdateTool) as Arc<dyn Tool>);
@@ -133,6 +141,12 @@ impl Plugin for TasksPlugin {
             Arc::new(TasksContributor) as Arc<dyn ContextContributor>
         ));
         registrar.add(guide::contribution(registrar));
+        let writer: Arc<dyn bingo_services::tasks_write::TasksWrite> = self.writer.clone();
+        registrar.add(Contribution::service(
+            &bingo_services::tasks_write::KEY,
+            writer.clone(),
+            Some(bingo_services::tasks_write::wire(writer)),
+        ));
         Ok(())
     }
 }
@@ -173,6 +187,7 @@ mod plugin_tests {
                 "command:tasks",
                 "context:tasks",
                 &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
+                bingo_services::tasks_write::CAPABILITY,
             ]
         );
         assert!(MANIFEST.requires.is_empty());
@@ -187,7 +202,9 @@ mod plugin_tests {
             Env::rooted("/tmp"),
             Default::default(),
         );
-        TasksPlugin.register(&mut registrar).expect("register");
+        TasksPlugin::default()
+            .register(&mut registrar)
+            .expect("register");
         let contributions = registrar.into_contributions();
         assert_eq!(contributions.len(), MANIFEST.provides.len());
         let tools: Vec<String> = contributions
@@ -216,3 +233,6 @@ mod plugin_tests {
         assert!(!traits.concurrency_safe && !traits.destructive && !traits.edit);
     }
 }
+
+#[cfg(test)]
+mod service_tests;

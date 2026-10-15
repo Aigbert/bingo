@@ -46,7 +46,7 @@ impl AgentService {
     pub fn bind(&self, host: &HostHandle) {
         let _ = self.host.set(Arc::downgrade(&host.0));
     }
-    fn host(&self) -> Result<HostHandle, ServiceError> {
+    pub(crate) fn host(&self) -> Result<HostHandle, ServiceError> {
         self.host
             .get()
             .and_then(Weak::upgrade)

@@ -12,6 +12,11 @@ pub struct RoomWriter {
 }
 
 impl RoomWriter {
+    pub(crate) fn control_host(&self) -> Result<&HostHandle, ServiceError> {
+        self.host
+            .get()
+            .ok_or_else(|| ServiceError("rooms have not started".into()))
+    }
     pub fn new(host: HostHandle) -> Self {
         Self {
             host: OnceLock::from(host),

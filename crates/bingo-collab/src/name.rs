@@ -40,17 +40,25 @@ pub const CLOSE: &str = "close";
 
 /// A name a room can be opened under.
 pub fn check_room(name: &str) -> Result<&str, KernelError> {
-    let name = segment(name, "room name")?;
-    if same(name, CLOSE) {
+    let name = room_address(name)?;
+    if [CLOSE, "seat", "unseat", "purpose"]
+        .iter()
+        .any(|verb| same(name, verb))
+    {
         return Err(KernelError::new(
             ErrorCode::InvalidInput,
             format!(
-                "{CLOSE:?} is the word that ends a room — `/room {CLOSE} <name>` — so no room \
+                "{name:?} is a room command — `/room {name} <name>` — so no room \
                  is called it; pick another name"
             ),
         ));
     }
     Ok(name)
+}
+
+/// Existing journals keep their addresses when a command word is reserved.
+pub fn room_address(name: &str) -> Result<&str, KernelError> {
+    segment(name, "room name")
 }
 
 /// The name as a title. A room reads as a channel, and `#design` is how a
@@ -111,4 +119,25 @@ fn segment<'a>(name: &'a str, noun: &str) -> Result<&'a str, KernelError> {
         ));
     }
     Ok(name)
+}
+
+/// A session's addressable name, falling back to its stable id.
+pub fn of_session(summary: &bingo_sdk::SessionSummary) -> &str {
+    summary
+        .title
+        .as_deref()
+        .unwrap_or_else(|| summary.id.as_str())
+}
+
+#[cfg(test)]
+mod room_name_tests {
+    use super::*;
+    #[test]
+    fn room_verbs_are_reserved_for_new_names_but_legacy_addresses_work() {
+        for name in ["close", "seat", "unseat", "purpose", "SEAT", "Purpose"] {
+            assert!(check_room(name).is_err(), "{name}");
+            assert_eq!(room_address(name).unwrap(), name);
+        }
+        assert_eq!(check_room("design").unwrap(), "design");
+    }
 }

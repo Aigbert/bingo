@@ -11,7 +11,7 @@ use jiff::Timestamp;
 use crate::ear::Seat;
 use crate::room::{self, CLOSED, Room};
 use crate::seat::Opening;
-use crate::{door, mentions, name, owed, seat};
+use crate::{mentions, name, owed, seat};
 
 /// The columns a person reads a listing in; the page names each of them.
 pub(crate) const HEADERS: [&str; 4] = ["room", "purpose", "members", "owed"];
@@ -38,10 +38,15 @@ impl Command for RoomCommand {
             keys: vec![],
             hidden: false,
             name: "room".into(),
-            aliases: Vec::new(),
+            aliases: vec!["rooms".into()],
             hint: "the rooms under this session, or open one".into(),
-            args: ArgSpec::Free {
-                hint: "[<name> [member…] | close <name>]".into(),
+            args: ArgSpec::Words {
+                then: None,
+                alone: vec![],
+                values: ["seat", "unseat", "purpose", "close"]
+                    .map(str::to_string)
+                    .to_vec(),
+                person: vec!["close".into()],
             },
             // Opening a room touches nothing a running turn is using.
             instant: true,
@@ -54,6 +59,20 @@ impl Command for RoomCommand {
         let Some(word) = words.next() else {
             return list(cx).await;
         };
+        if ["seat", "unseat", "purpose"].contains(&word) {
+            let rest = args.trim().strip_prefix(word).unwrap_or_default().trim();
+            let (name, text) = rest.split_once(char::is_whitespace).ok_or_else(|| {
+                KernelError::new(
+                    ErrorCode::InvalidInput,
+                    format!("/rooms {word} <room> <text>"),
+                )
+            })?;
+            let message =
+                crate::control::change(&cx.host, &cx.session, word, name, text.trim()).await?;
+            return Ok(CommandOutcome::Applied {
+                message: Some(message),
+            });
+        }
         if name::same(word, name::CLOSE) {
             return ended(cx, words.next()).await;
         }
@@ -76,14 +95,9 @@ async fn ended(cx: &CommandContext, name: Option<&str>) -> Result<CommandOutcome
             format!("`/room {} <name>` needs the room to close", name::CLOSE),
         ));
     };
-    let title = name::title(name::check_room(name)?);
-    let rooms = room::under(&cx.host, &cx.session).await?;
-    let Some((id, room)) = rooms.iter().find(|(_, room)| room.title == title).cloned() else {
-        return Err(door::unreachable(&title, &rooms));
-    };
-    seat::close(&cx.host, &id, &room, name::PARENT, None).await?;
+    let message = crate::control::change(&cx.host, &cx.session, "close", name, "").await?;
     Ok(CommandOutcome::Applied {
-        message: Some(format!("{title}: {CLOSED}")),
+        message: Some(message),
     })
 }
 
@@ -401,6 +415,6 @@ mod tests {
         assert_eq!(spec.name, "room");
         assert!(spec.instant, "opening a room never waits for a turn");
         assert_eq!(spec.family, "rooms");
-        assert!(matches!(spec.args, ArgSpec::Free { .. }));
+        assert!(spec.person_only("close"));
     }
 }
