@@ -27,7 +27,6 @@ impl Point for Json {
     ) -> BoxFuture<'a, Result<Value, KernelError>> {
         let entry = input.entry;
         let continued_entry = entry.clone();
-        let result_identity = input.value.get("name").cloned();
         let original = input.value.clone();
         let result_pins = original.clone();
         let next = Next::at(next.tier(), move |value| {
@@ -51,33 +50,7 @@ impl Point for Json {
         });
         Box::pin(async move {
             let result = link.chain(&entry, cx, input.value, next).await?;
-            let describes =
-                [catalogue::TOOL_DESCRIBE, catalogue::COMMAND_DESCRIBE].contains(&entry.as_ref());
-            if describes && !result.is_null() && result.get("name") != result_identity.as_ref() {
-                return Err(invalid("pinned field /name"));
-            }
-            if !super::person::kept(&entry, &result_pins, &result) {
-                return Err(invalid("pinned field /args/person"));
-            }
-            if [
-                catalogue::SESSION_APPEND,
-                catalogue::CONFIG_SET,
-                catalogue::PROMPT_AUTOCOMPLETE,
-            ]
-            .contains(&entry.as_ref())
-                && let Some(field) = catalogue::pinned_changed(&result_pins, &result, entry.pinned)
-            {
-                return Err(invalid(&format!("pinned field {field}")));
-            }
-            if entry.as_ref() == catalogue::PLUGIN_REGISTER
-                && !super::registration::values(&result_pins, &result)
-            {
-                return Err(invalid("plugin.register: grants may only be reduced"));
-            }
-            if !(entry.valid_result)(&result) {
-                return Err(invalid(&entry.name));
-            }
-            Ok(result)
+            checked(&entry, &result_pins, result)
         })
     }
     fn pinned(before: &Self::Input, after: &Self::Input) -> bool {
@@ -85,6 +58,33 @@ impl Point for Json {
             && catalogue::pinned_changed(&before.value, &after.value, before.entry.pinned).is_none()
             && super::person::kept(&before.entry, &before.value, &after.value)
     }
+}
+/// A link's answer, held to what the point pins of the input it was given.
+fn checked(entry: &catalogue::Entry, before: &Value, result: Value) -> Result<Value, KernelError> {
+    let describes = [catalogue::TOOL_DESCRIBE, catalogue::COMMAND_DESCRIBE].contains(&entry);
+    if describes && !result.is_null() && result.get("name") != before.get("name") {
+        return Err(invalid("pinned field /name"));
+    }
+    if !super::person::kept(entry, before, &result) {
+        return Err(invalid("pinned field /args/person"));
+    }
+    if [
+        catalogue::SESSION_APPEND,
+        catalogue::CONFIG_SET,
+        catalogue::PROMPT_AUTOCOMPLETE,
+    ]
+    .contains(&entry)
+        && let Some(field) = catalogue::pinned_changed(before, &result, entry.pinned)
+    {
+        return Err(invalid(&format!("pinned field {field}")));
+    }
+    if entry == catalogue::PLUGIN_REGISTER && !super::registration::values(before, &result) {
+        return Err(invalid("plugin.register: grants may only be reduced"));
+    }
+    if !(entry.valid_result)(&result) {
+        return Err(invalid(&entry.name));
+    }
+    Ok(result)
 }
 fn invalid(name: &str) -> KernelError {
     KernelError::new(

@@ -174,71 +174,147 @@ async fn invoke<'a, P: Point>(
     input: P::Input,
     report: Report,
 ) -> Result<P::Output, KernelError> {
-    let entry = P::entry(&input).clone();
-    let pending: Continuation<'a, P::Output> = Arc::new(Mutex::new(Continued::default()));
-    let phase = pending
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .phase
-        .subscribe();
-    let next = continuation::<P>(
+    let hop = Hop::<P> {
         link,
         rest,
-        kernel.clone(),
+        kernel,
         cx,
-        input.clone(),
-        report.clone(),
-        pending.clone(),
-    );
-    let future = P::dispatch(link.interceptor.as_ref(), cx, input.clone(), next);
-    let answer = if link.external.is_some() && !link.interceptor.owns_deadline() {
-        phase_deadline(future, phase).await
-    } else {
-        future.await
+        input,
+        report,
     };
+    let pending: Continuation<'a, P::Output> = Arc::new(Mutex::new(Continued::default()));
+    let answer = hop.answer(pending.clone()).await;
     let Continued {
         pending: called,
         invalid,
         rewritten,
         ..
     } = std::mem::take(&mut *pending.lock().unwrap_or_else(|e| e.into_inner()));
-    let baseline = match called {
-        Some(future) => Some(future.await),
-        None if answer
-            .as_ref()
-            .is_ok_and(|output| P::needs_baseline(link.tier, output)) =>
-        {
-            Some(run_at::<P>(rest, kernel.clone(), cx, input.clone(), report.clone()).await)
-        }
-        None => None,
-    };
-    if rewritten && &entry == bingo_sdk::catalogue::TOOL_CALL {
-        report.receipt(link, P::tool(&input));
+    let baseline = hop.baseline(called, &answer).await;
+    if rewritten && hop.entry() == bingo_sdk::catalogue::TOOL_CALL {
+        hop.report.receipt(link, P::tool(&hop.input));
     }
-    if invalid {
-        return match baseline {
-            Some(result) => result,
-            None => run_at::<P>(rest, kernel, cx, input, report).await,
-        };
-    }
-    if let Ok(output) = &answer {
-        let before = baseline.as_ref().and_then(|result| result.as_ref().ok());
-        if P::accepts(&entry, link.tier, before, output) {
-            if !rewritten && &entry == bingo_sdk::catalogue::TOOL_CALL && before != Some(output) {
-                report.receipt(link, P::tool(&input));
-            }
-            return answer;
-        }
-        report.notice(link, &entry, "answer exceeds its trust tier");
-    } else if let Err(error) = &answer {
-        if error.code == ErrorCode::PermissionDenied && entry.acts.deny && baseline.is_none() {
-            return answer;
-        }
-        report.notice(link, &entry, &error.message);
+    if !invalid && hop.accepted(&answer, baseline.as_ref(), rewritten) {
+        return answer;
     }
     match baseline {
         Some(result) => result,
-        None => run_at::<P>(rest, kernel, cx, input, report).await,
+        None => hop.passed().await,
+    }
+}
+
+/// One link and what it was handed: everything running the rest of the
+/// chain after it needs.
+struct Hop<'a, P: Point> {
+    link: &'a Link,
+    rest: &'a [Link],
+    kernel: Kernel<'a, P::Input, P::Output>,
+    cx: &'a HookContext,
+    input: P::Input,
+    report: Report,
+}
+
+impl<'a, P: Point> Hop<'a, P> {
+    fn entry(&self) -> &catalogue::Entry {
+        P::entry(&self.input)
+    }
+
+    /// The rest of the chain, as though this link had passed the input on.
+    async fn passed(&self) -> Result<P::Output, KernelError> {
+        run_at::<P>(
+            self.rest,
+            self.kernel.clone(),
+            self.cx,
+            self.input.clone(),
+            self.report.clone(),
+        )
+        .await
+    }
+
+    /// The link's own answer; an outside link is held to the phase deadline
+    /// unless it keeps its own.
+    async fn answer(&self, pending: Continuation<'a, P::Output>) -> Result<P::Output, KernelError> {
+        let phase = pending
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .phase
+            .subscribe();
+        let next = continuation::<P>(
+            self.link,
+            self.rest,
+            self.kernel.clone(),
+            self.cx,
+            self.input.clone(),
+            self.report.clone(),
+            pending,
+        );
+        let future = P::dispatch(
+            self.link.interceptor.as_ref(),
+            self.cx,
+            self.input.clone(),
+            next,
+        );
+        if self.link.external.is_some() && !self.link.interceptor.owns_deadline() {
+            phase_deadline(future, phase).await
+        } else {
+            future.await
+        }
+    }
+
+    /// What the rest of the chain answered: the run the link started, or one
+    /// run here when the link's tier must be measured against it.
+    async fn baseline(
+        &self,
+        called: Option<Pending<'a, P::Output>>,
+        answer: &Result<P::Output, KernelError>,
+    ) -> Option<Result<P::Output, KernelError>> {
+        match called {
+            Some(future) => Some(future.await),
+            None if answer
+                .as_ref()
+                .is_ok_and(|output| P::needs_baseline(self.link.tier, output)) =>
+            {
+                Some(self.passed().await)
+            }
+            None => None,
+        }
+    }
+
+    /// Whether the link's answer stands: within its tier, or a denial it may
+    /// give without having run the rest. A refused answer is reported.
+    fn accepted(
+        &self,
+        answer: &Result<P::Output, KernelError>,
+        baseline: Option<&Result<P::Output, KernelError>>,
+        rewritten: bool,
+    ) -> bool {
+        let entry = self.entry();
+        match answer {
+            Ok(output) => {
+                let before = baseline.and_then(|result| result.as_ref().ok());
+                if !P::accepts(entry, self.link.tier, before, output) {
+                    self.report
+                        .notice(self.link, entry, "answer exceeds its trust tier");
+                    return false;
+                }
+                if !rewritten && entry == bingo_sdk::catalogue::TOOL_CALL && before != Some(output)
+                {
+                    self.report.receipt(self.link, P::tool(&self.input));
+                }
+                true
+            }
+            Err(error)
+                if error.code == ErrorCode::PermissionDenied
+                    && entry.acts.deny
+                    && baseline.is_none() =>
+            {
+                true
+            }
+            Err(error) => {
+                self.report.notice(self.link, entry, &error.message);
+                false
+            }
+        }
     }
 }
 

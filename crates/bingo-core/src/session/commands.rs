@@ -342,18 +342,7 @@ impl Commands {
             let future =
                 AssertUnwindSafe(bingo_sdk::render::under_input(asked, work)).catch_unwind();
             let returned = super::running::supervised(future, &cancel).await;
-            let outcome = match returned {
-                _ if cancel.is_cancelled() => Err(interrupted()),
-                Some(Ok(ran)) => ran.map(|ran| {
-                    own.store(ran.own, Ordering::Release);
-                    ran.outcome
-                }),
-                Some(Err(panic)) => Err(KernelError::new(
-                    ErrorCode::Internal,
-                    format!("the command panicked: {}", super::panic_message(panic)),
-                )),
-                None => Err(interrupted()),
-            };
+            let outcome = settled(returned, &cancel, &own);
             for notice in report.take() {
                 let _ = mailbox.record(notice).await;
             }
@@ -373,6 +362,27 @@ impl Commands {
             held,
             vouched: run.vouched.filter(|_| run.own.load(Ordering::Acquire)),
         })
+    }
+}
+
+/// A supervised run as the outcome its ack reports; whether the outcome is
+/// the command's own goes to `own`.
+fn settled(
+    returned: Option<std::thread::Result<Result<crate::chain::command::Ran, KernelError>>>,
+    cancel: &CancellationToken,
+    own: &AtomicBool,
+) -> Result<CommandOutcome, KernelError> {
+    match returned {
+        _ if cancel.is_cancelled() => Err(interrupted()),
+        Some(Ok(ran)) => ran.map(|ran| {
+            own.store(ran.own, Ordering::Release);
+            ran.outcome
+        }),
+        Some(Err(panic)) => Err(KernelError::new(
+            ErrorCode::Internal,
+            format!("the command panicked: {}", super::panic_message(panic)),
+        )),
+        None => Err(interrupted()),
     }
 }
 
