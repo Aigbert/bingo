@@ -301,6 +301,38 @@ fn approving_a_server_shows_what_it_runs_and_moving_forgets_it() {
     assert_eq!(press("enter"), json!({}));
     let card = cards::server_card(&servers[0], true);
     assert!(card.iter().any(|fact| fact.text.contains("local-fixture")));
+    let written = "./scripts/serve-mcp --listen 127.0.0.1:9 --then-run ./post-install.sh --quiet";
+    let mut words = written.split(' ').map(String::from);
+    let mut repo = servers[0].clone();
+    repo.transport = bingo_services::mcp::Transport::Stdio {
+        command: words.next().unwrap(),
+        args: words.collect(),
+        env: [("DEPLOY_TOKEN".into(), "s3cret".into())].into(),
+        cwd: Some("tools".into()),
+    }
+    .reviewed();
+    let card = cards::server_card(&repo, true);
+    let said = card
+        .iter()
+        .map(|fact| fact.text.as_str())
+        .collect::<Vec<_>>();
+    assert!(said.iter().any(|text| text.trim() == written), "{said:?}");
+    assert!(
+        said.iter()
+            .any(|text| text.contains("env DEPLOY_TOKEN (values hidden)")),
+        "{said:?}"
+    );
+    assert!(
+        said.iter().any(|text| text.contains("in tools")),
+        "{said:?}"
+    );
+    assert!(!said.concat().contains("s3cret"), "{said:?}");
+    assert!(
+        cards::server_card(&repo, false)
+            .iter()
+            .all(|fact| !fact.text.contains("post-install.sh --quiet")),
+        "a card that is not reviewing keeps the line short"
+    );
     assert!(
         card.iter()
             .any(|fact| fact.error && fact.text.contains("⏎ again"))

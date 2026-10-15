@@ -73,10 +73,13 @@ pub(crate) fn row(
         sign_in_from: sign_in_from(server),
         stderr: None,
     };
-    // Only a row somebody may dial carries what dialling needs.
-    if !row.forwardable() {
-        row.transport = row.transport.redacted();
-    }
+    // Only a row somebody may dial carries what dialling needs; a row
+    // waiting for the person's yes carries what that yes would run.
+    row.transport = match row.status {
+        bingo_services::mcp::Status::Waiting { .. } => row.transport.reviewed(),
+        _ if !row.forwardable() => row.transport.redacted(),
+        _ => row.transport,
+    };
     row
 }
 
@@ -155,10 +158,13 @@ mod tests {
         );
         assert!(!serde_json::to_string(&rows).unwrap().contains("s3cret"));
     }
+    /// The person deciding sees the whole line the repository wrote and the
+    /// names of what it is given; the values stay in the file.
     #[test]
-    fn a_server_waiting_for_a_yes_is_handed_only_its_program() {
+    fn a_server_waiting_for_a_yes_is_handed_what_a_yes_would_run() {
         let server: crate::Server = serde_json::from_value(
-            serde_json::json!({"command":"./run.sh","args":["API_KEY=s3cret"],"env":{"TOKEN":"s3cret"}}),
+            serde_json::json!({"command":"./run.sh","args":["--port","9","API_KEY=s3cret"],
+                "env":{"TOKEN":"s3cret"},"cwd":"tools"}),
         )
         .unwrap();
         let row = row(
@@ -172,10 +178,11 @@ mod tests {
             row.transport,
             Transport::Stdio {
                 command: "./run.sh".into(),
-                args: vec![],
-                env: Default::default(),
-                cwd: None
+                args: vec!["--port".into(), "9".into(), "API_KEY=s3cret".into()],
+                env: [("TOKEN".into(), "…".into())].into(),
+                cwd: Some("tools".into())
             }
         );
+        assert_eq!(row.transport.line(), "./run.sh --port 9 API_KEY=s3cret");
     }
 }

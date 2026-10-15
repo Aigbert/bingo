@@ -289,4 +289,53 @@ mod tests {
         let merged = super::super::merge(&[user, project], &[claim]).unwrap();
         assert_eq!(merged.plugins["test"]["waiting"], json!([]));
     }
+
+    /// A yes is for the line the person reviewed: the same server with
+    /// another argument, or handed another variable, waits again.
+    #[test]
+    fn an_approval_holds_only_for_the_line_reviewed() {
+        let repo = tempfile::tempdir().unwrap();
+        let root = crate::approval::root_key(repo.path()).unwrap();
+        let reviewed = json!({"command":"./serve","args":["--port","9"],"env":{"A":"1"}});
+        let claim = Claim {
+            plugin: "test".into(),
+            keys: vec![("mcpServers".into(), bingo_sdk::Merge::ByName)],
+            approve: vec!["mcpServers".into()],
+        };
+        let user = Layer::new(
+            crate::settings::LayerOrigin::Explicit,
+            "user",
+            json!({"approved":{root: {"mcpServers:p": digest_entry(&reviewed)}}})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
+        .user();
+        let waiting = |server: Value| {
+            let project = Layer::new(
+                crate::settings::LayerOrigin::Explicit,
+                "project",
+                json!({"mcpServers":{"p":server}})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            )
+            .project(repo.path())
+            .unwrap();
+            let merged =
+                super::super::merge(&[user.clone(), project], std::slice::from_ref(&claim))
+                    .unwrap();
+            merged.plugins["test"]["waiting"].clone()
+        };
+        assert_eq!(waiting(reviewed.clone()), json!([]));
+        for changed in [
+            json!({"command":"./serve","args":["--port","9","--then","./x"],"env":{"A":"1"}}),
+            json!({"command":"./serve","args":["--port","9"],"env":{"A":"1","B":"2"}}),
+            json!({"command":"./other","args":["--port","9"],"env":{"A":"1"}}),
+        ] {
+            let waiting = waiting(changed.clone());
+            assert_eq!(waiting[0]["name"], "p", "{changed}");
+            assert_eq!(waiting[0]["changed"], true, "{changed}");
+        }
+    }
 }

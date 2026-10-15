@@ -64,8 +64,10 @@
         "name": "repo-tool",
         "transport": {
           "type": "http",
-          "url": "https://mcp.example.com",
-          "headers": {}
+          "url": "https://mcp.example.com/mcp?debug",
+          "headers": {
+            "Authorization": "\u2026"
+          }
         },
         "origin": "this project \u00b7 /work/repo",
         "status": {

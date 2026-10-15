@@ -1,5 +1,5 @@
 use bingo_sdk::{CatalogEntry, PluginState};
-use bingo_services::mcp::{Auth, ServerRow, Status};
+use bingo_services::mcp::{Auth, ServerRow, Status, Transport};
 #[derive(Clone, Debug)]
 pub struct Fact {
     pub text: String,
@@ -241,14 +241,16 @@ pub fn server_card(s: &ServerRow, reviewing: bool) -> Vec<Fact> {
             Status::SigningIn => "◌ waiting for the browser",
         },
     ));
-    rows.push(fact(
-        if s.transport.name() == "http" {
-            "address"
-        } else {
-            "runs"
-        },
-        middle(&s.transport.runs(), BESIDE),
-    ));
+    if !reviewing {
+        rows.push(fact(
+            if s.transport.name() == "http" {
+                "address"
+            } else {
+                "runs"
+            },
+            middle(&s.transport.runs(), BESIDE),
+        ));
+    }
     rows.push(fact(
         "from",
         middle(s.origin.as_deref().unwrap_or("configured settings"), BESIDE),
@@ -286,25 +288,35 @@ fn offered(status: &Status) -> String {
         _ => " no tools until it runs".into(),
     }
 }
-/// What a yes would start, said first on the card so it fits any height,
-/// before the second `⏎` gives it.
+/// What a yes would start, said first on the card so the warning fits any
+/// height, then the whole line the repository wrote, wrapped rather than cut,
+/// and the names of what it is handed; their values are never on the row.
 fn review(s: &ServerRow) -> Vec<Fact> {
-    let what = if s.transport.name() == "http" {
-        "dial"
+    let (what, handed) = if s.transport.name() == "http" {
+        ("dial", "headers")
     } else {
-        "run"
+        ("run", "env")
     };
-    vec![
-        line(format!(
-            " approving lets bingo {what}: {}",
-            s.transport.runs()
-        )),
+    let mut rows = vec![
         Fact {
             text: format!(" ⏎ again: approve {} for this checkout", s.name),
             error: true,
             aside: None,
         },
-    ]
+        line(format!(" approving lets bingo {what}:")),
+        line(format!("   {}", s.transport.line())),
+    ];
+    let named = s.transport.named();
+    if !named.is_empty() {
+        rows.push(line(format!(
+            " {handed} {} (values hidden)",
+            named.join(", ")
+        )));
+    }
+    if let Transport::Stdio { cwd: Some(cwd), .. } = &s.transport {
+        rows.push(line(format!(" in {}", cwd.display())));
+    }
+    rows
 }
 pub fn builtins_card(plugins: &[CatalogEntry], expanded: bool) -> Vec<Fact> {
     let builtins = plugins

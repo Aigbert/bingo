@@ -74,6 +74,51 @@ impl Transport {
             },
         }
     }
+    /// What a row carries while it waits for the person's yes: everything
+    /// the repository wrote that a yes would run, with the values of its
+    /// environment and headers hidden and their names kept.
+    pub fn reviewed(&self) -> Self {
+        let hidden = |values: &BTreeMap<String, String>| {
+            values
+                .keys()
+                .map(|name| (name.clone(), HIDDEN.to_string()))
+                .collect()
+        };
+        match self {
+            Self::Stdio {
+                command,
+                args,
+                env,
+                cwd,
+            } => Self::Stdio {
+                command: command.clone(),
+                args: args.clone(),
+                env: hidden(env),
+                cwd: cwd.clone(),
+            },
+            Self::Http { url, headers } => Self::Http {
+                url: url.clone(),
+                headers: hidden(headers),
+            },
+        }
+    }
+    /// The whole line as written, for the person deciding whether to run it.
+    pub fn line(&self) -> String {
+        match self {
+            Self::Stdio { command, args, .. } => std::iter::once(command.as_str())
+                .chain(args.iter().map(String::as_str))
+                .collect::<Vec<_>>()
+                .join(" "),
+            Self::Http { url, .. } => url.clone(),
+        }
+    }
+    /// The names of the environment or headers it is given, never values.
+    pub fn named(&self) -> Vec<&str> {
+        match self {
+            Self::Stdio { env, .. } => env.keys().map(String::as_str).collect(),
+            Self::Http { headers, .. } => headers.keys().map(String::as_str).collect(),
+        }
+    }
 }
 const HIDDEN: &str = "…";
 /// A line of free text a server wrote, with what looks like a token cut out:
@@ -276,6 +321,26 @@ mod tests {
             }
         );
     }
+    #[test]
+    fn a_reviewed_row_keeps_the_line_and_only_the_names_of_its_secrets() {
+        let Transport::Stdio {
+            command,
+            args,
+            env,
+            cwd,
+        } = stdio(&["--token", "s3cret", "files"]).reviewed()
+        else {
+            panic!("stdio stays stdio")
+        };
+        assert_eq!(command, "npx");
+        assert_eq!(args, ["--token", "s3cret", "files"]);
+        assert_eq!(env, BTreeMap::from([("TOKEN".into(), HIDDEN.into())]));
+        assert_eq!(cwd, Some("/home/me/secret-project".into()));
+        let web = http("https://mcp.example.com/mcp?debug").reviewed();
+        assert_eq!(web.line(), "https://mcp.example.com/mcp?debug");
+        assert_eq!(web.named(), ["Authorization"]);
+        assert!(!format!("{:?}", serde_json::to_value(&web).unwrap()).contains("s3cret"));
+    }
     /// The recorded rows nobody may dial are pinned in their redacted shape:
     /// an owner that answers more for them breaks the contract.
     #[test]
@@ -290,7 +355,11 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(closed.len(), 2);
         for row in closed {
-            assert_eq!(row.transport, row.transport.redacted(), "{}", row.name);
+            let shape = match row.status {
+                Status::Waiting { .. } => row.transport.reviewed(),
+                _ => row.transport.redacted(),
+            };
+            assert_eq!(row.transport, shape, "{}", row.name);
         }
     }
 }
