@@ -148,6 +148,16 @@ fn server_group(servers: &[ServerRow]) -> Group {
             .collect(),
     }
 }
+/// The cursor's row only while it is still listed; a vanished row resets the
+/// cursor to the first one and names nothing to act on.
+pub fn current<'a>(groups: &'a [Group], cursor: &mut crate::Cursor) -> Option<&'a Row> {
+    let listed = groups
+        .iter()
+        .flat_map(|group| &group.rows)
+        .any(|row| row.key == cursor.selected);
+    let row = selected(groups, cursor);
+    if listed { row } else { None }
+}
 pub fn selected<'a>(groups: &'a [Group], cursor: &mut crate::Cursor) -> Option<&'a Row> {
     let row = groups
         .iter()

@@ -145,13 +145,12 @@ fn handlers_retire_the_opening_and_return_only_command_lines() {
         },
     };
     let state = Shared::default();
-    let handler = keys::Handler(state.clone());
     assert_eq!(
-        handler.press("a", "space", &props, &servers).unwrap(),
+        press(&state, "a", "space", &props, &servers),
         json!({"run":"/plugins disable my-picker"})
     );
     assert_eq!(
-        handler.press("a", "esc", &props, &servers).unwrap(),
+        press(&state, "a", "esc", &props, &servers),
         json!({"close":true})
     );
     assert!(state.lock().unwrap().is_empty());
@@ -163,7 +162,7 @@ fn handlers_retire_the_opening_and_return_only_command_lines() {
         },
     );
     assert_eq!(
-        handler.press("b", "enter", &props, &servers).unwrap(),
+        press(&state, "b", "enter", &props, &servers),
         json!({"run":"/mcp tools github"})
     );
     assert!(state.lock().unwrap().is_empty());
@@ -285,8 +284,8 @@ fn approving_a_server_shows_what_it_runs_and_moving_forgets_it() {
             args: json!({"handler":"a"}),
         },
     };
-    let handler = keys::Handler(Shared::default());
-    let press = |key| handler.press("a", key, &props, &servers).unwrap();
+    let state = Shared::default();
+    let press = |key| press(&state, "a", key, &props, &servers);
     assert!(press("space")["message"].is_string());
     assert_eq!(press("enter"), json!({}));
     let card = cards::server_card(&servers[0], true);
@@ -306,4 +305,97 @@ fn approving_a_server_shows_what_it_runs_and_moving_forgets_it() {
         "esc ends the review, not the panel"
     );
     assert_eq!(press("esc"), json!({"close":true}));
+}
+
+/// Draws the panel the way the kernel would before a key reaches it, then
+/// presses the key against the row that drawing showed.
+fn press(
+    state: &Shared,
+    request: &str,
+    key: &str,
+    props: &component::PluginsProps,
+    servers: &[ServerRow],
+) -> serde_json::Value {
+    let row = drawn_row(state, request, props, servers);
+    pressed_on(state, request, key, Some(&row), props, servers)
+}
+fn drawn_row(
+    state: &Shared,
+    request: &str,
+    props: &component::PluginsProps,
+    servers: &[ServerRow],
+) -> String {
+    let mut guard = state.lock().unwrap();
+    let cursor = guard
+        .entry((props.session.clone(), request.into()))
+        .or_default();
+    let View::Box { layout, .. } = draw::tree(props, servers, cursor, request, 108, 30) else {
+        panic!("panel")
+    };
+    layout.on_key.unwrap().args["row"].as_str().unwrap().into()
+}
+fn pressed_on(
+    state: &Shared,
+    request: &str,
+    key: &str,
+    row: Option<&str>,
+    props: &component::PluginsProps,
+    servers: &[ServerRow],
+) -> serde_json::Value {
+    let at = keys::Press {
+        session: &props.session,
+        request,
+        key,
+        row,
+    };
+    keys::Handler(state.clone())
+        .press(&at, props, servers)
+        .unwrap()
+}
+
+/// A key answers the drawing it was pressed on: when the cursor has moved on
+/// since, or the row that drawing showed is gone, it acts on nothing.
+#[test]
+fn a_key_from_a_stale_drawing_acts_on_nothing() {
+    let (plugins, mut servers) = fixture();
+    let props = component::PluginsProps {
+        open: component::PluginsOpen::Mcp,
+        session: SessionId::from_raw("s"),
+        plugins,
+        action: Action {
+            name: "surface:plugins".into(),
+            args: json!({"handler":"a"}),
+        },
+    };
+    let state = Shared::default();
+    let seen = drawn_row(&state, "a", &props, &servers);
+    assert_eq!(seen, "m:github");
+    assert_eq!(
+        pressed_on(&state, "a", "down", Some(&seen), &props, &servers),
+        json!({})
+    );
+    let stale = pressed_on(&state, "a", "enter", Some(&seen), &props, &servers);
+    assert!(
+        stale.get("run").is_none() && stale["message"].is_string(),
+        "{stale}"
+    );
+    assert!(
+        pressed_on(&state, "a", "space", None, &props, &servers)
+            .get("run")
+            .is_none()
+    );
+    let linear = drawn_row(&state, "a", &props, &servers);
+    assert_eq!(linear, "m:linear");
+    servers.retain(|s| s.name != "linear");
+    let gone = pressed_on(&state, "a", "space", Some(&linear), &props, &servers);
+    assert!(gone.get("run").is_none(), "{gone}");
+    assert_eq!(
+        state.lock().unwrap()[&(props.session.clone(), "a".to_string())].selected,
+        "m:github",
+        "a vanished row resets the cursor to the first"
+    );
+    assert_eq!(
+        press(&state, "a", "space", &props, &servers),
+        json!({"run":"/mcp disable github"})
+    );
 }

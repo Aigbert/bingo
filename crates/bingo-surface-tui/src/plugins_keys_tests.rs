@@ -329,3 +329,41 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
     assert!(refused.get("run").is_none());
     host.shutdown().await;
 }
+/// Presses a key on a drawing already on screen, without drawing again
+/// first: what a person sees when keys outrun the redraw.
+async fn key_on(view: &View, attachment: &mut Attachment, key: &str) -> serde_json::Value {
+    let View::Box { layout, .. } = view else {
+        panic!("panel")
+    };
+    let mut action = layout.on_key.clone().unwrap();
+    action.args["value"] = json!({"key":key});
+    let IntentOutcome::Applied { result } = submit(attachment, Input::Action { action }).await
+    else {
+        panic!("handled")
+    };
+    result["surface"]["args"]["value"].clone()
+}
+#[tokio::test]
+async fn a_key_outrunning_the_redraw_acts_on_nothing() {
+    let home = tempfile::tempdir().unwrap();
+    let row = Arc::new(std::sync::Mutex::new(
+        serde_json::from_value(json!({
+            "name":"local", "transport":{"type":"stdio","command":"fixture"},
+            "status":{"kind":"disabled"}
+        }))
+        .unwrap(),
+    ));
+    let (host, mut attachment) = facts_scene(home.path(), row).await;
+    key(&host, &mut attachment, "down").await;
+    let seen = panel(&host, &attachment).await;
+    assert!(backend(seen.clone()).contains("❯  ▸ 2 built in"));
+    key(&host, &mut attachment, "down").await;
+    let stale = key_on(&seen, &mut attachment, "enter").await;
+    assert!(stale.get("run").is_none(), "{stale}");
+    assert!(stale["message"].as_str().unwrap().contains("changed"));
+    assert_eq!(
+        key(&host, &mut attachment, "enter").await["run"],
+        "/mcp enable local"
+    );
+    host.shutdown().await;
+}

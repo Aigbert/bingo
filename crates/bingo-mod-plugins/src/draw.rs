@@ -84,7 +84,7 @@ pub fn tree(
         layout: Box::new(view::BoxStyle {
             on_key: Some(Action {
                 name: "plugins:ui".into(),
-                args: json!({"handler":request,"event":"press","props":{"open":props.open,"session":props.session,"plugins":[],"action":props.action}}),
+                args: json!({"handler":request,"event":"press","row":cursor.selected,"props":{"open":props.open,"session":props.session,"plugins":[],"action":props.action}}),
             }),
             ..Default::default()
         }),

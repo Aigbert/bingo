@@ -23,7 +23,13 @@ impl Command for Handler {
         let plugins = cx.host.catalog(CatalogKind::Plugins).await?.entries;
         let props = PluginsProps { plugins, ..props };
         let servers = crate::servers(&cx.host).await;
-        let value = self.press(request, key, &props, &servers)?;
+        let at = Press {
+            session: &cx.session,
+            request,
+            key,
+            row: args["row"].as_str(),
+        };
+        let value = self.press(&at, &props, &servers)?;
         cx.host
             .invalidate(&cx.session, vec![request.into()])
             .await?;
@@ -35,19 +41,25 @@ impl Command for Handler {
         })
     }
 }
+/// One key press: the session the kernel says it came from, the drawing it
+/// answers, and the row that drawing showed selected.
+pub(crate) struct Press<'a> {
+    pub session: &'a SessionId,
+    pub request: &'a str,
+    pub key: &'a str,
+    pub row: Option<&'a str>,
+}
 impl Handler {
     pub(crate) fn press(
         &self,
-        request: &str,
-        key: &str,
+        at: &Press<'_>,
         props: &PluginsProps,
         servers: &[bingo_services::mcp::ServerRow],
     ) -> Result<Value, KernelError> {
+        let key = at.key;
         let mut state = self.0.lock().map_err(crate::error)?;
-        let identity = (props.session.clone(), request.into());
+        let identity = (at.session.clone(), at.request.into());
         let cursor = state.entry(identity.clone()).or_default();
-        let groups = groups::groups(props.open, &props.plugins, servers, cursor.expanded);
-        let selected = groups::selected(&groups, cursor).cloned();
         if key == "ctrl+c" || key == "esc" && cursor.trust.is_none() && !cursor.reviewing {
             state.remove(&identity);
             return Ok(json!({"close":true}));
@@ -56,9 +68,13 @@ impl Handler {
             cursor.reviewing = false;
             return Ok(json!({}));
         }
-        let Some(row) = selected else {
-            return Ok(json!({}));
+        let groups = groups::groups(props.open, &props.plugins, servers, cursor.expanded);
+        let Some(row) = groups::current(&groups, cursor).cloned() else {
+            return Ok(stale());
         };
+        if !matches!(key, "up" | "down") && at.row != Some(row.key.as_str()) {
+            return Ok(stale());
+        }
         if let Some(choice) = &mut cursor.trust {
             let Kind::Plugin(i) = row.kind else {
                 cursor.trust = None;
@@ -102,6 +118,11 @@ impl Handler {
             }
         }
     }
+}
+/// A key that answers a drawing whose selected row is gone or no longer the
+/// cursor's acts on nothing; the redraw shows the person what is there now.
+fn stale() -> Value {
+    json!({"message":"the list changed; look again and press once more"})
 }
 fn operation(verb: Verb) -> Value {
     match verb {
