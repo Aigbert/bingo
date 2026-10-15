@@ -156,7 +156,10 @@ impl Handler {
                 Ok(CommandOutcome::Surface {
                     action: Action {
                         name: "Pager".into(),
-                        args: json!({"title":self.title(&target, cx),"text":text}),
+                        args: json!({
+                            "title": self.title(&target, cx),
+                            "text": crate::fence::document(&text),
+                        }),
                     },
                     fallback: Some(text),
                 })

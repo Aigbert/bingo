@@ -9,8 +9,6 @@
 //! from the item every frame, so a block that is still arriving grows under the
 //! sheet rather than being copied into it.
 
-mod text;
-
 use bingo_sdk::{Item, ItemBody, ItemId, SessionState};
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::text::{Line, Span};
@@ -81,10 +79,7 @@ impl Pager {
             Source::Item(id) => source(tree, id)
                 .map(|(state, item)| (title(item, state), content(state, item, width, self)))
                 .unwrap_or_default(),
-            Source::Text { title, text } => (
-                title.clone(),
-                markdown::render(&self::text::document(text), width),
-            ),
+            Source::Text { title, text } => (title.clone(), markdown::render(text, width)),
         }
     }
 

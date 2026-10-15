@@ -1,5 +1,6 @@
-//! Frontmatter is data; only the document body is prose.
-pub(super) fn document(text: &str) -> String {
+//! Frontmatter is data; only the document body is prose. The pager renders
+//! what it is given as Markdown, so the files this panel reads arrive fenced.
+pub fn document(text: &str) -> String {
     let mut lines = text.split_inclusive('\n');
     if lines.next().map(str::trim_end) != Some("---") {
         return text.into();

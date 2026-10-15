@@ -1,5 +1,6 @@
 //! Reading and forgetting through the owners' services.
 pub mod draw;
+pub mod fence;
 mod guide;
 mod keys;
 mod lifecycle;

@@ -244,6 +244,12 @@ async fn memory_panel_reads_forgets_and_refuses_instruction_deletion() {
         still(scene().1),
     );
     assert!(screen.contains("Read this full memory."), "{screen}");
+    assert!(
+        screen
+            .lines()
+            .any(|line| line.trim_matches('"').trim() == "---"),
+        "the panel fences its own frontmatter: {screen}"
+    );
     crate::pager::keys(
         &mut fixture.run.ui,
         &fixture.run.session.tree,
