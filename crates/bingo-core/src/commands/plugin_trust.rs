@@ -65,25 +65,18 @@ pub(super) async fn run(host: &Host, args: &str) -> Result<CommandOutcome, Kerne
         ));
     };
     set(host, name, tier).await?;
-    let status = crate::plugins::listing(host.registry())
-        .await
-        .into_iter()
-        .find(|p| p.id == *name);
-    let mut when = "at next start";
-    if status.is_some_and(|p| p.state.is_on()) {
-        for source in &host.registry().sources.plugins {
-            if source.switch_kind(name).await == plugin::PluginSwitch::Now {
-                source.switch(name, false).await?;
-                when = match source.switch(name, true).await? {
-                    plugin::PluginSwitch::Now => "now",
-                    plugin::PluginSwitch::AfterTurn => "after the running turn",
-                    plugin::PluginSwitch::NextStart { .. } => "at next start",
-                };
-                break;
-            }
-        }
-    }
+    let when = reapplied(host, name).await;
     host.plugins_changed();
+    let when = when.map_err(|error| {
+        KernelError::new(
+            error.code,
+            format!(
+                "{name}: {tier} kept in ~/.bingo/settings.toml, but it did not come back on: {}; \
+                 /plugins enable {name} turns it on",
+                error.message
+            ),
+        )
+    })?;
     Ok(CommandOutcome::Applied {
         message: Some(format!(
             "{name}: {tier} kept in ~/.bingo/settings.toml; applies {when}"
@@ -91,11 +84,38 @@ pub(super) async fn run(host: &Host, args: &str) -> Result<CommandOutcome, Kerne
     })
 }
 
+/// A running plugin takes a new grant by going off and on again where its
+/// source can do that now; anything else takes it at next start.
+async fn reapplied(host: &Host, name: &str) -> Result<&'static str, KernelError> {
+    let status = crate::plugins::listing(host.registry())
+        .await
+        .into_iter()
+        .find(|p| p.id == name);
+    if !status.is_some_and(|p| p.state.is_on()) {
+        return Ok("at next start");
+    }
+    for source in &host.registry().sources.plugins {
+        if source.switch_kind(name).await == plugin::PluginSwitch::Now {
+            source.switch(name, false).await?;
+            return Ok(match source.switch(name, true).await? {
+                plugin::PluginSwitch::Now => "now",
+                plugin::PluginSwitch::AfterTurn => "after the running turn",
+                plugin::PluginSwitch::NextStart { .. } => "at next start",
+            });
+        }
+    }
+    Ok("at next start")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::sync::{Arc, Mutex};
-    struct Source(Mutex<Vec<plugin::PluginSwitch>>, Mutex<Option<Tier>>);
+    struct Source(
+        Mutex<Vec<plugin::PluginSwitch>>,
+        Mutex<Option<Tier>>,
+        std::sync::atomic::AtomicBool,
+    );
     #[async_trait::async_trait]
     impl PluginSource for Source {
         fn id(&self) -> &str {
@@ -125,6 +145,9 @@ mod tests {
             _: &str,
             enabled: bool,
         ) -> Result<plugin::PluginSwitch, KernelError> {
+            if enabled && self.2.load(std::sync::atomic::Ordering::SeqCst) {
+                return Err(KernelError::new(ErrorCode::Internal, "the module threw"));
+            }
             self.0.lock().unwrap().push(if enabled {
                 plugin::PluginSwitch::Now
             } else {
@@ -155,13 +178,20 @@ mod tests {
         }
         fn register(&self, r: &mut Registrar) -> Result<(), PluginError> {
             r.add(Contribution::Plugins(self.0.clone()));
+            r.add(Contribution::Provider(
+                crate::test_support::ScriptedProvider::new(vec![]),
+            ));
             Ok(())
         }
     }
     #[tokio::test]
     async fn only_person_input_saves_a_grant_and_new_registration_reads_it() {
         let home = tempfile::tempdir().unwrap();
-        let source = Arc::new(Source(Default::default(), Default::default()));
+        let source = Arc::new(Source(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        ));
         let host = Host::build(
             vec![Box::new(Fixture(source.clone()))],
             crate::HostConfig::new(Env::rooted(home.path())),
@@ -206,6 +236,106 @@ mod tests {
             Some(Tier::Full),
             "invalid live settings must not start a registration with default grants"
         );
+        host.shutdown().await;
+    }
+
+    /// An unreadable trust file keeps waiting plugins off and says which
+    /// file, once, to the sessions that are open.
+    #[tokio::test]
+    async fn an_unreadable_trust_file_is_named_once() {
+        let home = tempfile::tempdir().unwrap();
+        let source = Arc::new(Source(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        ));
+        let host = Host::build(
+            vec![Box::new(Fixture(source.clone()))],
+            crate::HostConfig::new(Env::rooted(home.path()))
+                .with_layer("cli", json!({"model":"m"})),
+        )
+        .await
+        .unwrap();
+        let open = |id: Option<SessionId>| {
+            let selector = match id {
+                Some(id) => SessionSelector::ById { id },
+                None => SessionSelector::Create {
+                    spec: SessionSpec {
+                        cwd: home.path().to_path_buf(),
+                        ..Default::default()
+                    },
+                },
+            };
+            let who = ClientIdentity {
+                name: "test".into(),
+                surface: "test".into(),
+            };
+            HostApi::open(host.as_ref(), selector, who, OpenOptions::default())
+        };
+        let session = open(None).await.unwrap();
+        let path = settings::user_path(host.env());
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, "[invalid").unwrap();
+        for _ in 0..3 {
+            HostApi::catalog(host.as_ref(), CatalogKind::Plugins)
+                .await
+                .unwrap();
+        }
+        assert_eq!(*source.1.lock().unwrap(), None, "nothing registered");
+        let again = open(Some(session.snapshot.summary.id.clone()))
+            .await
+            .unwrap();
+        let told = again
+            .snapshot
+            .transcript
+            .items()
+            .iter()
+            .filter_map(|item| match &item.body {
+                ItemBody::Notice { code, text, .. } if code == "PLUGIN_TRUST_UNREAD" => {
+                    Some(text.clone())
+                }
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(told.len(), 1, "{told:?}");
+        assert!(told[0].contains(&path.display().to_string()), "{told:?}");
+        drop((session, again));
+        host.shutdown().await;
+    }
+
+    /// A grant that took but a plugin that did not come back on says both,
+    /// and the one command that turns it on.
+    #[tokio::test]
+    async fn a_plugin_that_does_not_come_back_on_says_how_to_turn_it_on() {
+        let home = tempfile::tempdir().unwrap();
+        let source = Arc::new(Source(
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        ));
+        source.2.store(true, std::sync::atomic::Ordering::SeqCst);
+        let host = Host::build(
+            vec![Box::new(Fixture(source.clone()))],
+            crate::HostConfig::new(Env::rooted(home.path())),
+        )
+        .await
+        .unwrap();
+        let error = render::under_input(true, run(&host, "outside rewrite"))
+            .await
+            .unwrap_err();
+        assert!(error.message.contains("rewrite kept"), "{}", error.message);
+        assert!(
+            error.message.contains("the module threw"),
+            "{}",
+            error.message
+        );
+        assert!(
+            error.message.contains("/plugins enable outside"),
+            "{}",
+            error.message
+        );
+        let saved = settings::read_document(&settings::user_path(host.env())).unwrap();
+        assert_eq!(saved["pluginTrust"]["outside"]["tier"], "rewrite");
         host.shutdown().await;
     }
 }
