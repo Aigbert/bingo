@@ -105,6 +105,7 @@ fn mounted(view: View) -> SessionState {
                     view: view.into(),
                 }],
             ),
+            generation: None,
         },
     ));
     state
