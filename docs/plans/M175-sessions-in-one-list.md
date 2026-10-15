@@ -43,14 +43,14 @@ One list of every session, found by what was asked. `/sessions` and bare `bingo 
 
 ## Exit criteria
 
-- [ ] `ago`, `asked`, `title_from`, `kept`, `rows`, keys tables pass.
-- [ ] Fixtures: summary with `firstAsk` and `forkedFrom`; old summary without either; `session/fork` request/response; `Sessions` props.
-- [ ] RPC black-box: `session/fork` on a two-turn session; refused while a turn runs; NDJSON stdout pure.
-- [ ] `TestBackend`: tab toggles scope; `more` grows the list; typing filters; `d` on a parent names its children and deletes them first; `f` resumes the fork; `r` edits inline without switching; schedule rows fold.
-- [ ] `bingo --resume` opens the site; `--print --resume` fails, 1 line.
-- [ ] `enabledPlugins: {"bingo.mod.sessions": false}`: `/sessions` says it is off, `ctrl+r` and the palette work as before.
-- [ ] tmux drive on an isolated socket, temp HOME, fake provider: three sessions, one child, one fork; captures pasted.
-- [ ] `bash scripts/tui-smoke.sh`; `cargo fmt --all -- --check`; `cargo check --workspace --all-targets --locked`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked`; `scripts/check_discipline.sh`; `scripts/budget.sh`; `cargo deny check`.
+- [x] `ago`, `asked`, `title_from`, `kept`, `rows`, keys tables pass.
+- [x] Fixtures: summary with `firstAsk` and `forkedFrom`; old summary without either; `session/fork` request/response; `Sessions` props.
+- [x] RPC black-box: `session/fork` on a two-turn session; refused while a turn runs; NDJSON stdout pure.
+- [x] `TestBackend`: tab toggles scope; `more` grows the list; typing filters; `d` on a parent names its children and deletes them first; `f` resumes the fork; `r` edits inline without switching; schedule rows fold.
+- [x] `bingo --resume` opens the site; `--print --resume` fails, 1 line.
+- [x] `enabledPlugins: {"bingo.mod.sessions": false}`: `/sessions` says it is off, `ctrl+r` and the palette work as before.
+- [x] tmux drive on an isolated socket, temp HOME, fake provider: three sessions, one child, one fork; captures pasted.
+- [x] `bash scripts/tui-smoke.sh`; `cargo fmt --all -- --check`; `cargo check --workspace --all-targets --locked`; `cargo clippy --workspace --all-targets --locked -- -D warnings`; `cargo test --workspace --locked`; `scripts/check_discipline.sh`; `scripts/budget.sh`; `cargo deny check`.
 - [ ] Windows checks for every touched crate; record any C-toolchain deferrals below.
 
 ## In-flight dependencies
@@ -87,7 +87,61 @@ Review found that revival appended open-hook records and retained locks; stored 
 
 - Stored reads and forks replay without revival; stored title writes take a brief claim and append one summary, preserving activity time. Add targeted host summary/read and delete-check contracts with fail-closed defaults; no plugin bridge expansion.
 - Delete preflights the entire descendant set and retains claims until removal. Busy or foreign-locked rows are labelled and block confirmation.
-- Selection is a stable Target, rows have keyed plain buttons (nested onKey is invalid), missing targets never redirect a verb. Rename edits inline and leaves the viewed session unchanged. Empty bare-resume bootstrap sessions are removed on switching; ordinary or nonempty sessions remain.
+- Selection is a stable Target, rows have keyed plain buttons (nested onKey is invalid), missing targets never redirect a verb. Rename edits inline and leaves the viewed session unchanged. Empty, untitled bare-resume bootstrap sessions are removed on switching; ordinary or nonempty sessions remain.
 - Auto-title looks up only its session and logs errors without rejecting admitted input. Shared `asked` returns borrowed full Said text from the first text part (remaining parts are attachments); first-ask consumers take its first line.
 - Provenance is summary-only; Create cannot supply it. Consolidate remaining age formatters, fix labels, add fork-origin markers, reject bare-resume plus a prompt, and cover the mod in built-in parity tests.
 - Rebuild commits with schema regeneration beside its owning code; verify each build and its golden tests. The UI commit must not change core fork implementation.
+
+## Verified — 2026-10-15
+
+Contract-first: the original fork fixture failed with six missing field/method errors before implementation; the stored-inspection fixture likewise failed before adding read/summary/rename. Both now pass. Against dev, SessionSpec is unchanged, no summary property is removed, and only optional firstAsk/forkedFrom are added.
+
+Rebuilt history: `f87bb19c` independently passed `cargo build --workspace --all-targets --locked` (1m 07s) and `cargo test -p bingo-sdk -p bingo-surface-rpc -p bingo-plugin-rpc -p bingo-mods --locked` (all passed). `28f7574a` independently built (2m 43s); its golden tests passed in the full run below. The UI commit has no core changes. The final documentation tree also built (10.93s) and passed the same four-crate golden-test command. Regeneration used `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked`, then the surface-rpc/plugin-rpc/mods library generator tests; TypeScript generators ran with these tests.
+
+Sequential gates, credentials removed, RUST_TEST_THREADS=4; output summaries:
+```text
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: Finished dev in 1m 06s
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev in 54.96s
+cargo test --workspace --locked: 175 suites; 5766 passed; 0 failed; 5 ignored
+bash scripts/check_discipline.sh: discipline ok
+bash scripts/budget.sh: dependencies (unique, normal): 415 (max 415); budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+SHELL=/bin/sh bash scripts/tui-smoke.sh: tui-smoke ok
+cd sdk/typescript && npm test: tests 31; pass 31; fail 0
+```
+Budget reports 14 GB target/debug against its 5 GB soft limit; final cargo clean removes build output. Discipline advisories remain warnings. One earlier full run failed the existing ACP bridge test `a_bridged_call_posts_to_the_parent_and_is_journaled_under_the_turn` on missing “the member spoke” output under load; unchanged isolated rerun passed (1 passed, 0 failed, 0.66s), and subsequent full runs passed. The final run had no failures.
+
+Windows: ran `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` separately for all 20 touched crates. Fifteen passed: agents, checkpoints, context, core, demo-ui, experience, mod-palette, mod-sessions, persona, rooms, sdk, skills, store-jsonl, surface-rpc, tasks (all bingo-prefixed). Five remain deferred: bingo, channel-adapter, mods, surface-print, surface-tui; each failed building aws-lc-sys with `fatal error: 'stdlib.h' file not found` / `'windows.h' file not found`. This machine lacks the Windows C toolchain; the Windows criterion stays unticked.
+
+Isolated tmux, temporary HOME/data, fake provider; captures below show the complete list region. 108×30:
+```text
+ sessions · here (tab: all) ·                                                                         5 of 6
+❯ cwd · current                                                                             just now   0 msg
+  fixture for checkpoint v2                                                                 just now   2 msg
+     "can you add a fixture for checkpoint v2?"
+  fix the stale-edit race                                                                   just now   2 msg
+    └ review: action FIFO                                                                   just now   2 msg
+       "review the action FIFO"
+  fix the stale-edit race                                                                   just now   2 msg
+     ⑂ from fix the stale-edit race
+  schedule (1)                                                                                             ▸
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ⏎ resume  → preview  r rename  d delete  f fork  tab here/all  esc
+```
+80×24 after inline rename (same selected row, list remains open):
+```text
+ sessions · here (tab: all) ·                                             5 of 6
+  cwd · current                                                 just now   0 msg
+❯ renamed inline                                                just now   2 msg
+     "can you add a fixture for checkpoint v2?"
+  fix the stale-edit race                                       just now   2 msg
+    └ review: action FIFO                                       just now   2 msg
+       "review the action FIFO"
+  fix the stale-edit race                                       just now   2 msg
+     ⑂ from fix the stale-edit race
+  schedule (1)                                                                 ▸
+────────────────────────────────────────────────────────────────────────────────
+ ⏎ resume  → preview  r rename  d delete  f fork  tab here/all  esc
+```
+Drive assertions: `preview: source bytes and mtimes unchanged`; `rename: one record, mtime unchanged, list stays open`; `resume: empty bootstrap removed`. TestBackend golden captures cover both complete frames; integration tests also pin zero open hooks, released claims, foreign-lock refusal, busy deletion, stable targets, title error admission, built-in parity and NDJSON purity.
