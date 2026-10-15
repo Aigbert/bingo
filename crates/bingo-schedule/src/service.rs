@@ -1,3 +1,4 @@
+use crate::delivery::{Answer, BOUND, Fired};
 use crate::{Schedules, render, tools};
 use bingo_sdk::*;
 use bingo_services::schedule::{self, Listing, Pending, Service};
@@ -93,21 +94,55 @@ impl Service for Owner {
         self.schedules.changed();
         Ok(format!("forgot {}; its session stays", entry.id))
     }
+    /// Run one occurrence now. Typed in the entry's own session this cannot
+    /// wait on itself: `/schedule` is an instant command run in a task of its
+    /// own, and the line it hands the session is answered on that session's
+    /// stream — within the bound, or reported as still running.
     async fn run(&self, id: String) -> Result<String, KernelError> {
         let entry = self.entry(&id)?;
         if !entry.enabled {
             return Err(invalid("schedule is disabled; resume first"));
         }
-        self.schedules
+        let fired = self
+            .schedules
             .dispatcher(self.host()?.clone())
-            .deliver(&entry)
+            .fire(self.schedules.store(), &entry)
             .await?;
-        crate::runner::spend(self.schedules.store(), &entry)?;
         self.schedules.changed();
-        Ok(format!(
-            "ran {}; a concurrent runner fire may add one extra turn",
-            entry.id
-        ))
+        ran(&entry.id, fired)
+    }
+}
+
+/// What the person is told of a run they asked for. The occurrence is spent
+/// in every case but `Skipped`; a refusal is also on the `/schedule` badge.
+fn ran(id: &str, fired: Fired) -> Result<String, KernelError> {
+    let answer = match fired {
+        Fired::Skipped => {
+            return Err(invalid(format!(
+                "schedule {id} changed while its session opened; nothing ran"
+            )));
+        }
+        Fired::Spent { answer, .. } => answer,
+    };
+    match answer {
+        Answer::Taken => Ok(format!(
+            "ran {id}; a concurrent runner fire may add one extra turn"
+        )),
+        Answer::Unanswered => Ok(format!(
+            "started {id}; it is still running after {}s",
+            BOUND.as_secs()
+        )),
+        Answer::Refused(error) => Err(KernelError::new(
+            error.code,
+            format!(
+                "ran {id}, and its line was refused or failed: {}",
+                error.message
+            ),
+        )),
+        Answer::Stopped => Err(KernelError::new(
+            ErrorCode::Interrupted,
+            format!("started {id}; the scheduler stopped before it answered"),
+        )),
     }
 }
 pub fn contribution(owner: Arc<Owner>) -> Contribution {

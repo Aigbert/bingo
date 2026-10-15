@@ -1015,6 +1015,7 @@ dependencies = [
  "bingo-sdk",
  "bingo-services",
  "bingo-shelf",
+ "futures",
  "insta",
  "jiff",
  "proptest",

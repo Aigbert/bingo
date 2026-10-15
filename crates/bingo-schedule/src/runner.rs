@@ -7,16 +7,24 @@
 //! produces, including everything that goes wrong inside the turn, lands in
 //! that session's transcript, which is the record `--resume` reads.
 //!
-//! Each entry has at most one in-flight delivery. Success moves its clock;
-//! failure waits for a rescan before retrying, without holding up other entries.
+//! Each entry has at most one fire in flight, and one stalled fire holds up
+//! no other. An occurrence is spent as soon as its session is open
+//! ([`crate::delivery`]): however long the line runs, and whatever it
+//! answers, that occurrence does not fire again. A session that could not be
+//! opened leaves it unspent, and it waits a rescan before it is tried again,
+//! as does a fire that panicked. A stamp the disk refused is remembered here,
+//! so this process does not fire that occurrence twice either.
 
+use crate::delivery::Fired;
 use crate::{entry::Entry, store::Store};
-use bingo_sdk::{CancellationToken, ErrorCode, KernelError};
-use jiff::Zoned;
-use std::collections::HashSet;
+use bingo_sdk::{CancellationToken, ErrorCode};
+use jiff::{Timestamp, Zoned};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Notify;
+use tokio::task::{Id, JoinError, JoinSet};
+use tokio::time::Instant;
 pub const SURFACE: &str = "schedule";
 
 /// How long the loop will sleep without looking at the store again. The
@@ -62,6 +70,55 @@ pub fn delay(next: Option<&Zoned>, now: &Zoned) -> Duration {
     }
 }
 
+/// What a fire task reports when it lands.
+enum Landed {
+    /// The occurrence is spent at this moment.
+    Spent(Timestamp),
+    /// Nothing was left to fire once the session opened.
+    Skipped,
+    /// No session opened: the occurrence stands, after a rescan.
+    Unopened,
+}
+
+/// What the loop keeps between passes, beside the tasks themselves.
+#[derive(Default)]
+struct Flights {
+    /// The entry each task in flight is firing.
+    ids: HashMap<Id, String>,
+    /// Entries whose last fire failed, and when they may be tried again.
+    retry: HashMap<String, Instant>,
+    /// The last fire spent per entry in this process, for a stamp the disk
+    /// did not take.
+    spent: HashMap<String, Timestamp>,
+}
+
+impl Flights {
+    fn busy(&self, id: &str) -> bool {
+        self.ids.values().any(|flying| flying == id) || self.retry.contains_key(id)
+    }
+
+    /// The entries as this process knows them: the disk, unless a fire spent
+    /// here is newer than what the disk says.
+    fn remembered(&mut self, entries: Vec<Entry>) -> Vec<Entry> {
+        self.spent.retain(|id, at| {
+            entries
+                .iter()
+                .any(|entry| &entry.id == id && entry.last_fired < Some(*at))
+        });
+        entries
+            .into_iter()
+            .map(|entry| match self.spent.get(&entry.id) {
+                Some(at) => Entry {
+                    last_fired: Some(*at),
+                    enabled: entry.enabled && !entry.spec.is_once(),
+                    ..entry
+                },
+                None => entry,
+            })
+            .collect()
+    }
+}
+
 /// The one runner this process has, if it took the store's claim.
 pub struct Runner {
     store: Arc<Store>,
@@ -83,36 +140,33 @@ impl Runner {
             cancel,
         }
     }
+
+    /// Fire what is due, sleep to the next one or a landing, and start again
+    /// — until the plugin stops, when every fire in flight is let finish.
     pub async fn run(self) {
         let runner = Arc::new(self);
-        let mut flying = tokio::task::JoinSet::new();
-        let mut held = HashSet::new();
-        let mut retry = std::collections::HashMap::new();
+        let mut flying = JoinSet::new();
+        let mut flights = Flights::default();
         loop {
-            let waited = runner.launch(&mut flying, &mut held, &mut retry);
+            let waited = runner.launch(&mut flying, &mut flights);
             tokio::select! {
                 biased;
                 _ = runner.cancel.cancelled() => {
                     while flying.join_next().await.is_some() {}
                     return;
                 }
-                Some(result) = flying.join_next(), if !flying.is_empty() => {
-                    if let Ok((id, ok)) = result {
-                        held.remove(&id);
-                        if !ok { retry.insert(id, tokio::time::Instant::now() + RESCAN); }
-                    }
+                Some(joined) = flying.join_next_with_id(), if !flying.is_empty() => {
+                    runner.landed(&mut flights, joined);
                 }
                 _ = runner.changed.notified() => {},
                 _ = tokio::time::sleep(waited) => {},
             }
         }
     }
-    fn launch(
-        self: &Arc<Self>,
-        flying: &mut tokio::task::JoinSet<(String, bool)>,
-        held: &mut HashSet<String>,
-        retry: &mut std::collections::HashMap<String, tokio::time::Instant>,
-    ) -> Duration {
+
+    /// Start a fire for every due entry not already in flight or waiting out
+    /// a failure; how long until the next one is due.
+    fn launch(self: &Arc<Self>, flying: &mut JoinSet<Landed>, flights: &mut Flights) -> Duration {
         if self.cancel.is_cancelled() {
             return Duration::ZERO;
         }
@@ -124,55 +178,65 @@ impl Runner {
                 bad.why
             );
         }
-        retry.retain(|_, until| *until > tokio::time::Instant::now());
+        flights.retry.retain(|_, until| *until > Instant::now());
+        let entries = flights.remembered(shelf.entries);
         let now = Zoned::now();
-        let pass = pass(&shelf.entries, &now);
+        let pass = pass(&entries, &now);
         for entry in pass.due {
-            if held.contains(&entry.id) || retry.contains_key(&entry.id) {
+            if flights.busy(&entry.id) {
                 continue;
             }
-            held.insert(entry.id.clone());
             let runner = self.clone();
-            let entry = entry.clone();
-            flying.spawn(async move {
-                let ok = runner.fire(&entry).await;
-                (entry.id, ok)
-            });
+            let fired = entry.clone();
+            let task = flying.spawn(async move { runner.fire(&fired).await });
+            flights.ids.insert(task.id(), entry.id.clone());
         }
         delay(pass.next.as_ref(), &now)
     }
-    async fn fire(&self, entry: &Entry) -> bool {
-        let result = match self.dispatch.deliver(entry).await {
-            Ok(()) => spend(&self.store, entry),
-            Err(error) => Err(error),
-        };
-        if let Err(error) = result {
-            let said = format!(
-                "{} opened no turn on {}: {}",
-                entry.id,
-                entry.key(),
-                error.message
-            );
-            tracing::warn!("{said}");
-            *self
-                .dispatch
-                .trouble
-                .lock()
-                .unwrap_or_else(|held| held.into_inner()) = Some(said);
-            return false;
-        }
-        true
-    }
-}
 
-pub(crate) fn spend(store: &Store, entry: &Entry) -> Result<(), KernelError> {
-    // A concurrent pause, confirmation or deletion must not be overwritten by an old fire.
-    if store.load().entries.iter().any(|current| current == entry) {
-        store
-            .save(&entry.fired(jiff::Timestamp::now()))
-            .map_err(|error| KernelError::new(ErrorCode::Storage, error.to_string()))?;
+    /// A fire task landed — or panicked, which frees its entry all the same.
+    fn landed(&self, flights: &mut Flights, joined: Result<(Id, Landed), JoinError>) {
+        let (task, landed) = match joined {
+            Ok((task, landed)) => (task, Ok(landed)),
+            Err(error) => (error.id(), Err(error)),
+        };
+        let Some(id) = flights.ids.remove(&task) else {
+            return;
+        };
+        match landed {
+            Ok(Landed::Spent(at)) => {
+                flights.spent.insert(id, at);
+            }
+            Ok(Landed::Skipped) => {}
+            Ok(Landed::Unopened) => {
+                flights.retry.insert(id, Instant::now() + RESCAN);
+            }
+            Err(error) => {
+                self.dispatch.troubled(format!(
+                    "schedule {id}: its fire stopped unexpectedly: {error}"
+                ));
+                flights.retry.insert(id, Instant::now() + RESCAN);
+            }
+        }
     }
-    Ok(())
+
+    async fn fire(&self, entry: &Entry) -> Landed {
+        match self.dispatch.fire(&self.store, entry).await {
+            Ok(Fired::Spent { at, .. }) => Landed::Spent(at),
+            Ok(Fired::Skipped) => Landed::Skipped,
+            Err(error) => {
+                if error.code != ErrorCode::Interrupted {
+                    self.dispatch.troubled(format!(
+                        "{} opened no turn on {}: {}",
+                        entry.id,
+                        entry.key(),
+                        error.message
+                    ));
+                }
+                Landed::Unopened
+            }
+        }
+    }
 }
 
 #[cfg(test)]

@@ -15,6 +15,7 @@
 //! - [`store`] — the directory, rebuilt on every read.
 //! - [`lock`] — one runner per store, held by an OS file lock.
 //! - [`runner`] — the timer loop, and the pure pass that decides it;
+//!   `delivery` fires one entry and `spend` moves its clock;
 //!   `signed` is what a fire submits under whose name.
 //! - [`schedules`] — what this process has: the store, the claim, the bell.
 //! - [`wake`] and [`wakes`] — the model's own `once` on its own session:
@@ -37,6 +38,7 @@ pub mod schedules;
 mod service;
 mod signed;
 pub mod spec;
+mod spend;
 pub mod store;
 mod supervisor;
 pub mod tools;

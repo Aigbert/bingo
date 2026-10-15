@@ -25,18 +25,16 @@ pub fn asked_origin() -> Origin {
     }
 }
 
-/// Submit `input` and wait for the session's answer to it: refused, or
-/// taken (applied, queued or a turn started).
-pub async fn submitted(
-    attachment: &mut Attachment,
-    input: Input,
-    cancel: &CancellationToken,
-) -> Result<(), KernelError> {
+/// Submit `input` on the attachment; the intent names its answer.
+pub fn submit(attachment: &Attachment, input: Input) -> IntentId {
     let intent = IntentId::mint();
     attachment.handle.submit(intent.clone(), input);
-    acknowledged(attachment, &intent, cancel).await
+    intent
 }
 
+/// The session's answer to `intent`: refused, or taken (applied, queued or a
+/// turn started). A command's answer comes when it finishes, so the caller
+/// bounds this wait.
 pub(crate) async fn acknowledged(
     attachment: &mut Attachment,
     intent: &IntentId,
