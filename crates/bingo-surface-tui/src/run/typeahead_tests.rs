@@ -276,3 +276,58 @@ async fn deadline_release_owes_a_frame_showing_the_keys() {
         .unwrap();
     assert!(screen.last().contains("zq"), "{}", screen.last());
 }
+#[tokio::test]
+async fn pastes_wait_between_the_keys_they_were_typed_between() {
+    let now = still(scene().1);
+    let (_home, mut run, _) = palette_run(now);
+    typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
+    type_burst(&mut run, "ab");
+    run.terminal_event(Term::Paste("X".into()));
+    type_burst(&mut run, "cd");
+    run.typeahead.expire();
+    typeahead::drain(&mut run);
+    assert_eq!(run.ui.composer.text(), "abXcd");
+    assert!(run.typeahead.is_empty());
+}
+
+#[tokio::test]
+async fn queued_pastes_are_kept_out_of_asks() {
+    let now = still(scene().1);
+    let login = interaction(
+        bingo_sdk::InteractionKind::Login {
+            provider: "fixture".into(),
+            flow: bingo_sdk::LoginFlow::Paste,
+        },
+        vec![bingo_sdk::AnswerSpec::Text, bingo_sdk::AnswerSpec::Cancel],
+    );
+    for ask in [permission(None, None), question(false, true), login] {
+        for already_open in [false, true] {
+            let (_home, mut run, session) = palette_run(now);
+            if already_open {
+                run.session.tree.fold.apply(&frame(1, opened(ask.clone())));
+            }
+            typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
+            run.terminal_event(Term::Paste("secret fragment".into()));
+            if !already_open {
+                run.session.tree.fold.apply(&frame(1, opened(ask.clone())));
+            }
+            run.typeahead.expire();
+            typeahead::drain(&mut run);
+            assert!(
+                run.ui.composer.is_empty(),
+                "a paste must not bypass the ask"
+            );
+            assert!(run.typeahead.is_empty());
+            assert!(
+                run.ui
+                    .dialog
+                    .words
+                    .as_ref()
+                    .is_none_or(|words| words.is_empty())
+            );
+            assert!(session.answers().is_empty());
+            assert!(session.submitted().is_empty());
+            assert_eq!(run.ui.notices[0].text, typeahead::kept_out_notice(1));
+        }
+    }
+}

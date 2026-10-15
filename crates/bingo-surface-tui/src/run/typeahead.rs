@@ -15,15 +15,15 @@ use crossterm::event::KeyEvent;
 /// for longer than this hands the keyboard back rather than hold it.
 pub(super) const OPENING_WAIT: Duration = Duration::from_secs(1);
 
-/// What a dropped typeahead key says, with the count of keys it stands for.
+/// Count input events without exposing their contents.
 pub(super) fn kept_out_notice(count: usize) -> String {
-    let keys = if count == 1 { "key" } else { "keys" };
-    format!("{count} {keys} typed before this dialog opened were not entered into it")
+    let inputs = if count == 1 { "input" } else { "inputs" };
+    format!("Kept {count} queued {inputs} out of this dialog")
 }
 
 #[derive(Default)]
 pub(super) struct Typeahead {
-    keys: std::collections::VecDeque<Queued>,
+    inputs: std::collections::VecDeque<Queued>,
     opening: Option<Opening>,
 }
 
@@ -31,7 +31,12 @@ pub(super) struct Typeahead {
 /// owns the keyboard with no site open.
 struct Queued {
     site: Option<String>,
-    key: KeyEvent,
+    input: Held,
+}
+
+enum Held {
+    Key(KeyEvent),
+    Paste(String),
 }
 
 /// A command line on its way: keys typed after it wait for its answer, which
@@ -44,22 +49,22 @@ struct Opening {
 impl Typeahead {
     #[cfg(test)]
     pub(super) fn len(&self) -> usize {
-        self.keys.len()
+        self.inputs.len()
     }
 
     pub(super) fn is_empty(&self) -> bool {
-        self.keys.is_empty()
+        self.inputs.is_empty()
     }
 
     /// Escape and ctrl+c end what was typed ahead along with everything else.
     pub(super) fn clear(&mut self) {
-        self.keys.clear();
+        self.inputs.clear();
         self.opening = None;
     }
 
     /// Keys typed at a dialog that has been answered go with it.
     pub(super) fn forget_site(&mut self, site: &str) {
-        self.keys
+        self.inputs
             .retain(|queued| queued.site.as_deref() != Some(site));
     }
 
@@ -138,7 +143,34 @@ fn judging(run: &Run, site: &str) -> bool {
 
 pub(super) fn queue(run: &mut Run, key: KeyEvent) {
     let site = focus(run);
-    run.typeahead.keys.push_back(Queued { site, key });
+    run.typeahead.inputs.push_back(Queued {
+        site,
+        input: Held::Key(key),
+    });
+}
+
+/// A paste waits in the same order as keys, but never enters an ask from here.
+pub(super) fn paste(run: &mut Run, text: String) {
+    if blocked(run) {
+        let site = focus(run);
+        run.typeahead.inputs.push_back(Queued {
+            site,
+            input: Held::Paste(text),
+        });
+    } else {
+        input::on_paste(&mut run.ui, &text);
+    }
+}
+
+fn apply(run: &mut Run, held: Held) {
+    run.behind = true;
+    match held {
+        Held::Key(key) => {
+            let effects = input::on_key(&mut run.ui, &run.session.tree, key, run.detection.now());
+            run.apply(effects);
+        }
+        Held::Paste(text) => input::on_paste(&mut run.ui, &text),
+    }
 }
 
 /// Let waiting keys go, in order, for as long as nothing holds the first.
@@ -149,14 +181,19 @@ pub(super) fn drain(run: &mut Run) {
         run.typeahead.opening = None;
     }
     let mut kept_out = 0;
-    while let Some(front) = run.typeahead.keys.front() {
-        let (site, key) = (front.site.clone(), front.key);
+    while let Some(front) = run.typeahead.inputs.front() {
+        let site = front.site.clone();
         let now = focus(run);
+        if matches!(front.input, Held::Paste(_)) && dialog(run, now.as_deref()) {
+            run.typeahead.inputs.pop_front();
+            kept_out += 1;
+            continue;
+        }
         if site != now {
             if dialog(run, now.as_deref()) {
-                run.typeahead.keys.pop_front();
+                run.typeahead.inputs.pop_front();
                 kept_out += 1;
-            } else if let Some(front) = run.typeahead.keys.front_mut() {
+            } else if let Some(front) = run.typeahead.inputs.front_mut() {
                 front.site = now;
             }
             continue;
@@ -164,12 +201,12 @@ pub(super) fn drain(run: &mut Run) {
         if waiting(run, site.as_deref()) {
             break;
         }
-        run.typeahead.keys.pop_front();
-        run.behind = true;
-        let effects = input::on_key(&mut run.ui, &run.session.tree, key, run.detection.now());
-        run.apply(effects);
+        if let Some(queued) = run.typeahead.inputs.pop_front() {
+            apply(run, queued.input);
+        }
     }
     if kept_out > 0 {
+        run.behind = true;
         run.ui
             .notify(Level::Warn, kept_out_notice(kept_out), Instant::now());
     }

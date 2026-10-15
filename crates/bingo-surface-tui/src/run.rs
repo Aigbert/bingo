@@ -701,7 +701,7 @@ impl Run {
                 );
                 self.apply(effects);
             }
-            Term::Paste(text) => input::on_paste(&mut self.ui, &text),
+            Term::Paste(text) => typeahead::paste(self, text),
             // A window nobody is looking at is the one that may interrupt a
             // person somewhere else on their desktop — and a person who has
             // just come back to this one may have been away turning their

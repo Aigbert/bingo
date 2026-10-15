@@ -44,9 +44,9 @@ so the burst outran the smoke's 10 s wait. That is latency; this plan does not r
    which is when a command's `surface` action has opened its site, or for at most
    `OPENING_WAIT` (1 s); the loop wakes at that deadline.
 4. Dialogs: if the keyboard's owner is now an open ask (not set aside), typed-ahead
-   inputs are dropped with "N queued inputs from elsewhere were not entered into
-   this dialog" (singular: "input"). Count each key or paste once; do not expose
-   content. This wording also covers an already open ask regaining focus. Record
+   inputs are dropped with "Kept N queued inputs out of this dialog" (singular:
+   "input"). Count each key or paste once; do not expose content. This also covers
+   an already open ask regaining focus and a paste queued at that ask. Record
    actual keyboard ownership, never the identity of an ask set aside. Queued pastes
    are always excluded from asks, including ones queued at that ask, to protect
    answers and secret fields. This covers every ask, not only the sealed ones
