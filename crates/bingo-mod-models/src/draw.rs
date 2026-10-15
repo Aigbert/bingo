@@ -45,9 +45,9 @@ impl Interceptor for Drawing {
         let Some(picker) = picker.filter(|p| p.id == request.request_id) else {
             return next.run(value).await;
         };
-        let models = cx.host.catalog(CatalogKind::Models).await?.entries;
-        let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
         let attached = crate::bridge::attach(&cx.host, &cx.session).await?;
+        let models = crate::state::models(&cx.host, &attached.snapshot).await?;
+        let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
         serde_json::to_value(tree(
             &picker,
             &models,
@@ -151,7 +151,7 @@ impl List<'_> {
         let label = if unlisted {
             format!("use {}", picker.props.filter)
         } else {
-            action_label(row, self.models, self.providers, self.chat, picker)
+            action_label(row, self.models, self.providers, picker)
         };
         children.push(key_hint(&label, picker.keep()));
         children
@@ -347,7 +347,6 @@ fn action_label(
     row: Option<&Row>,
     models: &[CatalogEntry],
     providers: &[CatalogEntry],
-    chat: &crate::card::Chat,
     picker: &Picker,
 ) -> String {
     match row {
@@ -358,14 +357,7 @@ fn action_label(
                 providers
                     .iter()
                     .find(|p| m.meta["provider"] == p.id)
-                    .map(|p| {
-                        crate::label::label(
-                            m,
-                            p,
-                            if m.id == chat.current { 0 } else { chat.used },
-                            picker.keep(),
-                        )
-                    })
+                    .map(|p| crate::label::label(m, p, picker.keep()))
             })
             .unwrap_or_default(),
         Some(Row::Provider(_)) => "manage".into(),

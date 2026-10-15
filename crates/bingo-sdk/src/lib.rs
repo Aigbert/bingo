@@ -32,6 +32,7 @@ pub mod slot;
 pub mod state;
 pub mod store;
 pub mod surface;
+pub mod switch;
 /// Doubles for a plugin's tests; `features = ["testing"]` in dev-dependencies.
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;

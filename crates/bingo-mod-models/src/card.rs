@@ -129,7 +129,7 @@ fn append_controls(
         }
         .into(),
     );
-    if model.id != chat.current && crate::label::compacts(model, chat.used) {
+    if crate::label::compacts(model) {
         lines.push("▲ ⏎ compacts the chat first, then switches".into());
     }
     if chat.pictures && meta["images"] == false {
@@ -142,7 +142,7 @@ mod tests {
     use super::*;
     use serde_json::json;
     #[test]
-    fn absent_facts_are_unknown_and_warnings_come_from_the_chat() {
+    fn absent_facts_are_unknown_and_warnings_come_from_the_kernel_and_chat() {
         let mut model = CatalogEntry {
             id: "p/m".into(),
             label: "m".into(),
@@ -160,6 +160,12 @@ mod tests {
         );
         model.meta =
             json!({"context":128000,"switchAt":115200,"images":false,"efforts":["low","high"]});
+        let lines = card(&model, &chat, Some(Effort::High), true).join("\n");
+        assert!(
+            !lines.contains("compacts"),
+            "the kernel decides, not the window"
+        );
+        model.meta["compacts"] = json!(true);
         let lines = card(&model, &chat, Some(Effort::High), true).join("\n");
         assert!(
             lines.contains("compacts")

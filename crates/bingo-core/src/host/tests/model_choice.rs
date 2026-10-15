@@ -394,3 +394,40 @@ async fn next_walks_the_pins_in_their_setting_order() {
     assert_eq!(walked, ["tiny", "small", "large"]);
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn the_published_switch_decision_is_the_one_model_makes() {
+    let home = tempfile::tempdir().unwrap();
+    let (host, _) = setup(home.path(), vec![response(10)], None).await;
+    let mut client = Client::open(&host).await;
+    client.ack(&"word ".repeat(12000)).await;
+    client.until_turn_completed().await;
+    // The last measure lags a transcript that has grown since it was taken.
+    if let Some(context) = &mut client.state.context {
+        context.used = 10;
+    }
+    let switches = HostHandle(host.clone())
+        .service(&bingo_sdk::switch::MODEL_SWITCH)
+        .unwrap();
+    let catalog = switches.catalog(
+        host.catalog(CatalogKind::Models).await.unwrap(),
+        &client.state,
+    );
+    let compacts =
+        |id: &str| catalog.entries.iter().find(|e| e.id == id).unwrap().meta["compacts"].clone();
+    assert_eq!(compacts("scripted/small"), json!(true));
+    assert_eq!(compacts("scripted/large"), json!(false));
+    let small = crate::host::model_switch::proposed_model(
+        &host,
+        &client.state.summary.id,
+        Some("scripted".into()),
+        "small".into(),
+    )
+    .await
+    .unwrap();
+    assert!(crate::host::model_switch::needs_compaction(
+        &client.state,
+        &small
+    ));
+    host.shutdown().await;
+}

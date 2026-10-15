@@ -65,6 +65,17 @@ pub async fn close(host: &HostHandle, session: &SessionId) -> Result<(), KernelE
     )
     .await
 }
+/// The models with the kernel's switch decision for this session.
+pub async fn models(
+    host: &HostHandle,
+    state: &SessionState,
+) -> Result<Vec<CatalogEntry>, KernelError> {
+    let catalog = host.catalog(CatalogKind::Models).await?;
+    Ok(match host.service(&switch::MODEL_SWITCH) {
+        Some(switches) => switches.catalog(catalog, state).entries,
+        None => catalog.entries,
+    })
+}
 pub fn chat(state: &SessionState) -> crate::card::Chat {
     crate::card::Chat {
         current: format!("{}/{}",state.summary.provider.as_deref().unwrap_or_default(),state.summary.model.as_deref().unwrap_or_default()),

@@ -28,6 +28,13 @@ fn prototype_scenes_at_both_terminal_sizes() {
                     json!("ok");
             }
             let (picker, chat) = scenario(scene, &models);
+            let mut models = models.clone();
+            if scene == "long" {
+                // The kernel's switch decision for a chat this long.
+                for model in &mut models {
+                    model.meta["compacts"] = json!(model.id != chat.current);
+                }
+            }
             let view = bingo_mod_models::draw::tree(&picker, &models, &providers, &chat, width, 18);
             let text = serde_json::to_string(&view).unwrap();
             assert!(!text.contains("sk-dummy-never-draw-this"));

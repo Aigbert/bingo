@@ -976,7 +976,7 @@ impl HostApi for Host {
             let authority: Arc<dyn ApprovalReader> = self.approvals.clone();
             return Some(Arc::new(authority));
         }
-        self.registry.services.value(key)
+        model_switch::service(key).or_else(|| self.registry.services.value(key))
     }
 
     fn service_wire(&self, key: &str) -> Option<Arc<dyn WireService>> {

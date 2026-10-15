@@ -54,12 +54,46 @@ pub(crate) async fn compact_for_switch(
 }
 
 pub(crate) fn needs_compaction(state: &SessionState, target: &ModelChoice) -> bool {
-    if state.summary.provider.as_deref() == Some(target.endpoint.id())
-        && state.summary.model.as_deref() == Some(target.id.as_str())
-    {
-        return false;
+    compacts(
+        state,
+        context_used(state),
+        target.endpoint.id(),
+        &target.id,
+        trigger(target),
+    )
+}
+
+/// A switch compacts first when the session holds at least what the target
+/// model's ruler allows; staying on the same model never does.
+fn compacts(state: &SessionState, used: u64, provider: &str, model: &str, switch_at: u64) -> bool {
+    let same = state.summary.provider.as_deref() == Some(provider)
+        && state.summary.model.as_deref() == Some(model);
+    !same && used >= switch_at
+}
+
+/// Publishes the switch decision for every model the catalogue gives a ruler.
+/// The kernel's answer to `bingo.modelSwitch`: the decision `/model` acts on.
+pub(super) fn service(key: &str) -> Option<Arc<dyn Any + Send + Sync>> {
+    (key == bingo_sdk::switch::MODEL_SWITCH.name()).then(|| {
+        let switches: Arc<dyn bingo_sdk::switch::ModelSwitch> = Arc::new(Switches);
+        Arc::new(switches) as Arc<dyn Any + Send + Sync>
+    })
+}
+struct Switches;
+impl bingo_sdk::switch::ModelSwitch for Switches {
+    fn catalog(&self, mut catalog: Catalog, state: &SessionState) -> Catalog {
+        let used = context_used(state);
+        for entry in &mut catalog.entries {
+            let (Some((provider, model)), Some(switch_at)) =
+                (entry.id.split_once('/'), entry.meta["switchAt"].as_u64())
+            else {
+                continue;
+            };
+            let decided = compacts(state, used, provider, model, switch_at);
+            entry.meta["compacts"] = serde_json::json!(decided);
+        }
+        catalog
     }
-    context_used(state) >= trigger(target)
 }
 
 fn context_used(state: &SessionState) -> u64 {

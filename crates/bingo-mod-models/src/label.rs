@@ -16,7 +16,7 @@ pub fn reach(provider: &CatalogEntry) -> Reach {
         },
     }
 }
-pub fn label(model: &CatalogEntry, provider: &CatalogEntry, used: u64, keep: bool) -> String {
+pub fn label(model: &CatalogEntry, provider: &CatalogEntry, keep: bool) -> String {
     if model.meta["chat"] == false {
         return "can't chat".into();
     }
@@ -24,14 +24,14 @@ pub fn label(model: &CatalogEntry, provider: &CatalogEntry, used: u64, keep: boo
         Reach::Missing => "sign in, then use".into(),
         Reach::Down => format!("fix {}", provider.id),
         Reach::Unchecked => "check, then use".into(),
-        Reach::Ready if compacts(model, used) => "compact, then use".into(),
+        Reach::Ready if compacts(model) => "compact, then use".into(),
         Reach::Ready => if keep { "use and keep" } else { "use here" }.into(),
     }
 }
-pub fn compacts(model: &CatalogEntry, used: u64) -> bool {
-    model.meta["switchAt"]
-        .as_u64()
-        .is_some_and(|threshold| used >= threshold)
+/// The kernel's decision for this session (`bingo_sdk::switch`); the picker
+/// never measures the chat against `switchAt` itself.
+pub fn compacts(model: &CatalogEntry) -> bool {
+    model.meta["compacts"] == true
 }
 pub fn status(provider: &CatalogEntry) -> String {
     match reach(provider) {
@@ -58,25 +58,25 @@ mod tests {
     use serde_json::json;
     #[test]
     fn action_priority_is_auth_reach_window_then_scope() {
-        let model = CatalogEntry {
-            id: "p/m".into(),
-            label: "m".into(),
-            meta: json!({"context":100,"switchAt":90}),
-        };
-        for (auth, reach, used, keep, want) in [
-            ("missing", "down", 99, true, "sign in, then use"),
-            ("ready", "down", 99, true, "fix p"),
-            ("ready", "unchecked", 99, true, "check, then use"),
-            ("ready", "ok", 91, true, "compact, then use"),
-            ("ready", "ok", 89, true, "use and keep"),
-            ("ready", "ok", 1, false, "use here"),
+        for (auth, reach, compacts, keep, want) in [
+            ("missing", "down", true, true, "sign in, then use"),
+            ("ready", "down", true, true, "fix p"),
+            ("ready", "unchecked", true, true, "check, then use"),
+            ("ready", "ok", true, true, "compact, then use"),
+            ("ready", "ok", false, true, "use and keep"),
+            ("ready", "ok", false, false, "use here"),
         ] {
+            let model = CatalogEntry {
+                id: "p/m".into(),
+                label: "m".into(),
+                meta: json!({"context":100,"switchAt":1,"compacts":compacts}),
+            };
             let provider = CatalogEntry {
                 id: "p".into(),
                 label: "p".into(),
                 meta: json!({"auth":{"kind":auth},"reach":{"kind":reach}}),
             };
-            assert_eq!(label(&model, &provider, used, keep), want);
+            assert_eq!(label(&model, &provider, keep), want);
         }
     }
 }
