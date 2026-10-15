@@ -11,7 +11,7 @@
 //! ADR-0045) and the chord is live; nothing here changed for it, which was
 //! the point of asking the catalogue rather than assuming.
 
-use bingo_sdk::{CommandSpec, SessionState, TurnId};
+use bingo_sdk::{CommandSpec, SessionState, TurnId, asked};
 use ratatui::text::{Line, Span};
 
 use crate::{theme, window};
@@ -78,8 +78,6 @@ pub fn turns(state: &SessionState) -> Vec<Turn> {
     out.reverse();
     out
 }
-
-use bingo_sdk::asked;
 
 /// Whether this session has a `/rewind` to run. Nothing is offered that could
 /// not be done.
