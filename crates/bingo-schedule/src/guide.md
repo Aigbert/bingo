@@ -137,3 +137,19 @@ wakes = false
 turns wakes off: the `Wake` tool is then not offered at all, and the schedules
 are unaffected. `wakes` is true until a person says otherwise, and a typo in
 the block is a startup failure rather than a silence.
+
+## Managing schedules
+
+`/schedule add every 2h -- review the build` creates a schedule with this
+session's working directory and permission mode. The other forms are
+`daily at HH:MM` and `once at <RFC3339>`; ` -- ` separates spec and text.
+`/schedule pause <id>` disables it; `/schedule resume <id>` enables it.
+`/schedule run <id>` fires now, including from a dormant process, and refuses
+a disabled entry: resume first. A concurrent runner fire may add one extra turn.
+`/schedule forget <id>` removes the entry while keeping its session. Unique
+id prefixes work; ambiguous prefixes are refused. All these lines require a
+person's input; a model or a mod cannot run them on its own.
+
+With the built-in schedules mod on, the bare command opens a panel. With it
+off, the same table and lines remain. `/status` shows a pending wake counting
+down; Enter on that row prefills `/wake off` for you to send.

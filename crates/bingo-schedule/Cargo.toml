@@ -15,6 +15,7 @@ workspace = true
 bingo-alarm.workspace = true
 bingo-shelf.workspace = true
 bingo-claim.workspace = true
+bingo-services.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 schemars.workspace = true

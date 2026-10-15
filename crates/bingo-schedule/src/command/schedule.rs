@@ -37,10 +37,13 @@ impl Command for ScheduleCommand {
             hint: "what fires later, and whether anything will fire it".into(),
             args: ArgSpec::Words {
                 alone: vec![],
-                values: vec![ADD.into(), CONFIRM.into()],
-                // Both write the person's consent into an entry: no link
-                // rewrites them and no drawing may send one.
-                person: vec![ADD.into(), CONFIRM.into()],
+                values: [ADD, CONFIRM, "pause", "resume", "run", "forget"]
+                    .map(str::to_string)
+                    .to_vec(),
+                // Every mutation requires the person's asked line.
+                person: [ADD, CONFIRM, "pause", "resume", "run", "forget"]
+                    .map(str::to_string)
+                    .to_vec(),
                 then: Some(Box::new(ArgSpec::Free {
                     hint: "<spec> [as <mode>] -- <text> | <id>".into(),
                 })),
@@ -57,15 +60,42 @@ impl Command for ScheduleCommand {
             ("", _) => Ok(self.listed()),
             (ADD, rest) => consent::add(&self.schedules, rest, cx),
             (CONFIRM, rest) => consent::confirm(&self.schedules, rest),
+            (verb @ ("pause" | "resume" | "run" | "forget"), rest) => {
+                self.mutate(verb, rest, cx).await
+            }
             (other, _) => Err(KernelError::new(
                 ErrorCode::InvalidInput,
-                format!("/schedule takes `{ADD}` or `{CONFIRM}`, not `{other}`"),
+                format!(
+                    "unknown /schedule verb `{other}`; use add, confirm, pause, resume, run or forget"
+                ),
             )),
         }
     }
 }
 
 impl ScheduleCommand {
+    async fn mutate(
+        &self,
+        verb: &str,
+        id: &str,
+        cx: &CommandContext,
+    ) -> Result<CommandOutcome, KernelError> {
+        use bingo_services::schedule::Service;
+        consent::persons_own(verb)?;
+        let owner = crate::service::Owner::new(self.schedules.clone(), cx.host.clone());
+        let id = id.trim().to_string();
+        let message = match verb {
+            "pause" => owner.pause(id).await?,
+            "resume" => owner.resume(id).await?,
+            "run" => owner.run(id).await?,
+            "forget" => owner.forget(id).await?,
+            _ => return Err(crate::service::invalid("unknown verb")),
+        };
+        Ok(CommandOutcome::Applied {
+            message: Some(message),
+        })
+    }
+
     fn listed(&self) -> CommandOutcome {
         CommandOutcome::View {
             view: render::view(
@@ -208,7 +238,11 @@ mod tests {
     #[tokio::test]
     async fn a_word_it_does_not_take_is_refused() {
         let fixture = Fixture::new();
-        let refused = ran(&fixture, true, "pause abcd").await;
+        let refused = ran(&fixture, true, "unknown abcd").await;
         assert_eq!(refused.expect_err("refused").code, ErrorCode::InvalidInput);
     }
 }
+
+#[cfg(test)]
+#[path = "verbs_tests.rs"]
+mod verbs_tests;

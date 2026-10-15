@@ -34,6 +34,7 @@ mod render;
 pub mod runner;
 pub mod schedules;
 mod signed;
+mod service;
 pub mod spec;
 pub mod store;
 mod supervisor;
@@ -70,6 +71,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "tool:ScheduleForget",
         "tool:Wake",
         "command:schedule",
+        "service:schedule",
         "command:wake",
         "hook:schedule",
         "service:bingo.schedule.pages",
@@ -129,6 +131,7 @@ pub struct SchedulePlugin {
     /// Built in `register`, where the environment is; used by `start` and
     /// `stop`, which are handed nothing but the host.
     schedules: OnceLock<Arc<Schedules>>,
+    service: OnceLock<Arc<service::Owner>>,
 }
 
 #[async_trait]
@@ -158,6 +161,12 @@ impl Plugin for SchedulePlugin {
         registrar.add(Contribution::Hook(Arc::new(hook::ScheduleHook(
             schedules.wakes().clone(),
         ))));
+        let owner = Arc::new(service::Owner {
+            schedules: schedules.clone(),
+            host: OnceLock::new(),
+        });
+        registrar.add(service::contribution(owner.clone()));
+        let _ = self.service.set(owner);
         registrar.add(guide::contribution(registrar));
         self.schedules
             .set(schedules)
@@ -168,6 +177,9 @@ impl Plugin for SchedulePlugin {
     /// without preventing the rest of this process from starting.
     async fn start(&self, host: HostHandle) -> Result<(), PluginError> {
         if let Some(schedules) = self.schedules.get() {
+            if let Some(owner) = self.service.get() {
+                let _ = owner.host.set(host.clone());
+            }
             schedules.start(host);
         }
         Ok(())
@@ -231,7 +243,7 @@ mod plugin_tests {
         );
         assert!(matches!(contributions[4], Contribution::Command(_)));
         assert!(matches!(contributions[5], Contribution::Command(_)));
-        match &contributions[7] {
+        match &contributions[8] {
             Contribution::Service { key, wire, .. } => {
                 assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");

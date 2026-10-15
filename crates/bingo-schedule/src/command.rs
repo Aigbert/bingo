@@ -2,7 +2,7 @@
 //! everything that fires later with the person's own verbs over it, and the
 //! one wake the model set on this session.
 
-mod consent;
+pub(crate) mod consent;
 mod schedule;
 mod wake;
 

@@ -8,7 +8,7 @@
 pub mod agent;
 mod ago;
 mod asked;
-pub use ago::ago;
+pub use ago::{ago, until};
 pub use asked::{PERSON_SURFACES, asked, effective_voice, first_ask, first_line};
 pub mod bytes;
 pub mod command;

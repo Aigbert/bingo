@@ -78,9 +78,13 @@ pub fn set(now: Timestamp, after: SignedDuration, note: String) -> Wake {
 /// which is how a kind is taken back (ADR-0011 §2).
 pub fn payload(pending: Option<&Wake>) -> Value {
     match pending {
-        Some(wake) => {
-            bingo_sdk::slot::with(json!({ AT: wake.at.to_string(), NOTE: wake.note }), [])
-        }
+        Some(wake) => bingo_sdk::slot::with(
+            json!(bingo_services::schedule::Pending {
+                at: wake.at.to_string(),
+                note: wake.note.clone()
+            }),
+            [],
+        ),
         None => Value::Null,
     }
 }
@@ -102,6 +106,19 @@ pub fn origin() -> Origin {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn journal_payload_bytes_stay_unchanged() {
+        let wake = set(
+            Timestamp::UNIX_EPOCH,
+            SignedDuration::from_mins(5),
+            "check".into(),
+        );
+        assert_eq!(
+            serde_json::to_string(&payload(Some(&wake))).unwrap(),
+            r#"{"at":"1970-01-01T00:05:00Z","note":"check","slots":[]}"#
+        );
+    }
 
     #[test]
     fn slots_leave_the_wake_record_unplaced() {

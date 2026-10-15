@@ -13,3 +13,5 @@ pub mod agents_control;
 pub mod rooms_control;
 
 pub mod tasks_write;
+
+pub mod schedule;

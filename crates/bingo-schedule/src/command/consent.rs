@@ -57,7 +57,7 @@ pub fn added(args: &str) -> Result<Added, String> {
 }
 
 /// Refuse anything but the person's own asked line.
-fn persons_own(verb: &str) -> Result<(), KernelError> {
+pub(crate) fn persons_own(verb: &str) -> Result<(), KernelError> {
     match bingo_sdk::render::asked() {
         true => Ok(()),
         false => Err(KernelError::new(

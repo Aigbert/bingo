@@ -61,14 +61,38 @@ fn unreadable(shelf: &Shelf) -> Option<View> {
 }
 
 pub fn row(entry: &Entry, tz: &TimeZone) -> Vec<String> {
+    let row = row_of(entry, tz, None);
     vec![
-        entry.id.clone(),
-        entry.spec.to_string(),
-        when(entry.next_fire(tz).as_ref()),
-        if entry.enabled { "yes" } else { "no" }.into(),
-        entry.by.word().into(),
-        head(&entry.text, HEAD),
+        row.id,
+        row.spec,
+        when(
+            row.next_fire
+                .as_deref()
+                .and_then(|at| at.parse::<jiff::Timestamp>().ok())
+                .map(|at| at.to_zoned(tz.clone()))
+                .as_ref(),
+        ),
+        if row.enabled { "yes" } else { "no" }.into(),
+        row.by,
+        head(&row.text, HEAD),
     ]
+}
+
+pub fn row_of(
+    entry: &Entry,
+    tz: &TimeZone,
+    session: Option<bingo_sdk::SessionId>,
+) -> bingo_services::schedule::Row {
+    bingo_services::schedule::Row {
+        id: entry.id.clone(),
+        spec: entry.spec.to_string(),
+        next_fire: entry.next_fire(tz).map(|at| at.timestamp().to_string()),
+        enabled: entry.enabled,
+        by: entry.by.word().into(),
+        mode: entry.permission_mode.clone(),
+        text: entry.text.clone(),
+        session,
+    }
 }
 
 /// A fire as a person reads a clock: local, to the minute.
