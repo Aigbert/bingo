@@ -12,7 +12,7 @@ Search keeps up to 1000 matching lines, shown as `1000+` at the limit.
 Press `r` to preview a rewind to the selected turn. The sheet lists each
 tracked file and whether it will be restored, removed or skipped. Files
 written by shell commands are not tracked. A file marked **changed since the
-turn** contains later edits: confirming still replaces those edits. Old
+turn** may contain later edits: confirming still replaces those edits. Old
 checkpoints without post-turn hashes also carry this warning. Left and right choose:
 
 - **both**: restore files, then rewind the conversation.
