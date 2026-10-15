@@ -59,13 +59,18 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
 - The site mounts in a focused, bottom-anchored pulled pane (18 rows at 80×24);
   a late pane keeps its focus request. The mod owns filter and sheets; the pane
   title names a placement in words ("own place ▾"), never the wire's `rect`.
-- Selection is the drawn row's id, never an index: rows are keyed controls whose
-  action carries `{row}`; a key for a vanished row does nothing and the cursor
-  falls to the first selectable row, never a heading. Probes run concurrently
-  after the picker is published, so rows change under a stable cursor.
-- `/model` opens the picker bare or with a filter that has no `/`; a
-  `provider/model` argument goes to the kernel, listed or not. ⏎ on an empty
-  match offers "use <arg>". Bare `/model` elsewhere names the model, the pins
+- Selection is the kept row's key, never an index and never the drawn row: ↑↓
+  set it at once; a kept row that is gone takes no action and the cursor falls
+  to the first model row, never a heading. Probes run concurrently after the
+  picker is published, so rows change under a stable cursor. Amended in round 2:
+  a keyboard key names only itself in every pane (`pane::key_handler`), since a
+  queued key rides on a drawing the previous key already replaced; M174's
+  current-drawing resolution is untouched.
+- `/model` opens the picker bare, with a filter that has no `/`, or with
+  `provider/`; a `provider/model` argument goes to the kernel, listed or not,
+  and the kernel refuses an empty segment (InvalidInput). ⏎ on an empty match
+  offers "use <provider>/<arg>", a bare word taking the current model's provider,
+  so the switch never re-enters the picker. Bare `/model` elsewhere names the model, the pins
   and a count, never the whole catalogue. `next` walks `pinned` in its order.
 - Sign-in and the add paste use sealed Login (ADR-0086 §7); keys never reach
   composer, handlers, props or journal, and pastes before a pane's editor opens
@@ -76,7 +81,10 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
 - A pasted OpenAI address loses a trailing `/v1`: M165's adapter appends it.
 - `⇄` receipts are recorded for every client: an interceptor turns a model or
   effort outcome into a recorded Notice tied to its intent, and the ack carries
-  the same words. Print skips the item its own ack already printed.
+  the same words. Print skips the item its own ack already printed. Round 2:
+  only an Info notice (`ItemBody::receipt`) rides on the ack; Warn and Error
+  stay items, so print keeps them on stderr. Channels say a receipt once, as
+  the ack's card; the notice status is for acks that carry no words.
 - Text's `attention` tone draws the ember glyph without hard-coded RGB.
 - `/model next` and `/think next` are key bindings on `model` and `think`: a
   `KeyBinding` is a chord or `{chord, args}`. No catalogue entry has a space.
@@ -116,6 +124,9 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
 ## Non-goals
 
 Desktop/chat drawings; the merged palette; mouse; editing `models` overrides from the panel.
+Follow-ups (round 2, not fixed): type-ahead dropped while a pane opens;
+`--provider fake --model fake/fake-1` reports `fake/fake/fake-1`; the masked
+line says "pasted" for a typed key.
 
 ## Risks
 
@@ -147,4 +158,22 @@ tmux 108×30 and 80×24: `/model fake/other` → "⇄ other · fake …", status
   palette `/model fak` ⏎ opens "1 match for “fak”".
 cargo test -p bingo --test model_picker_tmux --locked -- --ignored: 1 passed
   (owned socket, wiremock; 18 captures, none says "rect")
+```
+
+## Verified — 2026-10-15
+
+Round 2. Runs unset OPENAI_*/ANTHROPIC_*; drives use an owned socket and temp HOME.
+
+```text
+cargo fmt --all -- --check: exit 0 · cargo check/clippy -D warnings --workspace: exit 0
+RUST_TEST_THREADS=4 cargo test --workspace --locked --no-fail-fast: 5782 passed; 0 failed;
+  6 ignored (a first run stopped on pty look::…within_one_focus; alone 3/3 pass)
+check_discipline: discipline ok · budget: 415/415, budget ok · cargo deny: all ok
+tui-smoke.sh ×3: tui-smoke ok · schema/TypeScript regenerated: no change
+windows msvc: sdk, core, mod-models, mod-palette exit 0; channels, surface-print,
+  surface-tui, bingo stop at aws-lc-sys (C toolchain deferral)
+tmux, openai list alpha…gamma: /model openai/ Down Enter → openai/beta;
+  Down Down Enter → openai/delta; /model zeta → "⏎ use fake/zeta", Enter → fake/zeta
+/ledger key-to-frame, debug, fake provider, 35 keys per run, median/mean/max ms:
+  dev 5422cac4 92/90/119, 91/89/117 · this branch 91/90/120, 93/96/224 (no regression)
 ```

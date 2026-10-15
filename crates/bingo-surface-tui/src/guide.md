@@ -123,13 +123,13 @@ wheel scrolling and drag-to-copy selection.
 
 ## Choosing a model
 
-Submit `/model` to open the model picker with the current model selected.
-↑↓ selects, ←→ sets effort, * pins, Tab keeps, Enter uses, and Escape backs out.
-Alt+M cycles pins; Alt+T cycles efforts. `/guide models` explains provider setup.
-Use `/model openai/gpt-5.4` to try a model in this session, or
-`/model openai/gpt-5.4 --keep` to also save the provider and model for new
-sessions. Project and command-line settings still take precedence at startup.
-`--model` and `--provider` never write settings.
+Submit `/model` to open the model picker with the current model selected;
+`/model gpt` or `/model openai/` opens it filtered. ↑↓ selects, ←→ sets
+effort, * pins, Tab keeps, Enter uses, Escape backs out; Alt+M cycles pins, Alt+T efforts.
+Enter on a filter nothing matches uses that name, on the current model's
+provider when it names none. `/guide models` explains provider setup.
+`/model openai/gpt-5.4` tries a model in this session; `--keep` also saves it for
+new sessions. Project and command-line settings win; `--model` and `--provider` write none.
 
 `/think high` changes the requested effort for this session. Add `--keep`
 to save it for new sessions. `/think off` omits the reasoning parameter;
