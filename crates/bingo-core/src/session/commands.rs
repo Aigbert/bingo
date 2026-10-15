@@ -60,12 +60,17 @@ pub(super) fn may_run_shell(input: &Input) -> bool {
     }
 }
 
+/// A typed line is the person's ask when their own surface signed it. A press
+/// is their ask only to the handler of the drawing they pressed: any other
+/// command a control names is the drawer's word, not the person's, so a
+/// drawn button cannot stand in for a typed person-only verb (fail closed).
 pub(super) fn asked(input: &Input) -> bool {
     invocation::current().is_empty()
         && match input {
             Input::Text { origin, .. } => crate::context::the_persons_own(origin),
-            Input::Action { origin, .. } => {
-                origin.as_ref().is_some_and(crate::context::the_persons_own)
+            Input::Action { action, origin } => {
+                bingo_sdk::CommandSpec::is_ui(&action.name)
+                    && origin.as_ref().is_some_and(crate::context::the_persons_own)
             }
         }
 }
@@ -650,8 +655,8 @@ mod tests {
         let fired = |origin: Option<Origin>| {
             asked(&Input::Action {
                 action: Action {
-                    name: "plugins".into(),
-                    args: json!("approve p full"),
+                    name: "plugins:ui".into(),
+                    args: json!({"handler":"h","event":"press"}),
                 },
                 origin,
             })
@@ -663,6 +668,33 @@ mod tests {
         assert!(!fired(Some(Origin::surface("plugin-kit"))));
         assert!(!fired(Some(Origin::surface("kernel"))));
         assert!(!fired(None), "an unsigned action is nobody's");
+    }
+
+    /// A drawn button naming a person-only verb is the drawer's word even
+    /// when the person pressed it: only a typed line asks for the verb.
+    #[test]
+    fn a_pressed_button_is_never_a_typed_command() {
+        for surface in PERSON_SURFACES {
+            for (name, args) in [
+                ("plugins", "trust evil full"),
+                ("plugins", "approve p full"),
+                ("permission", "wider"),
+            ] {
+                let pressed = Input::action(
+                    Action {
+                        name: name.into(),
+                        args: json!(args),
+                    },
+                    Origin::surface(surface),
+                );
+                assert!(!asked(&pressed), "{surface}: {name} {args}");
+                let typed = Input::text(format!("/{name} {args}"), Origin::surface(surface));
+                assert!(
+                    asked(&typed),
+                    "{surface}: the typed line stays the person's"
+                );
+            }
+        }
     }
 
     #[test]

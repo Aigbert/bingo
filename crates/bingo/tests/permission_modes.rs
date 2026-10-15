@@ -18,17 +18,20 @@ const TIGHTENS: [[bool; 5]; 5] = [
     [false, false, false, false, true],
 ];
 async fn change(attachment: &mut Attachment, origin: Origin, mode: &str) -> IntentOutcome {
+    let action = Action {
+        name: "permission".into(),
+        args: json!(mode),
+    };
+    submit(attachment, Input::action(action, origin)).await
+}
+/// The person's own `/permission` line, which may set any mode.
+async fn typed(attachment: &mut Attachment, mode: &str) -> IntentOutcome {
+    let line = format!("/permission {mode}");
+    submit(attachment, Input::text(line, Origin::surface("rpc"))).await
+}
+async fn submit(attachment: &mut Attachment, input: Input) -> IntentOutcome {
     let intent = IntentId::mint();
-    attachment.handle.submit(
-        intent.clone(),
-        Input::action(
-            Action {
-                name: "permission".into(),
-                args: json!(mode),
-            },
-            origin,
-        ),
-    );
+    attachment.handle.submit(intent.clone(), input);
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
         while let Some(frame) = attachment.events.next().await {
             if let Event::IntentAck {
@@ -53,7 +56,7 @@ async fn transition(
     allowed: bool,
 ) {
     assert!(matches!(
-        change(attachment, Origin::surface("rpc"), before).await,
+        typed(attachment, before).await,
         IntentOutcome::Applied { .. }
     ));
     let outcome = change(attachment, origin.clone(), after).await;
@@ -116,6 +119,14 @@ async fn matrix(origin: Origin) {
         }
     }
     host.shutdown().await;
+}
+/// A button a person pressed names the command its drawer chose: the
+/// drawer's word, which may tighten the mode but never widen it.
+#[tokio::test]
+async fn pressed_buttons_only_tighten_permission_modes() {
+    for surface in ["tui", "rpc"] {
+        matrix(Origin::surface(surface)).await;
+    }
 }
 #[tokio::test]
 async fn plugin_actions_only_tighten_permission_modes() {

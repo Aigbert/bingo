@@ -84,6 +84,13 @@ fn submit(attachment: &Attachment, name: &str, args: Value) {
         },
     );
 }
+/// A command line the person typed: a press names only its drawing's
+/// handler, so a person's command is a line, not an action.
+fn typed(attachment: &Attachment, line: &str) {
+    attachment
+        .handle
+        .submit(IntentId::mint(), Input::text(line, Origin::surface("tui")));
+}
 
 #[tokio::test]
 async fn click_and_commands_keep_only_the_persons_choice_across_hosts() {
@@ -110,9 +117,9 @@ async fn click_and_commands_keep_only_the_persons_choice_across_hosts() {
     host.shutdown().await;
     let (host, mut attachment) = start(home.path()).await;
     assert_eq!(pane(&mut attachment).await, Some(false));
-    submit(&attachment, "open-pane", Value::Null);
+    typed(&attachment, "/open-pane");
     assert_eq!(pane(&mut attachment).await, Some(true));
-    submit(&attachment, "close-pane", Value::Null);
+    typed(&attachment, "/close-pane");
     assert_eq!(pane(&mut attachment).await, None);
     host.shutdown().await;
     std::fs::write(&path, "corrupted").unwrap();

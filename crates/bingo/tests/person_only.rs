@@ -85,6 +85,10 @@ impl Interceptor for Lift {
 }
 
 async fn typed(host: &bingo_core::Host, cwd: &std::path::Path, line: &str) -> IntentOutcome {
+    submitted(host, cwd, Input::text(line, Origin::surface("rpc"))).await
+}
+
+async fn submitted(host: &bingo_core::Host, cwd: &std::path::Path, input: Input) -> IntentOutcome {
     let mut attachment = host
         .open(
             SessionSelector::Create {
@@ -103,9 +107,7 @@ async fn typed(host: &bingo_core::Host, cwd: &std::path::Path, line: &str) -> In
         .await
         .unwrap();
     let intent = IntentId::mint();
-    attachment
-        .handle
-        .submit(intent.clone(), Input::text(line, Origin::surface("rpc")));
+    attachment.handle.submit(intent.clone(), input);
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
         while let Some(frame) = attachment.events.next().await {
             if let Event::IntentAck {
@@ -121,6 +123,36 @@ async fn typed(host: &bingo_core::Host, cwd: &std::path::Path, line: &str) -> In
     })
     .await
     .unwrap()
+}
+
+/// A drawn button naming a trust line, pressed on the person's own surface,
+/// is the drawer's word: refused before anything is looked up or trusted.
+#[tokio::test]
+async fn a_pressed_button_cannot_grant_trust() {
+    let home = tempfile::tempdir().unwrap();
+    let host = bingo_core::Host::build(
+        vec![],
+        bingo_core::HostConfig::new(Env::rooted(home.path())),
+    )
+    .await
+    .unwrap();
+    let action = Action {
+        name: "plugins".into(),
+        args: json!("trust evil full"),
+    };
+    let outcome = submitted(
+        &host,
+        home.path(),
+        Input::action(action, Origin::surface("tui")),
+    )
+    .await;
+    assert!(
+        matches!(&outcome, IntentOutcome::Rejected { error } if error.code == ErrorCode::PermissionDenied),
+        "{outcome:?}"
+    );
+    let saved = settings::read_document(&settings::user_path(host.env())).unwrap_or_default();
+    assert!(saved.get("pluginTrust").is_none(), "{saved:?}");
+    host.shutdown().await;
 }
 
 /// The person typed `/plugins enable lift`; the link made it a trust line.
