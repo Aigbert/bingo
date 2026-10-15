@@ -164,7 +164,9 @@ impl Invocation {
         Self {
             surface: match input {
                 Input::Text { origin, .. } => origin.render_surface,
-                Input::Action { .. } => None,
+                Input::Action { origin, .. } => {
+                    origin.as_ref().and_then(|origin| origin.render_surface)
+                }
             },
             line: bingo_sdk::command::recorded_line(&parsed.typed()).into(),
             origin: Origin {
@@ -576,6 +578,25 @@ mod tests {
             "/guide do the thing\n\nRead the guide.",
             "the typed line is the item's first line and its only record"
         );
+    }
+
+    #[test]
+    fn an_action_keeps_render_metadata_without_person_authority() {
+        let input = Input::action(
+            Action {
+                name: "model".into(),
+                args: serde_json::Value::String(String::new()),
+            },
+            Origin::surface("plugin:picker").on(bingo_sdk::render::SurfaceName::Terminal),
+        );
+        let invocation = Invocation::of(&input, &parse(&input).unwrap());
+        assert_eq!(
+            invocation.surface,
+            Some(bingo_sdk::render::SurfaceName::Terminal)
+        );
+        assert!(!asked(&input));
+        assert!(!may_run_shell(&input));
+        assert_eq!(invocation.origin.principal, None);
     }
 
     /// The bareness the fold reads a person's own line by is the same bareness
