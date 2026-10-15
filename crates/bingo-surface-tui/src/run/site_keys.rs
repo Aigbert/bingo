@@ -166,6 +166,7 @@ pub(super) fn answered(run: &mut Run, intent: &IntentId, outcome: &IntentOutcome
                 &mut run.ui,
                 &run.session.tree,
                 &action,
+                vouched(result),
                 run.detection.now(),
             );
             run.apply(effects);
@@ -194,7 +195,13 @@ fn palette_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
     let effects = if let Ok(action) =
         serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
     {
-        crate::palette::result(&mut run.ui, &run.session.tree, &action, now)
+        crate::palette::result(
+            &mut run.ui,
+            &run.session.tree,
+            &action,
+            vouched(result),
+            now,
+        )
     } else if result["handled"] == false {
         input::palette_edit(&mut run.ui, &run.session.tree, pending.key, now)
     } else {
@@ -282,6 +289,12 @@ fn browse_answer(run: &mut Run, outcome: &IntentOutcome) {
             crate::browse::result(&mut run.ui, &run.session.tree, &action, run.detection.now());
         run.apply(effects);
     }
+}
+
+/// Only the kernel writes `drawnBy` into an ack, never a mod's answer: the
+/// answer itself sits under `surface`.
+fn vouched(result: &serde_json::Value) -> bool {
+    result["drawnBy"].is_string()
 }
 
 pub(super) fn notices(run: &mut Run) {

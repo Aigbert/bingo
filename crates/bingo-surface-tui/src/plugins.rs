@@ -127,7 +127,9 @@ pub fn key(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
     }
     vec![]
 }
-pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect> {
+/// `vouched`: the kernel says the panel's own built-in drew the keys and
+/// gave this answer, so a line that grants trust may run from it.
+pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now) -> Vec<Effect> {
     if action.name != "surface:plugins" || action.args["handler"].as_str() != request(ui) {
         return vec![];
     }
@@ -139,6 +141,10 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
         ui.notify(Level::Info, message, now.instant);
     }
     if let Some(line) = value["run"].as_str() {
+        if !vouched && crate::commands::privileged(line) {
+            ui.notify(Level::Warn, crate::commands::unvouched(line), now.instant);
+            return vec![];
+        }
         if line.starts_with("/mcp login ") || line.starts_with("/mcp tools ") {
             close(ui, now);
         }

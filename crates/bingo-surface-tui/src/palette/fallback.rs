@@ -103,7 +103,8 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
             if let Some((_, value)) = rows.get(at) {
                 let mut action = props.action;
                 action.args["value"] = value.clone();
-                return result(ui, tree, &action, now);
+                // The client drew these rows itself; no mod answered.
+                return result(ui, tree, &action, true, now);
             }
         }
         _ => {

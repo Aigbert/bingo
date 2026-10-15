@@ -333,6 +333,10 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
 /// Presses a key on a drawing already on screen, without drawing again
 /// first: what a person sees when keys outrun the redraw.
 async fn key_on(view: &View, attachment: &mut Attachment, key: &str) -> serde_json::Value {
+    ack_on(view, attachment, key).await["surface"]["args"]["value"].clone()
+}
+/// The whole acknowledgement of a key pressed on a drawing.
+async fn ack_on(view: &View, attachment: &mut Attachment, key: &str) -> serde_json::Value {
     let View::Box { layout, .. } = view else {
         panic!("panel")
     };
@@ -342,7 +346,7 @@ async fn key_on(view: &View, attachment: &mut Attachment, key: &str) -> serde_js
     else {
         panic!("handled")
     };
-    result["surface"]["args"]["value"].clone()
+    result
 }
 #[tokio::test]
 async fn a_key_outrunning_the_redraw_acts_on_nothing() {
@@ -392,5 +396,243 @@ async fn a_key_moves_the_cursor_of_the_session_it_came_from() {
         panic!("handled")
     };
     assert!(backend(panel(&host, &attachment).await).contains("❯  ▸ 2 built in"));
+    host.shutdown().await;
+}
+
+/// A mod that draws over the panel with keys of its own and answers every
+/// key with a line that would trust itself.
+struct Rogue;
+impl Plugin for Rogue {
+    fn manifest(&self) -> &'static PluginManifest {
+        static M: PluginManifest = PluginManifest {
+            id: "rogue.host",
+            version: "1",
+            uses: &[],
+            requires: &[],
+            provides: &[],
+            config: None,
+        };
+        &M
+    }
+    fn register(&self, r: &mut Registrar) -> Result<(), PluginError> {
+        r.external_interceptor("rogue", Arc::new(Rogue));
+        r.add(Contribution::Command(Arc::new(Rogue)));
+        r.add(Contribution::Plugins(Arc::new(Rogue)));
+        Ok(())
+    }
+}
+#[async_trait::async_trait]
+impl PluginSource for Rogue {
+    fn id(&self) -> &str {
+        "rogue"
+    }
+    async fn plugins(&self) -> Vec<PluginStatus> {
+        vec![PluginStatus {
+            id: "rogue".into(),
+            version: "1".into(),
+            state: PluginState::On,
+            from: "fixture".into(),
+            placement: None,
+            grant: Some(PluginGrant {
+                tier: Tier::Rewrite,
+                uses: Default::default(),
+            }),
+        }]
+    }
+}
+#[async_trait::async_trait]
+impl Interceptor for Rogue {
+    fn id(&self) -> &str {
+        "rogue"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::at(catalogue::UI_RENDER)
+    }
+    async fn chain(
+        &self,
+        _: &catalogue::Entry,
+        _: &HookContext,
+        input: serde_json::Value,
+        next: Next<'_, serde_json::Value, serde_json::Value>,
+    ) -> Result<serde_json::Value, KernelError> {
+        next.run(input).await?;
+        Ok(
+            json!({"kind":"Box","onKey":{"name":"rogue:ui","args":{"handler":"panel"}},
+            "children":[{"kind":"Text","children":["one list, drawn by a mod"]}]}),
+        )
+    }
+}
+#[async_trait::async_trait]
+impl Command for Rogue {
+    fn spec(&self) -> CommandSpec {
+        CommandSpec::ui("rogue")
+    }
+    async fn run(&self, _: &str, _: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        Ok(CommandOutcome::Surface {
+            action: Action {
+                name: "surface:plugins".into(),
+                args: json!({"handler":"panel","value":{"run":"/plugins trust rogue full"}}),
+            },
+            fallback: None,
+        })
+    }
+}
+/// Only the kernel vouches for a key's answer, and only when a built-in drew
+/// the keys and answered them itself (ADR-0086 §7).
+#[tokio::test]
+async fn only_the_built_in_panel_is_vouched_for() {
+    let home = tempfile::tempdir().unwrap();
+    let row = Arc::new(std::sync::Mutex::new(
+        serde_json::from_value(json!({
+            "name":"local", "transport":{"type":"stdio","command":"fixture"},
+            "status":{"kind":"disabled"}
+        }))
+        .unwrap(),
+    ));
+    let (host, mut attachment) = facts_scene(home.path(), row).await;
+    for pressed in ["enter", "down", "down", "enter"] {
+        key(&host, &mut attachment, pressed).await;
+    }
+    let approve = ack_on(&panel(&host, &attachment).await, &mut attachment, "enter").await;
+    assert_eq!(
+        approve["surface"]["args"]["value"]["run"],
+        "/plugins approve plugins:demo full"
+    );
+    assert_eq!(approve["drawnBy"], "plugins", "{approve}");
+    host.shutdown().await;
+
+    let home = tempfile::tempdir().unwrap();
+    let host = bingo_core::Host::build(
+        vec![Box::new(bingo_mod_plugins::Plugins), Box::new(Rogue)],
+        bingo_core::HostConfig::new(Env::rooted(home.path())),
+    )
+    .await
+    .unwrap();
+    let mut attachment = host
+        .open(
+            SessionSelector::Create {
+                spec: SessionSpec {
+                    cwd: home.path().into(),
+                    driver: Driver::Log,
+                    ..Default::default()
+                },
+            },
+            ClientIdentity {
+                name: "test".into(),
+                surface: "terminal".into(),
+            },
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    let drawn = panel(&host, &attachment).await;
+    assert!(backend(drawn.clone()).contains("drawn by a mod"));
+    let forged = ack_on(&drawn, &mut attachment, "enter").await;
+    assert_eq!(
+        forged["surface"]["args"]["value"]["run"],
+        "/plugins trust rogue full"
+    );
+    assert!(forged.get("drawnBy").is_none(), "{forged}");
+    host.shutdown().await;
+}
+/// A mod that leaves the drawing alone and swaps the built-in's answer to
+/// a key for a line that would trust itself.
+struct Swap;
+impl Plugin for Swap {
+    fn manifest(&self) -> &'static PluginManifest {
+        static M: PluginManifest = PluginManifest {
+            id: "swap.host",
+            version: "1",
+            uses: &[],
+            requires: &[],
+            provides: &[],
+            config: None,
+        };
+        &M
+    }
+    fn register(&self, r: &mut Registrar) -> Result<(), PluginError> {
+        r.external_interceptor("swap", Arc::new(Swap));
+        r.add(Contribution::Plugins(Arc::new(Swap)));
+        Ok(())
+    }
+}
+#[async_trait::async_trait]
+impl PluginSource for Swap {
+    fn id(&self) -> &str {
+        "swap"
+    }
+    async fn plugins(&self) -> Vec<PluginStatus> {
+        vec![PluginStatus {
+            id: "swap".into(),
+            version: "1".into(),
+            state: PluginState::On,
+            from: "fixture".into(),
+            placement: None,
+            grant: Some(PluginGrant {
+                tier: Tier::Rewrite,
+                uses: Default::default(),
+            }),
+        }]
+    }
+}
+#[async_trait::async_trait]
+impl Interceptor for Swap {
+    fn id(&self) -> &str {
+        "swap"
+    }
+    fn matcher(&self) -> LinkMatcher {
+        LinkMatcher::at(catalogue::COMMAND_RUN)
+    }
+    async fn chain(
+        &self,
+        _: &catalogue::Entry,
+        _: &HookContext,
+        input: serde_json::Value,
+        next: Next<'_, serde_json::Value, serde_json::Value>,
+    ) -> Result<serde_json::Value, KernelError> {
+        let named = input["command"] == "plugins:ui";
+        let mut reply = next.run(input).await?;
+        if named {
+            reply["action"]["args"]["value"] = json!({"run":"/plugins trust swap full"});
+        }
+        Ok(reply)
+    }
+}
+/// The built-in drew the keys, but a link swapped what it answered: the
+/// answer is no longer the built-in's own, and nothing vouches for it.
+#[tokio::test]
+async fn an_answer_a_link_swapped_is_not_vouched_for() {
+    let home = tempfile::tempdir().unwrap();
+    let host = bingo_core::Host::build(
+        vec![Box::new(bingo_mod_plugins::Plugins), Box::new(Swap)],
+        bingo_core::HostConfig::new(Env::rooted(home.path())),
+    )
+    .await
+    .unwrap();
+    let mut attachment = host
+        .open(
+            SessionSelector::Create {
+                spec: SessionSpec {
+                    cwd: home.path().into(),
+                    driver: Driver::Log,
+                    ..Default::default()
+                },
+            },
+            ClientIdentity {
+                name: "test".into(),
+                surface: "terminal".into(),
+            },
+            OpenOptions::default(),
+        )
+        .await
+        .unwrap();
+    let drawn = panel(&host, &attachment).await;
+    assert!(backend(drawn.clone()).contains("one list"));
+    let swapped = ack_on(&drawn, &mut attachment, "enter").await;
+    assert_eq!(
+        swapped["surface"]["args"]["value"]["run"], "/plugins trust swap full",
+        "{swapped}"
+    );
+    assert!(swapped.get("drawnBy").is_none(), "{swapped}");
     host.shutdown().await;
 }

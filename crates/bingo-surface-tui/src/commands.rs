@@ -61,6 +61,27 @@ pub fn local(line: &str) -> Option<Local> {
     }
 }
 
+/// A line that grants trust or lets a repository's code run. Only the
+/// person may write one: it runs from a site's answer only when the kernel
+/// vouches that a built-in drew the site and answered the key itself
+/// (ADR-0086 §7). These are the commands that refuse without person input.
+pub fn privileged(line: &str) -> bool {
+    let Some((name, args)) = split(line.trim()) else {
+        return false;
+    };
+    let verb = args.split_whitespace().next().unwrap_or_default();
+    match name {
+        "plugins" | "modules" => matches!(verb, "trust" | "approve"),
+        "mcp" | "acp" => verb == "approve",
+        _ => false,
+    }
+}
+
+/// What the person is told when a view bingo did not draw asks for one.
+pub fn unvouched(line: &str) -> String {
+    format!("not run: {line} came from a view bingo did not draw; type it yourself")
+}
+
 /// `/name args` split into its two halves — the actor's own parse (ADR-0008
 /// §1), read back by whoever recognises a line rather than dispatching it.
 pub fn split(line: &str) -> Option<(&str, &str)> {

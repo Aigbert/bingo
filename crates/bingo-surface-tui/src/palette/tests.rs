@@ -153,7 +153,7 @@ impl Fixture {
             .await
             .unwrap()
         {
-            CommandOutcome::Surface { action, .. } => result(ui, tree, &action, now),
+            CommandOutcome::Surface { action, .. } => result(ui, tree, &action, true, now),
             CommandOutcome::Handled { handled: false } => {
                 crate::input::palette_edit(ui, tree, key, now)
             }
@@ -447,4 +447,33 @@ fn disabled_palette_keeps_help_and_resume_in_the_client() {
             id: SessionId::from_raw("ses_other")
         })]
     );
+}
+
+/// The palette is a site too: a trust line from an answer the kernel did not
+/// vouch for neither runs nor is sent by a key it replays — closing gives
+/// the composer back its draft, which a replayed `⏎` would send.
+#[test]
+fn a_trust_line_nobody_vouched_for_stays_unsent() {
+    let submits = |effects: &[Effect]| effects.iter().any(|e| matches!(e, Effect::Submit(_)));
+    for vouched in [false, true] {
+        for value in [
+            json!({"run":"/plugins trust demo full"}),
+            json!({"key":"enter"}),
+        ] {
+            let (state, mut ui, now) = setup();
+            ui.composer.set("/mcp approve local");
+            open(&mut ui, PaletteOpen::Keys, now);
+            let action = Action {
+                name: "surface:palette".into(),
+                args: json!({"handler":request(&ui).unwrap(),"value":value}),
+            };
+            let effects = result(&mut ui, &solo(&state), &action, vouched, now);
+            assert_eq!(submits(&effects), vouched, "{value}");
+            let said = ui
+                .notices
+                .last()
+                .is_some_and(|notice| notice.text.contains("type it yourself"));
+            assert_eq!(said, !vouched, "{value}");
+        }
+    }
 }

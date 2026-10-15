@@ -224,7 +224,9 @@ pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     fallback::key(ui, tree, key, now)
 }
 
-pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect> {
+/// `vouched`: the kernel says the palette's own built-in drew the keys and
+/// gave this answer, so a line that grants trust may run from it.
+pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now) -> Vec<Effect> {
     if action.name != "surface:palette" || action.args["handler"].as_str() != request(ui) {
         return Vec::new();
     }
@@ -238,6 +240,9 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
     }
     if let Some(key) = value["key"].as_str().and_then(crate::keys::commands::event) {
         close(ui, now);
+        if !vouched && crate::commands::privileged(ui.composer.text()) {
+            return refuse(ui, ui.composer.text().to_string(), now);
+        }
         return crate::input::on_key(ui, tree, key, now);
     }
     if value["close"] == true {
@@ -245,6 +250,9 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
     }
     if let Some(line) = value["run"].as_str() {
         close(ui, now);
+        if !vouched && crate::commands::privileged(line) {
+            return refuse(ui, line.into(), now);
+        }
         return crate::input::command_line(ui, tree, now, line.into());
     }
     if let Some(id) = value["view"].as_str() {
@@ -257,6 +265,12 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, now: Now) -> Vec<Effect
             id: SessionId::from_raw(id),
         })];
     }
+    Vec::new()
+}
+
+/// A line only the person may write stays in the composer for them to send.
+fn refuse(ui: &mut Ui, line: String, now: Now) -> Vec<Effect> {
+    ui.notify(Level::Warn, crate::commands::unvouched(&line), now.instant);
     Vec::new()
 }
 

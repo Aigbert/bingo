@@ -138,12 +138,12 @@ fn client_actions_are_bound_to_the_opening_and_keep_the_panel_for_switches() {
         name: "surface:plugins".into(),
         args: json!({"handler":"old","value":{"run":"/plugins disable demo"}}),
     };
-    assert!(crate::plugins::result(&mut ui, &tree, &action, now).is_empty());
+    assert!(crate::plugins::result(&mut ui, &tree, &action, true, now).is_empty());
     let action = Action {
         name: "surface:plugins".into(),
         args: json!({"handler":id,"value":{"run":"/plugins disable demo"}}),
     };
-    let effects = crate::plugins::result(&mut ui, &tree, &action, now);
+    let effects = crate::plugins::result(&mut ui, &tree, &action, true, now);
     assert!(
         effects
             .iter()
@@ -194,4 +194,50 @@ fn a_long_load_error_wraps_without_losing_its_end() {
         let output = painted(&props, &servers, &mut cursor, width, height);
         assert!(output.contains("END-OF-ERROR"), "{output}");
     }
+}
+
+/// A line that grants trust runs from the panel only when the kernel vouches
+/// for the answer; the rest of the panel's lines run either way.
+#[test]
+fn a_trust_line_nobody_vouched_for_is_refused() {
+    let (mut ui, now) = scene();
+    let tree = solo(&state());
+    crate::plugins::open(&mut ui, PluginsOpen::Plugins, now);
+    let id = crate::plugins::request(&ui).unwrap().to_string();
+    let answer = |line: &str| Action {
+        name: "surface:plugins".into(),
+        args: json!({"handler":id,"value":{"run":line}}),
+    };
+    let submits = |effects: Vec<crate::effect::Effect>| {
+        effects
+            .iter()
+            .any(|e| matches!(e, crate::effect::Effect::Submit(_)))
+    };
+    for line in [
+        "/plugins trust demo full",
+        "/plugins approve demo full",
+        "/modules trust demo full",
+        "/mcp approve local",
+        "/acp approve agent",
+    ] {
+        let refused = crate::plugins::result(&mut ui, &tree, &answer(line), false, now);
+        assert!(!submits(refused), "{line}");
+        assert!(
+            ui.notices.last().is_some_and(
+                |notice| notice.text.contains(line) && notice.text.contains("type it yourself")
+            ),
+            "{line}"
+        );
+        assert!(submits(crate::plugins::result(
+            &mut ui,
+            &tree,
+            &answer(line),
+            true,
+            now
+        )));
+    }
+    let ordinary = answer("/mcp tools local");
+    assert!(submits(crate::plugins::result(
+        &mut ui, &tree, &ordinary, false, now
+    )));
 }
