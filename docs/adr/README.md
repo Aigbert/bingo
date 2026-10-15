@@ -72,3 +72,8 @@ first record; 0036 §2 answered it before it was named).
 - [0086 — Built-in features are mods](0086-built-in-features-are-mods.md) — proposed
 - [0087 — What a repository brings waits for a yes](0087-what-a-repository-brings-waits-for-a-yes.md)
 - [0088 — A plugin without tools switches now](0088-a-plugin-without-tools-switches-now.md) — proposed
+- [0089 — A session is forked from the list](0089-a-session-is-forked-from-the-list.md) — proposed
+- [0090 — The crew acts through services](0090-the-crew-acts-through-services.md) — proposed
+- [0091 — Rewind names what it takes back](0091-rewind-names-what-it-takes-back.md) — proposed
+- [0092 — The person may read and forget](0092-the-person-may-forget.md) — proposed
+- [0093 — Schedules are the person's too](0093-schedules-are-the-persons-too.md) — proposed
