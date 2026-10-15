@@ -13,16 +13,18 @@ const SCRIPT: &str = r#"{"responses":[{"steps":[{"text":"unused"}]}]}"#;
 const SECRET: &str = "sk-dummy-picker-must-never-be-drawn-or-journaled";
 async fn command(session: &mut Attachment, name: &str, args: serde_json::Value) -> IntentOutcome {
     let intent = IntentId::mint();
-    session.handle.submit(
-        intent.clone(),
-        Input::Action {
-            origin: Some(Origin::surface("rpc")),
-            action: Action {
+    let origin = Origin::surface("rpc").on(render::SurfaceName::Terminal);
+    let input = match args.as_str() {
+        Some(args) => Input::text(format!("/{name} {args}"), origin),
+        None => Input::action(
+            Action {
                 name: name.into(),
                 args,
             },
-        },
-    );
+            origin,
+        ),
+    };
+    session.handle.submit(intent.clone(), input);
     ack_for(session, &intent).await
 }
 async fn request(kernel: &impl HostApi, session: &mut Attachment) -> render::RenderRequest {
@@ -644,5 +646,42 @@ async fn a_switch_from_any_client_is_a_line_in_the_transcript() {
             recorded.body,
             ItemBody::Notice { ref text, .. } if text == message
         ));
+    }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn typed_surface_opens_the_picker_independently_of_attribution() {
+    let mut server = Server::spawn(SCRIPT);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    for surface in [
+        None,
+        Some(render::SurfaceName::Text),
+        Some(render::SurfaceName::Terminal),
+    ] {
+        let intent = IntentId::mint();
+        let origin = Origin {
+            render_surface: surface,
+            ..Origin::surface("tui")
+        };
+        session
+            .handle
+            .submit(intent.clone(), Input::text("/model", origin));
+        let outcome = ack_for(&mut session, &intent).await;
+        assert!(
+            matches!(outcome, IntentOutcome::Applied { .. }),
+            "{outcome:?}"
+        );
+        session = reopen(&kernel, &session).await;
+        let picker = slot::placed(&session.snapshot).into_iter().any(|placed| {
+            matches!(
+                placed.slot, slot::Slot::Pane { view: slot::Shown::Pull { request }, .. }
+                if request.component == render::Component::ModelPicker
+            )
+        });
+        assert_eq!(picker, surface == Some(render::SurfaceName::Terminal));
     }
 }

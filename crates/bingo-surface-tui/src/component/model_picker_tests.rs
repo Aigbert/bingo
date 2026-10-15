@@ -140,9 +140,7 @@ fn model_chords_submit_their_bound_lines_without_opening() {
             KeyEvent::new(KeyCode::Char(letter), KeyModifiers::ALT),
             now,
         );
-        assert!(
-            matches!(&effects[..],[crate::effect::Effect::Submit(Input::Text{text,..})] if text==line)
-        );
+        assert!(matches!(&effects[..], [crate::effect::Effect::Run(text)] if text == line));
         assert!(!ui.focus.showing());
         assert!(!draw_sized(80, 24, &state, &mut ui, now).contains("pinned ·"));
     }

@@ -146,7 +146,8 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
                         .as_ref()
                         .is_some_and(|spec| spec.aliases.iter().any(|alias| alias == query))
             });
-            if !exact && spec.is_some_and(|spec| !spec.opens && !matches!(spec.args, ArgSpec::None)) {
+            if !exact && spec.is_some_and(|spec| !spec.opens && !matches!(spec.args, ArgSpec::None))
+            {
                 json!({"edit":format!("/{name} ")})
             } else {
                 json!({"run":format!("/{name}")})

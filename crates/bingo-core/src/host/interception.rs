@@ -60,7 +60,7 @@ pub(super) async fn catalogue_answer(
         .await,
     };
     if kind == CatalogKind::Models {
-        super::catalog_limits::apply(host, &resolved, &mut catalog.entries);
+        super::catalog::limits::apply(host, &resolved, &mut catalog.entries);
         for entry in &mut catalog.entries {
             if entry.meta.get("context").is_some() || pins.contains(&entry.id) {
                 entry.meta["pinned"] = serde_json::json!(pins.contains(&entry.id));

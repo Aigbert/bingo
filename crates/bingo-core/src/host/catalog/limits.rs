@@ -1,9 +1,15 @@
 //! Publish resolved limits through the catalogue so clients share the switch ruler.
-use super::*;
 use crate::context::budget::Thresholds;
+use crate::host::Host;
+use bingo_sdk::{CatalogEntry, Provider};
 use serde_json::json;
+use std::sync::Arc;
 
-pub(super) fn apply(host: &Host, providers: &[Arc<dyn Provider>], entries: &mut [CatalogEntry]) {
+pub(in crate::host) fn apply(
+    host: &Host,
+    providers: &[Arc<dyn Provider>],
+    entries: &mut [CatalogEntry],
+) {
     for entry in entries {
         let Some((id, model)) = entry.id.split_once('/') else {
             continue;

@@ -103,3 +103,8 @@ attachment. Typed `CommandRun.surface` keeps interaction independent of
 attribution IDs and preserves text callers' fallback. The Composer surface
 action prefills editing; `Acknowledged` forwards an existing command result
 without repeating its record or action.
+
+M166 adds `bingo-mod-models`, raising the member budget 419 → 420 without
+external dependencies. Its command interceptor reads `CommandRun.surface`;
+its pulled pane uses the shared pane focus action and key queue. Internal
+commands carry the models plugin's signed origin, never a person's identity.

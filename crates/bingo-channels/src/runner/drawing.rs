@@ -242,6 +242,7 @@ mod tests {
         runner.deliverer.expecting_input(
             intent.clone(),
             Input::Action {
+                origin: Some(bingo_sdk::Origin::surface("channels")),
                 action: Action {
                     name: "fixture:ui".into(),
                     args: json!({"handler":"minted"}),

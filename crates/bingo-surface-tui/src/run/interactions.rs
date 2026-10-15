@@ -22,12 +22,12 @@ pub(super) fn refocus_at(run: &mut Run, now: jiff::Timestamp) {
     if changed && let Some(open) = open {
         run.ui.dialog.aside = !matches!(open.kind, bingo_sdk::InteractionKind::Login { .. })
             && (crate::sessions::active(&run.ui)
-            || crate::palette::active(&run.ui)
-            || crate::plugins::active(&run.ui)
-            || crate::ask::aside::recent(
-                run.received_asks.get(&open.id).copied().unwrap_or(now),
-                run.ui.last_typed,
-            ));
+                || crate::palette::active(&run.ui)
+                || crate::plugins::active(&run.ui)
+                || crate::ask::aside::recent(
+                    run.received_asks.get(&open.id).copied().unwrap_or(now),
+                    run.ui.last_typed,
+                ));
     }
 }
 

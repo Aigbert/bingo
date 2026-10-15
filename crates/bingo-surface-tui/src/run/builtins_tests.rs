@@ -181,7 +181,7 @@ async fn a_key_names_only_itself_never_the_drawing_it_was_pressed_on() {
         .unwrap();
     run.terminal_event(Term::Key(typed('x')));
     assert!(
-        matches!(&session.submitted()[0], Input::Action { action } if action.args["value"] == json!({"key":"x"})),
+        matches!(&session.submitted()[0], Input::Action { action, .. } if action.args["value"] == json!({"key":"x"})),
         "{:?}",
         session.submitted()
     );

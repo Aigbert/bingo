@@ -7,7 +7,6 @@ mod approval;
 mod ask;
 mod auth;
 mod catalog;
-mod catalog_limits;
 mod choose;
 mod completion;
 mod config;

@@ -5,6 +5,8 @@
 //! sources' both (ADR-0030 §2) — so a plugin's provider is listed by the one
 //! reader that lists every other, and its models by the one that lists theirs.
 
+pub(super) mod limits;
+
 use std::sync::Arc;
 
 use bingo_sdk::*;

@@ -1,7 +1,6 @@
 # M166 — The model picker
 
-ADR-0085 §8, ADR-0084 (`ModelPicker`, first interaction site),
-ADR-0086 (a built-in mod). Needs M167's seam.
+ADR-0085 §8, ADR-0084 (`ModelPicker`), ADR-0086; uses M167’s seam.
 Approved prototype: https://claude.ai/artifact/XWoqqyP8Jch6p5889dL1ZB
 
 ## Goal
@@ -12,12 +11,10 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
 
 ## Bricks
 
-1. **Site.** `Component::ModelPicker`, props
-   `{ filter, selected, scope, effort, sheet }` (ADR-0084 §1),
-   `surfaces()` terminal and desktop; schema and TypeScript; snapshot.
-2. **Catalogue with meta.** The mod reads `catalog(Models)` and
-   `catalog(Providers)` with `meta` through the host, refreshed on
-   `CatalogChanged`.
+1. **Site.** `Component::ModelPicker`, props `{ filter, selected, scope, effort, sheet }`
+   (ADR-0084 §1); terminal/desktop, schema, TypeScript and snapshot.
+2. **Catalogue with meta.** Host `catalog(Models)` and `catalog(Providers)`
+   supply `meta`; refresh on `CatalogChanged`.
 3. **List, pure.** `picker::rows(models, providers, filter, show_all)
    -> Vec<Row>`: pinned group first, then one group per provider with
    its state (`●` ok, `○` signed out, `◌` unchecked/checking, `✗`
@@ -35,8 +32,7 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
    effort, `tab` scope, `*` pin, `+` add, `⏎` act, `esc` back one layer
    (ADR-0086 §6). `/model next` (next pin) and `/think next` (next of
    `efforts`, wrapping) declare `alt+m` and `alt+t` (ADR-0086 §5).
-   Opening the picker sends `/models refresh <id>` for each unchecked
-   provider. Typing a filter never acts.
+   Open probes unchecked providers with `/models refresh <id>`; filters never act.
 7. **Sheets.** Manage (test, change address, replace key, refresh,
    sign out — disabled for `from: env` —, remove with confirm, use
    anyway); sign-in (browser, device, paste) using the existing
@@ -46,16 +42,19 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
    (`picker::guess`, pure, table test), then `/provider add`, then the
    pasted key answers the paste interaction, then "pick one".
 8. **Transcript line.** The mod draws the `⇄` outcome lines of M164
-   dim with the glyph in ember; the `SessionStatus` drawing remains owned by M170; reconcile `model ∴ effort` at its merge.
-9. **Direct entries.** `/think`, `/login <id>`, `/logout <id>`,
-   `/models` open the panel at the matching place when given no
-   arguments; with arguments they act as today.
+   dim with the glyph in ember; M170 owns `SessionStatus` and its status hub.
+9. **Direct entries.** Bare `/think`, `/login`, `/logout`, `/models` open the
+   matching place; arguments act as today.
 
 ## Decisions
 
-- `command.run` lacked the submitting surface, so it gained an optional `origin`
-  for the terminal-only picker opening. M170's typed `CommandRun.surface` wins:
-  `origin` and the `"tui"` filter are dropped when this branch rebases after M170.
+- Rebased onto dev `46843d78`: removed `CommandRun.origin` in its introducing
+  commit. `CommandRun.surface` selects terminal opening; signed `Input::Action`
+  attributes internal commands to the models plugin. No contract extension.
+- The existing `Pane` action focuses the picker; shared `site_keys` handles its
+  key queue, like memory/status panes. No parallel lifecycle or pager is added.
+  No picker line is run by the TUI and no composer prefill is needed; future
+  such actions must use owner vouching and `composer::fill` respectively.
 - The site mounts in a focused, bottom-anchored pulled pane (18 rows at 80×24);
   a late pane keeps its focus request. The mod owns filter and sheets; the pane
   title names a placement in words ("own place ▾"), never the wire's `rect`.
@@ -94,16 +93,14 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
 - The catalogue publishes resolved limits, `switchAt` and, through the
   `bingo.modelSwitch` service, the kernel's own compact-before-switch decision;
   the mod never recomputes either. A context nobody reported draws "—".
-- Chords are checked at the surface; cycling and refresh at host/RPC boundaries.
-- Guides are owning-crate Pages. Existing dependencies are reused; the new
-  workspace member raises the normal-tree budget by one.
+- Surface tests cover chords; host/RPC tests cover cycling and refresh. Guides
+  are crate Pages; the full TUI guide splits provider details into `tui-providers`,
+  keeping “Choosing a model” in `guide.md`. One member budget entry is added.
 
 ## Files
 
-- SDK site and command-origin contracts; generated schema and TypeScript.
-- `bingo-mod-models`; binary registration; owning-crate guides and snapshots.
-- Core cycling, catalogue limits, command origin and error propagation.
-- Generic TUI sealed paste, pane focus and semantic text tone; smoke scenario.
+SDK contracts/generators; `bingo-mod-models`, bin, crate guides/snapshots; core
+cycling/catalogue/errors; generic TUI paste/focus/text and smoke coverage.
 
 ## Exit criteria
 
@@ -118,62 +115,36 @@ Facts come from M164/M165 catalogues. The surface gains no picker code.
       switch, keep, pin, sign-in chain, add by paste, down provider,
       compact-before-switch. Screenshots compared with the prototype.
 - [x] tui-smoke scenario and native gates pass.
-- [ ] Windows checks for mods/TUI/bin await the MSVC C toolchain
-      (aws-lc-sys/rquickjs-sys); SDK/core/models mod pass.
+- [ ] Windows: 19 touched crates pass; 9 await MSVC C headers/compiler
+      for aws-lc-sys, rquickjs-sys or tree-sitter (details below).
 
 ## Non-goals
 
-Desktop/chat drawings; the merged palette; mouse; editing `models` overrides from the panel.
-Follow-ups (round 2, not fixed): type-ahead dropped while a pane opens;
-`--provider fake --model fake/fake-1` reports `fake/fake/fake-1`; the masked
-line says "pasted" for a typed key.
+Desktop/chat drawings, mouse, editing `models` overrides. Existing follow-ups:
+type-ahead while opening; `--model fake/fake-1` double prefix; typed keys say "pasted".
 
 ## Risks
 
-- alt+m/alt+t collide with a plugin band hotkey (`band::hotkey`): the
-  static binding wins; documented in the models mod's guide.
-- Alt as ESC-prefix: covered by `late.rs` and the tmux drive.
-- A pasted key must never be drawn unmasked or reach the journal:
-  test the frame text and the journal.
-
-## Verified — 2026-10-15 (review fixes)
-
-Runs unset OPENAI_*/ANTHROPIC_*; drives use an owned tmux socket, a temp HOME, the fake provider.
-
-```text
-cargo fmt --all -- --check: exit 0
-cargo clippy --workspace --all-targets --locked -- -D warnings: Finished, exit 0
-RUST_TEST_THREADS=4 cargo test --workspace --locked: 5777 passed; 0 failed; 6 ignored
-bash scripts/check_discipline.sh: discipline ok
-bash scripts/budget.sh: 415/415 dependencies; warm core 1s; isolation 0; budget ok
-cargo deny check: advisories ok, bans ok, licenses ok, sources ok
-bash scripts/tui-smoke.sh (3 runs): tui-smoke ok ×3
-node --test src/*.test.ts (sdk/typescript): pass 31; fail 0
-cargo check -p bingo-mod-models -p bingo-sdk -p bingo-core --all-targets
-  --target x86_64-pc-windows-msvc: exit 0
-tmux 108×30 and 80×24: `/model fake/other` → "⇄ other · fake …", status fake/other;
-  palette /model ⏎ opens "own place ▾"; ⏎ during the opening probes uses the drawn
-  fake-1; a 200-char dummy paste draws "••••••••  pasted" on one line, bare sk- opens
-  the address row; the dummy is in no frame and no file under the temp HOME;
-  palette `/model fak` ⏎ opens "1 match for “fak”".
-cargo test -p bingo --test model_picker_tmux --locked -- --ignored: 1 passed
-  (owned socket, wiremock; 18 captures, none says "rect")
-```
+- Static alt+m/alt+t win over band hotkeys; documented in the mod’s guide.
+- Alt as ESC-prefix: covered by `late.rs` and tmux.
+- A pasted key must never be drawn unmasked or journaled: test both.
 
 ## Verified — 2026-10-15
 
-Round 2. Runs unset OPENAI_*/ANTHROPIC_*; drives use an owned socket and temp HOME.
-
-```text
-cargo fmt --all -- --check: exit 0 · cargo check/clippy -D warnings --workspace: exit 0
-RUST_TEST_THREADS=4 cargo test --workspace --locked --no-fail-fast: 5782 passed; 0 failed;
-  6 ignored (a first run stopped on pty look::…within_one_focus; alone 3/3 pass)
-check_discipline: discipline ok · budget: 415/415, budget ok · cargo deny: all ok
-tui-smoke.sh ×3: tui-smoke ok · schema/TypeScript regenerated: no change
-windows msvc: sdk, core, mod-models, mod-palette exit 0; channels, surface-print,
-  surface-tui, bingo stop at aws-lc-sys (C toolchain deferral)
-tmux, openai list alpha…gamma: /model openai/ Down Enter → openai/beta;
-  Down Down Enter → openai/delta; /model zeta → "⏎ use fake/zeta", Enter → fake/zeta
-/ledger key-to-frame, debug, fake provider, 35 keys per run, median/mean/max ms:
-  dev 5422cac4 92/90/119, 91/89/117 · this branch 91/90/120, 93/96/224 (no regression)
-```
+Earlier reviews: 5782 Rust / 31 TS passed, 6 ignored; native gates and smoke ×3 passed.
+Prior local drives covered secret masking/journal absence, stored selection and provider sheets.
+Rebase onto `46843d78`: resolved contracts in their introducing commits; one final glue commit; all runs unset `OPENAI_*`/`ANTHROPIC_*`.
+- `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked`: Finished.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: Finished, exit 0.
+- `RUST_TEST_THREADS=4 cargo test --workspace --locked --no-fail-fast`: 6039 passed; 0 failed; 6 ignored.
+- After moving catalogue limits under `catalog/` to meet host.rs's line budget: 6038 passed; 1 PTY focus timing failure; 6 ignored. The focus test passed alone (1 passed). An earlier rewind timeout also passed alone and in the green full run; both are recorded wall-clock flakes.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --lib catalogue::`: 6 passed; `cargo test -p bingo-mods --lib dollar` with the same flag: 17 passed.
+- `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc --lib`: 134 + 19 passed; `git status --short`: empty after regeneration.
+- `node --test sdk/typescript/src/*.test.ts`: tests 32; pass 32; fail 0.
+- `bash scripts/check_discipline.sh`: exit 0 (existing warnings); run.rs 956 non-test lines, `impl Run` in 3 files.
+- `bash scripts/budget.sh`: dependencies 420 (max 420), warm core 0s, relink isolation 0 crates; budget ok (target-size warning).
+- `cargo deny check`: advisories ok, bans ok, licenses ok, sources ok.
+- `bash scripts/tui-smoke.sh` three consecutive runs: tui-smoke ok ×3; Ada persisted at every tested width.
+- Isolated `tmux -L m166rb -f /dev/null`, temp HOME, fake provider: 108×30 and 80×24 picker open/filter/Enter/Escape, zeta and fake/ choices, status/plugins/sessions/memory and ctrl+f browse passed. Full filter text is checked with paced input; burst input can still be dropped during handoffs/redraws (existing type-ahead follow-up); an extra full-drive repeat stalled on sessions Escape after the completed drive passed it.
+- `cargo check -p <each touched crate> --all-targets --target x86_64-pc-windows-msvc --locked`: 19 passed, including SDK/core/models/palette; 9 deferred on C-toolchain errors (missing stdlib.h/stdio.h/windows.h or unsupported MSVC flags), with no Rust errors reported.
+- Deferred crates: bingo, auth-oauth, channels, mcp, mods, permissions, plugin-rpc, surface-print, surface-tui; aws-lc-sys/rquickjs-sys/tree-sitter builds require the MSVC C toolchain.

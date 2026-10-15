@@ -34,7 +34,9 @@ impl Interceptor for Commands {
             .insert(cx.session.clone(), picker.clone());
         crate::state::publish(&cx.host, &cx.session, &picker).await?;
         probe(&cx.host, &cx.session, &providers);
-        Ok(json!({"kind":"surface","action":{"name":"ModelPicker","args":{}},"fallback":fallback}))
+        Ok(
+            json!({"kind":"surface","action":{"name":"Pane","args":{"plugin":"bingo.mod.models","id":picker.id}},"fallback":fallback}),
+        )
     }
 }
 /// Ask every provider not yet heard from, all at once and after the picker is up: its

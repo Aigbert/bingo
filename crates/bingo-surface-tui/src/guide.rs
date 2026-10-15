@@ -9,14 +9,21 @@ use std::sync::Arc;
 
 use bingo_sdk::{Contribution, Page, Pages, Registrar};
 
-pub static PAGES: Pages = Pages(&[Page {
-    name: "tui",
-    description: "The terminal surface a person sits in front of: every key it \
+pub static PAGES: Pages = Pages(&[
+    Page {
+        name: "tui",
+        description: "The terminal surface a person sits in front of: every key it \
                   binds, the two commands it answers itself, `@` mentions and \
                   pasted pictures in the composer, which terminals draw \
                   pictures, and the `tui.measure` and `update.check` settings.",
-    body: include_str!("guide.md"),
-}]);
+        body: include_str!("guide.md"),
+    },
+    Page {
+        name: "tui-providers",
+        description: "Manage provider instances, addresses and credentials from the terminal.",
+        body: include_str!("guide-providers.md"),
+    },
+]);
 
 /// The page under the key every plugin registers its pages by.
 pub fn contribution(registrar: &Registrar) -> Contribution {
@@ -31,10 +38,11 @@ mod tests {
     use crate::keys::BINDINGS;
 
     fn page() -> &'static Page {
-        let [page] = PAGES.0 else {
-            panic!("one page");
-        };
-        page
+        PAGES
+            .0
+            .iter()
+            .find(|page| page.name == "tui")
+            .expect("terminal page")
     }
 
     /// Every chord this surface binds is a chord a person can be told about.
@@ -87,8 +95,10 @@ mod tests {
     #[test]
     fn the_page_is_one_line_of_description_and_a_body_worth_reading() {
         assert_eq!(page().name, "tui");
-        assert!(!page().description.contains('\n'));
-        assert!(page().description.chars().count() < 250);
-        assert!(page().body.lines().count() < 200);
+        for page in PAGES.0 {
+            assert!(!page.description.contains('\n'));
+            assert!(page.description.chars().count() < 250);
+            assert!(page.body.lines().count() < 200);
+        }
     }
 }

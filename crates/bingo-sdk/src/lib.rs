@@ -45,7 +45,9 @@ pub mod view;
 pub use agent::{
     Agent, AgentEvent, AgentStream, AgentTurn, CallKind, CallLocation, ExternalCall, Judge,
 };
-pub use command::{ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec, KeyBinding, split_verb};
+pub use command::{
+    ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec, KeyBinding, split_verb,
+};
 pub use compactor::{CompactContext, CompactError, CompactReason, Compaction, Compactor};
 pub use contributor::{
     CONTRIBUTOR_PREFIX, ContextContributor, ContextError, ContextPiece, ContextQuery, Placement,

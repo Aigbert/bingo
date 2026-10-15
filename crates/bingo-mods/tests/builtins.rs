@@ -173,7 +173,10 @@ async fn javascript_key_handler_preserves_handled_false() {
         action.args["value"] = json!({"key":key});
         let outcome = command(
             &mut attachment,
-            Input::action(action, Origin::surface("tui").on(render::SurfaceName::Terminal)),
+            Input::action(
+                action,
+                Origin::surface("tui").on(render::SurfaceName::Terminal),
+            ),
         )
         .await;
         assert!(
@@ -234,7 +237,10 @@ async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
     action.args["value"] = json!({"key":"2"});
     let outcome = command(
         &mut attachment,
-        Input::action(action, Origin::surface("tui").on(render::SurfaceName::Terminal)),
+        Input::action(
+            action,
+            Origin::surface("tui").on(render::SurfaceName::Terminal),
+        ),
     )
     .await;
     let IntentOutcome::Applied { result } = outcome else {
@@ -524,7 +530,10 @@ async fn outside_wraps_model_picker_and_disabled_uses_engine() {
     assert!(matches!(
         command(
             &mut attachment,
-            Input::text("/model", Origin::surface("tui").on(render::SurfaceName::Terminal))
+            Input::text(
+                "/model",
+                Origin::surface("tui").on(render::SurfaceName::Terminal)
+            )
         )
         .await,
         IntentOutcome::Applied { .. }
@@ -648,7 +657,10 @@ async fn opening_checks_an_unchecked_provider_once_and_refreshes_the_tree() {
         assert!(matches!(
             command(
                 &mut attachment,
-                Input::text("/model", Origin::surface("tui").on(render::SurfaceName::Terminal))
+                Input::text(
+                    "/model",
+                    Origin::surface("tui").on(render::SurfaceName::Terminal)
+                )
             )
             .await,
             IntentOutcome::Applied { .. }
