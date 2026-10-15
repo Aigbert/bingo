@@ -164,9 +164,12 @@ impl ChannelsSurface {
                 addressed,
                 ..
             } => self.admits(adapter, conversation, principal, *addressed),
-            // A click came off a button this surface put there.
-            Incoming::Click { conversation, .. } => Some(conversation),
-            Incoming::Action {
+            Incoming::Click {
+                conversation,
+                principal,
+                ..
+            }
+            | Incoming::Action {
                 conversation,
                 principal,
                 ..

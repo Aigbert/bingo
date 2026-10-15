@@ -134,6 +134,7 @@ impl Runner {
 
     pub(super) async fn pressed(
         &mut self,
+        principal: &str,
         session: SessionId,
         id: &str,
         mut action: Action,
@@ -154,7 +155,7 @@ impl Runner {
             action.args["value"] = value;
         }
         let intent = IntentId::mint();
-        let input = Input::action(action, bingo_sdk::Origin::surface(super::SURFACE_ID));
+        let input = Input::action(action, incoming_origin(principal, &self.key));
         self.handle.submit(intent.clone(), input.clone());
         self.deliverer.expecting_input(intent, input);
     }
@@ -348,7 +349,13 @@ mod tests {
         assert!(runner.drawing("answer-1").is_some());
         assert!(runner.drawing(&format!("answer-{REMEMBERED}")).is_some());
         runner
-            .pressed(first.session, &first.request.request_id, action, None)
+            .pressed(
+                "member",
+                first.session,
+                &first.request.request_id,
+                action,
+                None,
+            )
             .await;
         assert!(
             matches!(adapter.records().last(), Some(Record::Send { text, .. })
@@ -357,5 +364,35 @@ mod tests {
         let before = renders(&host);
         runner.redraw(&[first.request.request_id]).await;
         assert_eq!(renders(&host), before);
+    }
+    #[tokio::test]
+    async fn a_drawn_control_keeps_the_member_who_pressed_it() {
+        let (mut runner, _, _) = runner(true, true).await;
+        let submitted = Arc::new(crate::host::tests::TestSession::default());
+        runner.handle = bingo_sdk::SessionHandle(submitted.clone());
+        answer(&mut runner).await;
+        let (mut drawing, at) = runner.drawn.front().unwrap().clone();
+        let action = Action {
+            name: "permission".into(),
+            args: json!("bypassPermissions"),
+        };
+        drawing.view =
+            serde_json::from_value(json!({"kind":"Button","children":["Press"],"onPress":action}))
+                .unwrap();
+        runner.remember(drawing.clone(), at);
+        runner
+            .heard(Incoming::Action {
+                conversation: runner.conversation.clone(),
+                principal: "member".into(),
+                session: drawing.session,
+                request_id: drawing.request.request_id,
+                action,
+                value: None,
+            })
+            .await;
+        assert_eq!(
+            submitted.origins(),
+            [incoming_origin("member", &runner.key)]
+        );
     }
 }

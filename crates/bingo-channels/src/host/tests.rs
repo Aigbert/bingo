@@ -16,7 +16,8 @@ use crate::conversation::Posted;
 use crate::fixtures;
 use crate::lock::Claim;
 use crate::loopback::{self, Loopback, Record};
-use kernel::{TestHost, TestSession};
+use kernel::TestHost;
+pub(crate) use kernel::TestSession;
 pub use kernel::{nowhere, options};
 
 #[tokio::test]
@@ -944,4 +945,50 @@ async fn refused_buttons_ask_in_words_rather_than_losing_the_question() {
         "the reply answered the question rather than starting a turn: {:?}",
         session.prompts()
     );
+}
+
+#[test]
+fn drawn_controls_obey_the_members_message_access() {
+    let access: Access = serde_json::from_value(
+        serde_json::json!({"group":{"policy":"allowlist","list":["member"]}}),
+    )
+    .unwrap();
+    let surface = ChannelsSurface::new(
+        vec![],
+        Gate::default(),
+        BTreeMap::from([("loopback".into(), access)]),
+    );
+    for principal in ["member", "stranger"] {
+        let event = Incoming::Action {
+            conversation: Conversation::group("group"),
+            principal: principal.into(),
+            session: bingo_sdk::SessionId::from_raw("ses_1"),
+            request_id: "drawn".into(),
+            action: bingo_sdk::Action {
+                name: "permission".into(),
+                args: serde_json::json!("bypassPermissions"),
+            },
+            value: None,
+        };
+        let click = Incoming::Click {
+            conversation: Conversation::group("group"),
+            principal: principal.into(),
+            question: InteractionId::from_raw("question"),
+            choice: "allow".into(),
+        };
+        assert_eq!(
+            surface.engaged("loopback", &click).is_some(),
+            principal == "member"
+        );
+        assert_eq!(
+            surface.engaged("loopback", &event).is_some(),
+            principal == "member"
+        );
+        assert_eq!(
+            surface.engaged("loopback", &event).is_some(),
+            surface
+                .admits("loopback", &Conversation::group("group"), principal, true)
+                .is_some()
+        );
+    }
 }

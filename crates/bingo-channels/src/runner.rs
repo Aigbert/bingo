@@ -470,12 +470,16 @@ impl Runner {
                 question, choice, ..
             } => self.clicked(&question, &choice).await,
             Incoming::Action {
+                principal,
                 session,
                 request_id,
                 action,
                 value,
                 ..
-            } => self.pressed(session, &request_id, action, value).await,
+            } => {
+                self.pressed(&principal, session, &request_id, action, value)
+                    .await
+            }
         }
     }
 

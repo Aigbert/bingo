@@ -80,7 +80,7 @@ impl TestSession {
             .iter()
             .filter_map(|(_, input)| match input {
                 Input::Text { origin, .. } => Some(origin.clone()),
-                Input::Action { .. } => None,
+                Input::Action { origin, .. } => origin.clone(),
             })
             .collect()
     }
