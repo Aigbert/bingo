@@ -20,32 +20,95 @@ impl Interceptor for Drawing {
     async fn chain(
         &self,
         _: &catalogue::Entry,
-        _: &HookContext,
+        cx: &HookContext,
         value: Value,
         _: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
         let request: render::RenderRequest = serde_json::from_value(value).map_err(crate::error)?;
-        let props: SessionsProps = serde_json::from_value(request.props).map_err(crate::error)?;
-        let mut state = self.0.lock().map_err(crate::error)?;
-        let cursor = state
-            .cursors
-            .entry((props.session.clone(), request.request_id.clone()))
-            .or_default();
+        let props: SessionsProps =
+            serde_json::from_value(request.props.clone()).map_err(crate::error)?;
+        let (view, wanted) = {
+            let mut state = self.0.lock().map_err(crate::error)?;
+            let cursor = state
+                .cursors
+                .entry((props.session.clone(), request.request_id.clone()))
+                .or_default();
+            self.drawn(cursor, &props, &request)
+        };
+        let owner = (props.session.clone(), request.request_id.clone());
+        crate::probe::start(self.0.clone(), cx.host.clone(), owner, wanted, props.now);
+        serde_json::to_value(view).map_err(crate::error)
+    }
+}
+impl Drawing {
+    /// The directory as it stands, and what its visible rows still need.
+    fn drawn(
+        &self,
+        cursor: &mut Cursor,
+        props: &SessionsProps,
+        request: &render::RenderRequest,
+    ) -> (View, crate::probe::Wanted) {
         cursor.sync(&props.query);
-        let rows = crate::rows::listed(&props, cursor);
+        let rows = crate::rows::listed(props, cursor);
         if cursor.selected.is_none() {
             cursor.selected = rows.first().map(|row| row.target.clone());
         }
-        serde_json::to_value(tree(
-            &props,
+        let wanted = if matches!(cursor.sheet, Sheet::None | Sheet::Rename { .. }) {
+            let visible = visible(&rows, cursor, room(request.viewport.rows));
+            crate::probe::wanted(&mut cursor.probed, &visible, props)
+        } else {
+            crate::probe::Wanted::default()
+        };
+        let view = tree(
+            props,
             &rows,
             cursor,
             &request.request_id,
             request.viewport.rows,
             request.viewport.columns,
-        ))
-        .map_err(crate::error)
+        );
+        (view, wanted)
     }
+}
+/// Lines left for rows under the header and above the rule and hint.
+fn room(height: u16) -> usize {
+    usize::from(height).saturating_sub(3)
+}
+/// Lines a row takes: itself, where it was forked from, and its first ask.
+fn height(row: &Row) -> usize {
+    1 + usize::from(row.provenance.is_some()) + usize::from(row.first_ask.is_some())
+}
+/// The first line drawn, keeping the selection near the middle.
+fn first_line(selected: usize, lines: usize, room: usize) -> usize {
+    selected
+        .saturating_sub(room / 2)
+        .min(lines.saturating_sub(room))
+}
+/// The rows with a line on screen, in the window `directory` draws.
+fn visible<'a>(rows: &'a [Row], cursor: &Cursor, room: usize) -> Vec<&'a Row> {
+    let owners: Vec<usize> = rows
+        .iter()
+        .enumerate()
+        .flat_map(|(index, row)| std::iter::repeat_n(index, height(row)))
+        .collect();
+    let selected = owners
+        .iter()
+        .position(|&index| cursor.selected.as_ref() == Some(&rows[index].target))
+        .unwrap_or(0);
+    let mut shown: Vec<&Row> = Vec::new();
+    for &index in owners
+        .iter()
+        .skip(first_line(selected, owners.len(), room))
+        .take(room)
+    {
+        if shown
+            .last()
+            .is_none_or(|last| !std::ptr::eq(*last, &rows[index]))
+        {
+            shown.push(&rows[index]);
+        }
+    }
+    shown
 }
 pub(crate) fn tree(
     props: &SessionsProps,
@@ -77,7 +140,7 @@ pub(crate) fn tree(
         )),
         width,
     )];
-    let room = usize::from(height).saturating_sub(3);
+    let room = room(height);
     let lines = match &cursor.sheet {
         Sheet::None | Sheet::Rename { .. } => directory(rows, cursor, room, width, props, request),
         Sheet::Loading(_) => vec![dim(" loading…")],
@@ -162,9 +225,7 @@ fn directory(
             lines.push(dim(format!("     {}\"{ask}\"", "  ".repeat(row.depth))));
         }
     }
-    let start = selected_line
-        .saturating_sub(room / 2)
-        .min(lines.len().saturating_sub(room));
+    let start = first_line(selected_line, lines.len(), room);
     lines.into_iter().skip(start).take(room).collect()
 }
 fn confirmation(doomed: &[crate::verbs::Deletion], room: usize) -> Vec<View> {

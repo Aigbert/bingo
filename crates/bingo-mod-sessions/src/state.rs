@@ -13,6 +13,7 @@ pub(crate) struct Cursor {
     pub sheet: Sheet,
     /// Why the last verb was refused, until the next key.
     pub refusal: Option<String>,
+    pub probed: crate::probe::Probed,
 }
 #[derive(Default)]
 pub(crate) enum Sheet {

@@ -291,6 +291,81 @@ async fn a_blocked_delete_says_why_and_enter_deletes_nothing() {
     );
 }
 
+/// Paints until the probes the first paint started have answered.
+async fn settled(
+    fixture: &Fixture,
+    ui: &mut Ui,
+    tree: &Tree,
+    now: Now,
+    size: (u16, u16),
+) -> String {
+    let mut screen = fixture.paint(ui, tree, now, size.0, size.1).await;
+    for _ in 0..50 {
+        tokio::task::yield_now().await;
+        let next = fixture.paint(ui, tree, now, size.0, size.1).await;
+        if next == screen {
+            break;
+        }
+        screen = next;
+    }
+    screen
+}
+
+#[tokio::test]
+async fn visible_rows_learn_foreign_locks_and_unlisted_fork_sources() {
+    let fixture = Fixture::new(rows());
+    fixture
+        .host
+        .on_open_elsewhere(|id| async move { Ok(id.as_str() == "fixture") });
+    fixture.host.on_summary(|id| async move {
+        if id.as_str() == "far-source" {
+            let mut source = summary("far-source", "the original plan");
+            source.history.messages = None;
+            Ok(source)
+        } else {
+            Err(KernelError::new(ErrorCode::SessionNotFound, "gone"))
+        }
+    });
+    let mut far = summary("far-fork", "a fork of something older");
+    far.history.forked_from = Some(bingo_sdk::ForkLink {
+        session: SessionId::from_raw("far-source"),
+        turn: None,
+    });
+    let mut lost = summary("lost-fork", "a fork of something deleted");
+    lost.history.forked_from = Some(bingo_sdk::ForkLink {
+        session: SessionId::from_raw("ses_01JDELETEDSOURCE42"),
+        turn: None,
+    });
+    for (width, height) in [(108, 30), (80, 24)] {
+        let (mut ui, tree, now) = setup();
+        if let Some(Open::Sessions(open)) = ui.focus.open_mut() {
+            open.sessions.extend([far.clone(), lost.clone()]);
+        }
+        let screen = settled(&fixture, &mut ui, &tree, now, (width, height)).await;
+        insta::assert_snapshot!(format!("probed_{width}x{height}"), screen);
+        assert!(screen.contains("● open elsewhere"));
+        assert!(screen.contains("⑂ from the original plan"));
+        assert!(screen.contains("⑂ from SOURCE42"));
+    }
+    let calls = fixture.host.calls();
+    let probes = |id: &str| {
+        calls
+            .iter()
+            .filter(|call| {
+                matches!(call, testing::HostCall::OpenElsewhere { session } if session.as_str() == id)
+            })
+            .count()
+    };
+    assert_eq!(probes("fixture"), 2, "once per directory, at each size");
+    assert_eq!(probes("current"), 0, "this session is open here");
+    assert!(
+        !calls
+            .iter()
+            .any(|call| matches!(call, testing::HostCall::Open { .. })),
+        "probing opens nothing"
+    );
+}
+
 #[tokio::test]
 async fn more_filter_and_group_expansion_stay_in_the_directory() {
     let fixture = Fixture::new(rows());

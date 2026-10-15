@@ -22,7 +22,8 @@ pub fn rows(
     query: &str,
     current: &SessionId,
 ) -> Vec<Row> {
-    expanded(summaries, now, query, current, &BTreeSet::new())
+    let probed = crate::probe::Probed::default();
+    expanded(summaries, now, query, current, &BTreeSet::new(), &probed)
 }
 pub(crate) fn expanded(
     summaries: &[SessionSummary],
@@ -30,6 +31,7 @@ pub(crate) fn expanded(
     query: &str,
     current: &SessionId,
     expanded: &BTreeSet<String>,
+    probed: &crate::probe::Probed,
 ) -> Vec<Row> {
     let query = query.to_lowercase();
     let projection = Projection {
@@ -37,6 +39,7 @@ pub(crate) fn expanded(
         query: &query,
         now,
         current,
+        probed,
     };
     let forest = forest(summaries);
     let mut out = Vec::new();
@@ -115,6 +118,7 @@ struct Projection<'a> {
     query: &'a str,
     now: jiff::Timestamp,
     current: &'a SessionId,
+    probed: &'a crate::probe::Probed,
 }
 impl Projection<'_> {
     fn branch(
@@ -137,18 +141,32 @@ impl Projection<'_> {
         }
         if matches(summary, self.query) || !children.is_empty() {
             let mut row = row(summary, self.now, self.current, depth);
-            row.provenance = summary.history.forked_from.as_ref().map(|link| {
-                let source = self
-                    .all
-                    .iter()
-                    .find(|s| s.id == link.session)
-                    .map(|s| crate::verbs::label(s, self.now))
-                    .unwrap_or_else(|| "untitled".into());
-                format!("⑂ from {source}")
-            });
+            if self.probed.elsewhere.get(&summary.id) == Some(&true)
+                && !summary.asking
+                && !summary.busy
+            {
+                row.detail.push_str("   ● open elsewhere");
+            }
+            row.provenance = summary
+                .history
+                .forked_from
+                .as_ref()
+                .map(|link| format!("⑂ from {}", self.source(&link.session)));
             out.push(row);
         }
         out.extend(children);
+    }
+}
+impl Projection<'_> {
+    /// A source on this page names itself; one off it is looked up on
+    /// screen, and until then, or if it is gone, its short id stands in.
+    fn source(&self, id: &SessionId) -> String {
+        self.all
+            .iter()
+            .find(|summary| &summary.id == id)
+            .map(|summary| crate::verbs::label(summary, self.now))
+            .or_else(|| self.probed.sources.get(id).cloned().flatten())
+            .unwrap_or_else(|| crate::probe::short(id))
     }
 }
 fn matches(summary: &SessionSummary, query: &str) -> bool {
@@ -211,6 +229,7 @@ pub(crate) fn listed(props: &component::SessionsProps, cursor: &crate::state::Cu
         &props.query,
         &props.session,
         &cursor.expanded,
+        &cursor.probed,
     );
     if props.sessions.len() > props.limit {
         rows.push(Row {
