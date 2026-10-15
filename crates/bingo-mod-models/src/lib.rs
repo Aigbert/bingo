@@ -2,7 +2,6 @@
 mod bridge;
 pub mod card;
 mod commands;
-mod describe;
 pub mod draw;
 pub mod guess;
 mod guide;
@@ -46,7 +45,6 @@ impl Plugin for Models {
         ))));
         for link in [
             Arc::new(commands::Commands(state.clone())) as Arc<dyn Interceptor>,
-            Arc::new(describe::Describe),
             Arc::new(draw::Drawing(state.clone(), render::Component::ModelPicker)),
             Arc::new(draw::Drawing(state, render::Component::InfoNotice)),
         ] {

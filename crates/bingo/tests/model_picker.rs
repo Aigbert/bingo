@@ -439,3 +439,20 @@ async fn keys_act_on_the_drawn_row_and_never_on_a_heading() {
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("fake-1"));
     assert!(!picker_open(&session));
 }
+#[tokio::test(flavor = "multi_thread")]
+async fn site_commands_keep_their_argument_hints_for_every_surface() {
+    let mut server = Server::spawn(SCRIPT);
+    let kernel = ready(&mut server).await;
+    let specs = kernel
+        .catalog(CatalogKind::Commands)
+        .await
+        .unwrap()
+        .entries
+        .into_iter()
+        .filter_map(|e| serde_json::from_value::<CommandSpec>(e.meta).ok())
+        .collect::<Vec<_>>();
+    for name in ["model", "think", "models", "login", "logout"] {
+        let spec = specs.iter().find(|s| s.name == name).unwrap();
+        assert!(!matches!(spec.args, ArgSpec::None), "{name}");
+    }
+}
