@@ -32,6 +32,10 @@ pub(super) fn answered(open: &Interaction, answer: &Answer) -> Option<ItemBody> 
                 .collect::<Vec<_>>()
                 .join("; "),
         ),
+        (InteractionKind::Form { title, .. }, Answer::Cancel) => (
+            title.clone().unwrap_or_else(|| "Form".into()),
+            "skipped · it decides".into(),
+        ),
         (InteractionKind::Form { title, .. }, _) => (
             title.clone().unwrap_or_else(|| "Form".into()),
             "declined".into(),
@@ -60,6 +64,30 @@ fn words(question: &Question, answer: &Answer) -> String {
             .chain(other.iter().cloned())
             .collect::<Vec<_>>()
             .join(", "),
+        Answer::Cancel => "skipped · it decides".into(),
         _ => "skipped".into(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn cancelled_questions_and_forms_record_the_same_skip() {
+        for kind in [
+            serde_json::json!({"kind":"question","question":"Choose?","options":[],"freeText":true,"multi":false}),
+            serde_json::json!({"kind":"form","questions":[],"title":"Options"}),
+        ] {
+            let open: Interaction = serde_json::from_value(serde_json::json!({
+                "id":"q","session":"s","openedAt":"2026-10-16T00:00:00Z",
+                "kind":kind,"answers":["cancel"]
+            }))
+            .unwrap();
+            let Some(ItemBody::QuestionAnswer { answer, .. }) = answered(&open, &Answer::Cancel)
+            else {
+                panic!("missing answer receipt")
+            };
+            assert_eq!(answer, "skipped · it decides");
+        }
     }
 }

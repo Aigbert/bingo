@@ -73,6 +73,17 @@ pub(crate) fn cancel(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
     let Some((owner, interaction)) = tree.open_interaction() else {
         return Vec::new();
     };
+    if ui.dialog.aside {
+        ui.dialog.aside = false;
+        return Vec::new();
+    }
+    if matches!(
+        interaction.kind,
+        bingo_sdk::InteractionKind::Question(_) | bingo_sdk::InteractionKind::Form { .. }
+    ) && interaction.answers.contains(&bingo_sdk::AnswerSpec::Cancel)
+    {
+        return skip(ui, interaction);
+    }
     ui.dialog.words = None;
     ui.dialog.changing = None;
     ui.dialog.aside = false;
@@ -82,5 +93,19 @@ pub(crate) fn cancel(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
         session: owner.summary.id.clone(),
         interaction: interaction.id.clone(),
         answer: crate::dialog::cancel(interaction),
+    }]
+}
+
+fn skip(ui: &mut Ui, interaction: &bingo_sdk::Interaction) -> Vec<Effect> {
+    if ui.dialog.answered || !interaction.answers.contains(&bingo_sdk::AnswerSpec::Cancel) {
+        return Vec::new();
+    }
+    ui.dialog.words = None;
+    ui.dialog.changing = None;
+    ui.dialog.answered = true;
+    vec![Effect::Answer {
+        interaction: interaction.id.clone(),
+        answer: bingo_sdk::Answer::Cancel,
+        activation: bingo_sdk::Activation::Keyboard,
     }]
 }

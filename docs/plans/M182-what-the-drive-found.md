@@ -43,7 +43,8 @@ drive bugs are gone, each with a test that failed before the fix.
 
 - `crates/bingo-surface-tui/src/{palette.rs,palette/fallback.rs,run/typeahead.rs,component.rs,toast.rs,input/interaction.rs,ask/receipts.rs}` and the pager key routing.
 - `crates/bingo-mod-palette`, `crates/bingo-mod-models/{card.rs,keys.rs,rows.rs,commands.rs}`, `crates/bingo-mod-ask`.
-- `crates/bingo-core/src/host/catalog.rs`.
+- `crates/bingo-core/src/host/catalog.rs`, interaction receipts, `bingo-tool-fs/src/ask.rs`,
+  the TUI crate guide, and isolated question smoke coverage.
 
 ## Exit criteria
 
@@ -74,3 +75,9 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
   viewport. Padding shorter answers keeps the header steady while narrowing.
 - Root Backspace and Escape retain the palette owner's close/back semantics;
   ordinary edits and horizontal cursor movement stay with the composer.
+- Question/form Escape sends the existing `Cancel` answer without an interrupt.
+  The receipt says `skipped · it decides`; the question tool returns a successful
+  skip result so the model continues. Permission and sign-in refusal stay intact.
+  Escape from a draft set aside returns to its ask, as ADR-0095 §4 requires.
+- An interaction that does not offer `Cancel` cannot accept a skip. Preserve its
+  interrupt-only escape route; do not invent an unsupported answer or trap focus.

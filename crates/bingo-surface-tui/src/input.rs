@@ -1591,10 +1591,10 @@ mod tests {
         press(&mut ui, &state, key(KeyCode::Enter), now);
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::StopInteraction {
-                session: state.summary.id.clone(),
+            vec![Effect::Answer {
                 interaction: state.interactions[0].id.clone(),
-                answer: Some(Answer::Cancel),
+                answer: Answer::Cancel,
+                activation: Activation::Keyboard,
             }]
         );
     }
@@ -1717,10 +1717,10 @@ mod tests {
         ui.dialog.focus_on(state.interactions.first());
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::StopInteraction {
-                session: state.summary.id.clone(),
+            vec![Effect::Answer {
                 interaction: state.interactions[0].id.clone(),
-                answer: Some(Answer::Cancel),
+                answer: Answer::Cancel,
+                activation: Activation::Keyboard,
             }]
         );
     }

@@ -16,8 +16,9 @@ where you are, the window used against the whole, and the model.
 - `shift+enter` — a newline. `ctrl+j`, `alt+enter` and `\` then `enter` do the
   same, for terminals that cannot tell the first one apart from `enter`.
 - `esc` — one ordered stack, innermost first: a sheet, then the card that is
-  asking (leaving it is its own cancel or denial), then the dropdown, then the
-  running turn. **One `esc` ends a turn**: every call in flight is dropped
+  asking, then the dropdown, then the running turn. A question or form is skipped
+  and the model continues; a permission ask is denied and stops the turn. From
+  a draft set aside, Escape returns to the ask. **One `esc` on a running turn ends it**: every call in flight is dropped
   where it stands, a shell command's process group with it, and the activity
   row says `Stopping…` from the frame the key was pressed.
 - `esc esc` — on an empty composer, the turns of this transcript newest first,
@@ -51,7 +52,7 @@ where you are, the window used against the whole, and the model.
 - `shift+tab` — cycle the permission mode.
 - `1-9 · y/a/n` — answer the open dialog. `ctrl+e` — expand its preview.
 - `ctrl+o` — open the newest fold one rung further, and again until it is
-  whole. It only ever opens; `esc` comes back.
+  whole. In the pager, `esc`, `q` or `ctrl+o` closes it without answering an ask.
 - `ctrl+b` — background the running command.
 - `/ · !` — `/` opens commands in the palette; `!` runs a shell line in the session's directory.
 - `click` — on a picture, open it. Mouse reporting has to reach us at all:

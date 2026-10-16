@@ -552,4 +552,21 @@ await 'you: Route: Beta'
 pane
 finish
 
+step 'M182: Escape skips a question and the turn continues'
+start '{"responses":[
+  {"steps":[{"toolCall":{"name":"AskUserQuestion","input":{"questions":[{"question":"Which route?","header":"Route","options":[{"label":"Alpha"},{"label":"Beta"}]}]}}}]},
+  {"steps":[{"text":"Skipped question; continued."}]}]}' 'BINGO_MOTION=off'
+keys 'choose for me' Enter
+await 'Which route?'
+if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+await 'something else'
+keys -l "$(printf '\033[27u')"
+await 'Skipped question; continued.'
+await 'skipped · it decides'
+if pane | grep -qF '[Request interrupted by user]'; then
+  echo 'tui-smoke: skipping the question interrupted its turn' >&2
+  exit 1
+fi
+finish
+
 echo 'tui-smoke ok'

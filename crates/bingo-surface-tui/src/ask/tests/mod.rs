@@ -254,7 +254,7 @@ fn ctrl_g_leaves_the_change_editor_and_the_hint_names_it() {
 }
 
 #[test]
-fn escape_ends_the_turn_from_aside_and_from_the_change_editor() {
+fn escaping_aside_returns_to_the_ask_but_the_change_editor_stops() {
     for editing in [false, true] {
         let (tree, mut ui, now) = scene_for(permission(None, None), true);
         if editing {
@@ -265,6 +265,13 @@ fn escape_ends_the_turn_from_aside_and_from_the_change_editor() {
             assert!(ui.dialog.aside);
         }
         let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
+        if !editing {
+            assert!(effects.is_empty());
+            assert!(!ui.dialog.aside);
+            assert_eq!(ui.composer.text(), "x");
+            assert!(!ui.dialog.answered);
+            continue;
+        }
         assert!(matches!(
             effects.as_slice(),
             [crate::effect::Effect::StopInteraction {
@@ -295,5 +302,24 @@ fn pager_close_keys_leave_the_underlying_ask_unanswered() {
         assert!(!ui.dialog.answered);
         assert!(ui.stop_asked.is_none());
         assert!(tree.open_interaction().is_some());
+    }
+}
+
+#[test]
+fn escaping_questions_and_forms_skips_without_stopping() {
+    for open in [question(false, true), form()] {
+        let (tree, mut ui, now) = scene_for(open, false);
+        let id = tree.open_interaction().unwrap().1.id.clone();
+        assert_eq!(
+            crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now),
+            vec![crate::effect::Effect::Answer {
+                interaction: id,
+                answer: Answer::Cancel,
+                activation: bingo_sdk::Activation::Keyboard,
+            }]
+        );
+        assert!(ui.stop_asked.is_none());
+        assert!(ui.dialog.answered);
+        assert!(crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now).is_empty());
     }
 }

@@ -253,6 +253,11 @@ impl Tool for AskUserQuestionTool {
             .ask(interaction(&args), answer_specs())
             .await
             .map_err(|e| ToolError::Failed(format!("the questions were not put: {e}")))?;
+        if answer == Answer::Cancel {
+            return Ok(ToolOutput::text(
+                "The user skipped these questions; decide how to proceed.",
+            ));
+        }
         let Answer::Form { answers } = answer else {
             return Ok(ToolOutput::error(declined(&args)));
         };
@@ -555,15 +560,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn skipping_questions_returns_control_to_the_model() {
+        let (out, _) = ask(one_question(), vec![Answer::Cancel]).await;
+        assert!(!out.is_error);
+        assert_eq!(
+            out.parts[0].as_text(),
+            Some("The user skipped these questions; decide how to proceed.")
+        );
+    }
+
+    #[tokio::test]
     async fn declining_is_an_error_result_that_says_so() {
-        for answer in [Answer::Cancel, Answer::Deny { feedback: None }] {
-            let (out, _) = ask(one_question(), vec![answer]).await;
-            assert!(out.is_error);
-            assert_eq!(
-                out.parts[0].as_text(),
-                Some("The user declined to answer: Which authentication method?")
-            );
-        }
+        let (out, _) = ask(one_question(), vec![Answer::Deny { feedback: None }]).await;
+        assert!(out.is_error);
+        assert_eq!(
+            out.parts[0].as_text(),
+            Some("The user declined to answer: Which authentication method?")
+        );
     }
 
     #[tokio::test]

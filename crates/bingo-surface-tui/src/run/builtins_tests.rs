@@ -187,7 +187,7 @@ async fn a_key_names_only_itself_never_the_drawing_it_was_pressed_on() {
     );
 }
 #[tokio::test]
-async fn escape_stops_the_asking_session_in_every_ask_state() {
+async fn escape_returns_from_aside_and_otherwise_stops_permission_asks() {
     for child_asks in [false, true] {
         for editing in ["list", "aside", "change"] {
             let root = Arc::new(TestSession::default());
@@ -235,8 +235,16 @@ async fn escape_stops_the_asking_session_in_every_ask_state() {
             } else {
                 (&root, &child)
             };
-            assert_eq!(asking.interrupts(), 1, "{child_asks} {editing}");
-            assert_eq!(asking.answers().len(), 1, "{child_asks} {editing}");
+            assert_eq!(
+                asking.interrupts(),
+                usize::from(editing != "aside"),
+                "{child_asks} {editing}"
+            );
+            assert_eq!(
+                asking.answers().len(),
+                usize::from(editing != "aside"),
+                "{child_asks} {editing}"
+            );
             assert_eq!(other.interrupts(), 0);
             assert!(other.answers().is_empty());
         }
@@ -622,7 +630,7 @@ async fn escape_discards_keys_waiting_for_the_asking_sessions_handle() {
         run.typeahead.is_empty(),
         "discard its queued follow-up key too"
     );
-    for _ in 0..2 {
+    for _ in 0..1 {
         let reply = tokio::time::timeout(Duration::from_secs(1), waiting.recv())
             .await
             .unwrap()
@@ -639,9 +647,9 @@ async fn escape_discards_keys_waiting_for_the_asking_sessions_handle() {
         child.submitted().is_empty(),
         "a late open must not revive the key"
     );
-    assert_eq!(child.interrupts(), 1);
-    assert_eq!(child.answers().len(), 1);
-    assert!(root.answers().is_empty());
+    assert_eq!(child.interrupts(), 0);
+    assert!(child.answers().is_empty());
+    assert_eq!(root.answers()[0].1, bingo_sdk::Answer::Cancel);
 }
 
 #[tokio::test(start_paused = true)]
