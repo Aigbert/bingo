@@ -22,6 +22,8 @@ pub struct Acts {
 #[derive(Clone, Debug)]
 pub struct Entry {
     pub name: std::borrow::Cow<'static, str>,
+    /// The doc comment lines of the catalogue row; empty for a service face.
+    pub doc: &'static [&'static str],
     pub kind: Kind,
     pub shapes_request: bool,
     pub input: Shape,
@@ -51,6 +53,7 @@ impl Entry {
     pub fn face(name: String, input: Schema, result: Schema) -> Self {
         Self {
             name: name.into(),
+            doc: &[],
             kind: Kind::Chain,
             shapes_request: false,
             input: Shape::Declared(input),
@@ -61,6 +64,12 @@ impl Entry {
             valid_input: |_| true,
             valid_result: |_| true,
         }
+    }
+
+    /// What the event is and what `next` does, from the row's doc comment.
+    pub fn description(&self) -> Option<String> {
+        let lines: Vec<&str> = self.doc.iter().map(|line| line.trim()).collect();
+        (!lines.is_empty()).then(|| lines.join(" "))
     }
 
     /// The same point holding `pinned` in place of the catalogue's pins; a
@@ -105,10 +114,10 @@ impl JsonSchema for Entry {
 }
 
 macro_rules! catalogue {
-    ($($id:ident: $name:literal, $kind:ident, $input:ty => $result:ty,
+    ($($(#[doc = $doc:literal])+ $id:ident: $name:literal, $kind:ident, $input:ty => $result:ty,
         $matcher:expr, $pinned:expr, $acts:expr $(, $shapes:literal)?;)+) => {
         $(pub const $id: &Entry = &Entry {
-            name: std::borrow::Cow::Borrowed($name), kind: Kind::$kind,
+            name: std::borrow::Cow::Borrowed($name), kind: Kind::$kind, doc: &[$($doc),+],
             input: Shape::Rust(|| schemars::schema_for!($input)), result: Shape::Rust(|| schemars::schema_for!($result)),
             matcher: $matcher, pinned: $pinned, acts: $acts,
             shapes_request: false $(|| $shapes)?,
@@ -135,35 +144,116 @@ const WATCH: Acts = Acts {
 };
 
 catalogue! {
+    /// A press on a control a mod drew: `handler` is the token its `onPress`
+    /// or `onKey` became, `value` what the surface sent. `next` runs that
+    /// handler; return `{handled: false}` to give a key back to the surface.
     UI_PRESS: "ui.press", Chain, crate::render::HandlerEvent => Option<crate::render::HandlerResult>, &["handler", "event"], &["/handler", "/event"], WRAP;
+    /// Text entered in an `Input` a mod drew (`onInput`, `onSubmit`): `value`
+    /// is the text. `next` runs the handler.
     UI_INPUT: "ui.input", Chain, crate::render::HandlerEvent => (), &["handler", "event"], &["/handler", "/event"], WRAP;
+    /// A choice made in a `Select` a mod drew (`onSelect`): `value` is the
+    /// chosen option. `next` runs the handler.
     UI_SELECT: "ui.select", Chain, crate::render::HandlerEvent => (), &["handler", "event"], &["/handler", "/event"], WRAP;
+    /// A surface asks for a component (`component`, a site such as `Pane` or
+    /// `AbovePrompt`) at `requestId`, sized by `viewport`, with that site's
+    /// `props`. Return a view tree to draw it; `next` returns what the rest of
+    /// the chain, ending in bingo's own drawing, would draw. Render hooks read
+    /// state but never write it.
     UI_RENDER: "ui.render", Chain, crate::render::RenderRequest => crate::View, &["component", "requestId", "surface"], &["/component", "/requestId", "/surface", "/viewport"], WRAP;
 
+    /// A plugin asks to load, naming itself, its version, origin and runtime.
+    /// `next` returns the grant trust settings give it; return a narrower grant,
+    /// or `{reason}` to refuse the plugin. A grant is never widened here.
     PLUGIN_REGISTER: "plugin.register", Chain, crate::PluginRegistration => crate::PluginDecision, &["name", "origin", "runtime"], &["/name", "/version", "/origin", "/runtime"], WRAP;
+    /// Input from a person or client reaches the session, before the kernel
+    /// decides turn, queue, steer or deliver. `next` admits it as given; return
+    /// `{accepted: input}` with changed input, `{rejected: error}` to refuse it,
+    /// or `{redirect: {session, input}}` to send it to another session.
     PROMPT_SUBMIT: "prompt.submit", Chain, crate::Input => crate::SubmitResult, &[], &[], PASS;
+    /// Permission for a tool call, before it runs: `tool`, `tool_use_id` and
+    /// the tool's own arguments beside them. `next` returns bingo's decision
+    /// (settings, mode, or asking the person) with the call; a mod may tighten
+    /// it, and only `full` trust may allow.
     TOOL_CHECK: "tool.check", Chain, ToolCall => crate::CheckResult, &["tool"], &["/tool", "/tool_use_id"], PASS;
+    /// A tool call runs: `tool`, `tool_use_id` and the tool's own arguments
+    /// beside them, not under `input`. `next` runs the tool and returns its
+    /// output; return output to answer without running it, `{deny: reason}` to
+    /// refuse, or call `next` with changed arguments to rewrite them.
     TOOL_CALL: "tool.call", Chain, ToolCall => ToolCallResult, &["tool"], &["/tool", "/tool_use_id"], WRAP;
+    /// A completion a plugin asked of the host through `$.model.complete`;
+    /// `plugin` names the asker. `next` calls the model; return model events
+    /// to answer instead.
     MODEL_COMPLETE: "model.complete", Chain, Complete => Vec<crate::ModelEvent>, &["plugin"], &["/plugin"], WRAP;
+    /// One model call inside a turn. `next` sends the request to the
+    /// configured provider and returns its events or a provider error; return
+    /// events to answer without calling the model.
     TURN_STEP: "turn.step", Chain, crate::ModelRequest => Result<Vec<crate::ModelEvent>, crate::ProviderError>, &[], &[], WRAP, true;
+    /// The model request a turn is about to send: system text, messages and
+    /// tools. `next` returns the request bingo composed; return a changed one
+    /// to add, remove or reorder context.
     PROMPT_COMPOSE: "prompt.compose", Chain, crate::ModelRequest => crate::ModelRequest, &[], &[], WRAP, true;
+    /// Compaction of a session's history: the `items`, the context `usage`,
+    /// the `request`, the `reason` and earlier `failures`. `next` runs bingo's
+    /// summarizing compaction; return a compaction or error to replace it.
     SESSION_COMPACT: "session.compact", Chain, crate::CompactInput => Result<crate::Compaction, crate::CompactError>, &[], &[], WRAP;
+    /// The model has stopped calling tools and the turn would end. `next`
+    /// returns `"complete"` unless a hook asks to go on; return
+    /// `{continue: {origin, reason}}` to keep the turn running, with `reason`
+    /// given back to the model.
     TURN_STOP: "turn.stop", Chain, () => crate::StopResult, &[], &[], PASS;
+    /// A tool as the model will see it: name, description and input schema.
+    /// `next` returns the spec bingo has; return a changed spec to reword it,
+    /// or `null` to hide the tool from the model.
     TOOL_DESCRIBE: "tool.describe", Chain, crate::ToolSpec => Option<crate::ToolSpec>, &["name"], &["/name"], WRAP, true;
+    /// Completions offered while the person types, by `kind` (such as
+    /// `commands` or `models`). `next` returns bingo's catalog; return a changed
+    /// catalog to add, remove or reorder entries.
     PROMPT_AUTOCOMPLETE: "prompt.autocomplete", Chain, crate::Catalog => crate::Catalog, &["kind"], &["/kind"], WRAP;
+    /// Input one session sends to another: `to` is the target and `delivery`
+    /// says whether it wakes the target or waits. `next` delivers it; rewrite
+    /// the input, or deny to stop it.
     SESSION_SEND: "session.send", Chain, Send => (), &["to"], &[], PASS;
+    /// Input reaching this session from elsewhere, such as a channel or another
+    /// session, before it is queued. `next` returns it as received; rewrite it,
+    /// or deny to drop it.
     SESSION_RECEIVE: "session.receive", Chain, crate::Input => crate::Input, &["origin.surface"], &[], PASS;
+    /// A record a plugin appends to the session's history: `plugin` owns it,
+    /// `kind` and `payload` are its own. `next` appends it; only the owning
+    /// plugin may rewrite it, others observe or deny.
     SESSION_APPEND: "session.append", Chain, Append => Append, &["plugin", "kind"], &["/plugin", "/kind"], PASS;
+    /// A turn has ended with its `outcome`, `usage` and final `answer`. `next`
+    /// returns the completion text bingo composes from that (or `null` for
+    /// none); return other text to replace it.
     TURN_COMPLETE: "turn.complete", Chain, Turn => Option<String>, &[], &["/turn", "/outcome", "/usage", "/answer"], WRAP;
+    /// A slash command runs: `command` is its name without the slash and
+    /// `args` the rest of the line. `next` runs the command's own handler;
+    /// return `{text}` or an outcome to answer it yourself.
     COMMAND_RUN: "command.run", Chain, CommandRun => CommandReply, &["command"], &["/command"], WRAP;
+    /// A command as the palette and completions list it. `next` returns the
+    /// spec bingo has; return a changed spec, or `null` to hide the command.
     COMMAND_DESCRIBE: "command.describe", Chain, crate::CommandSpec => Option<crate::CommandSpec>, &["name"], &["/name"], WRAP;
+    /// A setting changes: `key` and its new `value`. `next` stores it; rewrite
+    /// the value, or deny the change.
     CONFIG_SET: "config.set", Chain, ConfigSet => ConfigSet, &["key"], &["/key"], PASS;
+    /// The settings a client sees: the kernel's keys and each plugin's slice.
+    /// `next` returns bingo's view; return a changed view.
     CONFIG_DESCRIBE: "config.describe", Chain, crate::ConfigView => crate::ConfigView, &[], &[], WRAP;
+    /// Observation: a turn opened, with the input items it took and its
+    /// origin. A returned value is ignored.
     TURN_START: "turn.start", Observation, TurnStart => (), &[], &[], WATCH;
+    /// Observation: once per model round, the usage so far and the context
+    /// reading. A returned value is ignored.
     SESSION_MEASURE: "session.measure", Observation, Measure => (), &[], &[], WATCH;
+    /// Observation: a session opened, and again for a mod after it reloads. A
+    /// returned value is ignored.
     SESSION_START: "session.start", Observation, Session => (), &[], &[], WATCH;
+    /// Observation: a session closed. A returned value is ignored.
     SESSION_END: "session.end", Observation, Session => (), &[], &[], WATCH;
+    /// Observation: a client, such as a terminal or chat surface, attached to
+    /// the session. A returned value is ignored.
     SESSION_ATTACH: "session.attach", Observation, Attachment => (), &["client.surface"], &[], WATCH;
+    /// Observation: a client detached from the session. A returned value is
+    /// ignored.
     SESSION_DETACH: "session.detach", Observation, Attachment => (), &["client.surface"], &[], WATCH;
 }
 
@@ -190,7 +280,7 @@ pub fn document() -> Value {
                 serde_json::json!({
                     "kind":entry.kind, "input":entry.input.schema(), "result":entry.result.schema(),
                     "matcher":entry.matcher, "pinned":entry.pinned, "acts":entry.acts,
-                    "shapesRequest":entry.shapes_request,
+                    "shapesRequest":entry.shapes_request, "description":entry.description(),
                 }),
             )
         })

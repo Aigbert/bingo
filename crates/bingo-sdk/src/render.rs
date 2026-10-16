@@ -59,21 +59,81 @@ pub enum SurfaceName {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Viewport {
+    /// Where a pane sits, when the site is a pane.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub place: Option<crate::slot::Place>,
+    /// Width in cells.
     pub columns: u16,
+    /// Height in cells.
     pub rows: u16,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RenderRequest {
+    /// The site asked for.
     pub component: Component,
+    /// Which instance of the site; for `Pane`, the id given to `$.ui.open`.
     pub request_id: String,
+    /// The asking surface.
     pub surface: SurfaceName,
+    /// The site's facts; their shape is the component's props.
     pub props: Value,
+    /// The cells the surface offers the drawing.
     pub viewport: Viewport,
 }
 impl Component {
+    /// What this site draws, for authors choosing a `ui.render` match.
+    pub const fn summary(self) -> &'static str {
+        match self {
+            Self::ModelPicker => "The model picker: providers and their models to choose from.",
+            Self::Browse => "The transcript reader: the session turn by turn, with search.",
+            Self::Plugins => "The plugin list, with each plugin's state and switch.",
+            Self::Palette => {
+                "The command palette under the prompt line, filtered by what is typed."
+            }
+            Self::Sessions => "The list of saved sessions to resume.",
+            Self::Status => "The status page: session facts, settings and context usage.",
+            Self::Question => "A question the model or a plugin asks the person, with its choices.",
+            Self::UserMessage => "A message the person sent, in the transcript.",
+            Self::AssistantMessage => "The model's text reply, in the transcript.",
+            Self::ToolUse => {
+                "One tool call in the transcript: tool, input, and output once done; match `props: {tool}` to draw one tool."
+            }
+            Self::ToolResult => "A tool call's output, drawn on its own.",
+            Self::ToolGroup => "Consecutive tool calls folded into one row.",
+            Self::ToolProgress => "A running tool's progress line.",
+            Self::CommandOutput => "What a slash command answered, in the transcript.",
+            Self::Spinner => "The working indicator while a turn runs.",
+            Self::TurnDuration => "The line that says how long a finished turn took.",
+            Self::InfoNotice => "A notice in the transcript, such as one a plugin posted.",
+            Self::SessionMode => "The session's active modes beside the prompt.",
+            Self::PromptHint => "The hint line under the prompt.",
+            Self::AbovePrompt => {
+                "The band directly above the prompt; one per session, `requestId` `AbovePrompt`."
+            }
+            Self::Pane => {
+                "A pane a plugin opened with `$.ui.open`; `requestId` is the pane's `id`."
+            }
+            Self::Permission => {
+                "The permission question for a tool call. Sealed: only bingo draws it."
+            }
+            Self::SignIn => "A provider's sign-in flow. Sealed: only bingo draws it.",
+            Self::Reasoning => "The model's reasoning text, in the transcript.",
+            Self::Compaction => "The record that history was compacted, with its summary.",
+            Self::Rewind => "The record that the session was rewound to an earlier turn.",
+            Self::Interruption => "The marker where a turn was interrupted.",
+            Self::QuestionAnswer => "A question and the answer the person gave, in the transcript.",
+            Self::PermissionReceipt => "The record of a permission decision, in the transcript.",
+            Self::Asset => "A file or picture the session produced, in the transcript.",
+            Self::ShellRun => "A shell command the person ran from the prompt, with its output.",
+            Self::Action => "An action a client ran, with its result.",
+            Self::TurnProgress => "A running turn's elapsed time and tokens.",
+            Self::SessionStatus => "The status line: model, effort, directory and context use.",
+            Self::Toast => "A short-lived notification.",
+            Self::Welcome => "The welcome card a new session opens with.",
+        }
+    }
+
     pub fn sealed(self) -> bool {
         matches!(self, Self::Permission | Self::SignIn)
     }
@@ -184,8 +244,11 @@ pub struct Invalidate {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct HandlerEvent {
+    /// The token a drawn handler became, or a pane id for `close`.
     pub handler: String,
+    /// `press`, `input`, `select` or `close`.
     pub event: String,
+    /// What the surface sent: the text, the chosen value, or the key.
     #[serde(default)]
     pub value: Value,
 }
@@ -317,5 +380,6 @@ impl From<RenderRequest> for PullRequest {
 /// A control may return the key to the asking surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct HandlerResult {
+    /// `false` returns the key to the surface.
     pub handled: bool,
 }

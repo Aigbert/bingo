@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(try_from = "LengthWire", into = "LengthWire")]
+/// A length: a number of terminal cells, or a share of the screen written as
+/// a percentage string such as `'40%'`.
 pub enum Length {
     Cells(u16),
     Percent(u8),
@@ -54,10 +56,14 @@ impl Length {
     }
 }
 
+/// A size the surface fits between `min` and `max`, preferring `ideal`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Span {
+    /// The smallest it may be.
     pub min: Length,
+    /// What it takes when there is room.
     pub ideal: Length,
+    /// The largest it may be.
     pub max: Length,
 }
 impl Span {
@@ -74,8 +80,11 @@ impl Span {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(default)]
+/// A pane's height and width; each defaults when left out.
 pub struct PaneSize {
+    /// Height in rows.
     pub rows: Span,
+    /// Width in columns.
     pub columns: Span,
 }
 impl Default for PaneSize {
@@ -113,6 +122,8 @@ pub enum Anchor {
     BottomRight,
     Center,
 }
+/// A fixed rectangle: `width` by `height`, offset by `x` and `y` from
+/// `anchor`, a corner or the `center` (`topLeft` unless given).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Rect {
     #[serde(default, skip_serializing_if = "is_top_left")]
@@ -140,6 +151,8 @@ impl Rect {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "PanePlace")]
+/// Where a pane sits: `'above'` the prompt, at the `'side'`, as an
+/// `'overlay'` floating over the screen, or at a fixed `{rect}`.
 pub enum Place {
     #[default]
     Above,

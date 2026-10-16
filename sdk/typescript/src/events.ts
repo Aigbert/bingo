@@ -1,17 +1,38 @@
 // Generated from schema/events.json. Do not edit.
 export namespace UiPressInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "event": string; "handler": string; "value"?: unknown; [key: string]: unknown; };
+export type Payload = {
+  /** `press`, `input`, `select` or `close`. */
+  "event": string;
+  /** The token a drawn handler became, or a pane id for `close`. */
+  "handler": string;
+  /** What the surface sent: the text, the chosen value, or the key. */
+  "value"?: unknown;
+  [key: string]: unknown;
+};
 }
 export namespace UiPressResult {
 // Generated from JSON Schema. Do not edit.
-export type HandlerResult = { "handled": boolean; [key: string]: unknown; };
+/** A control may return the key to the asking surface. */
+export type HandlerResult = {
+  /** `false` returns the key to the surface. */
+  "handled": boolean;
+  [key: string]: unknown;
+};
 export type Payload = (HandlerResult | null);
 }
 export type UiPress = UiPressInput.Payload;
 export namespace UiInputInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "event": string; "handler": string; "value"?: unknown; [key: string]: unknown; };
+export type Payload = {
+  /** `press`, `input`, `select` or `close`. */
+  "event": string;
+  /** The token a drawn handler became, or a pane id for `close`. */
+  "handler": string;
+  /** What the surface sent: the text, the chosen value, or the key. */
+  "value"?: unknown;
+  [key: string]: unknown;
+};
 }
 export namespace UiInputResult {
 // Generated from JSON Schema. Do not edit.
@@ -20,7 +41,15 @@ export type Payload = null;
 export type UiInput = UiInputInput.Payload;
 export namespace UiSelectInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "event": string; "handler": string; "value"?: unknown; [key: string]: unknown; };
+export type Payload = {
+  /** `press`, `input`, `select` or `close`. */
+  "event": string;
+  /** The token a drawn handler became, or a pane id for `close`. */
+  "handler": string;
+  /** What the surface sent: the text, the chosen value, or the key. */
+  "value"?: unknown;
+  [key: string]: unknown;
+};
 }
 export namespace UiSelectResult {
 // Generated from JSON Schema. Do not edit.
@@ -30,36 +59,313 @@ export type UiSelect = UiSelectInput.Payload;
 export namespace UiRenderInput {
 // Generated from JSON Schema. Do not edit.
 export type Anchor = ("topLeft" | "topRight" | "bottomLeft" | "bottomRight" | "center");
-export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+/**
+ * A length: a number of terminal cells, or a share of the screen written as
+ * a percentage string such as `'40%'`.
+ */
 export type Length = (number | string);
+/**
+ * Where a pane sits: `'above'` the prompt, at the `'side'`, as an
+ * `'overlay'` floating over the screen, or at a fixed `{rect}`.
+ */
 export type PanePlace = (("above" | "side" | "overlay") | { "rect": Rect; });
+/**
+ * A fixed rectangle: `width` by `height`, offset by `x` and `y` from
+ * `anchor`, a corner or the `center` (`topLeft` unless given).
+ */
 export type Rect = { "anchor"?: Anchor; "height": Length; "width": Length; "x"?: Length; "y"?: Length; [key: string]: unknown; };
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
-export type Viewport = { "columns": number; "place"?: (PanePlace | null); "rows": number; [key: string]: unknown; };
-export type Payload = { "component": Component; "props": unknown; "requestId": string; "surface": SurfaceName; "viewport": Viewport; [key: string]: unknown; };
+export type Viewport = {
+  /** Width in cells. */
+  "columns": number;
+  /** Where a pane sits, when the site is a pane. */
+  "place"?: (PanePlace | null);
+  /** Height in cells. */
+  "rows": number;
+  [key: string]: unknown;
+};
+export type Payload = {
+  /** The site asked for. */
+  "component": Component;
+  /** The site's facts; their shape is the component's props. */
+  "props": unknown;
+  /** Which instance of the site; for `Pane`, the id given to `$.ui.open`. */
+  "requestId": string;
+  /** The asking surface. */
+  "surface": SurfaceName;
+  /** The cells the surface offers the drawing. */
+  "viewport": Viewport;
+  [key: string]: unknown;
+};
 }
 export namespace UiRenderResult {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
-export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
+/** A button: the surface fires `Input::Action` with `action` (ADR-0008 §1). */
+export type ActionItem = {
+  "action": Action;
+  /** A single-key hint; the surface may use another key. */
+  "key"?: (string | null);
+  "label": string;
+  [key: string]: unknown;
+};
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
-export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
-export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
+export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
 export type Direction = ("row" | "column");
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
-export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
-export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
-export type SelectOption = { "label": string; "value": string; [key: string]: unknown; };
-export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
+export type SelectOption = {
+  /** The text shown. */
+  "label": string;
+  /** The value chosen. */
+  "value": string;
+  [key: string]: unknown;
+};
+/** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | unknown);
+/** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
 export type Wrap = ("wrap" | "nowrap");
-export type Payload = ({ "bold"?: (boolean | null); "children": Array<TextChild>; "color"?: (string | null); "dimColor"?: (boolean | null); "inverse"?: (boolean | null); "italic"?: (boolean | null); "kind": "Text"; "strikethrough"?: (boolean | null); "underline"?: (boolean | null); "wrap"?: (string | null); [key: string]: unknown; } | { "dimColor"?: boolean; "kind": "Markdown"; "text": string; [key: string]: unknown; } | { "kind": "Code"; "language"?: (string | null); "source": string; [key: string]: unknown; } | { "kind": "diff"; "unified": string; [key: string]: unknown; } | { "items": Array<string>; "kind": "list"; [key: string]: unknown; } | { "headers": Array<string>; "kind": "table"; "rows": Array<Array<string>>; [key: string]: unknown; } | { "kind": "keyValue"; "rows": Array<[string, string, ...Array<unknown>]>; [key: string]: unknown; } | { "kind": "progress"; "label"?: (string | null); "total"?: (number | null); "value": number; [key: string]: unknown; } | { "kind": "badge"; "text": string; "tone"?: Tone; [key: string]: unknown; } | { "kind": "tree"; "nodes": Array<TreeNode>; [key: string]: unknown; } | { "alignItems"?: (Align | null); "borderColor"?: (string | null); "borderStyle"?: (string | null); "children": Array<unknown>; "display"?: (string | null); "flexDirection"?: (Direction | null); "flexGrow"?: (number | null); "flexWrap"?: (Wrap | null); "gap"?: (number | null); "height"?: (number | null); "hints"?: (SiteHints | null); "justifyContent"?: (Justify | null); "key"?: (string | null); "kind": "Box"; "margin"?: (number | null); "marginX"?: (number | null); "marginY"?: (number | null); "onKey"?: (Action | null); "padding"?: (number | null); "paddingX"?: (number | null); "paddingY"?: (number | null); "question"?: (QuestionFocus | null); "width"?: (number | null); [key: string]: unknown; } | { "child": unknown; "kind": "panel"; "title": string; [key: string]: unknown; } | { "items": Array<ActionItem>; "kind": "actions"; [key: string]: unknown; } | { "children"?: Array<TextChild>; "dimColor"?: (boolean | null); "hotkey"?: (string | null); "key"?: (string | null); "kind": "Button"; "label"?: (string | null); "onPress"?: (Action | null); "variant"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Input"; "label"?: (string | null); "onInput"?: (Action | null); "onSubmit"?: (Action | null); "placeholder"?: (string | null); "value"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Select"; "label"?: (string | null); "onSelect"?: (Action | null); "options"?: (Array<SelectOption> | null); "value"?: (string | null); [key: string]: unknown; } | { "href": string; "kind": "Link"; "label"?: (string | null); [key: string]: unknown; } | { "alt": string; "columns"?: (number | null); "kind": "Image"; "rows"?: (number | null); "source": string; [key: string]: unknown; } | { "cells": Array<string>; "columns": number; "kind": "Raster"; "rows": number; [key: string]: unknown; } | { "alt": string; "height"?: (number | null); "kind": "Svg"; "source": string; "width"?: (number | null); [key: string]: unknown; } | { "component": Component; "kind": "Engine"; "props": unknown; [key: string]: unknown; } | { "customKind": string; "data": unknown; "fold": string; "kind": "custom"; [key: string]: unknown; });
+export type Payload = ({
+  /** Draw the text bold. */
+  "bold"?: (boolean | null);
+  /** Strings and nested `Text` nodes, drawn in order. */
+  "children": Array<TextChild>;
+  /** A colour name or `#rrggbb`; the surface may adjust it to its theme. */
+  "color"?: (string | null);
+  /** Draw the text dimmed. */
+  "dimColor"?: (boolean | null);
+  /** Swap the foreground and background colours. */
+  "inverse"?: (boolean | null);
+  /** Draw the text in italics. */
+  "italic"?: (boolean | null);
+  "kind": "Text";
+  /** Strike the text through. */
+  "strikethrough"?: (boolean | null);
+  /** Underline the text. */
+  "underline"?: (boolean | null);
+  /** `wrap` breaks long lines at the width; `truncate` cuts them. */
+  "wrap"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Draw it dimmed. */
+  "dimColor"?: boolean;
+  "kind": "Markdown";
+  /** The Markdown source. */
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "kind": "Code";
+  /** The language name for highlighting, such as `rust`. */
+  "language"?: (string | null);
+  /** The code itself. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  "kind": "diff";
+  /** The diff in unified format. */
+  "unified": string;
+  [key: string]: unknown;
+} | {
+  /** One string per item. */
+  "items": Array<string>;
+  "kind": "list";
+  [key: string]: unknown;
+} | {
+  /** The column headings. */
+  "headers": Array<string>;
+  "kind": "table";
+  /** One array of cells per row, in column order. */
+  "rows": Array<Array<string>>;
+  [key: string]: unknown;
+} | {
+  "kind": "keyValue";
+  /** `[label, value]` pairs, in order. */
+  "rows": Array<[string, string, ...Array<unknown>]>;
+  [key: string]: unknown;
+} | {
+  "kind": "progress";
+  /** Text drawn beside the bar. */
+  "label"?: (string | null);
+  /** The whole; without it the surface shows a count. */
+  "total"?: (number | null);
+  /** How much is done. */
+  "value": number;
+  [key: string]: unknown;
+} | {
+  "kind": "badge";
+  /** The label. */
+  "text": string;
+  /** `neutral`, `good`, `bad` or `attention`; the surface picks the colour. */
+  "tone"?: Tone;
+  [key: string]: unknown;
+} | {
+  "kind": "tree";
+  /** The top-level nodes. */
+  "nodes": Array<TreeNode>;
+  [key: string]: unknown;
+} | {
+  /** Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`. */
+  "alignItems"?: (Align | null);
+  /** The border colour. */
+  "borderColor"?: (string | null);
+  /** Any value but `none` draws a border. */
+  "borderStyle"?: (string | null);
+  /** The views inside, in order. */
+  "children": Array<unknown>;
+  /** `none` hides the box and its controls. */
+  "display"?: (string | null);
+  /** `row` or `column` (the default). */
+  "flexDirection"?: (Direction | null);
+  /** How much of the spare room this box takes; `0` takes none. */
+  "flexGrow"?: (number | null);
+  /** `wrap` lets children flow onto another line. */
+  "flexWrap"?: (Wrap | null);
+  /** Cells between children. */
+  "gap"?: (number | null);
+  /** The height in rows. */
+  "height"?: (number | null);
+  /** Main-axis distribution, such as `flex-start` or `space-between`. */
+  "justifyContent"?: (Justify | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Box";
+  /** Cells outside the box on every side. */
+  "margin"?: (number | null);
+  /** Cells outside the box on the left and right. */
+  "marginX"?: (number | null);
+  /** Rows outside the box above and below. */
+  "marginY"?: (number | null);
+  /** A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back. */
+  "onKey"?: (Action | null);
+  /** Cells inside the box on every side. */
+  "padding"?: (number | null);
+  /** Cells inside the box on the left and right. */
+  "paddingX"?: (number | null);
+  /** Rows inside the box above and below. */
+  "paddingY"?: (number | null);
+  /** The width in cells. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The view inside. */
+  "child": unknown;
+  "kind": "panel";
+  /** The heading. */
+  "title": string;
+  [key: string]: unknown;
+} | {
+  /** The buttons, in order. */
+  "items": Array<ActionItem>;
+  "kind": "actions";
+  [key: string]: unknown;
+} | {
+  /** The button's text, when `label` is not given. */
+  "children"?: Array<TextChild>;
+  /** Draw the button dimmed. */
+  "dimColor"?: (boolean | null);
+  /** One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button. */
+  "hotkey"?: (string | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Button";
+  /** The button's text. */
+  "label"?: (string | null);
+  /** The handler run when the button is pressed: a mod passes a function. */
+  "onPress"?: (Action | null);
+  /** `primary` draws it bold, `danger` in the alarm colour. */
+  "variant"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Input";
+  /** Text before the field. */
+  "label"?: (string | null);
+  /** The handler run as the text changes: a mod passes a function. */
+  "onInput"?: (Action | null);
+  /** The handler run when the person presses Enter: a mod passes a function. */
+  "onSubmit"?: (Action | null);
+  /** Text shown while the field is empty. */
+  "placeholder"?: (string | null);
+  /** The text in the field. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Select";
+  /** Text before the choice. */
+  "label"?: (string | null);
+  /** The handler run with the chosen value: a mod passes a function. */
+  "onSelect"?: (Action | null);
+  /** The choices, each `{label, value}`. */
+  "options"?: (Array<SelectOption> | null);
+  /** The chosen option's `value`. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** The URL. */
+  "href": string;
+  "kind": "Link";
+  /** The text shown; the URL when absent. */
+  "label"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Text shown where the image cannot be. */
+  "alt": string;
+  /** The width in terminal columns. */
+  "columns"?: (number | null);
+  "kind": "Image";
+  /** The height in terminal rows. */
+  "rows"?: (number | null);
+  /** A path or a `data:` URL. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  /** The cells, row by row. */
+  "cells": Array<string>;
+  /** The width in cells. */
+  "columns": number;
+  "kind": "Raster";
+  /** The height in cells. */
+  "rows": number;
+  [key: string]: unknown;
+} | {
+  /** Text shown where the drawing cannot be. */
+  "alt": string;
+  /** The height in pixels. */
+  "height"?: (number | null);
+  "kind": "Svg";
+  /** The SVG markup. */
+  "source": string;
+  /** The width in pixels. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The component bingo draws, such as `ToolUse`. */
+  "component": Component;
+  "kind": "Engine";
+  /** That component's props, as its `ui.render` event carried them. */
+  "props": unknown;
+  [key: string]: unknown;
+} | {
+  /** The element's own name. */
+  "customKind": string;
+  /** Whatever the element needs. */
+  "data": unknown;
+  /** The plain text drawn where the element is unknown. */
+  "fold": string;
+  "kind": "custom";
+  [key: string]: unknown;
+});
 }
 export type UiRender = UiRenderInput.Payload;
 export namespace PluginRegisterInput {
 // Generated from JSON Schema. Do not edit.
+/** The directory that supplied an external plugin. */
 export type PluginOrigin = ("user" | "project" | "explicit");
 export type PluginRuntime = ("process" | "module");
 export type Tier = ("tighten" | "rewrite" | "full");
@@ -69,92 +375,596 @@ export namespace PluginRegisterResult {
 // Generated from JSON Schema. Do not edit.
 export type PluginGrant = { "tier": Tier; "uses": Array<string>; [key: string]: unknown; };
 export type Tier = ("tighten" | "rewrite" | "full");
+/** The registration chain may reduce a grant or refuse the plugin in words. */
 export type Payload = (PluginGrant | { "reason": string; [key: string]: unknown; });
 }
 export type PluginRegister = PluginRegisterInput.Payload;
 export namespace PromptSubmitInput {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
+/**
+ * How a line reaches a session's queue: a peer's message (ADR-0010 §1) and
+ * a person's own line are the same question, so they are the same word.
+ */
 export type Delivery = ("wake" | "hold");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
+/** Who submitted the input, as every surface records it. */
+export type Origin = {
+  "conversation"?: (string | null);
+  "principal"?: (string | null);
+  /** Drawing family of the caller, independent of its attribution identifier. */
+  "renderSurface"?: (SurfaceName | null);
+  "surface": string;
+  "voice"?: (Voice | null);
+  [key: string]: unknown;
+};
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
+/**
+ * The one submission entry. The kernel parses `/`, `!` and `@` in text and
+ * decides turn, queue, steer or deliver; a client never chooses.
+ */
+export type Payload = ({
+  /**
+   * Whether a running turn may be steered with it (ADR-0008 §2,
+   * amended M68). `Wake` is the line every client has always sent, so
+   * it is the default and nothing is written for it.
+   */
+  "delivery"?: Delivery;
+  /**
+   * The pictures the ask carries, in the order they reach the journal
+   * (ADR-0040): exactly as they will be journaled, because a surface
+   * resolves a picture and the kernel does no file I/O for input.
+   */
+  "images"?: Array<Image>;
+  "kind": "text";
+  "origin": Origin;
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "action": Action;
+  "kind": "action";
+  /**
+   * The door it came through. Absent, or a door that is not a person
+   * surface, and the action is not the person's own: it fails closed.
+   */
+  "origin"?: (Origin | null);
+  [key: string]: unknown;
+});
 }
 export namespace PromptSubmitResult {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
+/**
+ * How a line reaches a session's queue: a peer's message (ADR-0010 §1) and
+ * a person's own line are the same question, so they are the same word.
+ */
 export type Delivery = ("wake" | "hold");
 export type ErrorCode = (("SESSION_NOT_FOUND" | "SESSION_LOCKED" | "SESSION_CLOSED" | "INTERACTION_CLOSED" | "NOT_READY" | "STALE_GENERATION" | "NOT_INITIALIZED" | "INVALID_INPUT" | "PERMISSION_DENIED" | "TOOL_NOT_FOUND" | "TOOL_FAILED" | "PROVIDER_UNAVAILABLE" | "AUTH_REQUIRED" | "RATE_LIMITED" | "CONTEXT_OVERFLOW" | "TIMEOUT" | "OFFLINE" | "SERVER_ERROR" | "TURN_LOST" | "TURN_BUDGET_EXHAUSTED" | "UNSUPPORTED" | "INTERNAL") | "INTERRUPTED" | "PROTOCOL_LIMIT" | "NOT_FOUND" | "STORAGE");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
+/**
+ * The one submission entry. The kernel parses `/`, `!` and `@` in text and
+ * decides turn, queue, steer or deliver; a client never chooses.
+ */
+export type Input = ({
+  /**
+   * Whether a running turn may be steered with it (ADR-0008 §2,
+   * amended M68). `Wake` is the line every client has always sent, so
+   * it is the default and nothing is written for it.
+   */
+  "delivery"?: Delivery;
+  /**
+   * The pictures the ask carries, in the order they reach the journal
+   * (ADR-0040): exactly as they will be journaled, because a surface
+   * resolves a picture and the kernel does no file I/O for input.
+   */
+  "images"?: Array<Image>;
+  "kind": "text";
+  "origin": Origin;
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "action": Action;
+  "kind": "action";
+  /**
+   * The door it came through. Absent, or a door that is not a person
+   * surface, and the action is not the person's own: it fails closed.
+   */
+  "origin"?: (Origin | null);
+  [key: string]: unknown;
+});
+/** An error as it appears on the wire and in the journal. */
 export type KernelError = { "code": ErrorCode; "message": string; [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+/** Who submitted the input, as every surface records it. */
+export type Origin = {
+  "conversation"?: (string | null);
+  "principal"?: (string | null);
+  /** Drawing family of the caller, independent of its attribution identifier. */
+  "renderSurface"?: (SurfaceName | null);
+  "surface": string;
+  "voice"?: (Voice | null);
+  [key: string]: unknown;
+};
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = ({ "accepted": Input; } | { "rejected": KernelError; } | { "redirect": { "input": Input; "session": SessionId; [key: string]: unknown; }; });
 }
 export type PromptSubmit = PromptSubmitInput.Payload;
 export namespace ToolCheckInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "tool": string; "tool_use_id": string; [key: string]: unknown; };
+/**
+ * A tool call as a hook sees it: the tool's own arguments sit beside
+ * `tool` and `tool_use_id`, not under an `input` field.
+ */
+export type Payload = {
+  /** The tool's name, such as `Bash` or `Edit`. */
+  "tool": string;
+  /** The model's id for this call. */
+  "tool_use_id": string;
+  [key: string]: unknown;
+};
 }
 export namespace ToolCheckResult {
 // Generated from JSON Schema. Do not edit.
-export type Decision = ({ "kind": "allow"; "reason": Reason; [key: string]: unknown; } | { "kind": "deny"; "reason": Reason; [key: string]: unknown; } | { "kind": "ask"; "reason": Reason; "scope"?: (string | null); [key: string]: unknown; });
+export type Decision = ({ "kind": "allow"; "reason": Reason; [key: string]: unknown; } | { "kind": "deny"; "reason": Reason; [key: string]: unknown; } | {
+  "kind": "ask";
+  "reason": Reason;
+  /** The narrowest rule that would silence this prompt, offered as "allow for session". */
+  "scope"?: (string | null);
+  [key: string]: unknown;
+});
 export type Reason = ({ "kind": "rule"; "rule": string; [key: string]: unknown; } | { "kind": "mode"; "mode": string; [key: string]: unknown; } | { "hook": string; "kind": "hook"; [key: string]: unknown; } | { "detail": string; "kind": "safety"; [key: string]: unknown; } | { "kind": "readOnly"; [key: string]: unknown; } | { "detail": string; "kind": "confirm"; [key: string]: unknown; } | { "kind": "default"; [key: string]: unknown; });
+/** A call the model asked for, before or after the gate. */
 export type ToolCall = { "callId": string; "input": unknown; "name": string; [key: string]: unknown; };
-export type Payload = { "call": ToolCall; "decision": Decision; [key: string]: unknown; };
+export type Payload = {
+  /** The call as judged, possibly with tightened arguments. */
+  "call": ToolCall;
+  /** Whether it may run. */
+  "decision": Decision;
+  [key: string]: unknown;
+};
 }
 export type ToolCheck = ToolCheckInput.Payload;
 export namespace ToolCallInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "tool": string; "tool_use_id": string; [key: string]: unknown; };
+/**
+ * A tool call as a hook sees it: the tool's own arguments sit beside
+ * `tool` and `tool_use_id`, not under an `input` field.
+ */
+export type Payload = {
+  /** The tool's name, such as `Bash` or `Edit`. */
+  "tool": string;
+  /** The model's id for this call. */
+  "tool_use_id": string;
+  [key: string]: unknown;
+};
 }
 export namespace ToolCallResult {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
-export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
+/** A button: the surface fires `Input::Action` with `action` (ADR-0008 §1). */
+export type ActionItem = {
+  "action": Action;
+  /** A single-key hint; the surface may use another key. */
+  "key"?: (string | null);
+  "label": string;
+  [key: string]: unknown;
+};
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
-export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
-export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
+export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type Direction = ("row" | "column");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
-export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
-export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
-export type SelectOption = { "label": string; "value": string; [key: string]: unknown; };
-export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
+export type SelectOption = {
+  /** The text shown. */
+  "label": string;
+  /** The value chosen. */
+  "value": string;
+  [key: string]: unknown;
+};
+/** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
+/** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
+/**
+ * What a tool returned: the parts the model sees, plus what a person sees
+ * instead when the tool has something better than the text (ADR-0013 §2).
+ */
 export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
-export type View = ({ "bold"?: (boolean | null); "children": Array<TextChild>; "color"?: (string | null); "dimColor"?: (boolean | null); "inverse"?: (boolean | null); "italic"?: (boolean | null); "kind": "Text"; "strikethrough"?: (boolean | null); "underline"?: (boolean | null); "wrap"?: (string | null); [key: string]: unknown; } | { "dimColor"?: boolean; "kind": "Markdown"; "text": string; [key: string]: unknown; } | { "kind": "Code"; "language"?: (string | null); "source": string; [key: string]: unknown; } | { "kind": "diff"; "unified": string; [key: string]: unknown; } | { "items": Array<string>; "kind": "list"; [key: string]: unknown; } | { "headers": Array<string>; "kind": "table"; "rows": Array<Array<string>>; [key: string]: unknown; } | { "kind": "keyValue"; "rows": Array<[string, string, ...Array<unknown>]>; [key: string]: unknown; } | { "kind": "progress"; "label"?: (string | null); "total"?: (number | null); "value": number; [key: string]: unknown; } | { "kind": "badge"; "text": string; "tone"?: Tone; [key: string]: unknown; } | { "kind": "tree"; "nodes": Array<TreeNode>; [key: string]: unknown; } | { "alignItems"?: (Align | null); "borderColor"?: (string | null); "borderStyle"?: (string | null); "children": Array<View>; "display"?: (string | null); "flexDirection"?: (Direction | null); "flexGrow"?: (number | null); "flexWrap"?: (Wrap | null); "gap"?: (number | null); "height"?: (number | null); "hints"?: (SiteHints | null); "justifyContent"?: (Justify | null); "key"?: (string | null); "kind": "Box"; "margin"?: (number | null); "marginX"?: (number | null); "marginY"?: (number | null); "onKey"?: (Action | null); "padding"?: (number | null); "paddingX"?: (number | null); "paddingY"?: (number | null); "question"?: (QuestionFocus | null); "width"?: (number | null); [key: string]: unknown; } | { "child": View; "kind": "panel"; "title": string; [key: string]: unknown; } | { "items": Array<ActionItem>; "kind": "actions"; [key: string]: unknown; } | { "children"?: Array<TextChild>; "dimColor"?: (boolean | null); "hotkey"?: (string | null); "key"?: (string | null); "kind": "Button"; "label"?: (string | null); "onPress"?: (Action | null); "variant"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Input"; "label"?: (string | null); "onInput"?: (Action | null); "onSubmit"?: (Action | null); "placeholder"?: (string | null); "value"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Select"; "label"?: (string | null); "onSelect"?: (Action | null); "options"?: (Array<SelectOption> | null); "value"?: (string | null); [key: string]: unknown; } | { "href": string; "kind": "Link"; "label"?: (string | null); [key: string]: unknown; } | { "alt": string; "columns"?: (number | null); "kind": "Image"; "rows"?: (number | null); "source": string; [key: string]: unknown; } | { "cells": Array<string>; "columns": number; "kind": "Raster"; "rows": number; [key: string]: unknown; } | { "alt": string; "height"?: (number | null); "kind": "Svg"; "source": string; "width"?: (number | null); [key: string]: unknown; } | { "component": Component; "kind": "Engine"; "props": unknown; [key: string]: unknown; } | { "customKind": string; "data": unknown; "fold": string; "kind": "custom"; [key: string]: unknown; });
+export type View = ({
+  /** Draw the text bold. */
+  "bold"?: (boolean | null);
+  /** Strings and nested `Text` nodes, drawn in order. */
+  "children": Array<TextChild>;
+  /** A colour name or `#rrggbb`; the surface may adjust it to its theme. */
+  "color"?: (string | null);
+  /** Draw the text dimmed. */
+  "dimColor"?: (boolean | null);
+  /** Swap the foreground and background colours. */
+  "inverse"?: (boolean | null);
+  /** Draw the text in italics. */
+  "italic"?: (boolean | null);
+  "kind": "Text";
+  /** Strike the text through. */
+  "strikethrough"?: (boolean | null);
+  /** Underline the text. */
+  "underline"?: (boolean | null);
+  /** `wrap` breaks long lines at the width; `truncate` cuts them. */
+  "wrap"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Draw it dimmed. */
+  "dimColor"?: boolean;
+  "kind": "Markdown";
+  /** The Markdown source. */
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "kind": "Code";
+  /** The language name for highlighting, such as `rust`. */
+  "language"?: (string | null);
+  /** The code itself. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  "kind": "diff";
+  /** The diff in unified format. */
+  "unified": string;
+  [key: string]: unknown;
+} | {
+  /** One string per item. */
+  "items": Array<string>;
+  "kind": "list";
+  [key: string]: unknown;
+} | {
+  /** The column headings. */
+  "headers": Array<string>;
+  "kind": "table";
+  /** One array of cells per row, in column order. */
+  "rows": Array<Array<string>>;
+  [key: string]: unknown;
+} | {
+  "kind": "keyValue";
+  /** `[label, value]` pairs, in order. */
+  "rows": Array<[string, string, ...Array<unknown>]>;
+  [key: string]: unknown;
+} | {
+  "kind": "progress";
+  /** Text drawn beside the bar. */
+  "label"?: (string | null);
+  /** The whole; without it the surface shows a count. */
+  "total"?: (number | null);
+  /** How much is done. */
+  "value": number;
+  [key: string]: unknown;
+} | {
+  "kind": "badge";
+  /** The label. */
+  "text": string;
+  /** `neutral`, `good`, `bad` or `attention`; the surface picks the colour. */
+  "tone"?: Tone;
+  [key: string]: unknown;
+} | {
+  "kind": "tree";
+  /** The top-level nodes. */
+  "nodes": Array<TreeNode>;
+  [key: string]: unknown;
+} | {
+  /** Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`. */
+  "alignItems"?: (Align | null);
+  /** The border colour. */
+  "borderColor"?: (string | null);
+  /** Any value but `none` draws a border. */
+  "borderStyle"?: (string | null);
+  /** The views inside, in order. */
+  "children": Array<View>;
+  /** `none` hides the box and its controls. */
+  "display"?: (string | null);
+  /** `row` or `column` (the default). */
+  "flexDirection"?: (Direction | null);
+  /** How much of the spare room this box takes; `0` takes none. */
+  "flexGrow"?: (number | null);
+  /** `wrap` lets children flow onto another line. */
+  "flexWrap"?: (Wrap | null);
+  /** Cells between children. */
+  "gap"?: (number | null);
+  /** The height in rows. */
+  "height"?: (number | null);
+  /** Main-axis distribution, such as `flex-start` or `space-between`. */
+  "justifyContent"?: (Justify | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Box";
+  /** Cells outside the box on every side. */
+  "margin"?: (number | null);
+  /** Cells outside the box on the left and right. */
+  "marginX"?: (number | null);
+  /** Rows outside the box above and below. */
+  "marginY"?: (number | null);
+  /** A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back. */
+  "onKey"?: (Action | null);
+  /** Cells inside the box on every side. */
+  "padding"?: (number | null);
+  /** Cells inside the box on the left and right. */
+  "paddingX"?: (number | null);
+  /** Rows inside the box above and below. */
+  "paddingY"?: (number | null);
+  /** The width in cells. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The view inside. */
+  "child": View;
+  "kind": "panel";
+  /** The heading. */
+  "title": string;
+  [key: string]: unknown;
+} | {
+  /** The buttons, in order. */
+  "items": Array<ActionItem>;
+  "kind": "actions";
+  [key: string]: unknown;
+} | {
+  /** The button's text, when `label` is not given. */
+  "children"?: Array<TextChild>;
+  /** Draw the button dimmed. */
+  "dimColor"?: (boolean | null);
+  /** One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button. */
+  "hotkey"?: (string | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Button";
+  /** The button's text. */
+  "label"?: (string | null);
+  /** The handler run when the button is pressed: a mod passes a function. */
+  "onPress"?: (Action | null);
+  /** `primary` draws it bold, `danger` in the alarm colour. */
+  "variant"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Input";
+  /** Text before the field. */
+  "label"?: (string | null);
+  /** The handler run as the text changes: a mod passes a function. */
+  "onInput"?: (Action | null);
+  /** The handler run when the person presses Enter: a mod passes a function. */
+  "onSubmit"?: (Action | null);
+  /** Text shown while the field is empty. */
+  "placeholder"?: (string | null);
+  /** The text in the field. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Select";
+  /** Text before the choice. */
+  "label"?: (string | null);
+  /** The handler run with the chosen value: a mod passes a function. */
+  "onSelect"?: (Action | null);
+  /** The choices, each `{label, value}`. */
+  "options"?: (Array<SelectOption> | null);
+  /** The chosen option's `value`. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** The URL. */
+  "href": string;
+  "kind": "Link";
+  /** The text shown; the URL when absent. */
+  "label"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Text shown where the image cannot be. */
+  "alt": string;
+  /** The width in terminal columns. */
+  "columns"?: (number | null);
+  "kind": "Image";
+  /** The height in terminal rows. */
+  "rows"?: (number | null);
+  /** A path or a `data:` URL. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  /** The cells, row by row. */
+  "cells": Array<string>;
+  /** The width in cells. */
+  "columns": number;
+  "kind": "Raster";
+  /** The height in cells. */
+  "rows": number;
+  [key: string]: unknown;
+} | {
+  /** Text shown where the drawing cannot be. */
+  "alt": string;
+  /** The height in pixels. */
+  "height"?: (number | null);
+  "kind": "Svg";
+  /** The SVG markup. */
+  "source": string;
+  /** The width in pixels. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The component bingo draws, such as `ToolUse`. */
+  "component": Component;
+  "kind": "Engine";
+  /** That component's props, as its `ui.render` event carried them. */
+  "props": unknown;
+  [key: string]: unknown;
+} | {
+  /** The element's own name. */
+  "customKind": string;
+  /** Whatever the element needs. */
+  "data": unknown;
+  /** The plain text drawn where the element is unknown. */
+  "fold": string;
+  "kind": "custom";
+  [key: string]: unknown;
+});
 export type Wrap = ("wrap" | "nowrap");
+/** A denial is an answer, never an invalid output that falls through to execution. */
 export type Payload = ({ "deny": string; [key: string]: unknown; } | ToolOutput);
 }
 export type ToolCall = ToolCallInput.Payload;
 export namespace ModelCompleteInput {
 // Generated from JSON Schema. Do not edit.
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
+/** Reasoning effort, in the vocabulary providers converge on. */
 export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
-export type ModelRequest = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
+export type ModelRequest = {
+  "maxTokens": number;
+  "messages": Array<Message>;
+  "model": string;
+  "providerOptions"?: { [key: string]: { [key: string]: unknown; }; };
+  "reasoning"?: (Effort | null);
+  /**
+   * Whose turn this is. A stateless provider ignores it; one that keeps a
+   * conversation of its own per session — an ACP adapter holding one agent
+   * session per bingo session (ADR-0035 §3), a stateful wire like the
+   * Responses API — has no other way to know which conversation it is
+   * answering. `None` is a request built by hand or a side question, which
+   * belongs to no session.
+   */
+  "session"?: (SessionId | null);
+  "system": Array<SystemBlock>;
+  "tools": Array<ToolSpec>;
+  [key: string]: unknown;
+};
 export type Role = ("user" | "assistant");
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
+/** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
-export type ToolSpec = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
-export type Payload = { "plugin": string; "request": ModelRequest; [key: string]: unknown; };
+/** A tool as the model sees it. */
+export type ToolSpec = {
+  "description": string;
+  "inputSchema": unknown;
+  /**
+   * What a catalogue may show beside the tool (an MCP tool's `server`);
+   * never sent to a model.
+   */
+  "meta"?: { [key: string]: unknown; };
+  "name": string;
+  [key: string]: unknown;
+};
+export type Payload = {
+  /** The plugin that asked. */
+  "plugin": string;
+  /** The request it sent. */
+  "request": ModelRequest;
+  [key: string]: unknown;
+};
 }
 export namespace ModelCompleteResult {
 // Generated from JSON Schema. Do not edit.
 export type FinishReason = { "raw"?: (string | null); "unified": UnifiedFinish; [key: string]: unknown; };
+/** Provider stream events. Never published; the accumulator folds them into items. */
 export type ModelEvent = ({ "type": "streamStart"; "warnings"?: Array<string>; [key: string]: unknown; } | { "id"?: (string | null); "model"?: (string | null); "type": "responseMetadata"; [key: string]: unknown; } | { "id": string; "type": "textStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "textDelta"; [key: string]: unknown; } | { "id": string; "type": "textEnd"; [key: string]: unknown; } | { "id": string; "type": "reasoningStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "reasoningDelta"; [key: string]: unknown; } | { "id": string; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "type": "reasoningEnd"; [key: string]: unknown; } | { "id": string; "name": string; "type": "toolInputStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "toolInputDelta"; [key: string]: unknown; } | { "id": string; "type": "toolInputEnd"; [key: string]: unknown; } | { "id": string; "input": string; "name": string; "type": "toolCall"; [key: string]: unknown; } | { "type": "context"; "used": number; "window": number; [key: string]: unknown; } | { "after": number; "before": number; "type": "compacted"; [key: string]: unknown; } | { "finishReason": FinishReason; "type": "finish"; "usage": Usage; [key: string]: unknown; });
 export type UnifiedFinish = ("stop" | "length" | "toolCalls" | "contentFilter" | "error" | "other");
+/**
+ * Token counts as the provider reports them, the three input counts kept
+ * apart: `input_tokens` is what the model read fresh, the cache counts are
+ * what it read from or wrote to a cached prefix. The whole input side is
+ * `input_total()`.
+ */
 export type Usage = { "cacheReadTokens"?: number; "cacheWriteTokens"?: number; "inputTokens": number; "outputTokens": number; "reasoningTokens"?: number; [key: string]: unknown; };
 export type Payload = Array<ModelEvent>;
 }
@@ -162,21 +972,81 @@ export type ModelComplete = ModelCompleteInput.Payload;
 export namespace TurnStepInput {
 // Generated from JSON Schema. Do not edit.
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
+/** Reasoning effort, in the vocabulary providers converge on. */
 export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
 export type Role = ("user" | "assistant");
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
+/** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
-export type ToolSpec = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
-export type Payload = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
+/** A tool as the model sees it. */
+export type ToolSpec = {
+  "description": string;
+  "inputSchema": unknown;
+  /**
+   * What a catalogue may show beside the tool (an MCP tool's `server`);
+   * never sent to a model.
+   */
+  "meta"?: { [key: string]: unknown; };
+  "name": string;
+  [key: string]: unknown;
+};
+export type Payload = {
+  "maxTokens": number;
+  "messages": Array<Message>;
+  "model": string;
+  "providerOptions"?: { [key: string]: { [key: string]: unknown; }; };
+  "reasoning"?: (Effort | null);
+  /**
+   * Whose turn this is. A stateless provider ignores it; one that keeps a
+   * conversation of its own per session — an ACP adapter holding one agent
+   * session per bingo session (ADR-0035 §3), a stateful wire like the
+   * Responses API — has no other way to know which conversation it is
+   * answering. `None` is a request built by hand or a side question, which
+   * belongs to no session.
+   */
+  "session"?: (SessionId | null);
+  "system": Array<SystemBlock>;
+  "tools": Array<ToolSpec>;
+  [key: string]: unknown;
+};
 }
 export namespace TurnStepResult {
 // Generated from JSON Schema. Do not edit.
 export type FinishReason = { "raw"?: (string | null); "unified": UnifiedFinish; [key: string]: unknown; };
+/** Provider stream events. Never published; the accumulator folds them into items. */
 export type ModelEvent = ({ "type": "streamStart"; "warnings"?: Array<string>; [key: string]: unknown; } | { "id"?: (string | null); "model"?: (string | null); "type": "responseMetadata"; [key: string]: unknown; } | { "id": string; "type": "textStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "textDelta"; [key: string]: unknown; } | { "id": string; "type": "textEnd"; [key: string]: unknown; } | { "id": string; "type": "reasoningStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "reasoningDelta"; [key: string]: unknown; } | { "id": string; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "type": "reasoningEnd"; [key: string]: unknown; } | { "id": string; "name": string; "type": "toolInputStart"; [key: string]: unknown; } | { "delta": string; "id": string; "type": "toolInputDelta"; [key: string]: unknown; } | { "id": string; "type": "toolInputEnd"; [key: string]: unknown; } | { "id": string; "input": string; "name": string; "type": "toolCall"; [key: string]: unknown; } | { "type": "context"; "used": number; "window": number; [key: string]: unknown; } | { "after": number; "before": number; "type": "compacted"; [key: string]: unknown; } | { "finishReason": FinishReason; "type": "finish"; "usage": Usage; [key: string]: unknown; });
 export type ProviderError = ({ "kind": "auth"; "message": string; [key: string]: unknown; } | { "kind": "rateLimited"; "retryAfterMs"?: (number | null); [key: string]: unknown; } | { "kind": "contextOverflow"; "message": string; [key: string]: unknown; } | { "kind": "server"; "message": string; "status": number; [key: string]: unknown; } | { "kind": "request"; "message": string; [key: string]: unknown; } | { "kind": "transport"; "message": string; [key: string]: unknown; } | { "kind": "stream"; "message": string; [key: string]: unknown; } | { "kind": "timeout"; [key: string]: unknown; } | { "kind": "unsupported"; "message": string; [key: string]: unknown; } | { "kind": "config"; "message": string; [key: string]: unknown; });
 export type UnifiedFinish = ("stop" | "length" | "toolCalls" | "contentFilter" | "error" | "other");
+/**
+ * Token counts as the provider reports them, the three input counts kept
+ * apart: `input_tokens` is what the model read fresh, the cache counts are
+ * what it read from or wrote to a cached prefix. The whole input side is
+ * `input_total()`.
+ */
 export type Usage = { "cacheReadTokens"?: number; "cacheWriteTokens"?: number; "inputTokens": number; "outputTokens": number; "reasoningTokens"?: number; [key: string]: unknown; };
 export type Payload = ({ "Ok": Array<ModelEvent>; [key: string]: unknown; } | { "Err": ProviderError; [key: string]: unknown; });
 }
@@ -184,81 +1054,576 @@ export type TurnStep = TurnStepInput.Payload;
 export namespace PromptComposeInput {
 // Generated from JSON Schema. Do not edit.
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
+/** Reasoning effort, in the vocabulary providers converge on. */
 export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
 export type Role = ("user" | "assistant");
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
+/** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
-export type ToolSpec = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
-export type Payload = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
+/** A tool as the model sees it. */
+export type ToolSpec = {
+  "description": string;
+  "inputSchema": unknown;
+  /**
+   * What a catalogue may show beside the tool (an MCP tool's `server`);
+   * never sent to a model.
+   */
+  "meta"?: { [key: string]: unknown; };
+  "name": string;
+  [key: string]: unknown;
+};
+export type Payload = {
+  "maxTokens": number;
+  "messages": Array<Message>;
+  "model": string;
+  "providerOptions"?: { [key: string]: { [key: string]: unknown; }; };
+  "reasoning"?: (Effort | null);
+  /**
+   * Whose turn this is. A stateless provider ignores it; one that keeps a
+   * conversation of its own per session — an ACP adapter holding one agent
+   * session per bingo session (ADR-0035 §3), a stateful wire like the
+   * Responses API — has no other way to know which conversation it is
+   * answering. `None` is a request built by hand or a side question, which
+   * belongs to no session.
+   */
+  "session"?: (SessionId | null);
+  "system": Array<SystemBlock>;
+  "tools": Array<ToolSpec>;
+  [key: string]: unknown;
+};
 }
 export namespace PromptComposeResult {
 // Generated from JSON Schema. Do not edit.
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
+/** Reasoning effort, in the vocabulary providers converge on. */
 export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
 export type Role = ("user" | "assistant");
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
+/** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
-export type ToolSpec = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
-export type Payload = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
+/** A tool as the model sees it. */
+export type ToolSpec = {
+  "description": string;
+  "inputSchema": unknown;
+  /**
+   * What a catalogue may show beside the tool (an MCP tool's `server`);
+   * never sent to a model.
+   */
+  "meta"?: { [key: string]: unknown; };
+  "name": string;
+  [key: string]: unknown;
+};
+export type Payload = {
+  "maxTokens": number;
+  "messages": Array<Message>;
+  "model": string;
+  "providerOptions"?: { [key: string]: { [key: string]: unknown; }; };
+  "reasoning"?: (Effort | null);
+  /**
+   * Whose turn this is. A stateless provider ignores it; one that keeps a
+   * conversation of its own per session — an ACP adapter holding one agent
+   * session per bingo session (ADR-0035 §3), a stateful wire like the
+   * Responses API — has no other way to know which conversation it is
+   * answering. `None` is a request built by hand or a side question, which
+   * belongs to no session.
+   */
+  "session"?: (SessionId | null);
+  "system": Array<SystemBlock>;
+  "tools": Array<ToolSpec>;
+  [key: string]: unknown;
+};
 }
 export type PromptCompose = PromptComposeInput.Payload;
 export namespace SessionCompactInput {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
-export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
+/** A button: the surface fires `Input::Action` with `action` (ADR-0008 §1). */
+export type ActionItem = {
+  "action": Action;
+  /** A single-key hint; the surface may use another key. */
+  "key"?: (string | null);
+  "label": string;
+  [key: string]: unknown;
+};
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
+/**
+ * Why a compaction was asked for. Serializable because a strategy may live in
+ * another process: the reason crosses the bridge as it is.
+ */
 export type CompactReason = ({ "kind": "threshold"; [key: string]: unknown; } | { "kind": "overflow"; "message": string; [key: string]: unknown; } | { "instructions"?: (string | null); "kind": "manual"; [key: string]: unknown; });
-export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
-export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
+export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type ContextKind = ("system" | "tools" | "chat" | "pictures");
 export type ContextPart = { "name": ContextKind; "tokens": number; [key: string]: unknown; };
-export type ContextUsage = { "parts"?: (Array<ContextPart> | null); "trigger": number; "used": number; "window": number; [key: string]: unknown; };
+/**
+ * The one ruler for context: used tokens, the model window, and the point at
+ * which compaction triggers.
+ */
+export type ContextUsage = {
+  /** Approximate local request composition, independent of server anchoring. */
+  "parts"?: (Array<ContextPart> | null);
+  /**
+   * `used` at which the older turns are summarised, equal to `window`
+   * where the kernel draws no line because the endpoint holds the context
+   * and cuts it itself (ADR-0055 §2).
+   */
+  "trigger": number;
+  /** Tokens the next request would carry, anchored on the server's last count. */
+  "used": number;
+  /**
+   * The input side of the model's window: what is left once the output
+   * budget is reserved (ADR-0006).
+   */
+  "window": number;
+  [key: string]: unknown;
+};
 export type DecisionKind = ("allowChanged" | "allowChangedSession" | "allow" | "allowSession" | "deny");
 export type Direction = ("row" | "column");
+/** Reasoning effort, in the vocabulary providers converge on. */
 export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
+/** A client-minted write id; the outcome arrives as `IntentAck`. */
 export type IntentId = string;
+/** A pending question or permission, answered once by id. */
 export type InteractionId = string;
-export type Item = { "body": ItemBody; "completedAt"?: (string | null); "id": ItemId; "intent"?: (IntentId | null); "meta"?: { [key: string]: unknown; }; "round"?: number; "startedAt": string; "status": ItemStatus; "turn"?: (TurnId | null); [key: string]: unknown; };
+export type Item = {
+  "body": ItemBody;
+  "completedAt"?: (string | null);
+  "id": ItemId;
+  /** The client intent that produced this item, when one did (user items). */
+  "intent"?: (IntentId | null);
+  "meta"?: { [key: string]: unknown; };
+  "round"?: number;
+  "startedAt": string;
+  "status": ItemStatus;
+  "turn"?: (TurnId | null);
+  [key: string]: unknown;
+};
 export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<ContentPart>; [key: string]: unknown; } | { "kind": "assistant"; "text": string; [key: string]: unknown; } | { "kind": "reasoning"; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; [key: string]: unknown; } | { "callId": string; "durationMs"?: (number | null); "input": unknown; "kind": "toolCall"; "name": string; "output"?: (ToolOutput | null); "progress"?: (string | null); "quiet"?: boolean; [key: string]: unknown; } | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | { "after": number; "before": number; "durationMs": number; "kind": "compaction"; "replaced": number; "summary": string; [key: string]: unknown; } | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
+/** One unit in the transcript order. */
 export type ItemId = string;
 export type ItemStatus = ("pending" | "running" | "completed" | "failed" | "interrupted");
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
-export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
 export type Level = ("info" | "warn" | "error");
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
-export type ModelRequest = { "maxTokens": number; "messages": Array<Message>; "model": string; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "reasoning"?: (Effort | null); "session"?: (SessionId | null); "system": Array<SystemBlock>; "tools": Array<ToolSpec>; [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
-export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
+export type ModelRequest = {
+  "maxTokens": number;
+  "messages": Array<Message>;
+  "model": string;
+  "providerOptions"?: { [key: string]: { [key: string]: unknown; }; };
+  "reasoning"?: (Effort | null);
+  /**
+   * Whose turn this is. A stateless provider ignores it; one that keeps a
+   * conversation of its own per session — an ACP adapter holding one agent
+   * session per bingo session (ADR-0035 §3), a stateful wire like the
+   * Responses API — has no other way to know which conversation it is
+   * answering. `None` is a request built by hand or a side question, which
+   * belongs to no session.
+   */
+  "session"?: (SessionId | null);
+  "system": Array<SystemBlock>;
+  "tools": Array<ToolSpec>;
+  [key: string]: unknown;
+};
+/** Who submitted the input, as every surface records it. */
+export type Origin = {
+  "conversation"?: (string | null);
+  "principal"?: (string | null);
+  /** Drawing family of the caller, independent of its attribution identifier. */
+  "renderSurface"?: (SurfaceName | null);
+  "surface": string;
+  "voice"?: (Voice | null);
+  [key: string]: unknown;
+};
 export type Role = ("user" | "assistant");
-export type SelectOption = { "label": string; "value": string; [key: string]: unknown; };
+export type SelectOption = {
+  /** The text shown. */
+  "label": string;
+  /** The value chosen. */
+  "value": string;
+  [key: string]: unknown;
+};
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
-export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
+/** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
+/**
+ * What a tool returned: the parts the model sees, plus what a person sees
+ * instead when the tool has something better than the text (ADR-0013 §2).
+ */
 export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
-export type ToolSpec = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
+/** A tool as the model sees it. */
+export type ToolSpec = {
+  "description": string;
+  "inputSchema": unknown;
+  /**
+   * What a catalogue may show beside the tool (an MCP tool's `server`);
+   * never sent to a model.
+   */
+  "meta"?: { [key: string]: unknown; };
+  "name": string;
+  [key: string]: unknown;
+};
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
+/** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
-export type View = ({ "bold"?: (boolean | null); "children": Array<TextChild>; "color"?: (string | null); "dimColor"?: (boolean | null); "inverse"?: (boolean | null); "italic"?: (boolean | null); "kind": "Text"; "strikethrough"?: (boolean | null); "underline"?: (boolean | null); "wrap"?: (string | null); [key: string]: unknown; } | { "dimColor"?: boolean; "kind": "Markdown"; "text": string; [key: string]: unknown; } | { "kind": "Code"; "language"?: (string | null); "source": string; [key: string]: unknown; } | { "kind": "diff"; "unified": string; [key: string]: unknown; } | { "items": Array<string>; "kind": "list"; [key: string]: unknown; } | { "headers": Array<string>; "kind": "table"; "rows": Array<Array<string>>; [key: string]: unknown; } | { "kind": "keyValue"; "rows": Array<[string, string, ...Array<unknown>]>; [key: string]: unknown; } | { "kind": "progress"; "label"?: (string | null); "total"?: (number | null); "value": number; [key: string]: unknown; } | { "kind": "badge"; "text": string; "tone"?: Tone; [key: string]: unknown; } | { "kind": "tree"; "nodes": Array<TreeNode>; [key: string]: unknown; } | { "alignItems"?: (Align | null); "borderColor"?: (string | null); "borderStyle"?: (string | null); "children": Array<View>; "display"?: (string | null); "flexDirection"?: (Direction | null); "flexGrow"?: (number | null); "flexWrap"?: (Wrap | null); "gap"?: (number | null); "height"?: (number | null); "hints"?: (SiteHints | null); "justifyContent"?: (Justify | null); "key"?: (string | null); "kind": "Box"; "margin"?: (number | null); "marginX"?: (number | null); "marginY"?: (number | null); "onKey"?: (Action | null); "padding"?: (number | null); "paddingX"?: (number | null); "paddingY"?: (number | null); "question"?: (QuestionFocus | null); "width"?: (number | null); [key: string]: unknown; } | { "child": View; "kind": "panel"; "title": string; [key: string]: unknown; } | { "items": Array<ActionItem>; "kind": "actions"; [key: string]: unknown; } | { "children"?: Array<TextChild>; "dimColor"?: (boolean | null); "hotkey"?: (string | null); "key"?: (string | null); "kind": "Button"; "label"?: (string | null); "onPress"?: (Action | null); "variant"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Input"; "label"?: (string | null); "onInput"?: (Action | null); "onSubmit"?: (Action | null); "placeholder"?: (string | null); "value"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Select"; "label"?: (string | null); "onSelect"?: (Action | null); "options"?: (Array<SelectOption> | null); "value"?: (string | null); [key: string]: unknown; } | { "href": string; "kind": "Link"; "label"?: (string | null); [key: string]: unknown; } | { "alt": string; "columns"?: (number | null); "kind": "Image"; "rows"?: (number | null); "source": string; [key: string]: unknown; } | { "cells": Array<string>; "columns": number; "kind": "Raster"; "rows": number; [key: string]: unknown; } | { "alt": string; "height"?: (number | null); "kind": "Svg"; "source": string; "width"?: (number | null); [key: string]: unknown; } | { "component": Component; "kind": "Engine"; "props": unknown; [key: string]: unknown; } | { "customKind": string; "data": unknown; "fold": string; "kind": "custom"; [key: string]: unknown; });
+export type View = ({
+  /** Draw the text bold. */
+  "bold"?: (boolean | null);
+  /** Strings and nested `Text` nodes, drawn in order. */
+  "children": Array<TextChild>;
+  /** A colour name or `#rrggbb`; the surface may adjust it to its theme. */
+  "color"?: (string | null);
+  /** Draw the text dimmed. */
+  "dimColor"?: (boolean | null);
+  /** Swap the foreground and background colours. */
+  "inverse"?: (boolean | null);
+  /** Draw the text in italics. */
+  "italic"?: (boolean | null);
+  "kind": "Text";
+  /** Strike the text through. */
+  "strikethrough"?: (boolean | null);
+  /** Underline the text. */
+  "underline"?: (boolean | null);
+  /** `wrap` breaks long lines at the width; `truncate` cuts them. */
+  "wrap"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Draw it dimmed. */
+  "dimColor"?: boolean;
+  "kind": "Markdown";
+  /** The Markdown source. */
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "kind": "Code";
+  /** The language name for highlighting, such as `rust`. */
+  "language"?: (string | null);
+  /** The code itself. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  "kind": "diff";
+  /** The diff in unified format. */
+  "unified": string;
+  [key: string]: unknown;
+} | {
+  /** One string per item. */
+  "items": Array<string>;
+  "kind": "list";
+  [key: string]: unknown;
+} | {
+  /** The column headings. */
+  "headers": Array<string>;
+  "kind": "table";
+  /** One array of cells per row, in column order. */
+  "rows": Array<Array<string>>;
+  [key: string]: unknown;
+} | {
+  "kind": "keyValue";
+  /** `[label, value]` pairs, in order. */
+  "rows": Array<[string, string, ...Array<unknown>]>;
+  [key: string]: unknown;
+} | {
+  "kind": "progress";
+  /** Text drawn beside the bar. */
+  "label"?: (string | null);
+  /** The whole; without it the surface shows a count. */
+  "total"?: (number | null);
+  /** How much is done. */
+  "value": number;
+  [key: string]: unknown;
+} | {
+  "kind": "badge";
+  /** The label. */
+  "text": string;
+  /** `neutral`, `good`, `bad` or `attention`; the surface picks the colour. */
+  "tone"?: Tone;
+  [key: string]: unknown;
+} | {
+  "kind": "tree";
+  /** The top-level nodes. */
+  "nodes": Array<TreeNode>;
+  [key: string]: unknown;
+} | {
+  /** Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`. */
+  "alignItems"?: (Align | null);
+  /** The border colour. */
+  "borderColor"?: (string | null);
+  /** Any value but `none` draws a border. */
+  "borderStyle"?: (string | null);
+  /** The views inside, in order. */
+  "children": Array<View>;
+  /** `none` hides the box and its controls. */
+  "display"?: (string | null);
+  /** `row` or `column` (the default). */
+  "flexDirection"?: (Direction | null);
+  /** How much of the spare room this box takes; `0` takes none. */
+  "flexGrow"?: (number | null);
+  /** `wrap` lets children flow onto another line. */
+  "flexWrap"?: (Wrap | null);
+  /** Cells between children. */
+  "gap"?: (number | null);
+  /** The height in rows. */
+  "height"?: (number | null);
+  /** Main-axis distribution, such as `flex-start` or `space-between`. */
+  "justifyContent"?: (Justify | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Box";
+  /** Cells outside the box on every side. */
+  "margin"?: (number | null);
+  /** Cells outside the box on the left and right. */
+  "marginX"?: (number | null);
+  /** Rows outside the box above and below. */
+  "marginY"?: (number | null);
+  /** A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back. */
+  "onKey"?: (Action | null);
+  /** Cells inside the box on every side. */
+  "padding"?: (number | null);
+  /** Cells inside the box on the left and right. */
+  "paddingX"?: (number | null);
+  /** Rows inside the box above and below. */
+  "paddingY"?: (number | null);
+  /** The width in cells. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The view inside. */
+  "child": View;
+  "kind": "panel";
+  /** The heading. */
+  "title": string;
+  [key: string]: unknown;
+} | {
+  /** The buttons, in order. */
+  "items": Array<ActionItem>;
+  "kind": "actions";
+  [key: string]: unknown;
+} | {
+  /** The button's text, when `label` is not given. */
+  "children"?: Array<TextChild>;
+  /** Draw the button dimmed. */
+  "dimColor"?: (boolean | null);
+  /** One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button. */
+  "hotkey"?: (string | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Button";
+  /** The button's text. */
+  "label"?: (string | null);
+  /** The handler run when the button is pressed: a mod passes a function. */
+  "onPress"?: (Action | null);
+  /** `primary` draws it bold, `danger` in the alarm colour. */
+  "variant"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Input";
+  /** Text before the field. */
+  "label"?: (string | null);
+  /** The handler run as the text changes: a mod passes a function. */
+  "onInput"?: (Action | null);
+  /** The handler run when the person presses Enter: a mod passes a function. */
+  "onSubmit"?: (Action | null);
+  /** Text shown while the field is empty. */
+  "placeholder"?: (string | null);
+  /** The text in the field. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Select";
+  /** Text before the choice. */
+  "label"?: (string | null);
+  /** The handler run with the chosen value: a mod passes a function. */
+  "onSelect"?: (Action | null);
+  /** The choices, each `{label, value}`. */
+  "options"?: (Array<SelectOption> | null);
+  /** The chosen option's `value`. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** The URL. */
+  "href": string;
+  "kind": "Link";
+  /** The text shown; the URL when absent. */
+  "label"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Text shown where the image cannot be. */
+  "alt": string;
+  /** The width in terminal columns. */
+  "columns"?: (number | null);
+  "kind": "Image";
+  /** The height in terminal rows. */
+  "rows"?: (number | null);
+  /** A path or a `data:` URL. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  /** The cells, row by row. */
+  "cells": Array<string>;
+  /** The width in cells. */
+  "columns": number;
+  "kind": "Raster";
+  /** The height in cells. */
+  "rows": number;
+  [key: string]: unknown;
+} | {
+  /** Text shown where the drawing cannot be. */
+  "alt": string;
+  /** The height in pixels. */
+  "height"?: (number | null);
+  "kind": "Svg";
+  /** The SVG markup. */
+  "source": string;
+  /** The width in pixels. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The component bingo draws, such as `ToolUse`. */
+  "component": Component;
+  "kind": "Engine";
+  /** That component's props, as its `ui.render` event carried them. */
+  "props": unknown;
+  [key: string]: unknown;
+} | {
+  /** The element's own name. */
+  "customKind": string;
+  /** Whatever the element needs. */
+  "data": unknown;
+  /** The plain text drawn where the element is unknown. */
+  "fold": string;
+  "kind": "custom";
+  [key: string]: unknown;
+});
+/** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Wrap = ("wrap" | "nowrap");
-export type Payload = { "failures": number; "items": Array<Item>; "keepBudget": number; "reason": CompactReason; "request": ModelRequest; "usage": ContextUsage; [key: string]: unknown; };
+export type Payload = {
+  /** Earlier failed attempts this round. */
+  "failures": number;
+  /** The history to compact. */
+  "items": Array<Item>;
+  /** Tokens of recent history to keep verbatim. */
+  "keepBudget": number;
+  /** Why compaction runs. */
+  "reason": CompactReason;
+  /** The request the next round would send. */
+  "request": ModelRequest;
+  /** The context reading that triggered it. */
+  "usage": ContextUsage;
+  [key: string]: unknown;
+};
 }
 export namespace SessionCompactResult {
 // Generated from JSON Schema. Do not edit.
+/** A rejected summary still bills any usage observed before it failed. */
 export type CompactError = { "error": KernelError; "usage"?: Usage; [key: string]: unknown; };
-export type Compaction = { "after": number; "before": number; "boundary": ItemId; "kept"?: Array<ItemId>; "summary": string; "usage"?: Usage; [key: string]: unknown; };
+/**
+ * The result: a summary, the boundary before which items are replaced, the
+ * items before it to keep anyway, and what the summary cost. The kernel
+ * accepts it only when `after < before`; the cost is billed either way.
+ */
+export type Compaction = {
+  "after": number;
+  "before": number;
+  "boundary": ItemId;
+  "kept"?: Array<ItemId>;
+  "summary": string;
+  /** What the summary cost. A strategy that spends no tokens says nothing. */
+  "usage"?: Usage;
+  [key: string]: unknown;
+};
 export type ErrorCode = (("SESSION_NOT_FOUND" | "SESSION_LOCKED" | "SESSION_CLOSED" | "INTERACTION_CLOSED" | "NOT_READY" | "STALE_GENERATION" | "NOT_INITIALIZED" | "INVALID_INPUT" | "PERMISSION_DENIED" | "TOOL_NOT_FOUND" | "TOOL_FAILED" | "PROVIDER_UNAVAILABLE" | "AUTH_REQUIRED" | "RATE_LIMITED" | "CONTEXT_OVERFLOW" | "TIMEOUT" | "OFFLINE" | "SERVER_ERROR" | "TURN_LOST" | "TURN_BUDGET_EXHAUSTED" | "UNSUPPORTED" | "INTERNAL") | "INTERRUPTED" | "PROTOCOL_LIMIT" | "NOT_FOUND" | "STORAGE");
+/** One unit in the transcript order. */
 export type ItemId = string;
+/** An error as it appears on the wire and in the journal. */
 export type KernelError = { "code": ErrorCode; "message": string; [key: string]: unknown; };
+/**
+ * Token counts as the provider reports them, the three input counts kept
+ * apart: `input_tokens` is what the model read fresh, the cache counts are
+ * what it read from or wrote to a cached prefix. The whole input side is
+ * `input_total()`.
+ */
 export type Usage = { "cacheReadTokens"?: number; "cacheWriteTokens"?: number; "inputTokens": number; "outputTokens": number; "reasoningTokens"?: number; [key: string]: unknown; };
 export type Payload = ({ "Ok": Compaction; [key: string]: unknown; } | { "Err": CompactError; [key: string]: unknown; });
 }
@@ -269,16 +1634,38 @@ export type Payload = null;
 }
 export namespace TurnStopResult {
 // Generated from JSON Schema. Do not edit.
-export type Payload = (("complete") | { "continue": { "origin": string; "reason": string; [key: string]: unknown; }; });
+export type Payload = ("complete" | { "continue": { "origin": string; "reason": string; [key: string]: unknown; }; });
 }
 export type TurnStop = TurnStopInput.Payload;
 export namespace ToolDescribeInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
+/** A tool as the model sees it. */
+export type Payload = {
+  "description": string;
+  "inputSchema": unknown;
+  /**
+   * What a catalogue may show beside the tool (an MCP tool's `server`);
+   * never sent to a model.
+   */
+  "meta"?: { [key: string]: unknown; };
+  "name": string;
+  [key: string]: unknown;
+};
 }
 export namespace ToolDescribeResult {
 // Generated from JSON Schema. Do not edit.
-export type ToolSpec = { "description": string; "inputSchema": unknown; "meta"?: { [key: string]: unknown; }; "name": string; [key: string]: unknown; };
+/** A tool as the model sees it. */
+export type ToolSpec = {
+  "description": string;
+  "inputSchema": unknown;
+  /**
+   * What a catalogue may show beside the tool (an MCP tool's `server`);
+   * never sent to a model.
+   */
+  "meta"?: { [key: string]: unknown; };
+  "name": string;
+  [key: string]: unknown;
+};
 export type Payload = (ToolSpec | null);
 }
 export type ToolDescribe = ToolDescribeInput.Payload;
@@ -297,15 +1684,90 @@ export type Payload = { "entries": Array<CatalogEntry>; "kind": CatalogKind; [ke
 export type PromptAutocomplete = PromptAutocompleteInput.Payload;
 export namespace SessionSendInput {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
+/**
+ * How a line reaches a session's queue: a peer's message (ADR-0010 §1) and
+ * a person's own line are the same question, so they are the same word.
+ */
 export type Delivery = ("wake" | "hold");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Input = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
+/**
+ * The one submission entry. The kernel parses `/`, `!` and `@` in text and
+ * decides turn, queue, steer or deliver; a client never chooses.
+ */
+export type Input = ({
+  /**
+   * Whether a running turn may be steered with it (ADR-0008 §2,
+   * amended M68). `Wake` is the line every client has always sent, so
+   * it is the default and nothing is written for it.
+   */
+  "delivery"?: Delivery;
+  /**
+   * The pictures the ask carries, in the order they reach the journal
+   * (ADR-0040): exactly as they will be journaled, because a surface
+   * resolves a picture and the kernel does no file I/O for input.
+   */
+  "images"?: Array<Image>;
+  "kind": "text";
+  "origin": Origin;
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "action": Action;
+  "kind": "action";
+  /**
+   * The door it came through. Absent, or a door that is not a person
+   * surface, and the action is not the person's own: it fails closed.
+   */
+  "origin"?: (Origin | null);
+  [key: string]: unknown;
+});
+/** Who submitted the input, as every surface records it. */
+export type Origin = {
+  "conversation"?: (string | null);
+  "principal"?: (string | null);
+  /** Drawing family of the caller, independent of its attribution identifier. */
+  "renderSurface"?: (SurfaceName | null);
+  "surface": string;
+  "voice"?: (Voice | null);
+  [key: string]: unknown;
+};
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type Payload = { "delivery": Delivery; "input": Input; "to": SessionId; [key: string]: unknown; };
+export type Payload = {
+  /** Whether it wakes the receiver or waits for its next turn. */
+  "delivery": Delivery;
+  /** What is sent. */
+  "input": Input;
+  /** The receiving session. */
+  "to": SessionId;
+  [key: string]: unknown;
+};
 }
 export namespace SessionSendResult {
 // Generated from JSON Schema. Do not edit.
@@ -314,43 +1776,209 @@ export type Payload = null;
 export type SessionSend = SessionSendInput.Payload;
 export namespace SessionReceiveInput {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
+/**
+ * How a line reaches a session's queue: a peer's message (ADR-0010 §1) and
+ * a person's own line are the same question, so they are the same word.
+ */
 export type Delivery = ("wake" | "hold");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
+/** Who submitted the input, as every surface records it. */
+export type Origin = {
+  "conversation"?: (string | null);
+  "principal"?: (string | null);
+  /** Drawing family of the caller, independent of its attribution identifier. */
+  "renderSurface"?: (SurfaceName | null);
+  "surface": string;
+  "voice"?: (Voice | null);
+  [key: string]: unknown;
+};
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
+/**
+ * The one submission entry. The kernel parses `/`, `!` and `@` in text and
+ * decides turn, queue, steer or deliver; a client never chooses.
+ */
+export type Payload = ({
+  /**
+   * Whether a running turn may be steered with it (ADR-0008 §2,
+   * amended M68). `Wake` is the line every client has always sent, so
+   * it is the default and nothing is written for it.
+   */
+  "delivery"?: Delivery;
+  /**
+   * The pictures the ask carries, in the order they reach the journal
+   * (ADR-0040): exactly as they will be journaled, because a surface
+   * resolves a picture and the kernel does no file I/O for input.
+   */
+  "images"?: Array<Image>;
+  "kind": "text";
+  "origin": Origin;
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "action": Action;
+  "kind": "action";
+  /**
+   * The door it came through. Absent, or a door that is not a person
+   * surface, and the action is not the person's own: it fails closed.
+   */
+  "origin"?: (Origin | null);
+  [key: string]: unknown;
+});
 }
 export namespace SessionReceiveResult {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
+/**
+ * How a line reaches a session's queue: a peer's message (ADR-0010 §1) and
+ * a person's own line are the same question, so they are the same word.
+ */
 export type Delivery = ("wake" | "hold");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
+/** Who submitted the input, as every surface records it. */
+export type Origin = {
+  "conversation"?: (string | null);
+  "principal"?: (string | null);
+  /** Drawing family of the caller, independent of its attribution identifier. */
+  "renderSurface"?: (SurfaceName | null);
+  "surface": string;
+  "voice"?: (Voice | null);
+  [key: string]: unknown;
+};
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type Payload = ({ "delivery"?: Delivery; "images"?: Array<Image>; "kind": "text"; "origin": Origin; "text": string; [key: string]: unknown; } | { "action": Action; "kind": "action"; "origin"?: (Origin | null); [key: string]: unknown; });
+/**
+ * The one submission entry. The kernel parses `/`, `!` and `@` in text and
+ * decides turn, queue, steer or deliver; a client never chooses.
+ */
+export type Payload = ({
+  /**
+   * Whether a running turn may be steered with it (ADR-0008 §2,
+   * amended M68). `Wake` is the line every client has always sent, so
+   * it is the default and nothing is written for it.
+   */
+  "delivery"?: Delivery;
+  /**
+   * The pictures the ask carries, in the order they reach the journal
+   * (ADR-0040): exactly as they will be journaled, because a surface
+   * resolves a picture and the kernel does no file I/O for input.
+   */
+  "images"?: Array<Image>;
+  "kind": "text";
+  "origin": Origin;
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "action": Action;
+  "kind": "action";
+  /**
+   * The door it came through. Absent, or a door that is not a person
+   * surface, and the action is not the person's own: it fails closed.
+   */
+  "origin"?: (Origin | null);
+  [key: string]: unknown;
+});
 }
 export type SessionReceive = SessionReceiveInput.Payload;
 export namespace SessionAppendInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "kind": string; "payload": unknown; "plugin": string; [key: string]: unknown; };
+export type Payload = {
+  /** The record's kind, named by its plugin. */
+  "kind": string;
+  /** The record itself. */
+  "payload": unknown;
+  /** The plugin that owns the record. */
+  "plugin": string;
+  [key: string]: unknown;
+};
 }
 export namespace SessionAppendResult {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "kind": string; "payload": unknown; "plugin": string; [key: string]: unknown; };
+export type Payload = {
+  /** The record's kind, named by its plugin. */
+  "kind": string;
+  /** The record itself. */
+  "payload": unknown;
+  /** The plugin that owns the record. */
+  "plugin": string;
+  [key: string]: unknown;
+};
 }
 export type SessionAppend = SessionAppendInput.Payload;
 export namespace TurnCompleteInput {
 // Generated from JSON Schema. Do not edit.
 export type ErrorCode = (("SESSION_NOT_FOUND" | "SESSION_LOCKED" | "SESSION_CLOSED" | "INTERACTION_CLOSED" | "NOT_READY" | "STALE_GENERATION" | "NOT_INITIALIZED" | "INVALID_INPUT" | "PERMISSION_DENIED" | "TOOL_NOT_FOUND" | "TOOL_FAILED" | "PROVIDER_UNAVAILABLE" | "AUTH_REQUIRED" | "RATE_LIMITED" | "CONTEXT_OVERFLOW" | "TIMEOUT" | "OFFLINE" | "SERVER_ERROR" | "TURN_LOST" | "TURN_BUDGET_EXHAUSTED" | "UNSUPPORTED" | "INTERNAL") | "INTERRUPTED" | "PROTOCOL_LIMIT" | "NOT_FOUND" | "STORAGE");
 export type InterruptReason = ("userCancel" | "newInput" | "shutdown" | "budget");
+/** An error as it appears on the wire and in the journal. */
 export type KernelError = { "code": ErrorCode; "message": string; [key: string]: unknown; };
+/** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
 export type TurnStatus = ({ "kind": "completed"; [key: string]: unknown; } | { "error": KernelError; "kind": "failed"; [key: string]: unknown; } | { "kind": "interrupted"; "reason": InterruptReason; [key: string]: unknown; });
+/**
+ * Token counts as the provider reports them, the three input counts kept
+ * apart: `input_tokens` is what the model read fresh, the cache counts are
+ * what it read from or wrote to a cached prefix. The whole input side is
+ * `input_total()`.
+ */
 export type Usage = { "cacheReadTokens"?: number; "cacheWriteTokens"?: number; "inputTokens": number; "outputTokens": number; "reasoningTokens"?: number; [key: string]: unknown; };
-export type Payload = { "answer": string; "outcome": TurnStatus; "turn": TurnId; "usage": Usage; [key: string]: unknown; };
+export type Payload = {
+  /** The assistant's final text. */
+  "answer": string;
+  /** How it ended. */
+  "outcome": TurnStatus;
+  /** The turn that ended. */
+  "turn": TurnId;
+  /** Tokens the turn used. */
+  "usage": Usage;
+  [key: string]: unknown;
+};
 }
 export namespace TurnCompleteResult {
 // Generated from JSON Schema. Do not edit.
@@ -360,38 +1988,328 @@ export type TurnComplete = TurnCompleteInput.Payload;
 export namespace CommandRunInput {
 // Generated from JSON Schema. Do not edit.
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
-export type Payload = { "args": string; "command": string; "surface"?: (SurfaceName | null); [key: string]: unknown; };
+export type Payload = {
+  /** The rest of the line after the name. */
+  "args": string;
+  /** The command's name, without the slash. */
+  "command": string;
+  /** The surface the command was typed on, when known. */
+  "surface"?: (SurfaceName | null);
+  [key: string]: unknown;
+};
 }
 export namespace CommandRunResult {
 // Generated from JSON Schema. Do not edit.
+/** A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command. */
 export type Action = { "args"?: unknown; "name": string; [key: string]: unknown; };
-export type ActionItem = { "action": Action; "key"?: (string | null); "label": string; [key: string]: unknown; };
+/** A button: the surface fires `Input::Action` with `action` (ADR-0008 §1). */
+export type ActionItem = {
+  "action": Action;
+  /** A single-key hint; the surface may use another key. */
+  "key"?: (string | null);
+  "label": string;
+  [key: string]: unknown;
+};
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
 export type Answer = ({ "input": unknown; "kind": "allowChanged"; [key: string]: unknown; } | { "kind": "allowOnce"; [key: string]: unknown; } | { "kind": "allowSession"; "scope": string; [key: string]: unknown; } | { "feedback"?: (string | null); "kind": "deny"; [key: string]: unknown; } | { "ids": Array<string>; "kind": "choice"; "other"?: (string | null); [key: string]: unknown; } | { "kind": "text"; "text": string; [key: string]: unknown; } | { "kind": "confirm"; [key: string]: unknown; } | { "kind": "cancel"; [key: string]: unknown; } | { "answers": Array<Answer>; "kind": "form"; [key: string]: unknown; });
 export type CommandOutcome = ({ "kind": "acknowledged"; "result": unknown; [key: string]: unknown; } | { "action": Action; "fallback"?: (string | null); "kind": "surface"; [key: string]: unknown; } | { "answer": Answer; "kind": "answer"; [key: string]: unknown; } | { "handled": boolean; "kind": "handled"; [key: string]: unknown; } | { "kind": "applied"; "message"?: (string | null); [key: string]: unknown; } | { "kind": "view"; "view": View; [key: string]: unknown; } | { "kind": "prompt"; "text": string; [key: string]: unknown; } | { "body": ItemBody; "kind": "record"; [key: string]: unknown; });
-export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
-export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
+export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type DecisionKind = ("allowChanged" | "allowChangedSession" | "allow" | "allowSession" | "deny");
 export type Direction = ("row" | "column");
-export type Image = { "data": string; "height"?: (number | null); "mediaType": string; "path"?: (string | null); "width"?: (number | null); [key: string]: unknown; };
+/**
+ * A picture handed to the model, already the shape the journal keeps and a
+ * provider's request encodes: one struct, so a surface that reads a picture
+ * off disk, a wire client that already holds the bytes, and a tool result
+ * that returns one all produce the same thing.
+ */
+export type Image = {
+  /** Base64 payload. */
+  "data": string;
+  "height"?: (number | null);
+  "mediaType": string;
+  /**
+   * Where the same bytes are on this machine, when they are anywhere: a
+   * picture read off a disk, or one a surface wrote before handing it on
+   * (ADR-0052). A location, not a second copy — absent from the wire and
+   * the journal when there is none, so a picture without one is the
+   * bytes it always was.
+   */
+  "path"?: (string | null);
+  "width"?: (number | null);
+  [key: string]: unknown;
+};
+/** A pending question or permission, answered once by id. */
 export type InteractionId = string;
 export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<ContentPart>; [key: string]: unknown; } | { "kind": "assistant"; "text": string; [key: string]: unknown; } | { "kind": "reasoning"; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; [key: string]: unknown; } | { "callId": string; "durationMs"?: (number | null); "input": unknown; "kind": "toolCall"; "name": string; "output"?: (ToolOutput | null); "progress"?: (string | null); "quiet"?: boolean; [key: string]: unknown; } | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | { "after": number; "before": number; "durationMs": number; "kind": "compaction"; "replaced": number; "summary": string; [key: string]: unknown; } | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
+/** One unit in the transcript order. */
 export type ItemId = string;
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
-export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
 export type Level = ("info" | "warn" | "error");
-export type Origin = { "conversation"?: (string | null); "principal"?: (string | null); "renderSurface"?: (SurfaceName | null); "surface": string; "voice"?: (Voice | null); [key: string]: unknown; };
-export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
-export type SelectOption = { "label": string; "value": string; [key: string]: unknown; };
-export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
+/** Who submitted the input, as every surface records it. */
+export type Origin = {
+  "conversation"?: (string | null);
+  "principal"?: (string | null);
+  /** Drawing family of the caller, independent of its attribution identifier. */
+  "renderSurface"?: (SurfaceName | null);
+  "surface": string;
+  "voice"?: (Voice | null);
+  [key: string]: unknown;
+};
+export type SelectOption = {
+  /** The text shown. */
+  "label": string;
+  /** The value chosen. */
+  "value": string;
+  [key: string]: unknown;
+};
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
+/** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
+/**
+ * What a tool returned: the parts the model sees, plus what a person sees
+ * instead when the tool has something better than the text (ADR-0013 §2).
+ */
 export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
+/** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
-export type View = ({ "bold"?: (boolean | null); "children": Array<TextChild>; "color"?: (string | null); "dimColor"?: (boolean | null); "inverse"?: (boolean | null); "italic"?: (boolean | null); "kind": "Text"; "strikethrough"?: (boolean | null); "underline"?: (boolean | null); "wrap"?: (string | null); [key: string]: unknown; } | { "dimColor"?: boolean; "kind": "Markdown"; "text": string; [key: string]: unknown; } | { "kind": "Code"; "language"?: (string | null); "source": string; [key: string]: unknown; } | { "kind": "diff"; "unified": string; [key: string]: unknown; } | { "items": Array<string>; "kind": "list"; [key: string]: unknown; } | { "headers": Array<string>; "kind": "table"; "rows": Array<Array<string>>; [key: string]: unknown; } | { "kind": "keyValue"; "rows": Array<[string, string, ...Array<unknown>]>; [key: string]: unknown; } | { "kind": "progress"; "label"?: (string | null); "total"?: (number | null); "value": number; [key: string]: unknown; } | { "kind": "badge"; "text": string; "tone"?: Tone; [key: string]: unknown; } | { "kind": "tree"; "nodes": Array<TreeNode>; [key: string]: unknown; } | { "alignItems"?: (Align | null); "borderColor"?: (string | null); "borderStyle"?: (string | null); "children": Array<View>; "display"?: (string | null); "flexDirection"?: (Direction | null); "flexGrow"?: (number | null); "flexWrap"?: (Wrap | null); "gap"?: (number | null); "height"?: (number | null); "hints"?: (SiteHints | null); "justifyContent"?: (Justify | null); "key"?: (string | null); "kind": "Box"; "margin"?: (number | null); "marginX"?: (number | null); "marginY"?: (number | null); "onKey"?: (Action | null); "padding"?: (number | null); "paddingX"?: (number | null); "paddingY"?: (number | null); "question"?: (QuestionFocus | null); "width"?: (number | null); [key: string]: unknown; } | { "child": View; "kind": "panel"; "title": string; [key: string]: unknown; } | { "items": Array<ActionItem>; "kind": "actions"; [key: string]: unknown; } | { "children"?: Array<TextChild>; "dimColor"?: (boolean | null); "hotkey"?: (string | null); "key"?: (string | null); "kind": "Button"; "label"?: (string | null); "onPress"?: (Action | null); "variant"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Input"; "label"?: (string | null); "onInput"?: (Action | null); "onSubmit"?: (Action | null); "placeholder"?: (string | null); "value"?: (string | null); [key: string]: unknown; } | { "key"?: (string | null); "kind": "Select"; "label"?: (string | null); "onSelect"?: (Action | null); "options"?: (Array<SelectOption> | null); "value"?: (string | null); [key: string]: unknown; } | { "href": string; "kind": "Link"; "label"?: (string | null); [key: string]: unknown; } | { "alt": string; "columns"?: (number | null); "kind": "Image"; "rows"?: (number | null); "source": string; [key: string]: unknown; } | { "cells": Array<string>; "columns": number; "kind": "Raster"; "rows": number; [key: string]: unknown; } | { "alt": string; "height"?: (number | null); "kind": "Svg"; "source": string; "width"?: (number | null); [key: string]: unknown; } | { "component": Component; "kind": "Engine"; "props": unknown; [key: string]: unknown; } | { "customKind": string; "data": unknown; "fold": string; "kind": "custom"; [key: string]: unknown; });
+export type View = ({
+  /** Draw the text bold. */
+  "bold"?: (boolean | null);
+  /** Strings and nested `Text` nodes, drawn in order. */
+  "children": Array<TextChild>;
+  /** A colour name or `#rrggbb`; the surface may adjust it to its theme. */
+  "color"?: (string | null);
+  /** Draw the text dimmed. */
+  "dimColor"?: (boolean | null);
+  /** Swap the foreground and background colours. */
+  "inverse"?: (boolean | null);
+  /** Draw the text in italics. */
+  "italic"?: (boolean | null);
+  "kind": "Text";
+  /** Strike the text through. */
+  "strikethrough"?: (boolean | null);
+  /** Underline the text. */
+  "underline"?: (boolean | null);
+  /** `wrap` breaks long lines at the width; `truncate` cuts them. */
+  "wrap"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Draw it dimmed. */
+  "dimColor"?: boolean;
+  "kind": "Markdown";
+  /** The Markdown source. */
+  "text": string;
+  [key: string]: unknown;
+} | {
+  "kind": "Code";
+  /** The language name for highlighting, such as `rust`. */
+  "language"?: (string | null);
+  /** The code itself. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  "kind": "diff";
+  /** The diff in unified format. */
+  "unified": string;
+  [key: string]: unknown;
+} | {
+  /** One string per item. */
+  "items": Array<string>;
+  "kind": "list";
+  [key: string]: unknown;
+} | {
+  /** The column headings. */
+  "headers": Array<string>;
+  "kind": "table";
+  /** One array of cells per row, in column order. */
+  "rows": Array<Array<string>>;
+  [key: string]: unknown;
+} | {
+  "kind": "keyValue";
+  /** `[label, value]` pairs, in order. */
+  "rows": Array<[string, string, ...Array<unknown>]>;
+  [key: string]: unknown;
+} | {
+  "kind": "progress";
+  /** Text drawn beside the bar. */
+  "label"?: (string | null);
+  /** The whole; without it the surface shows a count. */
+  "total"?: (number | null);
+  /** How much is done. */
+  "value": number;
+  [key: string]: unknown;
+} | {
+  "kind": "badge";
+  /** The label. */
+  "text": string;
+  /** `neutral`, `good`, `bad` or `attention`; the surface picks the colour. */
+  "tone"?: Tone;
+  [key: string]: unknown;
+} | {
+  "kind": "tree";
+  /** The top-level nodes. */
+  "nodes": Array<TreeNode>;
+  [key: string]: unknown;
+} | {
+  /** Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`. */
+  "alignItems"?: (Align | null);
+  /** The border colour. */
+  "borderColor"?: (string | null);
+  /** Any value but `none` draws a border. */
+  "borderStyle"?: (string | null);
+  /** The views inside, in order. */
+  "children": Array<View>;
+  /** `none` hides the box and its controls. */
+  "display"?: (string | null);
+  /** `row` or `column` (the default). */
+  "flexDirection"?: (Direction | null);
+  /** How much of the spare room this box takes; `0` takes none. */
+  "flexGrow"?: (number | null);
+  /** `wrap` lets children flow onto another line. */
+  "flexWrap"?: (Wrap | null);
+  /** Cells between children. */
+  "gap"?: (number | null);
+  /** The height in rows. */
+  "height"?: (number | null);
+  /** Main-axis distribution, such as `flex-start` or `space-between`. */
+  "justifyContent"?: (Justify | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Box";
+  /** Cells outside the box on every side. */
+  "margin"?: (number | null);
+  /** Cells outside the box on the left and right. */
+  "marginX"?: (number | null);
+  /** Rows outside the box above and below. */
+  "marginY"?: (number | null);
+  /** A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back. */
+  "onKey"?: (Action | null);
+  /** Cells inside the box on every side. */
+  "padding"?: (number | null);
+  /** Cells inside the box on the left and right. */
+  "paddingX"?: (number | null);
+  /** Rows inside the box above and below. */
+  "paddingY"?: (number | null);
+  /** The width in cells. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The view inside. */
+  "child": View;
+  "kind": "panel";
+  /** The heading. */
+  "title": string;
+  [key: string]: unknown;
+} | {
+  /** The buttons, in order. */
+  "items": Array<ActionItem>;
+  "kind": "actions";
+  [key: string]: unknown;
+} | {
+  /** The button's text, when `label` is not given. */
+  "children"?: Array<TextChild>;
+  /** Draw the button dimmed. */
+  "dimColor"?: (boolean | null);
+  /** One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button. */
+  "hotkey"?: (string | null);
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Button";
+  /** The button's text. */
+  "label"?: (string | null);
+  /** The handler run when the button is pressed: a mod passes a function. */
+  "onPress"?: (Action | null);
+  /** `primary` draws it bold, `danger` in the alarm colour. */
+  "variant"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Input";
+  /** Text before the field. */
+  "label"?: (string | null);
+  /** The handler run as the text changes: a mod passes a function. */
+  "onInput"?: (Action | null);
+  /** The handler run when the person presses Enter: a mod passes a function. */
+  "onSubmit"?: (Action | null);
+  /** Text shown while the field is empty. */
+  "placeholder"?: (string | null);
+  /** The text in the field. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** A stable identity among siblings. */
+  "key"?: (string | null);
+  "kind": "Select";
+  /** Text before the choice. */
+  "label"?: (string | null);
+  /** The handler run with the chosen value: a mod passes a function. */
+  "onSelect"?: (Action | null);
+  /** The choices, each `{label, value}`. */
+  "options"?: (Array<SelectOption> | null);
+  /** The chosen option's `value`. */
+  "value"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** The URL. */
+  "href": string;
+  "kind": "Link";
+  /** The text shown; the URL when absent. */
+  "label"?: (string | null);
+  [key: string]: unknown;
+} | {
+  /** Text shown where the image cannot be. */
+  "alt": string;
+  /** The width in terminal columns. */
+  "columns"?: (number | null);
+  "kind": "Image";
+  /** The height in terminal rows. */
+  "rows"?: (number | null);
+  /** A path or a `data:` URL. */
+  "source": string;
+  [key: string]: unknown;
+} | {
+  /** The cells, row by row. */
+  "cells": Array<string>;
+  /** The width in cells. */
+  "columns": number;
+  "kind": "Raster";
+  /** The height in cells. */
+  "rows": number;
+  [key: string]: unknown;
+} | {
+  /** Text shown where the drawing cannot be. */
+  "alt": string;
+  /** The height in pixels. */
+  "height"?: (number | null);
+  "kind": "Svg";
+  /** The SVG markup. */
+  "source": string;
+  /** The width in pixels. */
+  "width"?: (number | null);
+  [key: string]: unknown;
+} | {
+  /** The component bingo draws, such as `ToolUse`. */
+  "component": Component;
+  "kind": "Engine";
+  /** That component's props, as its `ui.render` event carried them. */
+  "props": unknown;
+  [key: string]: unknown;
+} | {
+  /** The element's own name. */
+  "customKind": string;
+  /** Whatever the element needs. */
+  "data": unknown;
+  /** The plain text drawn where the element is unknown. */
+  "fold": string;
+  "kind": "custom";
+  [key: string]: unknown;
+});
+/** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Wrap = ("wrap" | "nowrap");
 export type Payload = (CommandOutcome | { "text": string; [key: string]: unknown; });
@@ -399,42 +2317,150 @@ export type Payload = (CommandOutcome | { "text": string; [key: string]: unknown
 export type CommandRun = CommandRunInput.Payload;
 export namespace CommandDescribeInput {
 // Generated from JSON Schema. Do not edit.
-export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "args": ArgSpec; "flags": Array<string>; "kind": "options"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | { "alone"?: Array<string>; "kind": "words"; "labels"?: { [key: string]: string; }; "person"?: Array<string>; "then"?: (ArgSpec | null); "values": Array<string>; [key: string]: unknown; });
+export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "args": ArgSpec; "flags": Array<string>; "kind": "options"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | {
+  /** Words among `values` that end the argument; `then` does not apply. */
+  "alone"?: Array<string>;
+  "kind": "words";
+  /**
+   * What a surface shows for a value that is not its own best name;
+   * the line still runs the value, and a value without one reads as
+   * itself.
+   */
+  "labels"?: { [key: string]: string; };
+  /**
+   * Words among `values` only the person may run: they raise trust or
+   * let repository code run, so no link rewrites a line that starts
+   * with one and no view bingo did not draw may send one.
+   */
+  "person"?: Array<string>;
+  "then"?: (ArgSpec | null);
+  "values": Array<string>;
+  [key: string]: unknown;
+});
+/**
+ * A chord a command declares for itself. A bare chord runs the command
+ * alone; one with `args` submits the command with them, so a shortcut for
+ * `/model next` is a binding on `model` and not a second catalogue entry.
+ */
 export type KeyBinding = (string | { "args": string; "chord": string; [key: string]: unknown; });
-export type Payload = { "aliases"?: Array<string>; "args": ArgSpec; "family": string; "hidden"?: boolean; "hint": string; "instant"?: boolean; "keys"?: Array<KeyBinding>; "name": string; "opens"?: boolean; [key: string]: unknown; };
+export type Payload = {
+  "aliases"?: Array<string>;
+  "args": ArgSpec;
+  "family": string;
+  "hidden"?: boolean;
+  /** A one-line description for the command menu; argument syntax belongs in `args`. */
+  "hint": string;
+  /** May run while a turn is busy (read-only commands). */
+  "instant"?: boolean;
+  "keys"?: Array<KeyBinding>;
+  "name": string;
+  /**
+   * Run bare, it opens the place where its argument is chosen, so a
+   * palette runs it rather than listing `args`; `args` stays for every
+   * surface that completes it.
+   */
+  "opens"?: boolean;
+  [key: string]: unknown;
+};
 }
 export namespace CommandDescribeResult {
 // Generated from JSON Schema. Do not edit.
-export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "args": ArgSpec; "flags": Array<string>; "kind": "options"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | { "alone"?: Array<string>; "kind": "words"; "labels"?: { [key: string]: string; }; "person"?: Array<string>; "then"?: (ArgSpec | null); "values": Array<string>; [key: string]: unknown; });
-export type CommandSpec = { "aliases"?: Array<string>; "args": ArgSpec; "family": string; "hidden"?: boolean; "hint": string; "instant"?: boolean; "keys"?: Array<KeyBinding>; "name": string; "opens"?: boolean; [key: string]: unknown; };
+export type ArgSpec = ({ "kind": "none"; [key: string]: unknown; } | { "args": ArgSpec; "flags": Array<string>; "kind": "options"; [key: string]: unknown; } | { "hint": string; "kind": "free"; [key: string]: unknown; } | { "kind": "catalog"; "source": string; [key: string]: unknown; } | {
+  /** Words among `values` that end the argument; `then` does not apply. */
+  "alone"?: Array<string>;
+  "kind": "words";
+  /**
+   * What a surface shows for a value that is not its own best name;
+   * the line still runs the value, and a value without one reads as
+   * itself.
+   */
+  "labels"?: { [key: string]: string; };
+  /**
+   * Words among `values` only the person may run: they raise trust or
+   * let repository code run, so no link rewrites a line that starts
+   * with one and no view bingo did not draw may send one.
+   */
+  "person"?: Array<string>;
+  "then"?: (ArgSpec | null);
+  "values": Array<string>;
+  [key: string]: unknown;
+});
+export type CommandSpec = {
+  "aliases"?: Array<string>;
+  "args": ArgSpec;
+  "family": string;
+  "hidden"?: boolean;
+  /** A one-line description for the command menu; argument syntax belongs in `args`. */
+  "hint": string;
+  /** May run while a turn is busy (read-only commands). */
+  "instant"?: boolean;
+  "keys"?: Array<KeyBinding>;
+  "name": string;
+  /**
+   * Run bare, it opens the place where its argument is chosen, so a
+   * palette runs it rather than listing `args`; `args` stays for every
+   * surface that completes it.
+   */
+  "opens"?: boolean;
+  [key: string]: unknown;
+};
+/**
+ * A chord a command declares for itself. A bare chord runs the command
+ * alone; one with `args` submits the command with them, so a shortcut for
+ * `/model next` is a binding on `model` and not a second catalogue entry.
+ */
 export type KeyBinding = (string | { "args": string; "chord": string; [key: string]: unknown; });
 export type Payload = (CommandSpec | null);
 }
 export type CommandDescribe = CommandDescribeInput.Payload;
 export namespace ConfigSetInput {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "key": string; "value": unknown; [key: string]: unknown; };
+export type Payload = {
+  /** The setting's dotted key. */
+  "key": string;
+  /** Its new value. */
+  "value": unknown;
+  [key: string]: unknown;
+};
 }
 export namespace ConfigSetResult {
 // Generated from JSON Schema. Do not edit.
-export type Payload = { "key": string; "value": unknown; [key: string]: unknown; };
+export type Payload = {
+  /** The setting's dotted key. */
+  "key": string;
+  /** Its new value. */
+  "value": unknown;
+  [key: string]: unknown;
+};
 }
 export type ConfigSet = ConfigSetInput.Payload;
 export namespace ConfigDescribeInput {
 // Generated from JSON Schema. Do not edit.
+/** Configuration as a client sees it: the kernel's keys and each plugin's claimed slice. */
 export type Payload = { "kernel"?: unknown; "plugins"?: { [key: string]: unknown; }; [key: string]: unknown; };
 }
 export namespace ConfigDescribeResult {
 // Generated from JSON Schema. Do not edit.
+/** Configuration as a client sees it: the kernel's keys and each plugin's claimed slice. */
 export type Payload = { "kernel"?: unknown; "plugins"?: { [key: string]: unknown; }; [key: string]: unknown; };
 }
 export type ConfigDescribe = ConfigDescribeInput.Payload;
 export namespace TurnStartInput {
 // Generated from JSON Schema. Do not edit.
+/** One unit in the transcript order. */
 export type ItemId = string;
+/** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
 export type TurnOrigin = ("submit" | "queue" | "peer" | "auto");
-export type Payload = { "inputs": Array<ItemId>; "origin": TurnOrigin; "turn": TurnId; [key: string]: unknown; };
+export type Payload = {
+  /** The history items it took as input. */
+  "inputs": Array<ItemId>;
+  /** What opened it. */
+  "origin": TurnOrigin;
+  /** The turn that opened. */
+  "turn": TurnId;
+  [key: string]: unknown;
+};
 }
 export namespace TurnStartResult {
 // Generated from JSON Schema. Do not edit.
@@ -445,10 +2471,46 @@ export namespace SessionMeasureInput {
 // Generated from JSON Schema. Do not edit.
 export type ContextKind = ("system" | "tools" | "chat" | "pictures");
 export type ContextPart = { "name": ContextKind; "tokens": number; [key: string]: unknown; };
-export type ContextUsage = { "parts"?: (Array<ContextPart> | null); "trigger": number; "used": number; "window": number; [key: string]: unknown; };
+/**
+ * The one ruler for context: used tokens, the model window, and the point at
+ * which compaction triggers.
+ */
+export type ContextUsage = {
+  /** Approximate local request composition, independent of server anchoring. */
+  "parts"?: (Array<ContextPart> | null);
+  /**
+   * `used` at which the older turns are summarised, equal to `window`
+   * where the kernel draws no line because the endpoint holds the context
+   * and cuts it itself (ADR-0055 §2).
+   */
+  "trigger": number;
+  /** Tokens the next request would carry, anchored on the server's last count. */
+  "used": number;
+  /**
+   * The input side of the model's window: what is left once the output
+   * budget is reserved (ADR-0006).
+   */
+  "window": number;
+  [key: string]: unknown;
+};
+/** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
+/**
+ * Token counts as the provider reports them, the three input counts kept
+ * apart: `input_tokens` is what the model read fresh, the cache counts are
+ * what it read from or wrote to a cached prefix. The whole input side is
+ * `input_total()`.
+ */
 export type Usage = { "cacheReadTokens"?: number; "cacheWriteTokens"?: number; "inputTokens": number; "outputTokens": number; "reasoningTokens"?: number; [key: string]: unknown; };
-export type Payload = { "context": ContextUsage; "turn": TurnId; "usage": Usage; [key: string]: unknown; };
+export type Payload = {
+  /** The context window reading after this round. */
+  "context": ContextUsage;
+  /** The turn being measured. */
+  "turn": TurnId;
+  /** Tokens used so far. */
+  "usage": Usage;
+  [key: string]: unknown;
+};
 }
 export namespace SessionMeasureResult {
 // Generated from JSON Schema. Do not edit.
@@ -457,8 +2519,13 @@ export type Payload = null;
 export type SessionMeasure = SessionMeasureInput.Payload;
 export namespace SessionStartInput {
 // Generated from JSON Schema. Do not edit.
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
-export type Payload = { "session": SessionId; [key: string]: unknown; };
+export type Payload = {
+  /** The session this concerns; `$` methods default it to the current one. */
+  "session": SessionId;
+  [key: string]: unknown;
+};
 }
 export namespace SessionStartResult {
 // Generated from JSON Schema. Do not edit.
@@ -467,8 +2534,13 @@ export type Payload = null;
 export type SessionStart = SessionStartInput.Payload;
 export namespace SessionEndInput {
 // Generated from JSON Schema. Do not edit.
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
-export type Payload = { "session": SessionId; [key: string]: unknown; };
+export type Payload = {
+  /** The session this concerns; `$` methods default it to the current one. */
+  "session": SessionId;
+  [key: string]: unknown;
+};
 }
 export namespace SessionEndResult {
 // Generated from JSON Schema. Do not edit.
@@ -478,8 +2550,15 @@ export type SessionEnd = SessionEndInput.Payload;
 export namespace SessionAttachInput {
 // Generated from JSON Schema. Do not edit.
 export type ClientIdentity = { "name": string; "surface": string; [key: string]: unknown; };
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
-export type Payload = { "client": ClientIdentity; "session": SessionId; [key: string]: unknown; };
+export type Payload = {
+  /** The client that attached or detached. */
+  "client": ClientIdentity;
+  /** The session. */
+  "session": SessionId;
+  [key: string]: unknown;
+};
 }
 export namespace SessionAttachResult {
 // Generated from JSON Schema. Do not edit.
@@ -489,8 +2568,15 @@ export type SessionAttach = SessionAttachInput.Payload;
 export namespace SessionDetachInput {
 // Generated from JSON Schema. Do not edit.
 export type ClientIdentity = { "name": string; "surface": string; [key: string]: unknown; };
+/** One persisted context: one journal, one actor. */
 export type SessionId = string;
-export type Payload = { "client": ClientIdentity; "session": SessionId; [key: string]: unknown; };
+export type Payload = {
+  /** The client that attached or detached. */
+  "client": ClientIdentity;
+  /** The session. */
+  "session": SessionId;
+  [key: string]: unknown;
+};
 }
 export namespace SessionDetachResult {
 // Generated from JSON Schema. Do not edit.

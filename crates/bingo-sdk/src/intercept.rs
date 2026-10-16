@@ -144,33 +144,47 @@ impl Drop for Resume {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum SubmitResult {
+    /// Admit this input, possibly changed.
     Accepted(Input),
+    /// Refuse it with this error.
     Rejected(KernelError),
+    /// Send it to another session instead.
     Redirect { session: SessionId, input: Input },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CheckResult {
+    /// The call as judged, possibly with tightened arguments.
     pub call: ToolCall,
+    /// Whether it may run.
     pub decision: Decision,
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CompactInput {
+    /// The history to compact.
     pub items: Vec<Item>,
+    /// The context reading that triggered it.
     pub usage: ContextUsage,
+    /// The request the next round would send.
     pub request: ModelRequest,
+    /// Why compaction runs.
     pub reason: CompactReason,
+    /// Earlier failed attempts this round.
     pub failures: u32,
+    /// Tokens of recent history to keep verbatim.
     pub keep_budget: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum StopResult {
+    /// Let the turn end.
     Complete,
+    /// Keep the turn running; `reason` goes back to the model and `origin`
+    /// names who asked.
     Continue { origin: String, reason: String },
 }
 

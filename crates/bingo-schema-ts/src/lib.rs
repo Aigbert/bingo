@@ -1,17 +1,15 @@
 //! Erasable TypeScript declarations from JSON Schema.
 use serde_json::Value;
 
-/// Render a schema's definitions and its titled root, if any.
+/// Render a schema's definitions and its titled root, if any. A schema's
+/// `description` travels as a JSDoc comment on its declaration and on each
+/// object property, so a reader of the types sees what the schema says.
 pub fn render(schema: &Value) -> String {
     let mut output = String::from("// Generated from JSON Schema. Do not edit.\n");
     if let Some(definitions) = schema.get("$defs").and_then(Value::as_object) {
         let sorted: std::collections::BTreeMap<_, _> = definitions.iter().collect();
         for (name, definition) in sorted {
-            output.push_str(&format!(
-                "export type {} = {};\n",
-                identifier(name),
-                expression(definition)
-            ));
+            output.push_str(&declaration(name, definition));
         }
     }
     if let Some(title) = schema.get("title").and_then(Value::as_str)
@@ -23,13 +21,50 @@ pub fn render(schema: &Value) -> String {
             .iter()
             .any(|key| schema.get(key).is_some())
     {
-        output.push_str(&format!(
-            "export type {} = {};\n",
-            identifier(title),
-            expression(schema)
-        ));
+        output.push_str(&declaration(title, schema));
     }
     output
+}
+
+fn declaration(name: &str, schema: &Value) -> String {
+    format!(
+        "{}export type {} = {};\n",
+        described(schema, ""),
+        identifier(name),
+        expression(schema, 0)
+    )
+}
+
+/// A JSDoc block for `text`, each line prefixed by `indent`; `*/` inside the
+/// text is broken so it cannot end the comment early.
+pub fn doc(text: &str, indent: &str) -> String {
+    let text = text.trim().replace("*/", "*\\/");
+    let lines: Vec<&str> = text.lines().collect();
+    match lines.as_slice() {
+        [] => String::new(),
+        [line] => format!("{indent}/** {line} */\n"),
+        lines => {
+            let mut block = format!("{indent}/**\n");
+            for line in lines {
+                let line = line.trim_end();
+                if line.is_empty() {
+                    block.push_str(&format!("{indent} *\n"));
+                } else {
+                    block.push_str(&format!("{indent} * {line}\n"));
+                }
+            }
+            block.push_str(&format!("{indent} */\n"));
+            block
+        }
+    }
+}
+
+fn described(schema: &Value, indent: &str) -> String {
+    schema
+        .get("description")
+        .and_then(Value::as_str)
+        .map(|text| doc(text, indent))
+        .unwrap_or_default()
 }
 
 fn identifier(name: &str) -> String {
@@ -54,18 +89,19 @@ fn identifier(name: &str) -> String {
     }
 }
 
-fn joined(values: &[Value], separator: &str) -> String {
+fn joined(values: &[Value], separator: &str, depth: usize) -> String {
     format!(
         "({})",
         values
             .iter()
-            .map(expression)
+            .map(|value| expression(value, depth))
             .collect::<Vec<_>>()
             .join(separator)
     )
 }
 
-fn expression(schema: &Value) -> String {
+/// The TypeScript type of `schema`, nested `depth` objects deep.
+pub fn expression(schema: &Value, depth: usize) -> String {
     if schema == &Value::Bool(false) {
         return "never".into();
     }
@@ -90,7 +126,7 @@ fn expression(schema: &Value) -> String {
     }
     for (key, separator) in [("oneOf", " | "), ("anyOf", " | "), ("allOf", " & ")] {
         if let Some(values) = schema.get(key).and_then(Value::as_array) {
-            return joined(values, separator);
+            return joined(values, separator, depth);
         }
     }
     if let Some(types) = schema.get("type").and_then(Value::as_array) {
@@ -102,56 +138,77 @@ fn expression(schema: &Value) -> String {
                 alternative
             })
             .collect();
-        return joined(&alternatives, " | ");
+        return joined(&alternatives, " | ", depth);
     }
     match schema.get("type").and_then(Value::as_str) {
         Some("string") => "string".into(),
         Some("integer" | "number") => "number".into(),
         Some("boolean") => "boolean".into(),
         Some("null") => "null".into(),
-        Some("array") => array(schema),
-        Some("object") => object(schema),
-        _ if schema.get("properties").is_some() => object(schema),
+        Some("array") => array(schema, depth),
+        Some("object") => object(schema, depth),
+        _ if schema.get("properties").is_some() => object(schema, depth),
         _ => "unknown".into(),
     }
 }
 
-fn array(schema: &Value) -> String {
+fn array(schema: &Value, depth: usize) -> String {
     if let Some(prefix) = schema.get("prefixItems").and_then(Value::as_array) {
-        let mut fields: Vec<_> = prefix.iter().map(expression).collect();
+        let mut fields: Vec<_> = prefix.iter().map(|item| expression(item, depth)).collect();
         if schema.get("items") != Some(&Value::Bool(false)) {
-            fields.push(format!("...Array<{}>", expression(&schema["items"])));
+            fields.push(format!("...Array<{}>", expression(&schema["items"], depth)));
         }
         return format!("[{}]", fields.join(", "));
     }
-    format!("Array<{}>", expression(&schema["items"]))
+    format!("Array<{}>", expression(&schema["items"], depth))
 }
 
-fn object(schema: &Value) -> String {
+/// An object stays on one line until one of its properties is described;
+/// then each property takes a line under its comment.
+fn object(schema: &Value, depth: usize) -> String {
+    let properties: std::collections::BTreeMap<_, _> = schema
+        .get("properties")
+        .and_then(Value::as_object)
+        .map(|properties| properties.iter().collect())
+        .unwrap_or_default();
+    let documented = properties
+        .values()
+        .any(|value| value.get("description").is_some());
+    let indent = "  ".repeat(depth + 1);
     let mut fields = Vec::new();
-    if let Some(properties) = schema.get("properties").and_then(Value::as_object) {
-        let sorted: std::collections::BTreeMap<_, _> = properties.iter().collect();
-        for (name, value) in sorted {
-            let required = schema
-                .get("required")
-                .and_then(Value::as_array)
-                .is_some_and(|fields| fields.iter().any(|field| field.as_str() == Some(name)));
-            let optional = if required { "" } else { "?" };
-            fields.push(format!(
-                "{}{optional}: {};",
-                Value::String(name.clone()),
-                expression(value)
-            ));
-        }
+    for (name, value) in properties {
+        let optional = if required(schema, name) { "" } else { "?" };
+        let declaration = format!(
+            "{}{optional}: {};",
+            Value::String(name.clone()),
+            expression(value, depth + 1)
+        );
+        fields.push((described(value, &indent), declaration));
     }
     if let Some(additional) = schema.get("additionalProperties") {
         if additional != &Value::Bool(false) {
-            fields.push(format!("[key: string]: {};", expression(additional)));
+            let declaration = format!("[key: string]: {};", expression(additional, depth + 1));
+            fields.push((String::new(), declaration));
         }
     } else {
-        fields.push("[key: string]: unknown;".into());
+        fields.push((String::new(), "[key: string]: unknown;".into()));
     }
-    format!("{{ {} }}", fields.join(" "))
+    if !documented {
+        let fields: Vec<_> = fields.into_iter().map(|(_, field)| field).collect();
+        return format!("{{ {} }}", fields.join(" "));
+    }
+    let lines: Vec<String> = fields
+        .into_iter()
+        .map(|(comment, declaration)| format!("{comment}{indent}{declaration}"))
+        .collect();
+    format!("{{\n{}\n{}}}", lines.join("\n"), "  ".repeat(depth))
+}
+
+fn required(schema: &Value, name: &str) -> bool {
+    schema
+        .get("required")
+        .and_then(Value::as_array)
+        .is_some_and(|fields| fields.iter().any(|field| field.as_str() == Some(name)))
 }
 
 #[cfg(test)]
@@ -190,6 +247,23 @@ mod tests {
             );
             root["title"] = json!("ignored");
         }
+    }
+
+    #[test]
+    fn descriptions_become_jsdoc_on_declarations_and_properties() {
+        let schema = json!({"$defs":{"Thing":{"description":"A thing.\nTwo lines.",
+            "type":"object","additionalProperties":false,"required":["name"],
+            "properties":{"name":{"type":"string","description":"Its name; never */ early."},
+                "size":{"type":"integer"}}}}});
+        let rendered = render(&schema);
+        assert!(
+            rendered.contains("/**\n * A thing.\n * Two lines.\n */\nexport type Thing = {\n"),
+            "{rendered}"
+        );
+        assert!(
+            rendered.contains("  /** Its name; never *\\/ early. */\n  \"name\": string;\n  \"size\"?: number;\n};"),
+            "{rendered}"
+        );
     }
 
     #[test]

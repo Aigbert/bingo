@@ -8,12 +8,15 @@
         "type": "object",
         "properties": {
           "handler": {
+            "description": "The token a drawn handler became, or a pane id for `close`.",
             "type": "string"
           },
           "event": {
+            "description": "`press`, `input`, `select` or `close`.",
             "type": "string"
           },
           "value": {
+            "description": "What the surface sent: the text, the chosen value, or the key.",
             "default": null
           }
         },
@@ -39,6 +42,7 @@
             "type": "object",
             "properties": {
               "handled": {
+                "description": "`false` returns the key to the surface.",
                 "type": "boolean"
               }
             },
@@ -61,7 +65,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A press on a control a mod drew: `handler` is the token its `onPress` or `onKey` became, `value` what the surface sent. `next` runs that handler; return `{handled: false}` to give a key back to the surface."
     },
     "ui.input": {
       "kind": "chain",
@@ -71,12 +76,15 @@
         "type": "object",
         "properties": {
           "handler": {
+            "description": "The token a drawn handler became, or a pane id for `close`.",
             "type": "string"
           },
           "event": {
+            "description": "`press`, `input`, `select` or `close`.",
             "type": "string"
           },
           "value": {
+            "description": "What the surface sent: the text, the chosen value, or the key.",
             "default": null
           }
         },
@@ -103,7 +111,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Text entered in an `Input` a mod drew (`onInput`, `onSubmit`): `value` is the text. `next` runs the handler."
     },
     "ui.select": {
       "kind": "chain",
@@ -113,12 +122,15 @@
         "type": "object",
         "properties": {
           "handler": {
+            "description": "The token a drawn handler became, or a pane id for `close`.",
             "type": "string"
           },
           "event": {
+            "description": "`press`, `input`, `select` or `close`.",
             "type": "string"
           },
           "value": {
+            "description": "What the surface sent: the text, the chosen value, or the key.",
             "default": null
           }
         },
@@ -145,7 +157,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A choice made in a `Select` a mod drew (`onSelect`): `value` is the chosen option. `next` runs the handler."
     },
     "ui.render": {
       "kind": "chain",
@@ -155,16 +168,22 @@
         "type": "object",
         "properties": {
           "component": {
+            "description": "The site asked for.",
             "$ref": "#/$defs/Component"
           },
           "requestId": {
+            "description": "Which instance of the site; for `Pane`, the id given to `$.ui.open`.",
             "type": "string"
           },
           "surface": {
+            "description": "The asking surface.",
             "$ref": "#/$defs/SurfaceName"
           },
-          "props": true,
+          "props": {
+            "description": "The site's facts; their shape is the component's props."
+          },
           "viewport": {
+            "description": "The cells the surface offers the drawing.",
             "$ref": "#/$defs/Viewport"
           }
         },
@@ -232,6 +251,7 @@
             "type": "object",
             "properties": {
               "place": {
+                "description": "Where a pane sits, when the site is a pane.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/PanePlace"
@@ -242,12 +262,14 @@
                 ]
               },
               "columns": {
+                "description": "Width in cells.",
                 "type": "integer",
                 "format": "uint16",
                 "minimum": 0,
                 "maximum": 65535
               },
               "rows": {
+                "description": "Height in cells.",
                 "type": "integer",
                 "format": "uint16",
                 "minimum": 0,
@@ -260,6 +282,7 @@
             ]
           },
           "PanePlace": {
+            "description": "Where a pane sits: `'above'` the prompt, at the `'side'`, as an\n`'overlay'` floating over the screen, or at a fixed `{rect}`.",
             "oneOf": [
               {
                 "type": "string",
@@ -284,6 +307,7 @@
             ]
           },
           "Rect": {
+            "description": "A fixed rectangle: `width` by `height`, offset by `x` and `y` from\n`anchor`, a corner or the `center` (`topLeft` unless given).",
             "type": "object",
             "properties": {
               "anchor": {
@@ -318,6 +342,7 @@
             ]
           },
           "Length": {
+            "description": "A length: a number of terminal cells, or a share of the screen written as\na percentage string such as `'40%'`.",
             "anyOf": [
               {
                 "type": "integer",
@@ -337,57 +362,67 @@
         "title": "View",
         "oneOf": [
           {
+            "description": "A run of text: strings and nested `Text` nodes, which keep their own style.",
             "type": "object",
             "properties": {
               "children": {
+                "description": "Strings and nested `Text` nodes, drawn in order.",
                 "type": "array",
                 "items": {
                   "$ref": "#/$defs/TextChild"
                 }
               },
               "color": {
+                "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "dimColor": {
+                "description": "Draw the text dimmed.",
                 "type": [
                   "boolean",
                   "null"
                 ]
               },
               "bold": {
+                "description": "Draw the text bold.",
                 "type": [
                   "boolean",
                   "null"
                 ]
               },
               "italic": {
+                "description": "Draw the text in italics.",
                 "type": [
                   "boolean",
                   "null"
                 ]
               },
               "underline": {
+                "description": "Underline the text.",
                 "type": [
                   "boolean",
                   "null"
                 ]
               },
               "strikethrough": {
+                "description": "Strike the text through.",
                 "type": [
                   "boolean",
                   "null"
                 ]
               },
               "inverse": {
+                "description": "Swap the foreground and background colours.",
                 "type": [
                   "boolean",
                   "null"
                 ]
               },
               "wrap": {
+                "description": "`wrap` breaks long lines at the width; `truncate` cuts them.",
                 "type": [
                   "string",
                   "null"
@@ -404,12 +439,15 @@
             ]
           },
           {
+            "description": "Markdown text the surface renders.",
             "type": "object",
             "properties": {
               "text": {
+                "description": "The Markdown source.",
                 "type": "string"
               },
               "dimColor": {
+                "description": "Draw it dimmed.",
                 "type": "boolean"
               },
               "kind": {
@@ -423,15 +461,18 @@
             ]
           },
           {
+            "description": "A block of source code.",
             "type": "object",
             "properties": {
               "language": {
+                "description": "The language name for highlighting, such as `rust`.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "source": {
+                "description": "The code itself.",
                 "type": "string"
               },
               "kind": {
@@ -445,9 +486,11 @@
             ]
           },
           {
+            "description": "A diff drawn with added and removed lines marked.",
             "type": "object",
             "properties": {
               "unified": {
+                "description": "The diff in unified format.",
                 "type": "string"
               },
               "kind": {
@@ -461,9 +504,11 @@
             ]
           },
           {
+            "description": "A bulleted list of lines.",
             "type": "object",
             "properties": {
               "items": {
+                "description": "One string per item.",
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -480,15 +525,18 @@
             ]
           },
           {
+            "description": "A table of strings.",
             "type": "object",
             "properties": {
               "headers": {
+                "description": "The column headings.",
                 "type": "array",
                 "items": {
                   "type": "string"
                 }
               },
               "rows": {
+                "description": "One array of cells per row, in column order.",
                 "type": "array",
                 "items": {
                   "type": "array",
@@ -509,9 +557,11 @@
             ]
           },
           {
+            "description": "Aligned label and value pairs.",
             "type": "object",
             "properties": {
               "rows": {
+                "description": "`[label, value]` pairs, in order.",
                 "type": "array",
                 "items": {
                   "type": "array",
@@ -538,14 +588,17 @@
             ]
           },
           {
+            "description": "A progress bar, or a count when there is no total.",
             "type": "object",
             "properties": {
               "value": {
+                "description": "How much is done.",
                 "type": "integer",
                 "format": "uint64",
                 "minimum": 0
               },
               "total": {
+                "description": "The whole; without it the surface shows a count.",
                 "type": [
                   "integer",
                   "null"
@@ -554,6 +607,7 @@
                 "minimum": 0
               },
               "label": {
+                "description": "Text drawn beside the bar.",
                 "type": [
                   "string",
                   "null"
@@ -570,12 +624,15 @@
             ]
           },
           {
+            "description": "A short label coloured by its tone.",
             "type": "object",
             "properties": {
               "text": {
+                "description": "The label.",
                 "type": "string"
               },
               "tone": {
+                "description": "`neutral`, `good`, `bad` or `attention`; the surface picks the colour.",
                 "$ref": "#/$defs/Tone",
                 "default": "neutral"
               },
@@ -590,9 +647,11 @@
             ]
           },
           {
+            "description": "An indented tree of labelled nodes.",
             "type": "object",
             "properties": {
               "nodes": {
+                "description": "The top-level nodes.",
                 "type": "array",
                 "items": {
                   "$ref": "#/$defs/TreeNode"
@@ -609,9 +668,11 @@
             ]
           },
           {
+            "description": "A flex container: lays its children out in a row or a column.",
             "type": "object",
             "properties": {
               "children": {
+                "description": "The views inside, in order.",
                 "type": "array",
                 "items": {
                   "$ref": "#"
@@ -639,6 +700,7 @@
                 ]
               },
               "onKey": {
+                "description": "A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Action"
@@ -649,12 +711,14 @@
                 ]
               },
               "key": {
+                "description": "A stable identity among siblings.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "flexDirection": {
+                "description": "`row` or `column` (the default).",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Direction"
@@ -665,6 +729,7 @@
                 ]
               },
               "flexGrow": {
+                "description": "How much of the spare room this box takes; `0` takes none.",
                 "type": [
                   "integer",
                   "null"
@@ -674,6 +739,7 @@
                 "maximum": 65535
               },
               "flexWrap": {
+                "description": "`wrap` lets children flow onto another line.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Wrap"
@@ -684,6 +750,7 @@
                 ]
               },
               "alignItems": {
+                "description": "Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Align"
@@ -694,6 +761,7 @@
                 ]
               },
               "justifyContent": {
+                "description": "Main-axis distribution, such as `flex-start` or `space-between`.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Justify"
@@ -704,6 +772,7 @@
                 ]
               },
               "gap": {
+                "description": "Cells between children.",
                 "type": [
                   "integer",
                   "null"
@@ -713,6 +782,7 @@
                 "maximum": 65535
               },
               "width": {
+                "description": "The width in cells.",
                 "type": [
                   "integer",
                   "null"
@@ -722,6 +792,7 @@
                 "maximum": 65535
               },
               "height": {
+                "description": "The height in rows.",
                 "type": [
                   "integer",
                   "null"
@@ -731,6 +802,7 @@
                 "maximum": 65535
               },
               "margin": {
+                "description": "Cells outside the box on every side.",
                 "type": [
                   "integer",
                   "null"
@@ -740,6 +812,7 @@
                 "maximum": 65535
               },
               "marginX": {
+                "description": "Cells outside the box on the left and right.",
                 "type": [
                   "integer",
                   "null"
@@ -749,6 +822,7 @@
                 "maximum": 65535
               },
               "marginY": {
+                "description": "Rows outside the box above and below.",
                 "type": [
                   "integer",
                   "null"
@@ -758,6 +832,7 @@
                 "maximum": 65535
               },
               "padding": {
+                "description": "Cells inside the box on every side.",
                 "type": [
                   "integer",
                   "null"
@@ -767,6 +842,7 @@
                 "maximum": 65535
               },
               "paddingX": {
+                "description": "Cells inside the box on the left and right.",
                 "type": [
                   "integer",
                   "null"
@@ -776,6 +852,7 @@
                 "maximum": 65535
               },
               "paddingY": {
+                "description": "Rows inside the box above and below.",
                 "type": [
                   "integer",
                   "null"
@@ -785,18 +862,21 @@
                 "maximum": 65535
               },
               "borderStyle": {
+                "description": "Any value but `none` draws a border.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "borderColor": {
+                "description": "The border colour.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "display": {
+                "description": "`none` hides the box and its controls.",
                 "type": [
                   "string",
                   "null"
@@ -813,12 +893,15 @@
             ]
           },
           {
+            "description": "One view under a title.",
             "type": "object",
             "properties": {
               "title": {
+                "description": "The heading.",
                 "type": "string"
               },
               "child": {
+                "description": "The view inside.",
                 "$ref": "#"
               },
               "kind": {
@@ -833,9 +916,11 @@
             ]
           },
           {
+            "description": "A row of buttons that each run a named action.",
             "type": "object",
             "properties": {
               "items": {
+                "description": "The buttons, in order.",
                 "type": "array",
                 "items": {
                   "$ref": "#/$defs/ActionItem"
@@ -852,27 +937,32 @@
             ]
           },
           {
+            "description": "A pressable control; a mod's `onPress` runs when it is pressed.",
             "type": "object",
             "properties": {
               "children": {
+                "description": "The button's text, when `label` is not given.",
                 "type": "array",
                 "items": {
                   "$ref": "#/$defs/TextChild"
                 }
               },
               "key": {
+                "description": "A stable identity among siblings.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "label": {
+                "description": "The button's text.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "hotkey": {
+                "description": "One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button.",
                 "type": [
                   "string",
                   "null"
@@ -881,18 +971,21 @@
                 "maxLength": 1
               },
               "dimColor": {
+                "description": "Draw the button dimmed.",
                 "type": [
                   "boolean",
                   "null"
                 ]
               },
               "variant": {
+                "description": "`primary` draws it bold, `danger` in the alarm colour.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "onPress": {
+                "description": "The handler run when the button is pressed: a mod passes a function.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Action"
@@ -912,33 +1005,39 @@
             ]
           },
           {
+            "description": "A one-line text field.",
             "type": "object",
             "properties": {
               "key": {
+                "description": "A stable identity among siblings.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "label": {
+                "description": "Text before the field.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "placeholder": {
+                "description": "Text shown while the field is empty.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "value": {
+                "description": "The text in the field.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "onInput": {
+                "description": "The handler run as the text changes: a mod passes a function.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Action"
@@ -949,6 +1048,7 @@
                 ]
               },
               "onSubmit": {
+                "description": "The handler run when the person presses Enter: a mod passes a function.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Action"
@@ -968,27 +1068,32 @@
             ]
           },
           {
+            "description": "A choice among options.",
             "type": "object",
             "properties": {
               "key": {
+                "description": "A stable identity among siblings.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "label": {
+                "description": "Text before the choice.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "value": {
+                "description": "The chosen option's `value`.",
                 "type": [
                   "string",
                   "null"
                 ]
               },
               "options": {
+                "description": "The choices, each `{label, value}`.",
                 "type": [
                   "array",
                   "null"
@@ -998,6 +1103,7 @@
                 }
               },
               "onSelect": {
+                "description": "The handler run with the chosen value: a mod passes a function.",
                 "anyOf": [
                   {
                     "$ref": "#/$defs/Action"
@@ -1017,12 +1123,15 @@
             ]
           },
           {
+            "description": "A link the person can open.",
             "type": "object",
             "properties": {
               "href": {
+                "description": "The URL.",
                 "type": "string"
               },
               "label": {
+                "description": "The text shown; the URL when absent.",
                 "type": [
                   "string",
                   "null"
@@ -1039,15 +1148,19 @@
             ]
           },
           {
+            "description": "A picture; surfaces that cannot draw it show `alt`.",
             "type": "object",
             "properties": {
               "source": {
+                "description": "A path or a `data:` URL.",
                 "type": "string"
               },
               "alt": {
+                "description": "Text shown where the image cannot be.",
                 "type": "string"
               },
               "columns": {
+                "description": "The width in terminal columns.",
                 "type": [
                   "integer",
                   "null"
@@ -1057,6 +1170,7 @@
                 "maximum": 65535
               },
               "rows": {
+                "description": "The height in terminal rows.",
                 "type": [
                   "integer",
                   "null"
@@ -1077,21 +1191,25 @@
             ]
           },
           {
+            "description": "A grid of character cells, drawn by terminals only.",
             "type": "object",
             "properties": {
               "columns": {
+                "description": "The width in cells.",
                 "type": "integer",
                 "format": "uint16",
                 "minimum": 0,
                 "maximum": 65535
               },
               "rows": {
+                "description": "The height in cells.",
                 "type": "integer",
                 "format": "uint16",
                 "minimum": 0,
                 "maximum": 65535
               },
               "cells": {
+                "description": "The cells, row by row.",
                 "type": "array",
                 "items": {
                   "type": "string"
@@ -1110,15 +1228,19 @@
             ]
           },
           {
+            "description": "An SVG drawing, for surfaces that draw vectors; others show `alt`.",
             "type": "object",
             "properties": {
               "source": {
+                "description": "The SVG markup.",
                 "type": "string"
               },
               "alt": {
+                "description": "Text shown where the drawing cannot be.",
                 "type": "string"
               },
               "width": {
+                "description": "The width in pixels.",
                 "type": [
                   "integer",
                   "null"
@@ -1128,6 +1250,7 @@
                 "maximum": 65535
               },
               "height": {
+                "description": "The height in pixels.",
                 "type": [
                   "integer",
                   "null"
@@ -1148,12 +1271,16 @@
             ]
           },
           {
+            "description": "bingo's own drawing of a component, placed inside a mod's view.",
             "type": "object",
             "properties": {
               "component": {
+                "description": "The component bingo draws, such as `ToolUse`.",
                 "$ref": "#/$defs/Component"
               },
-              "props": true,
+              "props": {
+                "description": "That component's props, as its `ui.render` event carried them."
+              },
               "kind": {
                 "type": "string",
                 "const": "Engine"
@@ -1166,13 +1293,18 @@
             ]
           },
           {
+            "description": "An element bingo has no name for; surfaces that do not know it show `fold`.",
             "type": "object",
             "properties": {
               "customKind": {
+                "description": "The element's own name.",
                 "type": "string"
               },
-              "data": true,
+              "data": {
+                "description": "Whatever the element needs."
+              },
               "fold": {
+                "description": "The plain text drawn where the element is unknown.",
                 "type": "string"
               },
               "kind": {
@@ -1402,9 +1534,11 @@
             "type": "object",
             "properties": {
               "label": {
+                "description": "The text shown.",
                 "type": "string"
               },
               "value": {
+                "description": "The value chosen.",
                 "type": "string"
               }
             },
@@ -1474,7 +1608,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A surface asks for a component (`component`, a site such as `Pane` or `AbovePrompt`) at `requestId`, sized by `viewport`, with that site's `props`. Return a view tree to draw it; `next` returns what the rest of the chain, ending in bingo's own drawing, would draw. Render hooks read state but never write it."
     },
     "plugin.register": {
       "kind": "chain",
@@ -1607,7 +1742,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A plugin asks to load, naming itself, its version, origin and runtime. `next` returns the grant trust settings give it; return a narrower grant, or `{reason}` to refuse the plugin. A grant is never widened here."
     },
     "prompt.submit": {
       "kind": "chain",
@@ -1817,6 +1953,7 @@
         "title": "SubmitResult",
         "oneOf": [
           {
+            "description": "Admit this input, possibly changed.",
             "type": "object",
             "properties": {
               "accepted": {
@@ -1829,6 +1966,7 @@
             "additionalProperties": false
           },
           {
+            "description": "Refuse it with this error.",
             "type": "object",
             "properties": {
               "rejected": {
@@ -1841,6 +1979,7 @@
             "additionalProperties": false
           },
           {
+            "description": "Send it to another session instead.",
             "type": "object",
             "properties": {
               "redirect": {
@@ -2143,19 +2282,23 @@
         "rewrite": true,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Input from a person or client reaches the session, before the kernel decides turn, queue, steer or deliver. `next` admits it as given; return `{accepted: input}` with changed input, `{rejected: error}` to refuse it, or `{redirect: {session, input}}` to send it to another session."
     },
     "tool.check": {
       "kind": "chain",
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "ToolEvent",
+        "description": "A tool call as a hook sees it: the tool's own arguments sit beside\n`tool` and `tool_use_id`, not under an `input` field.",
         "type": "object",
         "properties": {
           "tool": {
+            "description": "The tool's name, such as `Bash` or `Edit`.",
             "type": "string"
           },
           "tool_use_id": {
+            "description": "The model's id for this call.",
             "type": "string"
           }
         },
@@ -2171,9 +2314,11 @@
         "type": "object",
         "properties": {
           "call": {
+            "description": "The call as judged, possibly with tightened arguments.",
             "$ref": "#/$defs/ToolCall"
           },
           "decision": {
+            "description": "Whether it may run.",
             "$ref": "#/$defs/Decision"
           }
         },
@@ -2381,19 +2526,23 @@
         "rewrite": true,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Permission for a tool call, before it runs: `tool`, `tool_use_id` and the tool's own arguments beside them. `next` returns bingo's decision (settings, mode, or asking the person) with the call; a mod may tighten it, and only `full` trust may allow."
     },
     "tool.call": {
       "kind": "chain",
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "title": "ToolEvent",
+        "description": "A tool call as a hook sees it: the tool's own arguments sit beside\n`tool` and `tool_use_id`, not under an `input` field.",
         "type": "object",
         "properties": {
           "tool": {
+            "description": "The tool's name, such as `Bash` or `Edit`.",
             "type": "string"
           },
           "tool_use_id": {
+            "description": "The model's id for this call.",
             "type": "string"
           }
         },
@@ -2409,6 +2558,7 @@
         "description": "A denial is an answer, never an invalid output that falls through to execution.",
         "anyOf": [
           {
+            "description": "Refuse the call; `deny` is the reason the model reads.",
             "type": "object",
             "properties": {
               "deny": {
@@ -2420,6 +2570,7 @@
             ]
           },
           {
+            "description": "The tool's output, from `next` or answered by the hook.",
             "$ref": "#/$defs/ToolOutput"
           }
         ],
@@ -2600,57 +2751,67 @@
           "View": {
             "oneOf": [
               {
+                "description": "A run of text: strings and nested `Text` nodes, which keep their own style.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "Strings and nested `Text` nodes, drawn in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TextChild"
                     }
                   },
                   "color": {
+                    "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "dimColor": {
+                    "description": "Draw the text dimmed.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "bold": {
+                    "description": "Draw the text bold.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "italic": {
+                    "description": "Draw the text in italics.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "underline": {
+                    "description": "Underline the text.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "strikethrough": {
+                    "description": "Strike the text through.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "inverse": {
+                    "description": "Swap the foreground and background colours.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "wrap": {
+                    "description": "`wrap` breaks long lines at the width; `truncate` cuts them.",
                     "type": [
                       "string",
                       "null"
@@ -2667,12 +2828,15 @@
                 ]
               },
               {
+                "description": "Markdown text the surface renders.",
                 "type": "object",
                 "properties": {
                   "text": {
+                    "description": "The Markdown source.",
                     "type": "string"
                   },
                   "dimColor": {
+                    "description": "Draw it dimmed.",
                     "type": "boolean"
                   },
                   "kind": {
@@ -2686,15 +2850,18 @@
                 ]
               },
               {
+                "description": "A block of source code.",
                 "type": "object",
                 "properties": {
                   "language": {
+                    "description": "The language name for highlighting, such as `rust`.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "source": {
+                    "description": "The code itself.",
                     "type": "string"
                   },
                   "kind": {
@@ -2708,9 +2875,11 @@
                 ]
               },
               {
+                "description": "A diff drawn with added and removed lines marked.",
                 "type": "object",
                 "properties": {
                   "unified": {
+                    "description": "The diff in unified format.",
                     "type": "string"
                   },
                   "kind": {
@@ -2724,9 +2893,11 @@
                 ]
               },
               {
+                "description": "A bulleted list of lines.",
                 "type": "object",
                 "properties": {
                   "items": {
+                    "description": "One string per item.",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -2743,15 +2914,18 @@
                 ]
               },
               {
+                "description": "A table of strings.",
                 "type": "object",
                 "properties": {
                   "headers": {
+                    "description": "The column headings.",
                     "type": "array",
                     "items": {
                       "type": "string"
                     }
                   },
                   "rows": {
+                    "description": "One array of cells per row, in column order.",
                     "type": "array",
                     "items": {
                       "type": "array",
@@ -2772,9 +2946,11 @@
                 ]
               },
               {
+                "description": "Aligned label and value pairs.",
                 "type": "object",
                 "properties": {
                   "rows": {
+                    "description": "`[label, value]` pairs, in order.",
                     "type": "array",
                     "items": {
                       "type": "array",
@@ -2801,14 +2977,17 @@
                 ]
               },
               {
+                "description": "A progress bar, or a count when there is no total.",
                 "type": "object",
                 "properties": {
                   "value": {
+                    "description": "How much is done.",
                     "type": "integer",
                     "format": "uint64",
                     "minimum": 0
                   },
                   "total": {
+                    "description": "The whole; without it the surface shows a count.",
                     "type": [
                       "integer",
                       "null"
@@ -2817,6 +2996,7 @@
                     "minimum": 0
                   },
                   "label": {
+                    "description": "Text drawn beside the bar.",
                     "type": [
                       "string",
                       "null"
@@ -2833,12 +3013,15 @@
                 ]
               },
               {
+                "description": "A short label coloured by its tone.",
                 "type": "object",
                 "properties": {
                   "text": {
+                    "description": "The label.",
                     "type": "string"
                   },
                   "tone": {
+                    "description": "`neutral`, `good`, `bad` or `attention`; the surface picks the colour.",
                     "$ref": "#/$defs/Tone",
                     "default": "neutral"
                   },
@@ -2853,9 +3036,11 @@
                 ]
               },
               {
+                "description": "An indented tree of labelled nodes.",
                 "type": "object",
                 "properties": {
                   "nodes": {
+                    "description": "The top-level nodes.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TreeNode"
@@ -2872,9 +3057,11 @@
                 ]
               },
               {
+                "description": "A flex container: lays its children out in a row or a column.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "The views inside, in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/View"
@@ -2902,6 +3089,7 @@
                     ]
                   },
                   "onKey": {
+                    "description": "A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -2912,12 +3100,14 @@
                     ]
                   },
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "flexDirection": {
+                    "description": "`row` or `column` (the default).",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Direction"
@@ -2928,6 +3118,7 @@
                     ]
                   },
                   "flexGrow": {
+                    "description": "How much of the spare room this box takes; `0` takes none.",
                     "type": [
                       "integer",
                       "null"
@@ -2937,6 +3128,7 @@
                     "maximum": 65535
                   },
                   "flexWrap": {
+                    "description": "`wrap` lets children flow onto another line.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Wrap"
@@ -2947,6 +3139,7 @@
                     ]
                   },
                   "alignItems": {
+                    "description": "Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Align"
@@ -2957,6 +3150,7 @@
                     ]
                   },
                   "justifyContent": {
+                    "description": "Main-axis distribution, such as `flex-start` or `space-between`.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Justify"
@@ -2967,6 +3161,7 @@
                     ]
                   },
                   "gap": {
+                    "description": "Cells between children.",
                     "type": [
                       "integer",
                       "null"
@@ -2976,6 +3171,7 @@
                     "maximum": 65535
                   },
                   "width": {
+                    "description": "The width in cells.",
                     "type": [
                       "integer",
                       "null"
@@ -2985,6 +3181,7 @@
                     "maximum": 65535
                   },
                   "height": {
+                    "description": "The height in rows.",
                     "type": [
                       "integer",
                       "null"
@@ -2994,6 +3191,7 @@
                     "maximum": 65535
                   },
                   "margin": {
+                    "description": "Cells outside the box on every side.",
                     "type": [
                       "integer",
                       "null"
@@ -3003,6 +3201,7 @@
                     "maximum": 65535
                   },
                   "marginX": {
+                    "description": "Cells outside the box on the left and right.",
                     "type": [
                       "integer",
                       "null"
@@ -3012,6 +3211,7 @@
                     "maximum": 65535
                   },
                   "marginY": {
+                    "description": "Rows outside the box above and below.",
                     "type": [
                       "integer",
                       "null"
@@ -3021,6 +3221,7 @@
                     "maximum": 65535
                   },
                   "padding": {
+                    "description": "Cells inside the box on every side.",
                     "type": [
                       "integer",
                       "null"
@@ -3030,6 +3231,7 @@
                     "maximum": 65535
                   },
                   "paddingX": {
+                    "description": "Cells inside the box on the left and right.",
                     "type": [
                       "integer",
                       "null"
@@ -3039,6 +3241,7 @@
                     "maximum": 65535
                   },
                   "paddingY": {
+                    "description": "Rows inside the box above and below.",
                     "type": [
                       "integer",
                       "null"
@@ -3048,18 +3251,21 @@
                     "maximum": 65535
                   },
                   "borderStyle": {
+                    "description": "Any value but `none` draws a border.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "borderColor": {
+                    "description": "The border colour.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "display": {
+                    "description": "`none` hides the box and its controls.",
                     "type": [
                       "string",
                       "null"
@@ -3076,12 +3282,15 @@
                 ]
               },
               {
+                "description": "One view under a title.",
                 "type": "object",
                 "properties": {
                   "title": {
+                    "description": "The heading.",
                     "type": "string"
                   },
                   "child": {
+                    "description": "The view inside.",
                     "$ref": "#/$defs/View"
                   },
                   "kind": {
@@ -3096,9 +3305,11 @@
                 ]
               },
               {
+                "description": "A row of buttons that each run a named action.",
                 "type": "object",
                 "properties": {
                   "items": {
+                    "description": "The buttons, in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/ActionItem"
@@ -3115,27 +3326,32 @@
                 ]
               },
               {
+                "description": "A pressable control; a mod's `onPress` runs when it is pressed.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "The button's text, when `label` is not given.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TextChild"
                     }
                   },
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "The button's text.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "hotkey": {
+                    "description": "One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button.",
                     "type": [
                       "string",
                       "null"
@@ -3144,18 +3360,21 @@
                     "maxLength": 1
                   },
                   "dimColor": {
+                    "description": "Draw the button dimmed.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "variant": {
+                    "description": "`primary` draws it bold, `danger` in the alarm colour.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "onPress": {
+                    "description": "The handler run when the button is pressed: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -3175,33 +3394,39 @@
                 ]
               },
               {
+                "description": "A one-line text field.",
                 "type": "object",
                 "properties": {
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "Text before the field.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "placeholder": {
+                    "description": "Text shown while the field is empty.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "value": {
+                    "description": "The text in the field.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "onInput": {
+                    "description": "The handler run as the text changes: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -3212,6 +3437,7 @@
                     ]
                   },
                   "onSubmit": {
+                    "description": "The handler run when the person presses Enter: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -3231,27 +3457,32 @@
                 ]
               },
               {
+                "description": "A choice among options.",
                 "type": "object",
                 "properties": {
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "Text before the choice.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "value": {
+                    "description": "The chosen option's `value`.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "options": {
+                    "description": "The choices, each `{label, value}`.",
                     "type": [
                       "array",
                       "null"
@@ -3261,6 +3492,7 @@
                     }
                   },
                   "onSelect": {
+                    "description": "The handler run with the chosen value: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -3280,12 +3512,15 @@
                 ]
               },
               {
+                "description": "A link the person can open.",
                 "type": "object",
                 "properties": {
                   "href": {
+                    "description": "The URL.",
                     "type": "string"
                   },
                   "label": {
+                    "description": "The text shown; the URL when absent.",
                     "type": [
                       "string",
                       "null"
@@ -3302,15 +3537,19 @@
                 ]
               },
               {
+                "description": "A picture; surfaces that cannot draw it show `alt`.",
                 "type": "object",
                 "properties": {
                   "source": {
+                    "description": "A path or a `data:` URL.",
                     "type": "string"
                   },
                   "alt": {
+                    "description": "Text shown where the image cannot be.",
                     "type": "string"
                   },
                   "columns": {
+                    "description": "The width in terminal columns.",
                     "type": [
                       "integer",
                       "null"
@@ -3320,6 +3559,7 @@
                     "maximum": 65535
                   },
                   "rows": {
+                    "description": "The height in terminal rows.",
                     "type": [
                       "integer",
                       "null"
@@ -3340,21 +3580,25 @@
                 ]
               },
               {
+                "description": "A grid of character cells, drawn by terminals only.",
                 "type": "object",
                 "properties": {
                   "columns": {
+                    "description": "The width in cells.",
                     "type": "integer",
                     "format": "uint16",
                     "minimum": 0,
                     "maximum": 65535
                   },
                   "rows": {
+                    "description": "The height in cells.",
                     "type": "integer",
                     "format": "uint16",
                     "minimum": 0,
                     "maximum": 65535
                   },
                   "cells": {
+                    "description": "The cells, row by row.",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -3373,15 +3617,19 @@
                 ]
               },
               {
+                "description": "An SVG drawing, for surfaces that draw vectors; others show `alt`.",
                 "type": "object",
                 "properties": {
                   "source": {
+                    "description": "The SVG markup.",
                     "type": "string"
                   },
                   "alt": {
+                    "description": "Text shown where the drawing cannot be.",
                     "type": "string"
                   },
                   "width": {
+                    "description": "The width in pixels.",
                     "type": [
                       "integer",
                       "null"
@@ -3391,6 +3639,7 @@
                     "maximum": 65535
                   },
                   "height": {
+                    "description": "The height in pixels.",
                     "type": [
                       "integer",
                       "null"
@@ -3411,12 +3660,16 @@
                 ]
               },
               {
+                "description": "bingo's own drawing of a component, placed inside a mod's view.",
                 "type": "object",
                 "properties": {
                   "component": {
+                    "description": "The component bingo draws, such as `ToolUse`.",
                     "$ref": "#/$defs/Component"
                   },
-                  "props": true,
+                  "props": {
+                    "description": "That component's props, as its `ui.render` event carried them."
+                  },
                   "kind": {
                     "type": "string",
                     "const": "Engine"
@@ -3429,13 +3682,18 @@
                 ]
               },
               {
+                "description": "An element bingo has no name for; surfaces that do not know it show `fold`.",
                 "type": "object",
                 "properties": {
                   "customKind": {
+                    "description": "The element's own name.",
                     "type": "string"
                   },
-                  "data": true,
+                  "data": {
+                    "description": "Whatever the element needs."
+                  },
                   "fold": {
+                    "description": "The plain text drawn where the element is unknown.",
                     "type": "string"
                   },
                   "kind": {
@@ -3665,9 +3923,11 @@
             "type": "object",
             "properties": {
               "label": {
+                "description": "The text shown.",
                 "type": "string"
               },
               "value": {
+                "description": "The value chosen.",
                 "type": "string"
               }
             },
@@ -3733,7 +3993,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A tool call runs: `tool`, `tool_use_id` and the tool's own arguments beside them, not under `input`. `next` runs the tool and returns its output; return output to answer without running it, `{deny: reason}` to refuse, or call `next` with changed arguments to rewrite them."
     },
     "model.complete": {
       "kind": "chain",
@@ -3743,9 +4004,11 @@
         "type": "object",
         "properties": {
           "plugin": {
+            "description": "The plugin that asked.",
             "type": "string"
           },
           "request": {
+            "description": "The request it sent.",
             "$ref": "#/$defs/ModelRequest"
           }
         },
@@ -4451,7 +4714,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A completion a plugin asked of the host through `$.model.complete`; `plugin` names the asker. `next` calls the model; return model events to answer instead."
     },
     "turn.step": {
       "kind": "chain",
@@ -5344,7 +5608,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": true
+      "shapesRequest": true,
+      "description": "One model call inside a turn. `next` sends the request to the configured provider and returns its events or a provider error; return events to answer without calling the model."
     },
     "prompt.compose": {
       "kind": "chain",
@@ -5959,7 +6224,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": true
+      "shapesRequest": true,
+      "description": "The model request a turn is about to send: system text, messages and tools. `next` returns the request bingo composed; return a changed one to add, remove or reorder context."
     },
     "session.compact": {
       "kind": "chain",
@@ -5969,26 +6235,32 @@
         "type": "object",
         "properties": {
           "items": {
+            "description": "The history to compact.",
             "type": "array",
             "items": {
               "$ref": "#/$defs/Item"
             }
           },
           "usage": {
+            "description": "The context reading that triggered it.",
             "$ref": "#/$defs/ContextUsage"
           },
           "request": {
+            "description": "The request the next round would send.",
             "$ref": "#/$defs/ModelRequest"
           },
           "reason": {
+            "description": "Why compaction runs.",
             "$ref": "#/$defs/CompactReason"
           },
           "failures": {
+            "description": "Earlier failed attempts this round.",
             "type": "integer",
             "format": "uint32",
             "minimum": 0
           },
           "keepBudget": {
+            "description": "Tokens of recent history to keep verbatim.",
             "type": "integer",
             "format": "uint64",
             "minimum": 0
@@ -6696,57 +6968,67 @@
           "View": {
             "oneOf": [
               {
+                "description": "A run of text: strings and nested `Text` nodes, which keep their own style.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "Strings and nested `Text` nodes, drawn in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TextChild"
                     }
                   },
                   "color": {
+                    "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "dimColor": {
+                    "description": "Draw the text dimmed.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "bold": {
+                    "description": "Draw the text bold.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "italic": {
+                    "description": "Draw the text in italics.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "underline": {
+                    "description": "Underline the text.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "strikethrough": {
+                    "description": "Strike the text through.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "inverse": {
+                    "description": "Swap the foreground and background colours.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "wrap": {
+                    "description": "`wrap` breaks long lines at the width; `truncate` cuts them.",
                     "type": [
                       "string",
                       "null"
@@ -6763,12 +7045,15 @@
                 ]
               },
               {
+                "description": "Markdown text the surface renders.",
                 "type": "object",
                 "properties": {
                   "text": {
+                    "description": "The Markdown source.",
                     "type": "string"
                   },
                   "dimColor": {
+                    "description": "Draw it dimmed.",
                     "type": "boolean"
                   },
                   "kind": {
@@ -6782,15 +7067,18 @@
                 ]
               },
               {
+                "description": "A block of source code.",
                 "type": "object",
                 "properties": {
                   "language": {
+                    "description": "The language name for highlighting, such as `rust`.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "source": {
+                    "description": "The code itself.",
                     "type": "string"
                   },
                   "kind": {
@@ -6804,9 +7092,11 @@
                 ]
               },
               {
+                "description": "A diff drawn with added and removed lines marked.",
                 "type": "object",
                 "properties": {
                   "unified": {
+                    "description": "The diff in unified format.",
                     "type": "string"
                   },
                   "kind": {
@@ -6820,9 +7110,11 @@
                 ]
               },
               {
+                "description": "A bulleted list of lines.",
                 "type": "object",
                 "properties": {
                   "items": {
+                    "description": "One string per item.",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -6839,15 +7131,18 @@
                 ]
               },
               {
+                "description": "A table of strings.",
                 "type": "object",
                 "properties": {
                   "headers": {
+                    "description": "The column headings.",
                     "type": "array",
                     "items": {
                       "type": "string"
                     }
                   },
                   "rows": {
+                    "description": "One array of cells per row, in column order.",
                     "type": "array",
                     "items": {
                       "type": "array",
@@ -6868,9 +7163,11 @@
                 ]
               },
               {
+                "description": "Aligned label and value pairs.",
                 "type": "object",
                 "properties": {
                   "rows": {
+                    "description": "`[label, value]` pairs, in order.",
                     "type": "array",
                     "items": {
                       "type": "array",
@@ -6897,14 +7194,17 @@
                 ]
               },
               {
+                "description": "A progress bar, or a count when there is no total.",
                 "type": "object",
                 "properties": {
                   "value": {
+                    "description": "How much is done.",
                     "type": "integer",
                     "format": "uint64",
                     "minimum": 0
                   },
                   "total": {
+                    "description": "The whole; without it the surface shows a count.",
                     "type": [
                       "integer",
                       "null"
@@ -6913,6 +7213,7 @@
                     "minimum": 0
                   },
                   "label": {
+                    "description": "Text drawn beside the bar.",
                     "type": [
                       "string",
                       "null"
@@ -6929,12 +7230,15 @@
                 ]
               },
               {
+                "description": "A short label coloured by its tone.",
                 "type": "object",
                 "properties": {
                   "text": {
+                    "description": "The label.",
                     "type": "string"
                   },
                   "tone": {
+                    "description": "`neutral`, `good`, `bad` or `attention`; the surface picks the colour.",
                     "$ref": "#/$defs/Tone",
                     "default": "neutral"
                   },
@@ -6949,9 +7253,11 @@
                 ]
               },
               {
+                "description": "An indented tree of labelled nodes.",
                 "type": "object",
                 "properties": {
                   "nodes": {
+                    "description": "The top-level nodes.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TreeNode"
@@ -6968,9 +7274,11 @@
                 ]
               },
               {
+                "description": "A flex container: lays its children out in a row or a column.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "The views inside, in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/View"
@@ -6998,6 +7306,7 @@
                     ]
                   },
                   "onKey": {
+                    "description": "A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -7008,12 +7317,14 @@
                     ]
                   },
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "flexDirection": {
+                    "description": "`row` or `column` (the default).",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Direction"
@@ -7024,6 +7335,7 @@
                     ]
                   },
                   "flexGrow": {
+                    "description": "How much of the spare room this box takes; `0` takes none.",
                     "type": [
                       "integer",
                       "null"
@@ -7033,6 +7345,7 @@
                     "maximum": 65535
                   },
                   "flexWrap": {
+                    "description": "`wrap` lets children flow onto another line.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Wrap"
@@ -7043,6 +7356,7 @@
                     ]
                   },
                   "alignItems": {
+                    "description": "Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Align"
@@ -7053,6 +7367,7 @@
                     ]
                   },
                   "justifyContent": {
+                    "description": "Main-axis distribution, such as `flex-start` or `space-between`.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Justify"
@@ -7063,6 +7378,7 @@
                     ]
                   },
                   "gap": {
+                    "description": "Cells between children.",
                     "type": [
                       "integer",
                       "null"
@@ -7072,6 +7388,7 @@
                     "maximum": 65535
                   },
                   "width": {
+                    "description": "The width in cells.",
                     "type": [
                       "integer",
                       "null"
@@ -7081,6 +7398,7 @@
                     "maximum": 65535
                   },
                   "height": {
+                    "description": "The height in rows.",
                     "type": [
                       "integer",
                       "null"
@@ -7090,6 +7408,7 @@
                     "maximum": 65535
                   },
                   "margin": {
+                    "description": "Cells outside the box on every side.",
                     "type": [
                       "integer",
                       "null"
@@ -7099,6 +7418,7 @@
                     "maximum": 65535
                   },
                   "marginX": {
+                    "description": "Cells outside the box on the left and right.",
                     "type": [
                       "integer",
                       "null"
@@ -7108,6 +7428,7 @@
                     "maximum": 65535
                   },
                   "marginY": {
+                    "description": "Rows outside the box above and below.",
                     "type": [
                       "integer",
                       "null"
@@ -7117,6 +7438,7 @@
                     "maximum": 65535
                   },
                   "padding": {
+                    "description": "Cells inside the box on every side.",
                     "type": [
                       "integer",
                       "null"
@@ -7126,6 +7448,7 @@
                     "maximum": 65535
                   },
                   "paddingX": {
+                    "description": "Cells inside the box on the left and right.",
                     "type": [
                       "integer",
                       "null"
@@ -7135,6 +7458,7 @@
                     "maximum": 65535
                   },
                   "paddingY": {
+                    "description": "Rows inside the box above and below.",
                     "type": [
                       "integer",
                       "null"
@@ -7144,18 +7468,21 @@
                     "maximum": 65535
                   },
                   "borderStyle": {
+                    "description": "Any value but `none` draws a border.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "borderColor": {
+                    "description": "The border colour.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "display": {
+                    "description": "`none` hides the box and its controls.",
                     "type": [
                       "string",
                       "null"
@@ -7172,12 +7499,15 @@
                 ]
               },
               {
+                "description": "One view under a title.",
                 "type": "object",
                 "properties": {
                   "title": {
+                    "description": "The heading.",
                     "type": "string"
                   },
                   "child": {
+                    "description": "The view inside.",
                     "$ref": "#/$defs/View"
                   },
                   "kind": {
@@ -7192,9 +7522,11 @@
                 ]
               },
               {
+                "description": "A row of buttons that each run a named action.",
                 "type": "object",
                 "properties": {
                   "items": {
+                    "description": "The buttons, in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/ActionItem"
@@ -7211,27 +7543,32 @@
                 ]
               },
               {
+                "description": "A pressable control; a mod's `onPress` runs when it is pressed.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "The button's text, when `label` is not given.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TextChild"
                     }
                   },
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "The button's text.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "hotkey": {
+                    "description": "One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button.",
                     "type": [
                       "string",
                       "null"
@@ -7240,18 +7577,21 @@
                     "maxLength": 1
                   },
                   "dimColor": {
+                    "description": "Draw the button dimmed.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "variant": {
+                    "description": "`primary` draws it bold, `danger` in the alarm colour.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "onPress": {
+                    "description": "The handler run when the button is pressed: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -7271,33 +7611,39 @@
                 ]
               },
               {
+                "description": "A one-line text field.",
                 "type": "object",
                 "properties": {
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "Text before the field.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "placeholder": {
+                    "description": "Text shown while the field is empty.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "value": {
+                    "description": "The text in the field.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "onInput": {
+                    "description": "The handler run as the text changes: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -7308,6 +7654,7 @@
                     ]
                   },
                   "onSubmit": {
+                    "description": "The handler run when the person presses Enter: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -7327,27 +7674,32 @@
                 ]
               },
               {
+                "description": "A choice among options.",
                 "type": "object",
                 "properties": {
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "Text before the choice.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "value": {
+                    "description": "The chosen option's `value`.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "options": {
+                    "description": "The choices, each `{label, value}`.",
                     "type": [
                       "array",
                       "null"
@@ -7357,6 +7709,7 @@
                     }
                   },
                   "onSelect": {
+                    "description": "The handler run with the chosen value: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -7376,12 +7729,15 @@
                 ]
               },
               {
+                "description": "A link the person can open.",
                 "type": "object",
                 "properties": {
                   "href": {
+                    "description": "The URL.",
                     "type": "string"
                   },
                   "label": {
+                    "description": "The text shown; the URL when absent.",
                     "type": [
                       "string",
                       "null"
@@ -7398,15 +7754,19 @@
                 ]
               },
               {
+                "description": "A picture; surfaces that cannot draw it show `alt`.",
                 "type": "object",
                 "properties": {
                   "source": {
+                    "description": "A path or a `data:` URL.",
                     "type": "string"
                   },
                   "alt": {
+                    "description": "Text shown where the image cannot be.",
                     "type": "string"
                   },
                   "columns": {
+                    "description": "The width in terminal columns.",
                     "type": [
                       "integer",
                       "null"
@@ -7416,6 +7776,7 @@
                     "maximum": 65535
                   },
                   "rows": {
+                    "description": "The height in terminal rows.",
                     "type": [
                       "integer",
                       "null"
@@ -7436,21 +7797,25 @@
                 ]
               },
               {
+                "description": "A grid of character cells, drawn by terminals only.",
                 "type": "object",
                 "properties": {
                   "columns": {
+                    "description": "The width in cells.",
                     "type": "integer",
                     "format": "uint16",
                     "minimum": 0,
                     "maximum": 65535
                   },
                   "rows": {
+                    "description": "The height in cells.",
                     "type": "integer",
                     "format": "uint16",
                     "minimum": 0,
                     "maximum": 65535
                   },
                   "cells": {
+                    "description": "The cells, row by row.",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -7469,15 +7834,19 @@
                 ]
               },
               {
+                "description": "An SVG drawing, for surfaces that draw vectors; others show `alt`.",
                 "type": "object",
                 "properties": {
                   "source": {
+                    "description": "The SVG markup.",
                     "type": "string"
                   },
                   "alt": {
+                    "description": "Text shown where the drawing cannot be.",
                     "type": "string"
                   },
                   "width": {
+                    "description": "The width in pixels.",
                     "type": [
                       "integer",
                       "null"
@@ -7487,6 +7856,7 @@
                     "maximum": 65535
                   },
                   "height": {
+                    "description": "The height in pixels.",
                     "type": [
                       "integer",
                       "null"
@@ -7507,12 +7877,16 @@
                 ]
               },
               {
+                "description": "bingo's own drawing of a component, placed inside a mod's view.",
                 "type": "object",
                 "properties": {
                   "component": {
+                    "description": "The component bingo draws, such as `ToolUse`.",
                     "$ref": "#/$defs/Component"
                   },
-                  "props": true,
+                  "props": {
+                    "description": "That component's props, as its `ui.render` event carried them."
+                  },
                   "kind": {
                     "type": "string",
                     "const": "Engine"
@@ -7525,13 +7899,18 @@
                 ]
               },
               {
+                "description": "An element bingo has no name for; surfaces that do not know it show `fold`.",
                 "type": "object",
                 "properties": {
                   "customKind": {
+                    "description": "The element's own name.",
                     "type": "string"
                   },
-                  "data": true,
+                  "data": {
+                    "description": "Whatever the element needs."
+                  },
                   "fold": {
+                    "description": "The plain text drawn where the element is unknown.",
                     "type": "string"
                   },
                   "kind": {
@@ -7761,9 +8140,11 @@
             "type": "object",
             "properties": {
               "label": {
+                "description": "The text shown.",
                 "type": "string"
               },
               "value": {
+                "description": "The value chosen.",
                 "type": "string"
               }
             },
@@ -8324,7 +8705,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Compaction of a session's history: the `items`, the context `usage`, the `request`, the `reason` and earlier `failures`. `next` runs bingo's summarizing compaction; return a compaction or error to replace it."
     },
     "turn.stop": {
       "kind": "chain",
@@ -8338,12 +8720,12 @@
         "title": "StopResult",
         "oneOf": [
           {
+            "description": "Let the turn end.",
             "type": "string",
-            "enum": [
-              "complete"
-            ]
+            "const": "complete"
           },
           {
+            "description": "Keep the turn running; `reason` goes back to the model and `origin`\nnames who asked.",
             "type": "object",
             "properties": {
               "continue": {
@@ -8376,7 +8758,8 @@
         "rewrite": true,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "The model has stopped calling tools and the turn would end. `next` returns `\"complete\"` unless a hook asks to go on; return `{continue: {origin, reason}}` to keep the turn running, with `reason` given back to the model."
     },
     "tool.describe": {
       "kind": "chain",
@@ -8453,7 +8836,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": true
+      "shapesRequest": true,
+      "description": "A tool as the model will see it: name, description and input schema. `next` returns the spec bingo has; return a changed spec to reword it, or `null` to hide the tool from the model."
     },
     "prompt.autocomplete": {
       "kind": "chain",
@@ -8570,7 +8954,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Completions offered while the person types, by `kind` (such as `commands` or `models`). `next` returns bingo's catalog; return a changed catalog to add, remove or reorder entries."
     },
     "session.send": {
       "kind": "chain",
@@ -8580,12 +8965,15 @@
         "type": "object",
         "properties": {
           "to": {
+            "description": "The receiving session.",
             "$ref": "#/$defs/SessionId"
           },
           "input": {
+            "description": "What is sent.",
             "$ref": "#/$defs/Input"
           },
           "delivery": {
+            "description": "Whether it wakes the receiver or waits for its next turn.",
             "$ref": "#/$defs/Delivery"
           }
         },
@@ -8812,7 +9200,8 @@
         "rewrite": true,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Input one session sends to another: `to` is the target and `delivery` says whether it wakes the target or waits. `next` delivers it; rewrite the input, or deny to stop it."
     },
     "session.receive": {
       "kind": "chain",
@@ -9227,7 +9616,8 @@
         "rewrite": true,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Input reaching this session from elsewhere, such as a channel or another session, before it is queued. `next` returns it as received; rewrite it, or deny to drop it."
     },
     "session.append": {
       "kind": "chain",
@@ -9237,12 +9627,16 @@
         "type": "object",
         "properties": {
           "plugin": {
+            "description": "The plugin that owns the record.",
             "type": "string"
           },
           "kind": {
+            "description": "The record's kind, named by its plugin.",
             "type": "string"
           },
-          "payload": true
+          "payload": {
+            "description": "The record itself."
+          }
         },
         "required": [
           "plugin",
@@ -9256,12 +9650,16 @@
         "type": "object",
         "properties": {
           "plugin": {
+            "description": "The plugin that owns the record.",
             "type": "string"
           },
           "kind": {
+            "description": "The record's kind, named by its plugin.",
             "type": "string"
           },
-          "payload": true
+          "payload": {
+            "description": "The record itself."
+          }
         },
         "required": [
           "plugin",
@@ -9282,7 +9680,8 @@
         "rewrite": true,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A record a plugin appends to the session's history: `plugin` owns it, `kind` and `payload` are its own. `next` appends it; only the owning plugin may rewrite it, others observe or deny."
     },
     "turn.complete": {
       "kind": "chain",
@@ -9292,15 +9691,19 @@
         "type": "object",
         "properties": {
           "turn": {
+            "description": "The turn that ended.",
             "$ref": "#/$defs/TurnId"
           },
           "outcome": {
+            "description": "How it ended.",
             "$ref": "#/$defs/TurnStatus"
           },
           "usage": {
+            "description": "Tokens the turn used.",
             "$ref": "#/$defs/Usage"
           },
           "answer": {
+            "description": "The assistant's final text.",
             "type": "string"
           }
         },
@@ -9499,7 +9902,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A turn has ended with its `outcome`, `usage` and final `answer`. `next` returns the completion text bingo composes from that (or `null` for none); return other text to replace it."
     },
     "command.run": {
       "kind": "chain",
@@ -9509,6 +9913,7 @@
         "type": "object",
         "properties": {
           "surface": {
+            "description": "The surface the command was typed on, when known.",
             "anyOf": [
               {
                 "$ref": "#/$defs/SurfaceName"
@@ -9519,9 +9924,11 @@
             ]
           },
           "command": {
+            "description": "The command's name, without the slash.",
             "type": "string"
           },
           "args": {
+            "description": "The rest of the line after the name.",
             "type": "string"
           }
         },
@@ -9546,9 +9953,11 @@
         "title": "CommandReply",
         "anyOf": [
           {
+            "description": "A full outcome.",
             "$ref": "#/$defs/CommandOutcome"
           },
           {
+            "description": "Applied, with `text` shown as its message.",
             "type": "object",
             "properties": {
               "text": {
@@ -9872,57 +10281,67 @@
           "View": {
             "oneOf": [
               {
+                "description": "A run of text: strings and nested `Text` nodes, which keep their own style.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "Strings and nested `Text` nodes, drawn in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TextChild"
                     }
                   },
                   "color": {
+                    "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "dimColor": {
+                    "description": "Draw the text dimmed.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "bold": {
+                    "description": "Draw the text bold.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "italic": {
+                    "description": "Draw the text in italics.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "underline": {
+                    "description": "Underline the text.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "strikethrough": {
+                    "description": "Strike the text through.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "inverse": {
+                    "description": "Swap the foreground and background colours.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "wrap": {
+                    "description": "`wrap` breaks long lines at the width; `truncate` cuts them.",
                     "type": [
                       "string",
                       "null"
@@ -9939,12 +10358,15 @@
                 ]
               },
               {
+                "description": "Markdown text the surface renders.",
                 "type": "object",
                 "properties": {
                   "text": {
+                    "description": "The Markdown source.",
                     "type": "string"
                   },
                   "dimColor": {
+                    "description": "Draw it dimmed.",
                     "type": "boolean"
                   },
                   "kind": {
@@ -9958,15 +10380,18 @@
                 ]
               },
               {
+                "description": "A block of source code.",
                 "type": "object",
                 "properties": {
                   "language": {
+                    "description": "The language name for highlighting, such as `rust`.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "source": {
+                    "description": "The code itself.",
                     "type": "string"
                   },
                   "kind": {
@@ -9980,9 +10405,11 @@
                 ]
               },
               {
+                "description": "A diff drawn with added and removed lines marked.",
                 "type": "object",
                 "properties": {
                   "unified": {
+                    "description": "The diff in unified format.",
                     "type": "string"
                   },
                   "kind": {
@@ -9996,9 +10423,11 @@
                 ]
               },
               {
+                "description": "A bulleted list of lines.",
                 "type": "object",
                 "properties": {
                   "items": {
+                    "description": "One string per item.",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -10015,15 +10444,18 @@
                 ]
               },
               {
+                "description": "A table of strings.",
                 "type": "object",
                 "properties": {
                   "headers": {
+                    "description": "The column headings.",
                     "type": "array",
                     "items": {
                       "type": "string"
                     }
                   },
                   "rows": {
+                    "description": "One array of cells per row, in column order.",
                     "type": "array",
                     "items": {
                       "type": "array",
@@ -10044,9 +10476,11 @@
                 ]
               },
               {
+                "description": "Aligned label and value pairs.",
                 "type": "object",
                 "properties": {
                   "rows": {
+                    "description": "`[label, value]` pairs, in order.",
                     "type": "array",
                     "items": {
                       "type": "array",
@@ -10073,14 +10507,17 @@
                 ]
               },
               {
+                "description": "A progress bar, or a count when there is no total.",
                 "type": "object",
                 "properties": {
                   "value": {
+                    "description": "How much is done.",
                     "type": "integer",
                     "format": "uint64",
                     "minimum": 0
                   },
                   "total": {
+                    "description": "The whole; without it the surface shows a count.",
                     "type": [
                       "integer",
                       "null"
@@ -10089,6 +10526,7 @@
                     "minimum": 0
                   },
                   "label": {
+                    "description": "Text drawn beside the bar.",
                     "type": [
                       "string",
                       "null"
@@ -10105,12 +10543,15 @@
                 ]
               },
               {
+                "description": "A short label coloured by its tone.",
                 "type": "object",
                 "properties": {
                   "text": {
+                    "description": "The label.",
                     "type": "string"
                   },
                   "tone": {
+                    "description": "`neutral`, `good`, `bad` or `attention`; the surface picks the colour.",
                     "$ref": "#/$defs/Tone",
                     "default": "neutral"
                   },
@@ -10125,9 +10566,11 @@
                 ]
               },
               {
+                "description": "An indented tree of labelled nodes.",
                 "type": "object",
                 "properties": {
                   "nodes": {
+                    "description": "The top-level nodes.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TreeNode"
@@ -10144,9 +10587,11 @@
                 ]
               },
               {
+                "description": "A flex container: lays its children out in a row or a column.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "The views inside, in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/View"
@@ -10174,6 +10619,7 @@
                     ]
                   },
                   "onKey": {
+                    "description": "A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -10184,12 +10630,14 @@
                     ]
                   },
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "flexDirection": {
+                    "description": "`row` or `column` (the default).",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Direction"
@@ -10200,6 +10648,7 @@
                     ]
                   },
                   "flexGrow": {
+                    "description": "How much of the spare room this box takes; `0` takes none.",
                     "type": [
                       "integer",
                       "null"
@@ -10209,6 +10658,7 @@
                     "maximum": 65535
                   },
                   "flexWrap": {
+                    "description": "`wrap` lets children flow onto another line.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Wrap"
@@ -10219,6 +10669,7 @@
                     ]
                   },
                   "alignItems": {
+                    "description": "Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Align"
@@ -10229,6 +10680,7 @@
                     ]
                   },
                   "justifyContent": {
+                    "description": "Main-axis distribution, such as `flex-start` or `space-between`.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Justify"
@@ -10239,6 +10691,7 @@
                     ]
                   },
                   "gap": {
+                    "description": "Cells between children.",
                     "type": [
                       "integer",
                       "null"
@@ -10248,6 +10701,7 @@
                     "maximum": 65535
                   },
                   "width": {
+                    "description": "The width in cells.",
                     "type": [
                       "integer",
                       "null"
@@ -10257,6 +10711,7 @@
                     "maximum": 65535
                   },
                   "height": {
+                    "description": "The height in rows.",
                     "type": [
                       "integer",
                       "null"
@@ -10266,6 +10721,7 @@
                     "maximum": 65535
                   },
                   "margin": {
+                    "description": "Cells outside the box on every side.",
                     "type": [
                       "integer",
                       "null"
@@ -10275,6 +10731,7 @@
                     "maximum": 65535
                   },
                   "marginX": {
+                    "description": "Cells outside the box on the left and right.",
                     "type": [
                       "integer",
                       "null"
@@ -10284,6 +10741,7 @@
                     "maximum": 65535
                   },
                   "marginY": {
+                    "description": "Rows outside the box above and below.",
                     "type": [
                       "integer",
                       "null"
@@ -10293,6 +10751,7 @@
                     "maximum": 65535
                   },
                   "padding": {
+                    "description": "Cells inside the box on every side.",
                     "type": [
                       "integer",
                       "null"
@@ -10302,6 +10761,7 @@
                     "maximum": 65535
                   },
                   "paddingX": {
+                    "description": "Cells inside the box on the left and right.",
                     "type": [
                       "integer",
                       "null"
@@ -10311,6 +10771,7 @@
                     "maximum": 65535
                   },
                   "paddingY": {
+                    "description": "Rows inside the box above and below.",
                     "type": [
                       "integer",
                       "null"
@@ -10320,18 +10781,21 @@
                     "maximum": 65535
                   },
                   "borderStyle": {
+                    "description": "Any value but `none` draws a border.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "borderColor": {
+                    "description": "The border colour.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "display": {
+                    "description": "`none` hides the box and its controls.",
                     "type": [
                       "string",
                       "null"
@@ -10348,12 +10812,15 @@
                 ]
               },
               {
+                "description": "One view under a title.",
                 "type": "object",
                 "properties": {
                   "title": {
+                    "description": "The heading.",
                     "type": "string"
                   },
                   "child": {
+                    "description": "The view inside.",
                     "$ref": "#/$defs/View"
                   },
                   "kind": {
@@ -10368,9 +10835,11 @@
                 ]
               },
               {
+                "description": "A row of buttons that each run a named action.",
                 "type": "object",
                 "properties": {
                   "items": {
+                    "description": "The buttons, in order.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/ActionItem"
@@ -10387,27 +10856,32 @@
                 ]
               },
               {
+                "description": "A pressable control; a mod's `onPress` runs when it is pressed.",
                 "type": "object",
                 "properties": {
                   "children": {
+                    "description": "The button's text, when `label` is not given.",
                     "type": "array",
                     "items": {
                       "$ref": "#/$defs/TextChild"
                     }
                   },
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "The button's text.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "hotkey": {
+                    "description": "One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button.",
                     "type": [
                       "string",
                       "null"
@@ -10416,18 +10890,21 @@
                     "maxLength": 1
                   },
                   "dimColor": {
+                    "description": "Draw the button dimmed.",
                     "type": [
                       "boolean",
                       "null"
                     ]
                   },
                   "variant": {
+                    "description": "`primary` draws it bold, `danger` in the alarm colour.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "onPress": {
+                    "description": "The handler run when the button is pressed: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -10447,33 +10924,39 @@
                 ]
               },
               {
+                "description": "A one-line text field.",
                 "type": "object",
                 "properties": {
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "Text before the field.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "placeholder": {
+                    "description": "Text shown while the field is empty.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "value": {
+                    "description": "The text in the field.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "onInput": {
+                    "description": "The handler run as the text changes: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -10484,6 +10967,7 @@
                     ]
                   },
                   "onSubmit": {
+                    "description": "The handler run when the person presses Enter: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -10503,27 +10987,32 @@
                 ]
               },
               {
+                "description": "A choice among options.",
                 "type": "object",
                 "properties": {
                   "key": {
+                    "description": "A stable identity among siblings.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "label": {
+                    "description": "Text before the choice.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "value": {
+                    "description": "The chosen option's `value`.",
                     "type": [
                       "string",
                       "null"
                     ]
                   },
                   "options": {
+                    "description": "The choices, each `{label, value}`.",
                     "type": [
                       "array",
                       "null"
@@ -10533,6 +11022,7 @@
                     }
                   },
                   "onSelect": {
+                    "description": "The handler run with the chosen value: a mod passes a function.",
                     "anyOf": [
                       {
                         "$ref": "#/$defs/Action"
@@ -10552,12 +11042,15 @@
                 ]
               },
               {
+                "description": "A link the person can open.",
                 "type": "object",
                 "properties": {
                   "href": {
+                    "description": "The URL.",
                     "type": "string"
                   },
                   "label": {
+                    "description": "The text shown; the URL when absent.",
                     "type": [
                       "string",
                       "null"
@@ -10574,15 +11067,19 @@
                 ]
               },
               {
+                "description": "A picture; surfaces that cannot draw it show `alt`.",
                 "type": "object",
                 "properties": {
                   "source": {
+                    "description": "A path or a `data:` URL.",
                     "type": "string"
                   },
                   "alt": {
+                    "description": "Text shown where the image cannot be.",
                     "type": "string"
                   },
                   "columns": {
+                    "description": "The width in terminal columns.",
                     "type": [
                       "integer",
                       "null"
@@ -10592,6 +11089,7 @@
                     "maximum": 65535
                   },
                   "rows": {
+                    "description": "The height in terminal rows.",
                     "type": [
                       "integer",
                       "null"
@@ -10612,21 +11110,25 @@
                 ]
               },
               {
+                "description": "A grid of character cells, drawn by terminals only.",
                 "type": "object",
                 "properties": {
                   "columns": {
+                    "description": "The width in cells.",
                     "type": "integer",
                     "format": "uint16",
                     "minimum": 0,
                     "maximum": 65535
                   },
                   "rows": {
+                    "description": "The height in cells.",
                     "type": "integer",
                     "format": "uint16",
                     "minimum": 0,
                     "maximum": 65535
                   },
                   "cells": {
+                    "description": "The cells, row by row.",
                     "type": "array",
                     "items": {
                       "type": "string"
@@ -10645,15 +11147,19 @@
                 ]
               },
               {
+                "description": "An SVG drawing, for surfaces that draw vectors; others show `alt`.",
                 "type": "object",
                 "properties": {
                   "source": {
+                    "description": "The SVG markup.",
                     "type": "string"
                   },
                   "alt": {
+                    "description": "Text shown where the drawing cannot be.",
                     "type": "string"
                   },
                   "width": {
+                    "description": "The width in pixels.",
                     "type": [
                       "integer",
                       "null"
@@ -10663,6 +11169,7 @@
                     "maximum": 65535
                   },
                   "height": {
+                    "description": "The height in pixels.",
                     "type": [
                       "integer",
                       "null"
@@ -10683,12 +11190,16 @@
                 ]
               },
               {
+                "description": "bingo's own drawing of a component, placed inside a mod's view.",
                 "type": "object",
                 "properties": {
                   "component": {
+                    "description": "The component bingo draws, such as `ToolUse`.",
                     "$ref": "#/$defs/Component"
                   },
-                  "props": true,
+                  "props": {
+                    "description": "That component's props, as its `ui.render` event carried them."
+                  },
                   "kind": {
                     "type": "string",
                     "const": "Engine"
@@ -10701,13 +11212,18 @@
                 ]
               },
               {
+                "description": "An element bingo has no name for; surfaces that do not know it show `fold`.",
                 "type": "object",
                 "properties": {
                   "customKind": {
+                    "description": "The element's own name.",
                     "type": "string"
                   },
-                  "data": true,
+                  "data": {
+                    "description": "Whatever the element needs."
+                  },
                   "fold": {
+                    "description": "The plain text drawn where the element is unknown.",
                     "type": "string"
                   },
                   "kind": {
@@ -10922,9 +11438,11 @@
             "type": "object",
             "properties": {
               "label": {
+                "description": "The text shown.",
                 "type": "string"
               },
               "value": {
+                "description": "The value chosen.",
                 "type": "string"
               }
             },
@@ -11627,7 +12145,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A slash command runs: `command` is its name without the slash and `args` the rest of the line. `next` runs the command's own handler; return `{text}` or an outcome to answer it yourself."
     },
     "command.describe": {
       "kind": "chain",
@@ -12052,7 +12571,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A command as the palette and completions list it. `next` returns the spec bingo has; return a changed spec, or `null` to hide the command."
     },
     "config.set": {
       "kind": "chain",
@@ -12062,9 +12582,12 @@
         "type": "object",
         "properties": {
           "key": {
+            "description": "The setting's dotted key.",
             "type": "string"
           },
-          "value": true
+          "value": {
+            "description": "Its new value."
+          }
         },
         "required": [
           "key",
@@ -12077,9 +12600,12 @@
         "type": "object",
         "properties": {
           "key": {
+            "description": "The setting's dotted key.",
             "type": "string"
           },
-          "value": true
+          "value": {
+            "description": "Its new value."
+          }
         },
         "required": [
           "key",
@@ -12097,7 +12623,8 @@
         "rewrite": true,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "A setting changes: `key` and its new `value`. `next` stores it; rewrite the value, or deny the change."
     },
     "config.describe": {
       "kind": "chain",
@@ -12140,7 +12667,8 @@
         "rewrite": true,
         "answer": true
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "The settings a client sees: the kernel's keys and each plugin's slice. `next` returns bingo's view; return a changed view."
     },
     "turn.start": {
       "kind": "observation",
@@ -12150,15 +12678,18 @@
         "type": "object",
         "properties": {
           "turn": {
+            "description": "The turn that opened.",
             "$ref": "#/$defs/TurnId"
           },
           "inputs": {
+            "description": "The history items it took as input.",
             "type": "array",
             "items": {
               "$ref": "#/$defs/ItemId"
             }
           },
           "origin": {
+            "description": "What opened it.",
             "$ref": "#/$defs/TurnOrigin"
           }
         },
@@ -12214,7 +12745,8 @@
         "rewrite": false,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Observation: a turn opened, with the input items it took and its origin. A returned value is ignored."
     },
     "session.measure": {
       "kind": "observation",
@@ -12224,12 +12756,15 @@
         "type": "object",
         "properties": {
           "turn": {
+            "description": "The turn being measured.",
             "$ref": "#/$defs/TurnId"
           },
           "usage": {
+            "description": "Tokens used so far.",
             "$ref": "#/$defs/Usage"
           },
           "context": {
+            "description": "The context window reading after this round.",
             "$ref": "#/$defs/ContextUsage"
           }
         },
@@ -12362,7 +12897,8 @@
         "rewrite": false,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Observation: once per model round, the usage so far and the context reading. A returned value is ignored."
     },
     "session.start": {
       "kind": "observation",
@@ -12372,6 +12908,7 @@
         "type": "object",
         "properties": {
           "session": {
+            "description": "The session this concerns; `$` methods default it to the current one.",
             "$ref": "#/$defs/SessionId"
           }
         },
@@ -12397,7 +12934,8 @@
         "rewrite": false,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Observation: a session opened, and again for a mod after it reloads. A returned value is ignored."
     },
     "session.end": {
       "kind": "observation",
@@ -12407,6 +12945,7 @@
         "type": "object",
         "properties": {
           "session": {
+            "description": "The session this concerns; `$` methods default it to the current one.",
             "$ref": "#/$defs/SessionId"
           }
         },
@@ -12432,7 +12971,8 @@
         "rewrite": false,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Observation: a session closed. A returned value is ignored."
     },
     "session.attach": {
       "kind": "observation",
@@ -12442,9 +12982,11 @@
         "type": "object",
         "properties": {
           "session": {
+            "description": "The session.",
             "$ref": "#/$defs/SessionId"
           },
           "client": {
+            "description": "The client that attached or detached.",
             "$ref": "#/$defs/ClientIdentity"
           }
         },
@@ -12488,7 +13030,8 @@
         "rewrite": false,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Observation: a client, such as a terminal or chat surface, attached to the session. A returned value is ignored."
     },
     "session.detach": {
       "kind": "observation",
@@ -12498,9 +13041,11 @@
         "type": "object",
         "properties": {
           "session": {
+            "description": "The session.",
             "$ref": "#/$defs/SessionId"
           },
           "client": {
+            "description": "The client that attached or detached.",
             "$ref": "#/$defs/ClientIdentity"
           }
         },
@@ -12544,7 +13089,8 @@
         "rewrite": false,
         "answer": false
       },
-      "shapesRequest": false
+      "shapesRequest": false,
+      "description": "Observation: a client detached from the session. A returned value is ignored."
     }
   }
 }
