@@ -41,6 +41,7 @@ fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block 
         rows.width,
         |changed, width| ledger(changed, width, rows.now),
     );
+    out.extend(super::slots::actions_under(item, HANG, rows));
     if !opened {
         return out.into();
     }
@@ -48,6 +49,13 @@ fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block 
     let mut block = Block::from(out);
     pictured::under_the_step(&mut block, item, HANG, rows);
     block
+}
+
+/// The row of a step that is asking, standing on its own: the head of the
+/// card it opens where its row was, in the row's own columns.
+pub(crate) fn asked(step: &Step, width: usize) -> Line<'static> {
+    let glyph = theme::glyphs().chrome.steps[1];
+    line(step.row(glyph, width, UnicodeWidthStr::width))
 }
 
 /// The surface's own drawing of the ledger: one row a step.

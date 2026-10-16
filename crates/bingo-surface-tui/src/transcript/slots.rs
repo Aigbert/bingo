@@ -92,6 +92,24 @@ fn placed_heading(heading: &mut Line<'static>, mark: Option<char>, badge: Option
     }
 }
 
+/// The actions a producer offers on a step, under the step's words: the
+/// last row placed on it decides, as it does for a row of its own.
+pub(super) fn actions_under(item: &Item, indent: usize, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    let Some(bingo_sdk::slot::Slot::Row { actions, .. }) = rows.placed_on(&item.id).next_back()
+    else {
+        return Vec::new();
+    };
+    if actions.is_empty() {
+        return Vec::new();
+    }
+    let view = bingo_sdk::View::Actions {
+        items: actions.clone(),
+    };
+    let width = rows.width.saturating_sub(indent).max(1);
+    let body = crate::views::marked(&view, width, &crate::views::Marks::at(rows.now));
+    super::under(Span::raw(" ".repeat(indent)), body, indent, rows.width)
+}
+
 fn placed_body(view: &bingo_sdk::View, rows: &Rows<'_>) -> Vec<Line<'static>> {
     returns(
         crate::views::marked(

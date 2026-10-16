@@ -171,3 +171,15 @@ fn ascii_turns() {
     let (tree, mut ui, now) = stopped();
     without_glyphs("ascii_turn_stopped", &tree, &mut ui, now);
 }
+
+/// A producer that only offers an action on a running step draws nothing of
+/// its own: the step keeps its row, the action hangs under its words.
+#[test]
+fn an_action_on_a_running_step_hangs_under_it() {
+    let (_, mut ui, now) = running();
+    let state = crate::transcript::slots::fixtures::with_promotions(folded(running_turn()));
+    let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
+    assert!(screen.contains("   ◌ bash cargo test -q"), "{screen}");
+    assert!(screen.contains("     [ b background ]"), "{screen}");
+    assert_aligned(&screen, 80);
+}
