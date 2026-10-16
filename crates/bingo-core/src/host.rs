@@ -27,6 +27,8 @@ mod reach;
 mod refresh;
 mod registry;
 mod registry_commands;
+mod registry_folds;
+mod registry_hooks;
 mod render;
 mod render_queue;
 mod resume;
@@ -531,6 +533,7 @@ impl Host {
         let _ = self.gateway.send(GatewayEvent::SessionCreated {
             summary: Box::new(summary),
         });
+        registry_folds::report(self, &live.mailbox).await;
         Ok(live.mailbox)
     }
 

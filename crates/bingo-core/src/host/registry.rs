@@ -59,7 +59,7 @@ pub struct Registry {
     pub hooks: Vec<Arc<dyn Hook>>,
     pub links: Vec<crate::chain::Link>,
     pub contributors: Vec<Arc<dyn ContextContributor>>,
-    pub commands: Vec<super::registry_commands::OwnedCommand>,
+    pub commands: super::registry_commands::RegisteredCommands,
     pub switches: Switches,
     pub surfaces: Vec<Arc<dyn Surface>>,
     pub store: Option<Arc<dyn SessionStore>>,
@@ -81,6 +81,7 @@ pub struct Registry {
 fn contribution_kind(contribution: &Contribution) -> ContributionKind {
     match contribution {
         Contribution::Command(_) => ContributionKind::Commands,
+        Contribution::CommandFold(_) => ContributionKind::Catalogue,
         Contribution::Interceptor { link, external, .. } => {
             if external.is_some() {
                 return ContributionKind::Process;
@@ -108,6 +109,9 @@ fn contribution_kind(contribution: &Contribution) -> ContributionKind {
         Contribution::Service { .. } => ContributionKind::Service,
         Contribution::Context(_) | Contribution::Contexts(_) => ContributionKind::Context,
         Contribution::Policy(_) => ContributionKind::Policy,
+        Contribution::Hook(hook) if super::registry_hooks::event_only(&hook.matcher()) => {
+            ContributionKind::EventHooks
+        }
         Contribution::Hook(_) | Contribution::Hooks(_) => ContributionKind::Hooks,
         Contribution::Compactor(_) | Contribution::Compactors(_) => ContributionKind::Compactor,
         Contribution::Interceptors(_) | Contribution::Commands(_) | Contribution::Plugins(_) => {
@@ -199,7 +203,8 @@ impl Registry {
     }
 
     fn exclude(&mut self, id: &str, why: String) {
-        self.commands.retain(|entry| entry.plugin != id);
+        self.commands.entries.retain(|entry| entry.plugin != id);
+        self.commands.folds.retain(|entry| entry.plugin != id);
         self.links.retain(|link| link.plugin != id);
         self.unavailable(id, why);
     }
@@ -355,7 +360,7 @@ impl Registry {
                 Ok(())
             }
             Contribution::Hook(hook) => {
-                self.hooks.push(hook);
+                self.add_hook(plugin, hook);
                 Ok(())
             }
             Contribution::Hooks(source) => {
@@ -371,6 +376,10 @@ impl Registry {
                 Ok(())
             }
             Contribution::Command(command) => self.add_command(plugin, command),
+            Contribution::CommandFold(fold) => {
+                self.add_command_fold(plugin, fold);
+                Ok(())
+            }
             Contribution::Commands(source) => {
                 self.sources.commands.push(source);
                 Ok(())
@@ -531,18 +540,24 @@ impl Registry {
     /// The kernel's own commands, added last: a plugin that took a name
     /// first keeps it.
     pub(super) fn add_builtins(&mut self, commands: Vec<Arc<dyn Command>>) {
-        self.commands.extend(commands.into_iter().map(|command| {
-            super::registry_commands::OwnedCommand {
-                plugin: String::new(),
-                command,
-            }
-        }));
+        self.commands
+            .entries
+            .extend(
+                commands
+                    .into_iter()
+                    .map(|command| super::registry_commands::OwnedCommand {
+                        plugin: String::new(),
+                        command,
+                    }),
+            );
+        self.validate_command_folds();
     }
 
     fn add_command(&mut self, plugin: &str, command: Arc<dyn Command>) -> Result<(), String> {
         let name = command.spec().name;
         if let Some(owner) = self
             .commands
+            .entries
             .iter()
             .find(|c| c.spec().name == name)
             .map(|entry| entry.plugin.clone())
@@ -559,10 +574,12 @@ impl Registry {
             // An off resident must never prevent an active owner from starting.
             self.exclude(&owner, format!("command {name} conflicts with {plugin}"));
         }
-        self.commands.push(super::registry_commands::OwnedCommand {
-            plugin: plugin.into(),
-            command,
-        });
+        self.commands
+            .entries
+            .push(super::registry_commands::OwnedCommand {
+                plugin: plugin.into(),
+                command,
+            });
         Ok(())
     }
 
@@ -593,7 +610,7 @@ impl Registry {
     pub(super) fn command_sources(&self) -> Vec<Arc<dyn CommandSource>> {
         let mut sources: Vec<Arc<dyn CommandSource>> =
             vec![Arc::new(super::registry_commands::Commands {
-                table: self.commands.clone(),
+                table: self.commands.entries.clone(),
                 running: self.switches.running.clone(),
             })];
         sources.extend(self.sources.commands.clone());

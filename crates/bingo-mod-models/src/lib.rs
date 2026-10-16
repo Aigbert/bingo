@@ -3,6 +3,7 @@ mod bridge;
 pub mod card;
 mod commands;
 mod describe;
+mod disable;
 pub mod draw;
 pub mod guess;
 mod guide;
@@ -40,6 +41,10 @@ impl Plugin for Models {
     }
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         let state = Shared::default();
+        registrar.add(Contribution::CommandFold(CommandFold {
+            into: "model".into(),
+            names: vec!["models".into(), "provider".into()],
+        }));
         registrar.add(Contribution::Command(Arc::new(keys::Handler(
             state.clone(),
         ))));
@@ -50,6 +55,7 @@ impl Plugin for Models {
             Arc::new(commands::Commands(state.clone())) as Arc<dyn Interceptor>,
             Arc::new(receipts::Receipts),
             Arc::new(describe::Describe),
+            Arc::new(disable::Disable(state.clone())),
             Arc::new(draw::Drawing(state.clone(), render::Component::ModelPicker)),
             Arc::new(draw::Drawing(state, render::Component::InfoNotice)),
         ] {

@@ -218,7 +218,7 @@ async fn commands(registry: &Registry, cwd: &std::path::Path) -> Vec<CatalogEntr
         all.extend(source.commands(cwd).await);
     }
     all.iter()
-        .map(|c| c.spec())
+        .map(|command| command.spec())
         .filter(|spec| !spec.hidden)
         .map(|spec| CatalogEntry {
             id: spec.name.clone(),
@@ -226,6 +226,25 @@ async fn commands(registry: &Registry, cwd: &std::path::Path) -> Vec<CatalogEntr
             meta: serde_json::to_value(spec).unwrap_or(Value::Null),
         })
         .collect()
+}
+
+/// Description links rewrite specs, so derived catalogue facts are applied last.
+pub(super) fn command_folds(registry: &Registry, entries: &mut [CatalogEntry]) {
+    let available: std::collections::BTreeSet<_> =
+        entries.iter().map(|entry| entry.id.clone()).collect();
+    for entry in entries {
+        if let Some(meta) = entry.meta.as_object_mut() {
+            meta.remove("foldedInto");
+        }
+        let Ok(spec) = serde_json::from_value::<CommandSpec>(entry.meta.clone()) else {
+            continue;
+        };
+        if let Some(into) = registry.folded_into(&spec)
+            && available.contains(into)
+        {
+            entry.meta["foldedInto"] = json!(into);
+        }
+    }
 }
 
 /// What this build registered, then what every source found (ADR-0057 §5):
@@ -673,6 +692,7 @@ impl command::CommandCatalog for Scoped {
         let commands = host
             .registry
             .commands
+            .entries
             .iter()
             .map(|command| (command.spec().name, command))
             .collect::<std::collections::HashMap<_, _>>();
@@ -766,7 +786,7 @@ mod current_values {
             providers: &providers,
             models: &[],
         };
-        for command in &host.registry.commands {
+        for command in &host.registry.commands.entries {
             let value = command.now(&view);
             if command.spec().name == "login" {
                 assert_eq!(value.as_deref(), Some("2 signed out"));

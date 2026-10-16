@@ -1582,6 +1582,25 @@
         }
       ]
     },
+    "CommandFold": {
+      "type": "object",
+      "properties": {
+        "into": {
+          "type": "string"
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "into",
+        "names"
+      ],
+      "description": "Commands presented through one destination while their dispatch stays intact."
+    },
     "CommandOutcome": {
       "oneOf": [
         {

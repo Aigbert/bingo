@@ -417,6 +417,7 @@ pub enum Contribution {
     /// Contributors resolved late, from a source that does its I/O elsewhere.
     Contexts(Arc<dyn ContextSource>),
     Command(Arc<dyn Command>),
+    CommandFold(crate::CommandFold),
     /// Commands resolved late, from a source that does its I/O elsewhere.
     Commands(Arc<dyn CommandSource>),
     Surface(Arc<dyn Surface>),
@@ -471,6 +472,7 @@ impl fmt::Debug for Contribution {
             Contribution::Context(c) => write!(f, "Context({})", c.id()),
             Contribution::Contexts(s) => write!(f, "Contexts({})", s.id()),
             Contribution::Command(c) => write!(f, "Command({})", c.spec().name),
+            Contribution::CommandFold(fold) => f.debug_tuple("CommandFold").field(fold).finish(),
             Contribution::Commands(s) => write!(f, "Commands({})", s.id()),
             Contribution::Surface(s) => write!(f, "Surface({})", s.id()),
             Contribution::Store(_) => write!(f, "Store"),
