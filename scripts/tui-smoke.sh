@@ -236,7 +236,7 @@ vanish '1/1 (n/N)'
 # CSI-u keeps this Escape separate from the probe under a delayed tty read.
 keys -l "$(printf '\033[27u')"
 keys 'smoke-ready'
-await '> smoke-ready'
+await '▍ smoke-ready'
 finish
 
 step 'ctrl+f remains line search with Browse disabled'
@@ -280,7 +280,7 @@ start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '@Car'
 await '@Cargo.toml'
 keys Enter
-await '> @Cargo.toml'
+await '▍ @Cargo.toml'
 finish
 
 step 'the keys palette opens on ? and closes on esc'

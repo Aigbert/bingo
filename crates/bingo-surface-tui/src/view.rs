@@ -1924,11 +1924,11 @@ mod tests {
         let lines: Vec<&str> = screen.lines().collect();
         let top = lines
             .iter()
-            .rposition(|line| line.contains('╭'))
-            .unwrap_or_else(|| panic!("no input box:\n{screen}"));
+            .rposition(|line| line.trim_matches('"').starts_with("──"))
+            .unwrap_or_else(|| panic!("no prompt rule:\n{screen}"));
         lines[top..]
             .iter()
-            .take_while(|line| !line.contains('╰'))
+            .take(2)
             .map(|line| (*line).to_string())
             .collect()
     }
@@ -1959,8 +1959,8 @@ mod tests {
             let lines: Vec<&str> = screen.lines().collect();
             let top = lines
                 .iter()
-                .rposition(|line| line.contains('╭'))
-                .expect("the input box");
+                .rposition(|line| line.trim_matches('"').starts_with("──"))
+                .expect("the prompt rule");
             assert!(
                 lines[top - usize::from(graphics::band::ROWS)..top]
                     .iter()
