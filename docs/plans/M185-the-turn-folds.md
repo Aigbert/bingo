@@ -45,8 +45,8 @@ output); Browse's layout.
 
 ## Verified — 2026-10-17
 
-Branch `m185-turn-folds` from dev 1a06d18a, 22 commits to 217a0bab. Fake
-provider, temp HOME/data/cwd and own `tmux -L` sockets only; no credentials.
+Branch `m185-turn-folds`, rebased onto dev 3c37d20e (M191). Fake provider,
+temp HOME/data/cwd and own `tmux -L` sockets only; no credentials.
 
 **Bricks as built.** 1: `ToolOutput.upshot` (optional, `skip_serializing_if`,
 journal/wire additive; schemas and `wire.ts` regenerated), written by
@@ -56,7 +56,8 @@ built-in `bingo-mod-ledger`. 3/5: step rows at col 3 with the outcome two cells
 from the edge; a finished turn folds onto its first step; `ctrl+o`, `⏎` on the
 held line and a click open it in place (a click folds it again, a second
 `ctrl+o` goes on to the pager); paths relative. 4: verbs are the lowercase tool
-names; the stop line is drawn by the turn's `Interruption` item.
+names (an ACP call reads `read Read …`); the stop line is the surface's,
+asked of the `Interruption` site.
 
 **Not done.** The notes `⇄ ✎ ⟲ ⇣`. `▸ N earlier turns`: the TUI owns an
 alternate screen and its own scroll, so nothing reaches the terminal's
@@ -95,8 +96,9 @@ Stopped: `▸ 3 steps · read · grep · bash · stopped   1s` over
 cargo fmt --all -- --check                                  exit 0
 cargo clippy --workspace --all-targets --locked -- -D warnings   exit 0
 RUST_TEST_THREADS=4 cargo test --workspace --locked --no-fail-fast
-  exit 0 — 117 suites, 6271 passed, 0 failed (bingo-surface-tui 1359)
-scripts/check_discipline.sh   exit 0 "discipline ok"; warnings identical to dev 1a06d18a
+  exit 0 — 118 suites, 6344 passed, 0 failed (bingo-surface-tui 1369)
+scripts/check_discipline.sh   exit 0 "discipline ok"; the same 239 warnings as
+  dev 3c37d20e (sizes moved; sites_tests `fn site` 71 → 69 lines)
 scripts/budget.sh             exit 0
   dependencies (unique, normal): 423 (max  423)
   warm cargo check -p bingo-core: 0s (max  20s)
@@ -116,6 +118,29 @@ Budget: `bingo-mod-ledger` is one new workspace member and no external crate;
 `max_dependencies` 422 → 423 in `scripts/budget.toml` with its reason.
 The smoke now reads `you stopped the turn` and presses `ctrl+o` before
 looking for a step's picture, as the pty picture tests do.
+
+**Rebase onto M191.** 1e4b49c1 M191's room rows off col 0; 9bd3a407 the hour
+in UTC under test; ad9d2919 `input/turn.rs` (input.rs passed 1000 lines).
+
+**Review fixes.** 53df0abd bash counts tests from whole output only;
+ec89bc3a a diff's `+ −` count only inside hunks; f7211b69 one answers map per
+frame (`Blocks::sync`, `long_session(500)`, debug: first 529 → 33 ms, warm
+450 → 12 ms, `Roles::of` 226 → 7 ms); a2965556 a refusal read from its
+decision; c55f2847 drops `TurnEnd::Failed`; 85580bed stop line drawn by the
+surface; 2f696486 a turn folds only from its folded line; e922ad04 the
+ledger's marks travel in `LedgerProps`/`TurnFoldProps.marks` (ASCII reaches
+the built-in mod); 60512ae9 an opened turn asks `ToolResult`, `Reasoning`
+and `Interruption`, site tests sit inside a turn, ADR-0095 §8 says which
+sites a turn asks (none retires).
+
+**Follow-ups.** `turns.rs` copies `ledger.rs` layout across sdk/TUI;
+`row::Ink` is a second styled-text model naming colours as strings; the
+spinner's tmux-only detection and copied `clock::alternating` maths; retire
+the turnless `▏ Thought`/`▍ Name(args)` grammar (`thinking::lines`,
+`Place.run`, `THOUGHT_ROWS`), reached now only outside every turn.
+Residuals: a `cat` of an old log still counts tests; fold-word separators
+(`·` `×` `−`) are not ASCII-switched; an unlinked receipt under an opened
+step keeps its `⎿` row; a running step in a finished turn still spins.
 
 **Found, not fixed.** On interrupt `wait_for` in
 `crates/bingo-tool-bash/src/lib.rs` drops `listening` without republishing the
