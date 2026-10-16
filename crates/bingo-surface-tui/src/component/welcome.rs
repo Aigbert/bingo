@@ -55,7 +55,6 @@ pub fn request(rows: &Rows<'_>) -> Option<crate::pulled::Key> {
 
 fn changed_state(facts: &WelcomeProps) -> SessionState {
     let mut state = SessionState::new(facts.session.clone());
-    state.config.kernel["thinking"] = serde_json::to_value(facts.effort).unwrap_or_default();
     state.signals.entry("welcome".into()).or_default().insert(
         "modes".into(),
         bingo_sdk::slot::with(

@@ -1,7 +1,7 @@
 //! The persistent mode, crew, context and model footer, plus transitional hints.
 //! All facts come from the folded session and plugin slots.
 
-use bingo_sdk::{Effort, SessionState};
+use bingo_sdk::SessionState;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
@@ -392,10 +392,9 @@ fn notice(ui: &Ui, now: Now) -> Vec<Span<'static>> {
 /// serves the model, which model, and how hard it is asked to think — the
 /// model alone at the root.
 ///
-/// All three are read from the frames that carry them: the summary, which the
-/// kernel stamps from the choice a turn will actually run on, and the config
-/// view's `thinking`, which is the one place a client reads the level
-/// (ADR-0008 §4). Nothing here is a second copy of either.
+/// All of it is read from the summary, which the kernel stamps from the
+/// choice a turn will actually run on; a journal written before the summary
+/// carried the effort shows none rather than a second reading of it.
 fn right(tree: &Tree, site: &mut crate::component::Site<'_>, now: Now) -> Vec<Span<'static>> {
     let state = tree.viewed();
     let props = bingo_sdk::component::Props::SessionStatus(session_facts(state));
@@ -439,13 +438,7 @@ pub(crate) fn session_facts(state: &SessionState) -> bingo_sdk::component::Sessi
         provider: state.summary.provider.clone(),
         model: state.summary.model.clone(),
         model_scope: state.summary.model_scope,
-        effort: state.summary.effort.or_else(|| {
-            state
-                .config
-                .kernel
-                .get("thinking")
-                .and_then(|level| serde_json::from_value::<Effort>(level.clone()).ok())
-        }),
+        effort: state.summary.effort,
         context: state.context,
         usage: state.summary.usage,
     }
@@ -624,14 +617,18 @@ mod tests {
     }
 
     #[test]
-    fn old_journals_keep_their_configured_effort() {
-        let state = folded(vec![frame(1, thinking_view(Some(Effort::High)))]);
+    fn old_journals_fold_and_show_no_effort() {
+        let summary = serde_json::to_value(summary()).unwrap();
+        assert!(summary.get("effort").is_none(), "written before the field");
+        let old = serde_json::from_value(summary).unwrap();
+        let state = folded(vec![
+            frame(1, Event::SessionUpdated { summary: old }),
+            frame(2, thinking_view(Some(Effort::High))),
+        ]);
         let (ui, now) = scene();
-        assert!(
-            line(&solo(&state), &ui, 108, now)
-                .to_string()
-                .contains("∴ high")
-        );
+        let drawn = line(&solo(&state), &ui, 108, now).to_string();
+        assert!(drawn.ends_with("fake-1  "), "{drawn}");
+        assert!(!drawn.contains('∴'), "{drawn}");
     }
 
     #[test]
