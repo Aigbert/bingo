@@ -133,14 +133,15 @@ impl Linked {
 }
 
 /// Where a destination points, as this machine spells it: an `http(s)` address
-/// this machine fetches, and everything else a path — `~` for home, and a
-/// relative one in the session's own directory.
+/// this machine fetches, and everything else a path — `~` for home, a
+/// `file:` URL's own, a relative one in the session's own directory, and
+/// each with its `%20` decoded, since a destination is written as a URL is.
 ///
 /// Nothing else is ever reached. A `data:`, an `ftp:` or a bare word is a path
 /// that is not there, which is the answer a person sees rather than a scheme
 /// this surface invented a way to follow.
 pub fn source(dest: &str, cwd: &Path, home: Option<&str>) -> Source {
-    Source::parse(&crate::paths::expand(dest, home), cwd)
+    Source::link(&crate::paths::expand(dest, home), cwd)
 }
 
 /// The picture at a destination, off the loop's own thread. A fetched one is
@@ -277,6 +278,23 @@ mod tests {
             source("ftp://x/a.png", cwd, home),
             Source::Path(_)
         ));
+    }
+
+    /// A destination is written as a URL is: its spaces and its letters
+    /// outside ASCII may be percent-encoded, and a `file:` URL names a path.
+    #[cfg(unix)]
+    #[test]
+    fn a_destination_written_as_a_url_is_the_path_it_spells() {
+        let cwd = Path::new("/work");
+        let home = Some("/home/me");
+        assert_eq!(
+            source("~/Desktop/my%20shot.png", cwd, home),
+            Source::Path("/home/me/Desktop/my shot.png".into())
+        );
+        assert_eq!(
+            source("file:///home/me/%E6%A1%8C.png", cwd, home),
+            Source::Path("/home/me/桌.png".into())
+        );
     }
 
     /// The few words a chip can carry, one per kind of failure.
