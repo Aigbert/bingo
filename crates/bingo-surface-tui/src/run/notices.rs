@@ -17,10 +17,10 @@ use crate::ui::Ui;
 
 /// Everything the run opens with. Today that is what tmux has to be told
 /// when the pictures could not reach the terminal behind it (M49 brick 3),
-/// or why a terminal that said it speaks the protocol still draws chips; a
-/// terminal that simply draws none says nothing, because there is nothing
-/// a person could do about it.
-pub(super) fn raise(ui: &mut Ui, notice: Option<String>, now: Instant) {
+/// or the setting a herdr pane needs to draw them; a terminal that simply
+/// draws none says nothing, because there is nothing a person could do
+/// about it.
+pub(super) fn raise(ui: &mut Ui, notice: Option<&'static str>, now: Instant) {
     if let Some(text) = notice {
         ui.notify(Level::Info, text, now);
     }
@@ -39,13 +39,7 @@ mod tests {
 
     #[test]
     fn what_the_probe_found_is_said_once_when_the_run_opens() {
-        let ui = opened(|ui| {
-            raise(
-                ui,
-                Some(graphics::PASSTHROUGH_UNHEARD.into()),
-                Instant::now(),
-            )
-        });
+        let ui = opened(|ui| raise(ui, Some(graphics::PASSTHROUGH_UNHEARD), Instant::now()));
         let said = ui.notice().expect("a notice");
         assert_eq!(said.text, graphics::PASSTHROUGH_UNHEARD);
         assert_eq!(said.level, Level::Info);

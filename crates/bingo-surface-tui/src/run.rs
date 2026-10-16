@@ -669,15 +669,12 @@ impl Run {
 
     /// What a late answer changes: the pictures it turns on for the next
     /// frame, the notice it has just made wrong, and the palette the next
-    /// frame is drawn in (M71). A notice the answer changed is wrong too, and
-    /// goes; the one in its place is not said, because the run said its piece
-    /// once when it opened.
+    /// frame is drawn in (M71).
     fn answered_late(&mut self, reply: &[u8]) {
         let before = self.detection.notice();
         self.detection.reply(reply);
-        let after = self.detection.notice();
-        if let Some(wrong) = before.filter(|said| after.as_ref() != Some(said)) {
-            self.ui.withdraw(&wrong);
+        if let Some(wrong) = before.filter(|_| self.detection.notice().is_none()) {
+            self.ui.withdraw(wrong);
         }
     }
 
@@ -2614,32 +2611,6 @@ mod tests {
                 "another probe does not change the ground"
             );
         });
-    }
-
-    /// A late answer that changes why the pictures are off takes the old
-    /// reason back and says no second one: the run said its piece once.
-    #[test]
-    fn a_late_answer_that_changes_the_reason_withdraws_the_one_said() {
-        use crate::graphics::{Heard, Passthrough, Transport};
-        let now = crate::test_support::scene().1;
-        let mut run = idle(now.instant);
-        run.detection.heard = Some(Heard {
-            probe: crate::graphics::probe::parse(b"\x1bP>|tmux 3.6b\x1b\\"),
-            transport: Transport::Tmux,
-            passthrough: Passthrough::On,
-        });
-        notices::raise(&mut run.ui, run.detection.notice(), now.instant);
-        assert_eq!(
-            run.ui.notice().map(|said| said.text.clone()).as_deref(),
-            Some(crate::graphics::PASSTHROUGH_UNHEARD)
-        );
-        run.answered_late(b"\x1b_Gi=31;OK\x1b\\\x1bP>|ghostty 1.3.1\x1b\\");
-        assert_eq!(
-            run.detection.notice().as_deref(),
-            Some(crate::graphics::unseen::NO_CELL),
-            "the reason now is the cell"
-        );
-        assert!(run.ui.notice().is_none(), "and nothing more is said");
     }
 
     #[tokio::test]

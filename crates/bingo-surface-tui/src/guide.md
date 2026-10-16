@@ -88,10 +88,9 @@ iTerm2 3.5.6 or Rio 0.5.27 or newer, or a herdr pane (`libghostty`) — the list
 is a list because the protocol's own query carries no answer for it, and two
 terminals that claim the key ignore it. Everywhere else a picture is
 `[image: …]`, and a click still opens it in whatever this system opens pictures
-with; a terminal that answered the protocol and still gets the chip is told
-why, once, when the run opens. In herdr before 0.9, pictures need
-`[experimental] kitty_graphics = true` in its config; 0.9 and newer draw them
-by default.
+with. In herdr before 0.9, pictures need
+`[experimental] kitty_graphics = true` in its config, and a herdr pane without
+it is told so once, when the run opens; 0.9 and newer draw them by default.
 
 A picture fetched from the web is kept under `<data>/pictures/cache/` for
 `pictures.cacheDays` days — a fortnight unless a person says otherwise, and `0`

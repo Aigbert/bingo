@@ -785,6 +785,22 @@ mod tests {
         assert_eq!(footer, line(&tree, &ui, 108, now));
     }
 
+    /// The lines the run opens with name a setting, and a setting cut short
+    /// is no remedy: each fits whole at 80 columns.
+    #[test]
+    fn the_opening_lines_fit_whole_at_eighty_columns() {
+        for line in [
+            crate::graphics::PASSTHROUGH_OFF,
+            crate::graphics::PASSTHROUGH_UNHEARD,
+            crate::graphics::unseen::HERDR_OFF,
+        ] {
+            let (mut ui, now) = scene();
+            ui.notify(bingo_sdk::Level::Info, line, now.instant);
+            let drawn = hints(&solo(&state()), &ui, 80, now, &mut Vec::new()).to_string();
+            assert!(drawn.contains(line), "{drawn}");
+        }
+    }
+
     #[test]
     fn a_model_receipt_flashes_for_fourteen_hundred_milliseconds() {
         let state = folded(vec![frame(

@@ -9,7 +9,7 @@
 //! - [`probe`] is the questions and the reading of the answers, both pure.
 //! - [`placeholders`] is the list of terminals that draw a placeholder cell,
 //!   which is the one thing no terminal can be asked.
-//! - [`unseen`] is why a terminal that said `OK` still draws chips.
+//! - [`unseen`] is the setting a herdr pane that draws chips is told.
 //! - [`tmux`] is the multiplexer the questions and the pictures travel
 //!   through when there is one, and the envelope they travel in.
 //! - [`picture`] is one picture a frame drew: where it came from and how many
@@ -128,13 +128,11 @@ fn only_tmux(probe: &Probe) -> bool {
 }
 
 /// The one thing there is to say about a terminal that draws no pictures:
-/// what tmux has to be told, or else why a terminal that said `OK` still
-/// draws chips ([`unseen`]). Every other silence is the terminal's own and
-/// has nothing to tell.
-fn notice(heard: &Heard) -> Option<String> {
-    unheard(heard)
-        .map(String::from)
-        .or_else(|| unseen::unseen(&heard.probe))
+/// what tmux has to be told, or else the setting a herdr pane needs
+/// ([`unseen`]). Every other silence is the terminal's own and has nothing
+/// to tell.
+fn notice(heard: &Heard) -> Option<&'static str> {
+    unheard(heard).or_else(|| unseen::unseen(heard))
 }
 
 /// What tmux has to be told when nothing behind it was heard.
@@ -181,10 +179,10 @@ impl Heard {
 /// What the probe settled: how this run draws pictures, and the one thing
 /// there is to say about it. Both come from the one answer, so neither can
 /// go stale against the other.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Settled {
     pub graphics: Graphics,
-    pub notice: Option<String>,
+    pub notice: Option<&'static str>,
 }
 
 impl Settled {
@@ -466,7 +464,7 @@ mod tests {
             Passthrough::On,
         ));
         assert_eq!(off.graphics, Graphics::Off);
-        assert_eq!(off.notice.as_deref(), Some(PASSTHROUGH_UNHEARD));
+        assert_eq!(off.notice, Some(PASSTHROUGH_UNHEARD));
 
         let on = Settled::of(&heard(
             answered(true, Some(CELL), &[TMUX, GHOSTTY]),
@@ -520,7 +518,6 @@ mod tests {
     /// because crossterm drops the cell reply without an event
     /// ([`crate::late`]) — takes the notice back without turning the
     /// pictures on: the terminal did answer, and saying it did not was wrong.
-    /// What is true now is the cell it never said.
     #[test]
     fn a_late_answer_with_no_cell_still_takes_the_wrong_word_back() {
         let mut waiting = heard(
@@ -528,13 +525,10 @@ mod tests {
             Transport::Tmux,
             Passthrough::On,
         );
-        assert_eq!(
-            Settled::of(&waiting).notice.as_deref(),
-            Some(PASSTHROUGH_UNHEARD)
-        );
+        assert_eq!(Settled::of(&waiting).notice, Some(PASSTHROUGH_UNHEARD));
         waiting.and(answered(true, None, &[GHOSTTY]));
         let settled = Settled::of(&waiting);
-        assert_eq!(settled.notice.as_deref(), Some(unseen::NO_CELL));
+        assert_eq!(settled.notice, None);
         assert_eq!(settled.graphics, Graphics::Off, "no cell is no picture");
     }
 
@@ -549,7 +543,7 @@ mod tests {
             Passthrough::Unknown,
         ));
         assert_eq!(off.graphics, Graphics::Off);
-        assert_eq!(off.notice.as_deref(), Some(unseen::HERDR_OFF));
+        assert_eq!(off.notice, Some(unseen::HERDR_OFF));
         let on = Settled::of(&heard(
             answered(true, Some(CELL), &[herdr]),
             Transport::Bare,
