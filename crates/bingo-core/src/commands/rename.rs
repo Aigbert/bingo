@@ -29,7 +29,7 @@ impl Command for RenameCommand {
             "rename",
             "name this session",
             ArgSpec::Free {
-                hint: "<title>".into(),
+                hint: "a name for this session".into(),
             },
             true,
         )

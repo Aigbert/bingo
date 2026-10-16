@@ -27,7 +27,7 @@ impl Command for ThinkCommand {
     fn spec(&self) -> CommandSpec {
         let mut spec = super::spec(
             "think",
-            "set the reasoning effort",
+            "how hard it thinks",
             super::keep_args(ArgSpec::Words {
                 labels: Default::default(),
                 person: vec![],

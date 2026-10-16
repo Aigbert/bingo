@@ -15,7 +15,7 @@ pub(super) struct StatusCommand {
 #[async_trait]
 impl Command for StatusCommand {
     fn spec(&self) -> CommandSpec {
-        super::spec("status", "show session details", ArgSpec::None, true)
+        super::spec("status", "session, context and cost", ArgSpec::None, true)
     }
 
     async fn run(&self, _args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {

@@ -32,7 +32,7 @@ impl Command for PluginsCommand {
             aliases: vec!["modules".into()],
             ..super::spec(
                 "plugins",
-                "list, trust, approve, reload, enable or disable plugins",
+                "plugins on and off, and their trust",
                 ArgSpec::Words {
                     labels: Default::default(),
                     person: vec!["approve".into(), "trust".into()],

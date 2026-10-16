@@ -26,7 +26,7 @@ impl Command for AgentsCommand {
             hidden: false,
             name: "agents".into(),
             aliases: Vec::new(),
-            hint: "the sub-agents this session started, or stop or dismiss one".into(),
+            hint: "sub-agents of this session".into(),
             args: ArgSpec::Words {
                 labels: Default::default(),
                 then: None,

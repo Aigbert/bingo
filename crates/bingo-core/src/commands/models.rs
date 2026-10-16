@@ -22,7 +22,7 @@ impl Command for ModelsCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "models",
-            "list available models",
+            "every model, hidden ones too",
             ArgSpec::Words {
                 labels: Default::default(),
                 person: vec![],

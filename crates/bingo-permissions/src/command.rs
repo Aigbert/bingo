@@ -60,7 +60,7 @@ impl Command for PermissionCommand {
             hidden: false,
             name: "permission".into(),
             aliases: vec!["permissions".into()],
-            hint: "show or change the permission mode".into(),
+            hint: "what it may do without asking".into(),
             args: ArgSpec::Words {
                 labels: Mode::ALL
                     .iter()

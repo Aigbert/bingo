@@ -66,7 +66,7 @@ impl Command for LogoutCommand {
     fn spec(&self) -> CommandSpec {
         super::spec(
             "logout",
-            "sign out of a provider",
+            "forget a provider's key",
             ArgSpec::Catalog {
                 source: "providers".into(),
             },

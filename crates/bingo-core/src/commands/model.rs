@@ -32,7 +32,7 @@ impl Command for ModelCommand {
     fn spec(&self) -> CommandSpec {
         let mut spec = super::spec(
             "model",
-            "choose the model for this session",
+            "model, thinking and providers",
             super::keep_args(ArgSpec::Catalog {
                 source: "models".into(),
             }),

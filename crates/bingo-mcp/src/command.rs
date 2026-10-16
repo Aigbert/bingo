@@ -359,7 +359,7 @@ impl Command for McpCommand {
             hidden: false,
             name: "mcp".into(),
             aliases: Vec::new(),
-            hint: format!("[{} <server>]", Verb::ALL.map(Verb::as_str).join("|")),
+            hint: "MCP servers and their tools".into(),
             args: ArgSpec::Words {
                 labels: Default::default(),
                 person: vec![Verb::Approve.as_str().into()],
@@ -556,9 +556,6 @@ mod tests {
             }),
             "a build with no servers configured offers no name"
         );
-        for verb in Verb::ALL {
-            assert!(spec.hint.contains(verb.as_str()), "{verb:?} is not offered");
-        }
     }
 
     /// A surface that cannot show a sign-in declines it, and *cancelled* is
