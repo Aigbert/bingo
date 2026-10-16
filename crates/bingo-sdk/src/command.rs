@@ -214,6 +214,18 @@ impl ArgSpec {
             _ => &[],
         }
     }
+
+    /// The catalogue kinds this spec completes from, at any depth.
+    pub fn sources(&self) -> Vec<&str> {
+        match self {
+            ArgSpec::Catalog { source } => vec![source],
+            ArgSpec::Options { args, .. } => args.sources(),
+            ArgSpec::Words {
+                then: Some(next), ..
+            } => next.sources(),
+            _ => vec![],
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -294,6 +306,23 @@ pub trait Command: Send + Sync {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn a_spec_names_every_catalogue_it_completes_from() {
+        let spec: ArgSpec = serde_json::from_value(json!({
+            "kind":"words","values":["enable","model"],
+            "then":{"kind":"options","args":{"kind":"catalog","source":"plugins"},"flags":["--keep"]}
+        }))
+        .unwrap();
+        assert_eq!(spec.sources(), ["plugins"]);
+        assert!(
+            ArgSpec::Free {
+                hint: "name".into()
+            }
+            .sources()
+            .is_empty()
+        );
+    }
 
     #[test]
     fn optional_flags_wrap_an_existing_argument_contract() {

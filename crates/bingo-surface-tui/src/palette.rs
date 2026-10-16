@@ -72,8 +72,10 @@ pub fn request(ui: &Ui) -> Option<&str> {
 }
 fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
     let state = tree.viewed();
-    let catalogs = ui.catalogs.values();
+    let mut catalogs = ui.catalogs.values();
     let commands = command_entries(ui, state, &catalogs);
+    let read = sources(ui, ui.composer.text());
+    catalogs.retain(|kind, _| read.contains(kind));
     PaletteProps {
         key_hints: crate::keys::BINDINGS
             .iter()
@@ -102,6 +104,30 @@ fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
         },
         catalogs,
     }
+}
+/// The catalogues the query's command completes from: none before the query
+/// reaches its arguments, since every press carries them.
+fn sources(ui: &Ui, query: &str) -> Vec<String> {
+    let Some((name, _)) = query
+        .strip_prefix('/')
+        .and_then(|rest| rest.split_once(' '))
+    else {
+        return Vec::new();
+    };
+    ui.catalogs
+        .commands
+        .iter()
+        .cloned()
+        .chain(crate::commands::local_specs())
+        .filter(|spec| spec.name == name || spec.aliases.iter().any(|alias| alias == name))
+        .flat_map(|spec| {
+            spec.args
+                .sources()
+                .into_iter()
+                .map(String::from)
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 fn command_entries(
     ui: &Ui,

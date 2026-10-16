@@ -19,6 +19,9 @@ pub struct Palette;
 struct Cursor {
     query: String,
     selected: usize,
+    /// What the site was last drawn from, so a press is judged against the
+    /// drawing the person saw without carrying it back.
+    drawn: Option<Arc<component::PaletteProps>>,
 }
 struct State {
     cursors: BTreeMap<(SessionId, String), Cursor>,

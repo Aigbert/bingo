@@ -25,6 +25,9 @@ pub struct PaletteProps {
     pub conversation: Vec<PaletteSession>,
     pub sessions: Vec<PaletteSession>,
     pub action: Action,
+    /// Only the catalogues the query's command completes from, once the
+    /// query reaches its arguments: every press carries them, and a model
+    /// catalogue is the largest thing it would otherwise carry.
     pub catalogs: BTreeMap<String, Vec<CatalogEntry>>,
 }
 

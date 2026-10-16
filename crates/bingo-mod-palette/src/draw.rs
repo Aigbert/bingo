@@ -34,6 +34,7 @@ impl Interceptor for Drawing {
             .or_insert_with(|| crate::Cursor {
                 query: props.query.clone(),
                 selected: initial,
+                drawn: None,
             });
         if cursor.query != props.query {
             cursor.query = props.query.clone();
@@ -51,14 +52,15 @@ impl Interceptor for Drawing {
                 .position(|row| !matches!(row.target, crate::rows::Target::Inert))
                 .unwrap_or(0);
         }
-        serde_json::to_value(tree(
+        let view = tree(
             &props,
             &groups,
             cursor.selected,
             &request.request_id,
             request.viewport.rows,
-        ))
-        .map_err(crate::error)
+        );
+        cursor.drawn = Some(std::sync::Arc::new(props));
+        serde_json::to_value(view).map_err(crate::error)
     }
 }
 pub(crate) fn groups(props: &PaletteProps, recent: &[String]) -> (Vec<Group>, usize) {
@@ -172,7 +174,7 @@ pub fn tree(
         layout: Box::new(view::BoxStyle {
             on_key: Some(Action {
                 name: "palette:ui".into(),
-                args: json!({"handler":request,"event":"press","props":key_props(props)}),
+                args: json!({"handler":request,"event":"press","query":props.query}),
             }),
             ..Default::default()
         }),
@@ -270,14 +272,4 @@ fn marked(text: &str, marks: &[usize], dim: bool) -> View {
             ..Default::default()
         },
     }
-}
-
-fn key_props(props: &PaletteProps) -> PaletteProps {
-    let mut props = props.clone();
-    for entries in props.catalogs.values_mut() {
-        for entry in entries {
-            entry.meta = Value::Null;
-        }
-    }
-    props
 }

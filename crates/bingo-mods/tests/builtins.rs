@@ -342,10 +342,10 @@ async fn a_js_command_and_its_keys_appear_inside_a_wrapped_palette() {
     assert!(tree.fold().contains("Outside frame"));
     let payload = serde_json::to_value(&tree).unwrap();
     assert_eq!(
-        payload["onKey"]["args"]["props"]["catalogs"]["plugins"][0]["id"],
-        "demo"
+        payload["onKey"]["args"],
+        json!({"handler":"palette","event":"press","query":""}),
+        "a press names its query; the drawn props stay with the palette"
     );
-    assert!(payload["onKey"]["args"]["props"]["catalogs"]["plugins"][0]["meta"].is_null());
     assert!(tree.fold().contains("alt+z"));
     assert!(tree.fold().contains("sample command"), "{}", tree.fold());
     assert!(matches!(tree,View::Box{layout,..} if layout.on_key.is_some()));

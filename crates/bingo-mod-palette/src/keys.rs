@@ -51,11 +51,12 @@ impl Command for Handler {
         let args: Value = serde_json::from_str(args).map_err(crate::error)?;
         let request = args["handler"].as_str().unwrap_or_default();
         let key = args["value"]["key"].as_str().unwrap_or_default();
+        let Some(props) = self.drawn(&cx.session, request, &args["query"]) else {
+            return Ok(CommandOutcome::Handled { handled: false });
+        };
         if args["event"] != "press" {
             return Ok(CommandOutcome::Handled { handled: false });
         }
-        let props: PaletteProps =
-            serde_json::from_value(args["props"].clone()).map_err(crate::error)?;
         let outcome = self.press(request, key, &props)?;
         cx.host
             .invalidate(&cx.session, vec![request.into()])
@@ -64,6 +65,22 @@ impl Command for Handler {
     }
 }
 impl Handler {
+    /// The props the site was last drawn from, while that drawing is of the
+    /// query the press was made at.
+    fn drawn(
+        &self,
+        session: &SessionId,
+        request: &str,
+        query: &Value,
+    ) -> Option<std::sync::Arc<PaletteProps>> {
+        let shared = self.0.lock().ok()?;
+        let drawn = shared
+            .cursors
+            .get(&(session.clone(), request.into()))?
+            .drawn
+            .clone()?;
+        (query.as_str() == Some(drawn.query.as_str())).then_some(drawn)
+    }
     fn press(
         &self,
         request: &str,
@@ -82,6 +99,7 @@ impl Handler {
             .or_insert_with(|| crate::Cursor {
                 query: props.query.clone(),
                 selected: initial,
+                drawn: None,
             });
         if cursor.query != props.query {
             cursor.query = props.query.clone();
@@ -324,6 +342,49 @@ mod review_tests {
             matches!(outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["close"] == true)
         );
         assert!(state.lock().unwrap().cursors.is_empty());
+    }
+    /// A press names the query it was made at and nothing else; the handler
+    /// judges it against the props that drawing came from.
+    #[test]
+    fn a_press_is_judged_against_the_drawing_of_its_own_query() {
+        let home = tempfile::tempdir().unwrap();
+        let mut props = props();
+        props.query = "/mo".into();
+        let (groups, selected) = crate::draw::groups(&props, &[]);
+        let View::Box { layout, .. } = crate::draw::tree(&props, &groups, selected, "opening", 10)
+        else {
+            panic!("the palette draws a box")
+        };
+        assert_eq!(
+            layout.on_key.unwrap().args,
+            json!({"handler":"opening","event":"press","query":"/mo"})
+        );
+        let state = Arc::new(Mutex::new(crate::State {
+            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            cursors: Default::default(),
+        }));
+        state.lock().unwrap().cursors.insert(
+            (props.session.clone(), "opening".into()),
+            crate::Cursor {
+                query: props.query.clone(),
+                selected,
+                drawn: Some(Arc::new(props.clone())),
+            },
+        );
+        let handler = Handler(state);
+        let drawn = handler.drawn(&props.session, "opening", &json!("/mo"));
+        assert_eq!(drawn.as_deref(), Some(&props));
+        assert!(
+            handler
+                .drawn(&props.session, "opening", &json!("/m"))
+                .is_none(),
+            "a press made before the last drawing is not judged against it"
+        );
+        assert!(
+            handler
+                .drawn(&props.session, "elsewhere", &json!("/mo"))
+                .is_none()
+        );
     }
     #[test]
     fn arrow_navigation_skips_inert_rows_and_enter_releases_its_cursor() {

@@ -3854,7 +3854,8 @@
             "items": {
               "$ref": "#/$defs/CatalogEntry"
             }
-          }
+          },
+          "description": "Only the catalogues the query's command completes from, once the\nquery reaches its arguments: every press carries them, and a model\ncatalogue is the largest thing it would otherwise carry."
         }
       },
       "required": [
