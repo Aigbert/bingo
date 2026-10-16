@@ -167,6 +167,9 @@ fn composer_props(
                 "your message waits until the ask is answered"
             } else if state.summary.driver == bingo_sdk::Driver::Log {
                 "post to the room"
+            } else if state.busy() {
+                // The KeyBar says what ⏎ does while a turn runs (M183).
+                ""
             } else {
                 crate::keys::PLACEHOLDER
             }

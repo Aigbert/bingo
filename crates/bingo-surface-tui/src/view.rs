@@ -1159,6 +1159,7 @@ mod tests {
         assert!(waits.contains("› and then the docs (waits)"), "{waits}");
 
         assert!(waits.contains("⏎ queue a message"), "{waits}");
+        assert!(!waits.contains(keys::PLACEHOLDER), "{waits}");
         let idle = render(&state(), &mut scene().0, scene().1);
         assert!(idle.contains(keys::PLACEHOLDER), "{idle}");
         assert!(idle.contains(" ▍ ask anything"), "{idle}");
