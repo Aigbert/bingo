@@ -91,6 +91,13 @@ pub enum Event {
         usage: Usage,
         context: ContextUsage,
     },
+    /// Where the context stands outside a round: published when a segment
+    /// opens and when the model changes, once the window is known. `None`
+    /// says the window is no longer known.
+    ContextChanged {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        context: Option<ContextUsage>,
+    },
     /// Additive model spend, independent of context measurement and rounds.
     UsageCharged {
         #[serde(default, skip_serializing_if = "Option::is_none")]

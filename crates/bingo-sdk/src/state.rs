@@ -223,6 +223,7 @@ impl SessionState {
             Event::TurnStarted { turn, origin, .. } => self.turn_started(turn, *origin, frame.ts),
             Event::TurnRetrying { attempt, max, .. } => self.turn_retrying(*attempt, *max),
             Event::TurnUsage { usage, context, .. } => self.turn_usage(*usage, *context),
+            Event::ContextChanged { context } => self.context_changed(*context),
             Event::UsageCharged { turn, usage, .. } => self.usage_charged(turn.as_ref(), *usage),
             Event::TurnCompleted {
                 turn,
@@ -393,6 +394,11 @@ impl SessionState {
         self.summary.usage.add(usage);
         self.context = Some(context);
         Applied::Turn
+    }
+
+    fn context_changed(&mut self, context: Option<ContextUsage>) -> Applied {
+        self.context = context;
+        Applied::Session
     }
 
     /// The live turn is put away as the last one. A completion for a turn
@@ -575,6 +581,20 @@ mod tests {
         state.apply(&frame(3, charge));
         assert_eq!(state.summary.usage.input_tokens, 7);
         assert_eq!(state.turn.as_ref().unwrap().usage.input_tokens, 5);
+    }
+
+    #[test]
+    fn a_context_change_sets_the_reading_without_a_round() {
+        let mut state = SessionState::new(summary());
+        let opened: Event =
+            serde_json::from_str(include_str!("../fixtures/record/event/contextChanged.json"))
+                .unwrap();
+        assert_eq!(state.apply(&frame(1, opened)), Applied::Session);
+        let context = state.context.unwrap();
+        assert_eq!((context.used, context.window), (0, 199_000));
+        assert_eq!(state.summary.usage, Usage::default());
+        state.apply(&frame(2, Event::ContextChanged { context: None }));
+        assert!(state.context.is_none());
     }
 
     #[test]

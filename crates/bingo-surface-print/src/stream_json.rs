@@ -177,6 +177,7 @@ impl Encoder {
             | Event::SessionUpdated { .. }
             | Event::SessionClosed { .. }
             | Event::TurnRetrying { .. }
+            | Event::ContextChanged { .. }
             | Event::QueueChanged { .. }
             | Event::InteractionOpened { .. }
             | Event::InteractionResolved { .. }

@@ -182,6 +182,7 @@ impl Renderer {
             | Event::SessionUpdated { .. }
             | Event::TurnStarted { .. }
             | Event::TurnUsage { .. }
+            | Event::ContextChanged { .. }
             | Event::UsageCharged { .. }
             | Event::QueueChanged { .. }
             | Event::InteractionOpened { .. }

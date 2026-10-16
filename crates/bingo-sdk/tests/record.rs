@@ -29,6 +29,10 @@ fn fixture_name(value: &Event) -> (&'static str, &'static str) {
             "turnUsage",
             include_str!("../fixtures/record/event/turnUsage.json"),
         ),
+        Event::ContextChanged { .. } => (
+            "contextChanged",
+            include_str!("../fixtures/record/event/contextChanged.json"),
+        ),
         Event::UsageCharged { .. } => (
             "usageCharged",
             include_str!("../fixtures/record/event/usageCharged.json"),

@@ -1285,6 +1285,29 @@
         {
           "type": "object",
           "properties": {
+            "context": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ContextUsage"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": {
+              "type": "string",
+              "const": "contextChanged"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "description": "Where the context stands outside a round: published when a segment\nopens and when the model changes, once the window is known. `None`\nsays the window is no longer known."
+        },
+        {
+          "type": "object",
+          "properties": {
             "turn": {
               "anyOf": [
                 {
