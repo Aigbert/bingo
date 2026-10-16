@@ -230,6 +230,89 @@ fn the_palette_receives_drawing_facts_without_a_copy_of_session_state() {
     );
 }
 
+/// Every press carries the props, so they hold only the catalogue the
+/// query's command completes from, and none before its arguments.
+#[test]
+fn a_press_carries_only_the_catalogue_its_command_completes_from() {
+    let now = still(scene().1);
+    let mut state = state();
+    state.config.kernel["render"] = json!({"Palette":[{}]});
+    let mut run = tests::idle_in(state, Arc::new(TestSession::default()), now.instant);
+    run.ui.catalogs.commands = vec![
+        serde_json::from_value(json!({
+            "name":"model","hint":"","family":"session",
+            "args":{"kind":"options","args":{"kind":"catalog","source":"models"},"flags":[]}
+        }))
+        .unwrap(),
+    ];
+    for kind in ["models", "providers"] {
+        run.ui.catalogs.values.insert(
+            kind.into(),
+            vec![CatalogEntry {
+                id: kind.into(),
+                label: kind.into(),
+                meta: json!({}),
+            }],
+        );
+    }
+    crate::palette::open(&mut run.ui, PaletteOpen::Commands, now);
+    let catalogs = |run: &mut Run, query: &str| {
+        run.ui.composer.set(query);
+        draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
+        let key = run
+            .ui
+            .shown
+            .pulls
+            .iter()
+            .find(|key| key.request.component == bingo_sdk::render::Component::Palette)
+            .unwrap();
+        key.request.props["catalogs"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>()
+    };
+    assert!(catalogs(&mut run, "/mo").is_empty());
+    assert_eq!(catalogs(&mut run, "/model "), ["models"]);
+    assert!(catalogs(&mut run, "/think ").is_empty());
+}
+
+/// A held arrow: each press waits on the palette's redraw, so its
+/// invalidation asks for the drawing at once rather than at the next paint.
+#[tokio::test]
+async fn a_drawing_a_press_waits_on_is_pulled_when_invalidated() {
+    for pressed in [false, true] {
+        let now = still(scene().1);
+        let mut state = state();
+        state.config.kernel["render"] = json!({"Palette":[{}]});
+        let mut run = tests::idle_in(state, Arc::new(TestSession::default()), now.instant);
+        crate::palette::open(&mut run.ui, PaletteOpen::Commands, now);
+        pull(&mut run, now);
+        if pressed {
+            run.terminal_event(Term::Key(key(KeyCode::Down)));
+            assert!(!run.site_keys.is_empty(), "the press waits on the site");
+        }
+        let id = crate::palette::request(&run.ui).unwrap().to_owned();
+        let invalidated = frame(1, Event::Invalidated { requests: vec![id] });
+        run.frame(&invalidated, &mut Recorder::default()).unwrap();
+        draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
+        let key = run
+            .ui
+            .shown
+            .pulls
+            .iter()
+            .find(|key| key.request.component == bingo_sdk::render::Component::Palette)
+            .unwrap()
+            .clone();
+        assert_eq!(
+            !run.ui.placed.pulled.request(&key),
+            pressed,
+            "only a waiting press pulls before the paint"
+        );
+    }
+}
+
 #[tokio::test]
 async fn acknowledgements_refetch_only_plugins_and_changes_fetch_only_their_kind() {
     let now = still(scene().1);

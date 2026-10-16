@@ -511,6 +511,7 @@ impl Run {
                 self.ui.notify(*level, text.clone(), Instant::now())
             }
             Event::IntentAck { intent, outcome } => self.ack(intent, outcome),
+            Event::Invalidated { requests } => pulling::refetch(self, requests),
             Event::ConfigChanged { .. } => site_keys::notices(self),
             Event::SessionClosed { .. } => self.closed(&frame.session),
             _ => {}

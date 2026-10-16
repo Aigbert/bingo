@@ -10,12 +10,46 @@ pub(super) fn sync(run: &mut Run, screen: &mut dyn Screen, now: Now) -> Result<(
 }
 
 pub(super) fn request(run: &mut Run, keys: &[crate::pulled::Key]) -> bool {
+    run.ui.placed.pulled.retain(keys);
+    ask(run, keys)
+}
+
+/// A drawing a key waits on is asked for again the moment it is
+/// invalidated, not at the next paint: a held arrow otherwise pays a frame
+/// boundary per press and falls behind the key repeat.
+pub(super) fn refetch(run: &mut Run, requests: &[String]) {
+    if run.site_keys.is_empty() && run.typeahead.is_empty() {
+        return;
+    }
+    let keys = run
+        .ui
+        .shown
+        .pulls
+        .iter()
+        .filter(|key| requests.contains(&key.request.request_id))
+        .filter_map(|key| {
+            let state = run.session.tree.state(&key.session)?;
+            let viewport = &key.request.viewport;
+            Some(crate::pulled::Key::new(
+                state,
+                &key.request,
+                viewport.columns,
+                viewport.rows,
+            ))
+        })
+        .collect::<Vec<_>>();
+    if ask(run, &keys) {
+        run.release_actions();
+        typeahead::drain(run);
+    }
+}
+
+fn ask(run: &mut Run, keys: &[crate::pulled::Key]) -> bool {
     use std::{
         future::Future,
         task::{Context, Poll, Waker},
     };
     let mut answered = false;
-    run.ui.placed.pulled.retain(keys);
     for key in keys {
         if !run.ui.placed.pulled.request(key) {
             continue;
