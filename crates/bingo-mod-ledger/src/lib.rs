@@ -1,5 +1,5 @@
 //! The replaceable owner of a turn's step rows and its folded line.
-mod draw;
+pub mod draw;
 use bingo_sdk::*;
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -127,8 +127,8 @@ mod tests {
     async fn the_builtin_owns_both_sites() {
         let links = links();
         assert_eq!(links.len(), 2);
-        let fold = json!({"component":"TurnFold","requestId":"itm_1","surface":"terminal","props":{"steps":[{"verb":"read","target":"a","state":"done"}],"outcome":"done","elapsed":2000},"viewport":{"columns":60,"rows":1}});
-        let row = json!({"component":"Ledger","requestId":"itm_1","surface":"terminal","props":{"steps":[{"verb":"read","target":"a","state":"done"}]},"viewport":{"columns":60,"rows":1}});
+        let fold = json!({"component":"TurnFold","requestId":"itm_1","surface":"terminal","props":{"steps":[{"verb":"read","target":"a","state":"done"}],"outcome":"done","elapsed":2000,"marks":{"done":"✓","asked":"◆","running":"◌","failed":"✗","folded":"▸","open":"▾"}},"viewport":{"columns":60,"rows":1}});
+        let row = json!({"component":"Ledger","requestId":"itm_1","surface":"terminal","props":{"steps":[{"verb":"read","target":"a","state":"done"}],"marks":{"done":"✓","asked":"◆","running":"◌","failed":"✗","folded":"▸","open":"▾"}},"viewport":{"columns":60,"rows":1}});
         let matched = |link: &Arc<dyn Interceptor>, request: &Value| {
             link.matcher().prefilter["component"] == request["component"]
         };

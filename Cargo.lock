@@ -1172,6 +1172,7 @@ dependencies = [
  "bingo-mod-browse",
  "bingo-mod-crew",
  "bingo-mod-hello",
+ "bingo-mod-ledger",
  "bingo-mod-memory",
  "bingo-mod-models",
  "bingo-mod-palette",

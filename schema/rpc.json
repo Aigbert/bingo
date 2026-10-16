@@ -3398,10 +3398,15 @@
           "items": {
             "$ref": "#/$defs/Step"
           }
+        },
+        "marks": {
+          "$ref": "#/$defs/Marks",
+          "description": "What each row starts with."
         }
       },
       "required": [
-        "steps"
+        "steps",
+        "marks"
       ],
       "description": "The `Ledger` site: the rows of a running turn's steps."
     },
@@ -3597,6 +3602,44 @@
           ]
         }
       ]
+    },
+    "Marks": {
+      "type": "object",
+      "properties": {
+        "done": {
+          "type": "string",
+          "description": "A step that came back: `✓`."
+        },
+        "asked": {
+          "type": "string",
+          "description": "A step waiting on a person: `◆`."
+        },
+        "running": {
+          "type": "string",
+          "description": "A running step when nothing turns it: `◌`."
+        },
+        "failed": {
+          "type": "string",
+          "description": "A step that failed or was stopped: `✗`."
+        },
+        "folded": {
+          "type": "string",
+          "description": "A turn folded to its line: `▸`."
+        },
+        "open": {
+          "type": "string",
+          "description": "A turn opened under its line: `▾`."
+        }
+      },
+      "required": [
+        "done",
+        "asked",
+        "running",
+        "failed",
+        "folded",
+        "open"
+      ],
+      "description": "The marks a turn's rows start with, from the surface's glyph table. A\ndrawing uses the marks it is handed, so a terminal that shows only ASCII\ngets ASCII whoever draws the rows."
     },
     "Match": {
       "type": "object",
@@ -6726,12 +6769,17 @@
         "isExpanded": {
           "type": "boolean",
           "description": "The person opened the fold to read the steps inline."
+        },
+        "marks": {
+          "$ref": "#/$defs/Marks",
+          "description": "What the line starts with, folded or opened."
         }
       },
       "required": [
         "steps",
         "outcome",
-        "elapsed"
+        "elapsed",
+        "marks"
       ],
       "description": "The `TurnFold` site: a finished turn as one line. The stop line under a\nstopped turn is the interruption's own row."
     },

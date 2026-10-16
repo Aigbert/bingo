@@ -3,7 +3,7 @@
 //! where the person stopped it. What hangs under a step starts at column 5,
 //! under its words.
 
-use bingo_sdk::component::ledger::{FoldGlyphs, STEP_INDENT, plural};
+use bingo_sdk::component::ledger::{Marks, STEP_INDENT, plural};
 use bingo_sdk::component::row::{Ink, Piece};
 use bingo_sdk::component::{Props, Step, StepState, TurnFoldProps};
 
@@ -67,18 +67,18 @@ fn ledger(props: &Props, width: usize, now: Now) -> Vec<Line<'static>> {
     ledger
         .steps
         .iter()
-        .map(|step| line(step.row(glyph(step, now), width, UnicodeWidthStr::width)))
+        .map(|step| {
+            let glyph = glyph(step, &ledger.marks, now);
+            line(step.row(glyph, width, UnicodeWidthStr::width))
+        })
         .collect()
 }
 
 /// What a step's row starts with: what state it is in, a running one turning.
-fn glyph(step: &Step, now: Now) -> &'static str {
-    let steps = theme::glyphs().chrome.steps;
+fn glyph<'a>(step: &Step, marks: &'a Marks, now: Now) -> &'a str {
     match step.state {
         StepState::Running => crate::spinner::glyph(now),
-        StepState::Done => steps[0],
-        StepState::Asked => steps[1],
-        StepState::Failed | StepState::Stopped => steps[3],
+        state => marks.step(state),
     }
 }
 
@@ -107,12 +107,7 @@ fn folded_line(props: &Props, width: usize) -> Vec<Line<'static>> {
     let Props::TurnFold(fold) = props else {
         return Vec::new();
     };
-    let chrome = theme::glyphs().chrome;
-    let glyphs = FoldGlyphs {
-        folded: chrome.fold[0],
-        open: chrome.fold[1],
-    };
-    fold.row(glyphs, width, UnicodeWidthStr::width)
+    fold.row(width, UnicodeWidthStr::width)
         .map(line)
         .into_iter()
         .collect()

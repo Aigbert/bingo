@@ -6,7 +6,9 @@
 
 use std::collections::BTreeMap;
 
-use bingo_sdk::component::{LedgerProps, Props, Step, StepState, TurnEnd, TurnFoldProps};
+use bingo_sdk::component::{
+    LedgerProps, Props, Step, StepState, TurnEnd, TurnFoldProps, ledger::Marks,
+};
 use bingo_sdk::{
     DecisionKind, Item, ItemBody, ItemId, ItemStatus, SessionState, Upshot, view::Tone,
 };
@@ -131,8 +133,25 @@ pub fn requests(item: &Item, role: &Role) -> Vec<(String, Props)> {
 pub fn ledger(item: &Item, step: &Step) -> (String, Props) {
     let props = Props::Ledger(LedgerProps {
         steps: vec![step.clone()],
+        marks: marks(),
     });
     (crate::component::items::id(item), props)
+}
+
+/// The marks a turn's rows start with, as this terminal's glyph table has
+/// them: whoever draws the rows draws them with these.
+fn marks() -> Marks {
+    let chrome = crate::theme::glyphs().chrome;
+    let [done, asked, running, failed] = chrome.steps.map(str::to_owned);
+    let [folded, open] = chrome.fold.map(str::to_owned);
+    Marks {
+        done,
+        asked,
+        running,
+        failed,
+        folded,
+        open,
+    }
 }
 
 /// A finished turn's line as its site is asked for it, by the item holding it.
@@ -222,6 +241,7 @@ impl Turn<'_> {
             elapsed: self.elapsed(),
             thought,
             is_expanded: opened,
+            marks: marks(),
         };
         let last_step = steps.last().copied();
         for (at, item) in self.items.iter().enumerate() {

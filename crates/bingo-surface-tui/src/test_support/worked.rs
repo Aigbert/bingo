@@ -54,8 +54,16 @@ pub fn worked(turn: &str) -> Vec<Item> {
     items
         .into_iter()
         .zip(0..)
-        .map(|(item, second)| at(in_turn(item, turn), second))
+        .map(|(item, second)| at(in_turn(called(item), turn), second))
         .collect()
+}
+
+/// A call named after its item, as every call of a session is named apart.
+fn called(mut item: Item) -> Item {
+    if let ItemBody::ToolCall { call_id, .. } = &mut item.body {
+        *call_id = format!("call_{}", item.id).into();
+    }
+    item
 }
 
 /// An item started `second`s into its turn and done a second later.

@@ -49,11 +49,45 @@ pub enum TurnEnd {
     Stopped,
 }
 
+/// The marks a turn's rows start with, from the surface's glyph table. A
+/// drawing uses the marks it is handed, so a terminal that shows only ASCII
+/// gets ASCII whoever draws the rows.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Marks {
+    /// A step that came back: `✓`.
+    pub done: String,
+    /// A step waiting on a person: `◆`.
+    pub asked: String,
+    /// A running step when nothing turns it: `◌`.
+    pub running: String,
+    /// A step that failed or was stopped: `✗`.
+    pub failed: String,
+    /// A turn folded to its line: `▸`.
+    pub folded: String,
+    /// A turn opened under its line: `▾`.
+    pub open: String,
+}
+
+impl Marks {
+    /// The mark a step in `state` starts with.
+    pub fn step(&self, state: StepState) -> &str {
+        match state {
+            StepState::Done => &self.done,
+            StepState::Asked => &self.asked,
+            StepState::Running => &self.running,
+            StepState::Failed | StepState::Stopped => &self.failed,
+        }
+    }
+}
+
 /// The `Ledger` site: the rows of a running turn's steps.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LedgerProps {
     pub steps: Vec<Step>,
+    /// What each row starts with.
+    pub marks: Marks,
 }
 
 /// The `TurnFold` site: a finished turn as one line. The stop line under a
@@ -71,6 +105,8 @@ pub struct TurnFoldProps {
     /// The person opened the fold to read the steps inline.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub is_expanded: bool,
+    /// What the line starts with, folded or opened.
+    pub marks: Marks,
 }
 
 impl Step {
@@ -226,13 +262,6 @@ impl Run {
     }
 }
 
-/// The glyphs a fold draws, from the surface's table.
-#[derive(Clone, Copy, Debug)]
-pub struct FoldGlyphs<'a> {
-    pub folded: &'a str,
-    pub open: &'a str,
-}
-
 impl TurnFoldProps {
     /// The turn's steps grouped into runs of one verb, in order.
     pub fn runs(&self) -> Vec<Run> {
@@ -244,26 +273,21 @@ impl TurnFoldProps {
 
     /// The folded line, `▸ 5 steps · read · edit +1 −1 … 7s`; nothing for a
     /// turn that neither stepped nor thought.
-    pub fn row(
-        &self,
-        glyphs: FoldGlyphs,
-        width: usize,
-        cells: impl Fn(&str) -> usize,
-    ) -> Option<Vec<Piece>> {
-        let left = self.fold_words(&glyphs)?;
+    pub fn row(&self, width: usize, cells: impl Fn(&str) -> usize) -> Option<Vec<Piece>> {
+        let left = self.fold_words()?;
         let right = vec![Piece::new(elapsed(self.elapsed), Ink::Dim)];
         Some(laid(left, right, width, cells))
     }
 
     /// `▸ 5 steps · read · grep · edit +1 −1`, or `▸ thought` for a turn
     /// that only thought; nothing for a turn that did neither.
-    fn fold_words(&self, glyphs: &FoldGlyphs) -> Option<Vec<Piece>> {
+    fn fold_words(&self) -> Option<Vec<Piece>> {
         if self.steps.is_empty() && !self.thought {
             return None;
         }
         let glyph = match self.is_expanded {
-            true => glyphs.open,
-            false => glyphs.folded,
+            true => &self.marks.open,
+            false => &self.marks.folded,
         };
         let mut out = vec![
             Piece::new(STEP_INDENT, Ink::Plain),
@@ -342,10 +366,17 @@ mod tests {
     fn cells(s: &str) -> usize {
         s.chars().count()
     }
-    const GLYPHS: FoldGlyphs = FoldGlyphs {
-        folded: "\u{25b8}",
-        open: "\u{25be}",
-    };
+    fn marks() -> Marks {
+        let mark = |c: char| c.to_string();
+        Marks {
+            done: mark('\u{2713}'),
+            asked: mark('\u{25c6}'),
+            running: mark('\u{25cc}'),
+            failed: mark('\u{2717}'),
+            folded: mark('\u{25b8}'),
+            open: mark('\u{25be}'),
+        }
+    }
     fn prototype_turn() -> TurnFoldProps {
         let done = StepState::Done;
         TurnFoldProps {
@@ -368,12 +399,13 @@ mod tests {
             elapsed: 7_400,
             thought: false,
             is_expanded: false,
+            marks: marks(),
         }
     }
 
     #[test]
     fn a_finished_turn_folds_to_the_prototype_line() {
-        let row = prototype_turn().row(GLYPHS, 80, cells).unwrap();
+        let row = prototype_turn().row(80, cells).unwrap();
         let line = text(&row);
         assert!(
             line.starts_with("   \u{25b8} 5 steps \u{b7} read \u{b7} grep \u{b7} edit +1 \u{2212}1 \u{b7} test 3 passed \u{b7} run "),
@@ -406,8 +438,9 @@ mod tests {
             elapsed: 372_000,
             thought: false,
             is_expanded: true,
+            marks: marks(),
         };
-        let line = text(&fold.row(GLYPHS, 80, cells).unwrap());
+        let line = text(&fold.row(80, cells).unwrap());
         assert!(
             line.starts_with(
                 "   \u{25be} 20 steps \u{b7} read \u{d7}18 \u{b7} edit \u{d7}2 +212 \u{2212}88"
@@ -430,8 +463,9 @@ mod tests {
             elapsed: 900,
             thought: true,
             is_expanded: false,
+            marks: marks(),
         };
-        let line = text(&fold.row(GLYPHS, 100, cells).unwrap());
+        let line = text(&fold.row(100, cells).unwrap());
         assert!(line.contains("grep \u{b7} bash \u{b7} stopped"), "{line:?}");
         assert!(line.ends_with(" 1s"));
         let nothing = TurnFoldProps {
@@ -440,7 +474,7 @@ mod tests {
             ..fold
         };
         assert_eq!(
-            nothing.row(GLYPHS, 100, cells),
+            nothing.row(100, cells),
             None,
             "no fold line for a turn with nothing to fold"
         );
@@ -454,8 +488,9 @@ mod tests {
             elapsed: 1_000,
             thought: false,
             is_expanded: false,
+            marks: marks(),
         };
-        let line = text(&fold.row(GLYPHS, 80, cells).unwrap());
+        let line = text(&fold.row(80, cells).unwrap());
         assert!(
             line.starts_with("   \u{25b8} 1 step \u{b7} bash failed  "),
             "{line:?}"
@@ -524,8 +559,9 @@ mod tests {
             elapsed: 1_000,
             thought: false,
             is_expanded: false,
+            marks: marks(),
         };
-        let pieces = fold.row(GLYPHS, 80, cells).unwrap();
+        let pieces = fold.row(80, cells).unwrap();
         let line = text(&pieces);
         assert!(
             line.contains("bash \u{d7}2 \u{b7} you: yes \u{b7} you: no "),

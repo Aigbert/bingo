@@ -2,7 +2,6 @@ use bingo_sdk::{
     View,
     component::{
         LedgerProps, StepState, TurnFoldProps,
-        ledger::FoldGlyphs,
         row::{Ink, Piece},
     },
     render::Component,
@@ -10,13 +9,9 @@ use bingo_sdk::{
 };
 use unicode_width::UnicodeWidthStr;
 
-const FOLD: FoldGlyphs = FoldGlyphs {
-    folded: "▸",
-    open: "▾",
-};
-
-/// A step's row. A running step is left to the surface, whose spinner turns
-/// with its clock; a still answer could not.
+/// A step's row, in the marks the surface handed over. A running step is
+/// left to the surface, whose spinner turns with its clock; a still answer
+/// could not.
 pub fn ledger(props: &LedgerProps, width: usize) -> View {
     if props.steps.iter().any(|s| s.state == StepState::Running) {
         return View::Engine {
@@ -25,12 +20,7 @@ pub fn ledger(props: &LedgerProps, width: usize) -> View {
         };
     }
     let rows = props.steps.iter().map(|step| {
-        let glyph = match step.state {
-            StepState::Done => "✓",
-            StepState::Asked => "◆",
-            StepState::Running => "◌",
-            StepState::Failed | StepState::Stopped => "✗",
-        };
+        let glyph = props.marks.step(step.state);
         row(step.row(glyph, width, UnicodeWidthStr::width))
     });
     View::column(rows.collect())
@@ -38,7 +28,7 @@ pub fn ledger(props: &LedgerProps, width: usize) -> View {
 
 /// The folded line; a turn with nothing to fold draws nothing.
 pub fn fold(props: &TurnFoldProps, width: usize) -> View {
-    let rows = props.row(FOLD, width, UnicodeWidthStr::width);
+    let rows = props.row(width, UnicodeWidthStr::width);
     View::column(rows.into_iter().map(row).collect())
 }
 
@@ -81,8 +71,24 @@ mod tests {
     use super::*;
     use bingo_sdk::{
         Upshot,
-        component::{Step, TurnEnd},
+        component::{Step, TurnEnd, ledger::Marks},
     };
+
+    fn marks(set: [&str; 6]) -> Marks {
+        let [done, asked, running, failed, folded, open] = set.map(str::to_owned);
+        Marks {
+            done,
+            asked,
+            running,
+            failed,
+            folded,
+            open,
+        }
+    }
+
+    fn unicode() -> Marks {
+        marks(["✓", "◆", "◌", "✗", "▸", "▾"])
+    }
 
     fn step(verb: &str, state: StepState, upshot: Option<Upshot>) -> Step {
         Step {
@@ -105,12 +111,14 @@ mod tests {
                     removed: 1,
                 }),
             )],
+            marks: unicode(),
         };
         let drawn = ledger(&done, 40).fold();
         assert!(drawn.starts_with("   ✓ edit src/main.rs"), "{drawn:?}");
         assert!(drawn.trim_end().ends_with("+1 −1"), "{drawn:?}");
         let running = LedgerProps {
             steps: vec![step("bash", StepState::Running, None)],
+            marks: unicode(),
         };
         assert!(matches!(
             ledger(&running, 40),
@@ -132,11 +140,47 @@ mod tests {
             elapsed: 3_000,
             thought: false,
             is_expanded: false,
+            marks: unicode(),
         };
         let drawn = fold(&props, 80).fold();
         let rows: Vec<&str> = drawn.lines().collect();
         assert_eq!(rows.len(), 1, "{drawn:?}");
         assert!(rows[0].starts_with("   ▸ 2 steps · read · bash · stopped"));
         assert!(rows[0].ends_with("3s"));
+    }
+
+    /// The marks are the surface's: handed ASCII, the rows are ASCII.
+    #[test]
+    fn rows_are_drawn_in_the_marks_they_are_handed() {
+        let ascii = marks(["+", "*", "o", "!", ">", "v"]);
+        let steps = vec![
+            step("read", StepState::Done, None),
+            step("bash", StepState::Asked, None),
+            step("edit", StepState::Failed, None),
+        ];
+        let drawn = ledger(
+            &LedgerProps {
+                steps: steps.clone(),
+                marks: ascii.clone(),
+            },
+            60,
+        )
+        .fold();
+        let marks: Vec<&str> = drawn.lines().map(|row| &row[3..4]).collect();
+        assert_eq!(marks, ["+", "*", "!"], "{drawn:?}");
+        let folded = TurnFoldProps {
+            steps,
+            outcome: TurnEnd::Done,
+            elapsed: 1_000,
+            thought: false,
+            is_expanded: false,
+            marks: ascii,
+        };
+        assert!(fold(&folded, 80).fold().starts_with("   > 3 steps"));
+        let opened = TurnFoldProps {
+            is_expanded: true,
+            ..folded
+        };
+        assert!(fold(&opened, 80).fold().starts_with("   v 3 steps"));
     }
 }

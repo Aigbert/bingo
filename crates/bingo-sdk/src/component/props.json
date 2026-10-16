@@ -429,7 +429,15 @@
             "tone": "good"
           }
         }
-      ]
+      ],
+      "marks": {
+        "done": "+",
+        "asked": "*",
+        "running": "o",
+        "failed": "!",
+        "folded": ">",
+        "open": "v"
+      }
     }
   },
   {
@@ -455,7 +463,15 @@
       "outcome": "stopped",
       "elapsed": 7000,
       "thought": true,
-      "isExpanded": true
+      "isExpanded": true,
+      "marks": {
+        "done": "✓",
+        "asked": "◆",
+        "running": "◌",
+        "failed": "✗",
+        "folded": "▸",
+        "open": "▾"
+      }
     }
   }
 ]

@@ -735,7 +735,12 @@ export type KeyBinding = (string | { "args": string; "chord": string; [key: stri
 export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
 export type KeyToast = { "about"?: (string | null); "level": Level; "text": string; [key: string]: unknown; };
 /** The `Ledger` site: the rows of a running turn's steps. */
-export type LedgerProps = { "steps": Array<Step>; [key: string]: unknown; };
+export type LedgerProps = {
+  /** What each row starts with. */
+  "marks": Marks;
+  "steps": Array<Step>;
+  [key: string]: unknown;
+};
 /**
  * A length: a number of terminal cells, or a share of the screen written as
  * a percentage string such as `'40%'`.
@@ -801,6 +806,26 @@ export type Manifest = ({
   "version": string;
   [key: string]: unknown;
 });
+/**
+ * The marks a turn's rows start with, from the surface's glyph table. A
+ * drawing uses the marks it is handed, so a terminal that shows only ASCII
+ * gets ASCII whoever draws the rows.
+ */
+export type Marks = {
+  /** A step waiting on a person: `◆`. */
+  "asked": string;
+  /** A step that came back: `✓`. */
+  "done": string;
+  /** A step that failed or was stopped: `✗`. */
+  "failed": string;
+  /** A turn folded to its line: `▸`. */
+  "folded": string;
+  /** A turn opened under its line: `▾`. */
+  "open": string;
+  /** A running step when nothing turns it: `◌`. */
+  "running": string;
+  [key: string]: unknown;
+};
 export type Match = { "item": ItemId; "line": number; "turn"?: (TurnId | null); [key: string]: unknown; };
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
 export type Messages = {
@@ -1427,6 +1452,8 @@ export type TurnFoldProps = {
   "elapsed": number;
   /** The person opened the fold to read the steps inline. */
   "isExpanded"?: boolean;
+  /** What the line starts with, folded or opened. */
+  "marks": Marks;
   "outcome": TurnEnd;
   "steps": Array<Step>;
   /** The turn thought before or between its steps. */

@@ -173,14 +173,7 @@ fn a_long_run_of_one_verb_folds_to_a_count() {
         panic!("the thought before the reads holds the line");
     };
     let line: String = fold
-        .row(
-            bingo_sdk::component::ledger::FoldGlyphs {
-                folded: "▸",
-                open: "▾",
-            },
-            120,
-            |s| s.chars().count(),
-        )
+        .row(120, |s| s.chars().count())
         .unwrap_or_default()
         .into_iter()
         .map(|piece| piece.text)

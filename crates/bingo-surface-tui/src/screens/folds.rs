@@ -257,3 +257,39 @@ fn a_click_under_an_opened_turn_leaves_it_open() {
         );
     }
 }
+
+/// The built-in ledger answers in this terminal's marks: under ASCII, a
+/// turn's rows are ASCII whoever draws them.
+#[test]
+fn the_builtin_ledger_draws_in_ascii_where_the_terminal_does() {
+    let (tree, mut ui, now) = expanded();
+    let mut state = tree.viewed().clone();
+    state.config.kernel["render"] = serde_json::json!({"Ledger": [{}], "TurnFold": [{}]});
+    let tree = solo(&state);
+    let draw = |ui: &mut Ui| in_look(ascii(), || draw_tree(80, 24, &tree, ui, now));
+    draw(&mut ui);
+    let keys = ui.shown.pulls.clone();
+    assert!(keys.len() > 1, "the line and its steps ask: {keys:?}");
+    for key in keys {
+        let width = usize::from(key.request.viewport.columns);
+        let props =
+            bingo_sdk::component::Props::parse(key.request.component, key.request.props.clone());
+        let view = match props.expect("typed props") {
+            bingo_sdk::component::Props::Ledger(props) => {
+                bingo_mod_ledger::draw::ledger(&props, width)
+            }
+            bingo_sdk::component::Props::TurnFold(props) => {
+                bingo_mod_ledger::draw::fold(&props, width)
+            }
+            other => panic!("only the ledger's sites ask: {other:?}"),
+        };
+        ui.placed.pulled.request(&key);
+        ui.placed.pulled.answer(key, view);
+    }
+    let screen = draw(&mut ui);
+    assert!(screen.contains("   v 4 steps"), "{screen}");
+    assert!(screen.contains("   + read src/main.rs"), "{screen}");
+    for mark in ['✓', '◆', '◌', '✗', '▸', '▾'] {
+        assert!(!screen.contains(mark), "{mark} under ASCII: {screen}");
+    }
+}
