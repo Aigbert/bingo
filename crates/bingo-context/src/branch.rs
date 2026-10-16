@@ -53,7 +53,13 @@ async fn read(cwd: &Path) -> serde_json::Value {
         .and_then(|output| String::from_utf8(output.stdout).ok())
         .map(|name| name.trim().to_string())
         .filter(|name| !name.is_empty());
-    serde_json::json!({"cwd": cwd, "branch": branch})
+    bingo_sdk::slot::with(
+        serde_json::json!({}),
+        [bingo_sdk::slot::Slot::Location {
+            cwd: cwd.display().to_string(),
+            branch,
+        }],
+    )
 }
 
 #[async_trait]
@@ -93,16 +99,20 @@ mod tests {
         };
         let path = repo.root();
         let fact = read(&path).await;
-        assert_eq!(fact["cwd"], path.to_string_lossy().as_ref());
-        assert!(fact["branch"].as_str().is_some_and(|s| !s.is_empty()));
+        assert_eq!(fact["slots"][0]["cwd"], path.to_string_lossy().as_ref());
+        assert!(
+            fact["slots"][0]["branch"]
+                .as_str()
+                .is_some_and(|s| !s.is_empty())
+        );
         let status = std::process::Command::new("git")
             .args(["checkout", "--detach", "--quiet"])
             .current_dir(&path)
             .status()
             .unwrap();
         assert!(status.success());
-        assert!(read(&path).await["branch"].is_null());
+        assert!(read(&path).await["slots"][0]["branch"].is_null());
         let outside = tempfile::tempdir().unwrap();
-        assert!(read(outside.path()).await["branch"].is_null());
+        assert!(read(outside.path()).await["slots"][0]["branch"].is_null());
     }
 }

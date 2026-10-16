@@ -373,7 +373,13 @@ mod m183 {
             .or_default()
             .insert(
                 "location".into(),
-                serde_json::json!({"cwd":state.summary.cwd, "branch":"main"}),
+                bingo_sdk::slot::with(
+                    serde_json::json!({}),
+                    [bingo_sdk::slot::Slot::Location {
+                        cwd: state.summary.cwd.clone(),
+                        branch: Some("main".into()),
+                    }],
+                ),
             );
         let (mut ui, now) = scene();
         for (name, events) in [

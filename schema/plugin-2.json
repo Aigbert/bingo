@@ -5509,6 +5509,28 @@
         {
           "type": "object",
           "properties": {
+            "cwd": {
+              "type": "string"
+            },
+            "branch": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "type": "string",
+              "const": "location"
+            }
+          },
+          "required": [
+            "kind",
+            "cwd"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
             "text": {
               "type": "string"
             },

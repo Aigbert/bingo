@@ -79,5 +79,10 @@
     "caption": "the wire format",
     "body": null,
     "actions": []
+  },
+  {
+    "kind": "location",
+    "cwd": "/work",
+    "branch": "main"
   }
 ]

@@ -38,6 +38,10 @@ impl Shown {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(remote = "Self", tag = "kind", rename_all = "camelCase")]
 pub enum Slot {
+    Location {
+        cwd: String,
+        branch: Option<String>,
+    },
     Status {
         text: String,
         tone: Tone,
@@ -244,7 +248,7 @@ mod tests {
         } else {
             assert_eq!(generated, json);
         }
-        assert_eq!(slots().len(), 7);
+        assert_eq!(slots().len(), 8);
     }
 
     #[test]

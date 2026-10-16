@@ -43,14 +43,16 @@ pub(super) fn render(
 }
 
 pub(crate) fn welcome(state: &SessionState, width: usize) -> Line<'static> {
-    line(&state.summary, branch(state), width)
+    line(&state.summary, branch(state).as_deref(), width)
 }
 
-fn branch(state: &SessionState) -> Option<&str> {
-    let location = state.extensions.get("_bingo.context")?.get("location")?;
-    (location["cwd"].as_str()? == state.summary.cwd)
-        .then(|| location["branch"].as_str())
-        .flatten()
+fn branch(state: &SessionState) -> Option<String> {
+    bingo_sdk::slot::placed(state)
+        .into_iter()
+        .find_map(|placed| match placed.slot {
+            bingo_sdk::slot::Slot::Location { cwd, branch } if cwd == state.summary.cwd => branch,
+            _ => None,
+        })
 }
 
 fn line(summary: &SessionSummary, branch: Option<&str>, width: usize) -> Line<'static> {
@@ -98,6 +100,28 @@ fn line(summary: &SessionSummary, branch: Option<&str>, width: usize) -> Line<'s
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn location_is_a_public_slot_and_must_match_the_session_cwd() {
+        let mut state = crate::test_support::state();
+        state
+            .extensions
+            .entry("producer".into())
+            .or_default()
+            .insert(
+                "location".into(),
+                bingo_sdk::slot::with(
+                    serde_json::json!({}),
+                    [bingo_sdk::slot::Slot::Location {
+                        cwd: "/other".into(),
+                        branch: Some("main".into()),
+                    }],
+                ),
+            );
+        assert_eq!(branch(&state), None);
+        state.summary.cwd = "/other".into();
+        assert_eq!(branch(&state).as_deref(), Some("main"));
+    }
+
     #[test]
     fn a_narrow_header_drops_title_then_branch() {
         let mut state = crate::test_support::state();
