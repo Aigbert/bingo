@@ -40,7 +40,12 @@ impl Uses {
             .and_then(|bytes| serde_json::from_slice::<Vec<Use>>(&bytes).ok())
             .unwrap_or_default()
             .into_iter()
-            .filter_map(|entry| Some(Use { name: name(&entry.name)?, ..entry }))
+            .filter_map(|entry| {
+                Some(Use {
+                    name: name(&entry.name)?,
+                    ..entry
+                })
+            })
             .take(KEPT)
             .collect();
         Self { path, counts }
@@ -121,7 +126,14 @@ mod tests {
 
     #[test]
     fn the_most_used_lead_and_a_tie_goes_to_the_last_run() {
-        let (dir, _) = counted(&["/think", "/model", "/think", "/rename x", "/model", "/status"]);
+        let (dir, _) = counted(&[
+            "/think",
+            "/model",
+            "/think",
+            "/rename x",
+            "/model",
+            "/status",
+        ]);
         let reopened = Uses::load(path(dir.path()));
         assert_eq!(reopened.top(), ["model", "think", "status"]);
     }

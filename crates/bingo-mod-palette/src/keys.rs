@@ -88,32 +88,11 @@ impl Handler {
         props: &PaletteProps,
     ) -> Result<CommandOutcome, KernelError> {
         let mut shared = self.0.lock().map_err(crate::error)?;
-        let (groups, initial) = crate::draw::groups(props, &shared.uses.top());
+        let (cursor, groups) = shared.walk(&props.session, request, props);
         let rows = groups
             .iter()
             .flat_map(|group| &group.rows)
             .collect::<Vec<_>>();
-        let cursor = shared
-            .cursors
-            .entry((props.session.clone(), request.into()))
-            .or_insert_with(|| crate::Cursor {
-                query: props.query.clone(),
-                selected: initial,
-                drawn: None,
-            });
-        if cursor.query != props.query {
-            cursor.query = props.query.clone();
-            cursor.selected = initial;
-        }
-        if rows
-            .get(cursor.selected)
-            .is_some_and(|row| matches!(row.target, Target::Inert))
-        {
-            cursor.selected = rows
-                .iter()
-                .position(|row| !matches!(row.target, Target::Inert))
-                .unwrap_or(0);
-        }
         let target = rows.get(cursor.selected).map(|row| row.target.clone());
         let (handled, operation) = operation(cursor, &rows, target, key, props);
         if !handled {
@@ -169,6 +148,7 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
                 json!({"run":format!("/{name}")})
             }
         }
+        Target::Skill(name) => skill(&name, props),
         Target::Key(line) if line.starts_with("@key:") => {
             json!({"key":line.trim_start_matches("@key:")})
         }
@@ -179,7 +159,24 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
         }
         Target::Session(id) => json!({"resume":id}),
         Target::View(id) => json!({"view":id}),
-        Target::Inert => Value::Null,
+        Target::Inert | Target::Expand(_) => Value::Null,
+    }
+}
+
+/// A skill runs as soon as it is chosen unless it asks for an argument the
+/// person has not typed; then its line waits in the box for them.
+fn skill(name: &str, props: &PaletteProps) -> Value {
+    let asks = props
+        .commands
+        .iter()
+        .find(|entry| entry.id == name)
+        .and_then(|entry| serde_json::from_value::<CommandSpec>(entry.meta.clone()).ok())
+        .is_some_and(|spec| matches!(spec.args, ArgSpec::Free { hint } if !hint.is_empty()));
+    let typed = props.query.trim().strip_prefix('/') == Some(name);
+    if asks && !typed {
+        json!({"edit":format!("/{name} ")})
+    } else {
+        json!({"run":format!("/{name}")})
     }
 }
 
@@ -253,8 +250,16 @@ fn operation(
                 .unwrap_or_else(|| json!({"close":true})),
         ),
         "backspace" if props.query.is_empty() || props.query == "/" => Some(json!({"close":true})),
+        "tab" | "enter" if matches!(target, Some(Target::Expand(_))) => {
+            if let Some(Target::Expand(fold)) = target {
+                cursor.expanded.insert(fold);
+            }
+            None
+        }
         "tab" => target.and_then(|target| match target {
-            Target::Command(name) => Some(json!({"edit":format!("/{name} ")})),
+            Target::Command(name) | Target::Skill(name) => {
+                Some(json!({"edit":format!("/{name} ")}))
+            }
             _ => None,
         }),
         "enter" => target
@@ -315,7 +320,7 @@ pub(crate) mod review_tests {
         ] {
             props.key_hints.insert(key.into(), "informational".into());
         }
-        let (groups, _) = crate::draw::groups(&props, &[]);
+        let (groups, _) = crate::draw::groups(&props, &[], &Default::default());
         assert!(
             groups
                 .iter()
@@ -350,9 +355,18 @@ pub(crate) mod review_tests {
         let home = tempfile::tempdir().unwrap();
         let mut props = props();
         props.query = "/mo".into();
-        let (groups, selected) = crate::draw::groups(&props, &[]);
-        let View::Box { layout, .. } = crate::draw::tree(&props, &groups, selected, "opening", 10)
-        else {
+        let (groups, selected) = crate::draw::groups(&props, &[], &Default::default());
+        let View::Box { layout, .. } = crate::draw::tree(
+            &props,
+            &groups,
+            selected,
+            "opening",
+            &render::Viewport {
+                place: None,
+                columns: 80,
+                rows: 10,
+            },
+        ) else {
             panic!("the palette draws a box")
         };
         assert_eq!(
@@ -369,6 +383,7 @@ pub(crate) mod review_tests {
                 query: props.query.clone(),
                 selected,
                 drawn: Some(Arc::new(props.clone())),
+                expanded: Default::default(),
             },
         );
         let handler = Handler(state);
@@ -405,6 +420,58 @@ pub(crate) mod review_tests {
         );
         assert!(state.lock().unwrap().cursors.is_empty());
     }
+    fn skill(name: &str, hint: &str) -> CatalogEntry {
+        CatalogEntry {
+            id: name.into(),
+            label: name.into(),
+            meta: json!({"name":name,"hint":"a skill","family":"skill/project","args":{"kind":"free","hint":hint}}),
+        }
+    }
+    /// Every skill is reachable from a bare `/`: Enter opens the fold the
+    /// cursor rests on, and a skill without an argument runs at once.
+    #[test]
+    fn enter_unfolds_the_skills_and_runs_one_that_asks_nothing() {
+        let home = tempfile::tempdir().unwrap();
+        let mut props = props();
+        props.open = bingo_sdk::component::PaletteOpen::Commands;
+        props.query = "/".into();
+        props.commands = vec![skill("deploy", ""), skill("standup", "[days]")];
+        let state = Arc::new(Mutex::new(crate::State {
+            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
+            cursors: Default::default(),
+        }));
+        let handler = Handler(state.clone());
+        let outcome = handler.press("opening", "enter", &props).unwrap();
+        assert_eq!(
+            outcome,
+            CommandOutcome::Handled { handled: true },
+            "unfolded"
+        );
+        let unfolded = state
+            .lock()
+            .unwrap()
+            .cursors
+            .values()
+            .next()
+            .unwrap()
+            .expanded
+            .clone();
+        assert!(unfolded.contains(crate::skills::SKILLS));
+        let outcome = handler.press("opening", "enter", &props).unwrap();
+        assert!(
+            matches!(&outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["run"] == "/deploy"),
+            "{outcome:?}"
+        );
+        assert_eq!(state.lock().unwrap().uses.top(), ["deploy"]);
+        // `deploy` is recent now; the fold under it holds the other.
+        handler.press("opening", "down", &props).unwrap();
+        handler.press("opening", "enter", &props).unwrap();
+        let outcome = handler.press("opening", "enter", &props).unwrap();
+        assert!(
+            matches!(&outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["edit"] == "/standup "),
+            "a skill that asks for an argument waits for it: {outcome:?}"
+        );
+    }
     /// A link that fills the plugin catalogue names the id `evil` "good".
     /// The trust row shows `evil`, and a row that hides it runs nothing.
     #[test]
@@ -430,7 +497,7 @@ pub(crate) mod review_tests {
             uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
-        let (groups, _) = crate::draw::groups(&props, &[]);
+        let (groups, _) = crate::draw::groups(&props, &[], &Default::default());
         let row = &groups[0].rows[0];
         assert_eq!((row.label.as_str(), row.hint.as_str()), ("evil", "good"));
         let outcome = Handler(state).press("opening", "enter", &props).unwrap();
