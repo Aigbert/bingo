@@ -39,15 +39,14 @@ pub struct Step {
     pub answer: Option<Upshot>,
 }
 
-/// How a turn ended, for its folded line. A line folded from a `failed`
-/// turn does not say so: the line under the turn says why, and a failed step
-/// already says `failed`.
+/// How a turn ended, for its folded line. A failed turn ends `done` here:
+/// the line under the turn says why it failed, and a failed step already says
+/// `failed`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum TurnEnd {
     Done,
     Stopped,
-    Failed,
 }
 
 /// The `Ledger` site: the rows of a running turn's steps.
@@ -476,7 +475,7 @@ mod tests {
     fn a_failed_turn_says_failed_once_on_the_step_that_failed() {
         let fold = TurnFoldProps {
             steps: vec![step("bash", "cargo test", StepState::Failed, None)],
-            outcome: TurnEnd::Failed,
+            outcome: TurnEnd::Done,
             elapsed: 1_000,
             thought: false,
             is_expanded: false,

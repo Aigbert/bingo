@@ -10883,10 +10883,9 @@
       "type": "string",
       "enum": [
         "done",
-        "stopped",
-        "failed"
+        "stopped"
       ],
-      "description": "How a turn ended, for its folded line. A line folded from a `failed`\nturn does not say so: the line under the turn says why, and a failed step\nalready says `failed`."
+      "description": "How a turn ended, for its folded line. A failed turn ends `done` here:\nthe line under the turn says why it failed, and a failed step already says\n`failed`."
     },
     "TurnFoldProps": {
       "type": "object",

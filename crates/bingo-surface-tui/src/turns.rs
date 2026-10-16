@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use bingo_sdk::component::{LedgerProps, Props, Step, StepState, TurnEnd, TurnFoldProps};
 use bingo_sdk::{
-    DecisionKind, Item, ItemBody, ItemId, ItemStatus, SessionState, TurnStatus, Upshot, view::Tone,
+    DecisionKind, Item, ItemBody, ItemId, ItemStatus, SessionState, Upshot, view::Tone,
 };
 
 use crate::ask::receipts::Answers;
@@ -310,14 +310,9 @@ impl Turn<'_> {
             .items
             .iter()
             .any(|item| matches!(item.body, ItemBody::Interruption { .. }));
-        let failed = self.state.last_turn.as_ref().is_some_and(|turn| {
-            Some(&turn.id) == self.items[0].turn.as_ref()
-                && matches!(turn.status, TurnStatus::Failed { .. })
-        });
-        match (stopped, failed) {
-            (true, _) => TurnEnd::Stopped,
-            (false, true) => TurnEnd::Failed,
-            _ => TurnEnd::Done,
+        match stopped {
+            true => TurnEnd::Stopped,
+            false => TurnEnd::Done,
         }
     }
 

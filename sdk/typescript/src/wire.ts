@@ -1413,11 +1413,11 @@ export type Turn = {
 export type Turn2 = { "first": number; "headline"?: (string | null); "id": TurnId; "last": number; [key: string]: unknown; };
 export type TurnDurationProps = { "durationMs": number; "word": string; [key: string]: unknown; };
 /**
- * How a turn ended, for its folded line. A line folded from a `failed`
- * turn does not say so: the line under the turn says why, and a failed step
- * already says `failed`.
+ * How a turn ended, for its folded line. A failed turn ends `done` here:
+ * the line under the turn says why it failed, and a failed step already says
+ * `failed`.
  */
-export type TurnEnd = ("done" | "stopped" | "failed");
+export type TurnEnd = ("done" | "stopped");
 /**
  * The `TurnFold` site: a finished turn as one line. The stop line under a
  * stopped turn is the interruption's own row ([`stop_row`]).
