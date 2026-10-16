@@ -56,12 +56,14 @@ Fixing the flaky tests the audit found (tool-bash 150 ms race, channels "nothing
 
 - Keep both plugin enable/disable rows: they exercise distinct states. The harness wake floor is one second; normal runs retain ten. Tree sequences retain 80 operations; only the case count drops to 256. Empty rustdoc targets are identified by the baseline; SDK and the hello example stay on.
 
-- Keep journal helpers with distinct result types or read-failure behavior; common projections move to CLI support. Five explicit integration targets retain every mounted scenario and the CI `plugin_kit` target name.
+- Keep journal helpers with distinct result types or read-failure behavior; common projections move to CLI support. Six explicit integration targets retain every mounted scenario and the CI `plugin_kit` target name.
 
 - The binary adds the existing `bingo-mod-hello` workspace edge. Its scripted `Harness` supplies board/progress contributions; ordinary `Hello` keeps its immediate switch contract. Publication is serialized through the SDK token, retaining concurrent edits and late row placement without a mirrored state.
 - Legacy demo flags/keys remain parseable with a stderr notice; historical ADR text and persisted demo-name fixtures remain intentionally. No production composition includes the hello harness without both fake-provider switches.
 
 - Keep all 29 event snapshot values as compact `fixtures/record/frames.jsonl` rows, including all three Form cases and the shell item. The record test pins serialization and round-tripping before deleting the old test/snapshot; existing per-variant fixtures remain. Historical milestone references name the old evidence and are not rewritten.
+
+- Keep `session_inspection` as a standalone target. The first full run failed its unchanged child-lock release assertion after consolidation; an isolated rerun passed all four cases. Restore the original isolation from other host tests without weakening the lock contract. The exact transient lock holder was not identified.
 
 ## Verified — 2026-10-16
 
@@ -101,4 +103,6 @@ Brick 10: sdk — check 0; clippy 0; test 0 (231 passed)
           record contract passed before removal; all 29 JSON values identical
 BINGO_UPDATE_SCHEMA=1 cargo test -p <sdk/plugin-rpc/mods> --locked
           all three exit 0; schema/ and sdk/typescript regeneration has no diff
+Brick 8 follow-up: restore standalone session_inspection; workspace fmt,
+         check, clippy and test pass; all four inspection cases pass
 ```

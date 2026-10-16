@@ -136,3 +136,7 @@ path = "tests/cli/main.rs"
 [[test]]
 name = "pty"
 path = "tests/pty/main.rs"
+
+[[test]]
+name = "session_inspection"
+path = "tests/session_inspection.rs"
