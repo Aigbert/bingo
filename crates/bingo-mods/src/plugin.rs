@@ -119,7 +119,7 @@ impl Plugin for ModsPlugin {
             .manager
             .get()
             .ok_or_else(|| PluginError::Failed("module manager unavailable".into()))?;
-        let dollar = crate::dollar::Runtime::install_testing(
+        let dollar = crate::dollar::Runtime::install(
             &host,
             cwd.clone(),
             manager.env(),

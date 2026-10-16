@@ -117,20 +117,6 @@ where
     outcomes
 }
 
-/// One call, alone: what a door outside the turn hands in (ADR-0036 §2). The
-/// same two steps a batch takes for a single call, so nothing about how a
-/// call runs is written twice.
-pub async fn execute_one(
-    call: PendingCall,
-    cancel: &CancellationToken,
-    cx: ToolContext,
-) -> ToolOutcome {
-    if cancel.is_cancelled() {
-        return interrupted(&call);
-    }
-    run_one(&call, cx, cancel, None).await
-}
-
 fn interrupted(pc: &PendingCall) -> ToolOutcome {
     ToolOutcome {
         item: pc.item.clone(),

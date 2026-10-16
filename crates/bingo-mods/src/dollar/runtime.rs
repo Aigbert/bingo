@@ -30,22 +30,7 @@ struct Noun {
     runtime: Arc<Runtime>,
 }
 impl Runtime {
-    pub fn install(
-        host: &HostHandle,
-        root: PathBuf,
-        every_floor: std::time::Duration,
-    ) -> Result<Arc<Self>, KernelError> {
-        Self::install_in(host, root.clone(), &Env::rooted(root), every_floor)
-    }
-    pub fn install_in(
-        host: &HostHandle,
-        root: PathBuf,
-        env: &Env,
-        every_floor: std::time::Duration,
-    ) -> Result<Arc<Self>, KernelError> {
-        Self::install_testing(host, root, env, every_floor, None)
-    }
-    pub(crate) fn install_testing(
+    pub(crate) fn install(
         host: &HostHandle,
         root: PathBuf,
         env: &Env,

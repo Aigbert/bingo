@@ -167,7 +167,6 @@ const KNOWN: &[&str] = &[
     "Box", "panel", "actions", "Button", "Input", "Select", "Link", "Image", "Raster", "Svg",
     "Engine", CUSTOM,
 ];
-pub const READ_ONLY: &[&str] = &["stack", "columns"];
 fn is_false(value: &bool) -> bool {
     !value
 }

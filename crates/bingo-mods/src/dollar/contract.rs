@@ -136,8 +136,14 @@ async fn host_rows_answer_on_the_test_host() {
     let host = host();
     let root = tempfile::tempdir().unwrap();
     let state = Store::new(root.path(), "fixture");
-    let runtime =
-        Runtime::install(&host.handle(), root.path().into(), Duration::from_secs(1)).unwrap();
+    let runtime = Runtime::install(
+        &host.handle(),
+        root.path().into(),
+        &Env::rooted(root.path()),
+        Duration::from_secs(1),
+        None,
+    )
+    .unwrap();
     let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/mods/nouns");
     let engine = Engine::start(&source, "all.ts", json!({}), Limits::default())
         .await

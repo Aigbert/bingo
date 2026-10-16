@@ -15,8 +15,6 @@ type ServiceLookup = Immediate<(String,), Option<Arc<dyn Any + Send + Sync>>>;
 
 type WireLookup = Immediate<(String,), Option<Arc<dyn WireService>>>;
 
-type ServiceOpening = Immediate<(String, Arc<dyn WireService>), Result<(), KernelError>>;
-
 type CompletionScript = Script<(SessionId, Option<TurnId>, Completion), Vec<ModelEvent>>;
 
 #[derive(Default)]
@@ -34,7 +32,6 @@ pub(super) struct Scripts {
     pub signal: Option<Script<(SessionId, String, String, Value), ()>>,
     pub invoke: Option<Script<(SessionId, ToolCall), ToolOutcome>>,
     pub rewind: Option<Script<(SessionId, TurnId), u32>>,
-    pub withdraw: Option<Script<(SessionId, IntentId, ClientIdentity), Input>>,
     pub reconfigure: Option<Script<(SessionId, SessionChange), ()>>,
     pub catalog: CatalogScripts,
 }
@@ -66,7 +63,6 @@ pub(super) struct ImmediateScripts {
     pub gateway_events: Option<Immediate<(), GatewayStream>>,
     pub service_any: Option<ServiceLookup>,
     pub service_wire: Option<WireLookup>,
-    pub open_service: Option<ServiceOpening>,
 }
 
 impl TestHost {
@@ -258,17 +254,6 @@ impl TestHost {
         }));
     }
 
-    /// Override `withdraw`; the call is recorded before this script runs.
-    pub fn on_withdraw<F, Fut>(&self, script: F)
-    where
-        F: Fn(SessionId, IntentId, ClientIdentity) -> Fut + Send + Sync + 'static,
-        Fut: Future<Output = Result<Input, KernelError>> + Send + 'static,
-    {
-        locked(&self.inner.scripts).withdraw = Some(Arc::new(move |(session, intent, who)| {
-            Box::pin(script(session, intent, who))
-        }));
-    }
-
     /// Override `reconfigure`; the call is recorded before this script runs.
     pub fn on_reconfigure<F, Fut>(&self, script: F)
     where
@@ -335,14 +320,5 @@ impl TestHost {
         F: Fn(String) -> Option<Arc<dyn WireService>> + Send + Sync + 'static,
     {
         locked(&self.inner.immediate).service_wire = Some(Arc::new(move |(key,)| script(key)));
-    }
-
-    /// Override `open_service`; the call is recorded before this script runs.
-    pub fn on_open_service<F>(&self, script: F)
-    where
-        F: Fn(String, Arc<dyn WireService>) -> Result<(), KernelError> + Send + Sync + 'static,
-    {
-        locked(&self.inner.immediate).open_service =
-            Some(Arc::new(move |(key, wire)| script(key, wire)));
     }
 }

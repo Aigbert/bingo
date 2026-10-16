@@ -1,6 +1,4 @@
-//! `RemoteKernel`: `HostApi` and `SessionPort` over the wire, so a surface
-//! written against `HostHandle` runs on the far side of a pipe by changing one
-//! constructor (ADR-0007). It is also the black-box harness for the server.
+//! The JSON-RPC reference client, used by the server contract tests.
 
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -11,8 +9,8 @@ use bingo_jsonrpc::{Handler, Peer, PeerError};
 use bingo_sdk::{
     Activation, Answer, Attachment, Catalog, CatalogKind, ClientIdentity, CloseReason, Delivery,
     ErrorCode, Frame, FrameStream, GatewayEvent, GatewayStream, HistoryChunk, HistoryPage, HostApi,
-    HostHandle, Input, IntentId, InteractionId, InterruptScope, KernelError, OpenOptions, Seq,
-    SessionFilter, SessionHandle, SessionId, SessionPort, SessionSelector, SessionSummary,
+    Input, IntentId, InteractionId, InterruptScope, KernelError, OpenOptions, Seq, SessionFilter,
+    SessionHandle, SessionId, SessionPort, SessionSelector, SessionSummary,
 };
 use futures::{FutureExt, Stream};
 use serde::Serialize;
@@ -275,11 +273,6 @@ impl RemoteKernel {
     pub async fn shutdown(&self) -> Result<(), KernelError> {
         let Empty {} = self.connection.call(name::SHUTDOWN, &Empty {}).await?;
         Ok(())
-    }
-
-    /// Hand this kernel to a surface written against `HostHandle`.
-    pub fn into_host(self) -> HostHandle {
-        HostHandle(Arc::new(self))
     }
 }
 

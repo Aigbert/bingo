@@ -146,16 +146,6 @@ impl OpenAiProvider {
         Self::with_credential(http, id, Credential::Key(key), base_url)
     }
 
-    /// The same, over a credential that renews itself.
-    pub fn with_tokens(
-        http: reqwest::Client,
-        source: Arc<TokenSource>,
-        base_url: impl Into<String>,
-    ) -> Self {
-        let id = source.provider().to_string();
-        Self::with_credential(http, id, Credential::Tokens(source), base_url)
-    }
-
     fn with_credential(
         http: reqwest::Client,
         id: impl Into<String>,

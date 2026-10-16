@@ -15,7 +15,6 @@ use std::path::Path;
 use std::process::Stdio;
 
 use bingo_process::Tree;
-use tokio::io::{AsyncWrite, AsyncWriteExt};
 use tokio::process::{ChildStdin, ChildStdout};
 
 use crate::error::AcpError;
@@ -87,13 +86,6 @@ fn drain_stderr(child: &mut Tree) {
         let mut sink = tokio::io::sink();
         let _ = tokio::io::copy(&mut stderr, &mut sink).await;
     });
-}
-
-/// Close the adapter's stdin and let it end on its own terms. `codex-acp`
-/// takes its own child down two seconds after its stdin closes, so asking
-/// first is kinder than the kill that follows when the handle drops.
-pub async fn hang_up(mut writer: impl AsyncWrite + Unpin) {
-    let _ = writer.shutdown().await;
 }
 
 #[cfg(test)]

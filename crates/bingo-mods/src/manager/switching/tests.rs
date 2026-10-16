@@ -157,7 +157,9 @@ fn runtime(manager: &Arc<Manager>) -> Arc<crate::dollar::Runtime> {
     let runtime = crate::dollar::Runtime::install(
         &host.handle(),
         manager.env.home.clone(),
+        &Env::rooted(manager.env.home.clone()),
         std::time::Duration::from_secs(1),
+        None,
     )
     .unwrap();
     manager.host.set(host.handle()).unwrap();

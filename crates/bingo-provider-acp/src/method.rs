@@ -30,13 +30,6 @@ pub const SESSION_SET_CONFIG_OPTION: &str = "session/set_config_option";
 pub const SESSION_SET_MODEL: &str = "session/set_model";
 pub const SESSION_UPDATE: &str = "session/update";
 pub const SESSION_REQUEST_PERMISSION: &str = "session/request_permission";
-pub const FS_READ_TEXT_FILE: &str = "fs/read_text_file";
-pub const FS_WRITE_TEXT_FILE: &str = "fs/write_text_file";
-pub const TERMINAL_CREATE: &str = "terminal/create";
-pub const TERMINAL_OUTPUT: &str = "terminal/output";
-pub const TERMINAL_RELEASE: &str = "terminal/release";
-pub const TERMINAL_WAIT_FOR_EXIT: &str = "terminal/wait_for_exit";
-pub const TERMINAL_KILL: &str = "terminal/kill";
 pub const ELICITATION_CREATE: &str = "elicitation/create";
 
 /// A request this plugin sends and the answer it expects back.
@@ -230,12 +223,12 @@ mod tests {
     #[test]
     fn a_method_the_table_does_not_know_is_unsupported_not_a_crash() {
         assert!(matches!(
-            incoming(FS_READ_TEXT_FILE, serde_json::json!({ "path": "/tmp/x" }))
+            incoming("fs/read_text_file", serde_json::json!({ "path": "/tmp/x" }))
                 .expect("an unknown method is not a parse failure"),
             Incoming::Unsupported
         ));
         assert!(matches!(
-            incoming(TERMINAL_CREATE, Value::Null).expect("nor is a null body"),
+            incoming("terminal/create", Value::Null).expect("nor is a null body"),
             Incoming::Unsupported
         ));
     }

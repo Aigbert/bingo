@@ -40,7 +40,5 @@ pub mod stamp;
 pub mod version;
 
 pub use check::check;
-pub use install::InstallError;
-pub use release::{Asset, Release, ReleaseError};
-pub use settings::{SETTING, Settings, Update, schema, wanted};
-pub use stamp::Stamp;
+pub use release::Release;
+pub use settings::{SETTING, Update};

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bingo_sdk::*;
 
-pub(super) struct Unavailable;
+pub(crate) struct Unavailable;
 
 fn unavailable() -> KernelError {
     KernelError::new(ErrorCode::SessionClosed, "the host is shut down")

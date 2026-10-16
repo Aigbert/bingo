@@ -319,10 +319,6 @@ impl HostApi for TestHost {
             intent: intent.clone(),
             who: who.clone(),
         });
-        let script = locked(&self.inner.scripts).withdraw.clone();
-        if let Some(script) = script {
-            return script((session.clone(), intent.clone(), who)).await;
-        }
         NoHost.withdraw(session, intent, who).await
     }
 
@@ -423,10 +419,6 @@ impl HostApi for TestHost {
             key: key.to_string(),
             wire: wire.clone(),
         });
-        let script = locked(&self.inner.immediate).open_service.clone();
-        if let Some(script) = script {
-            return script((key.to_string(), wire));
-        }
         self.inner
             .services
             .open(key, wire)

@@ -48,7 +48,7 @@ use tokio::sync::broadcast;
 pub(crate) use refresh::Refreshed;
 pub use registry::{Registry, standing};
 use tool_host::SessionToolHost;
-use unavailable::Unavailable;
+pub(crate) use unavailable::Unavailable;
 
 use crate::gate::DefaultPolicy;
 use crate::models::{Learned, ServedModels};

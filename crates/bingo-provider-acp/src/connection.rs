@@ -413,7 +413,7 @@ mod tests {
             .write(json!({
                 "jsonrpc": "2.0",
                 "id": 7,
-                "method": method::FS_READ_TEXT_FILE,
+                "method": "fs/read_text_file",
                 "params": { "sessionId": "s", "path": "/etc/passwd" }
             }))
             .await;

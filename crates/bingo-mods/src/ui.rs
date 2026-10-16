@@ -331,7 +331,9 @@ mod tests {
         crate::dollar::Runtime::install(
             &handle,
             root.path().into(),
+            &Env::rooted(root.path()),
             std::time::Duration::from_secs(1),
+            None,
         )
         .unwrap();
         let ui = handle.service_wire("bingo.plugin.ui").unwrap();
@@ -376,7 +378,9 @@ mod tests {
         crate::dollar::Runtime::install(
             &handle,
             root.path().into(),
+            &Env::rooted(root.path()),
             std::time::Duration::from_secs(1),
+            None,
         )
         .unwrap();
         let ui = handle.service_wire("bingo.plugin.ui").unwrap();

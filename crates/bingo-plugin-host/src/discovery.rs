@@ -41,16 +41,6 @@ pub fn dirs(env: &Env, cwd: &Path) -> Vec<PathBuf> {
     vec![config, project]
 }
 
-/// What the layers hold, by name, the last layer winning. A directory that is
-/// not there is not an error: most people have no plugins.
-pub fn discover(dirs: &[PathBuf], notices: &Notices) -> Vec<Found> {
-    approved(dirs, &[], notices, None)
-}
-
-pub fn with_explicit(dirs: &[PathBuf], explicit: &[PathBuf], notices: &Notices) -> Vec<Found> {
-    approved(dirs, explicit, notices, None)
-}
-
 pub fn approved(
     dirs: &[PathBuf],
     explicit: &[PathBuf],
@@ -222,13 +212,14 @@ mod tests {
         for dir in [&home, &first, &last] {
             plugin(dir.path(), "wordcount", &manifest("wordcount"));
         }
-        let found = with_explicit(
+        let found = approved(
             &[home.path().into()],
             &[
                 first.path().join("wordcount"),
                 last.path().join("wordcount"),
             ],
             &Notices::default(),
+            None,
         );
         assert_eq!(found.len(), 1);
         assert_eq!(found[0].root, last.path().join("wordcount"));
@@ -258,7 +249,7 @@ mod tests {
     #[test]
     fn a_layer_that_is_not_there_finds_nothing_and_says_nothing() {
         let notices = Notices::default();
-        assert!(discover(&[PathBuf::from("/no/such/dir")], &notices).is_empty());
+        assert!(approved(&[PathBuf::from("/no/such/dir")], &[], &notices, None).is_empty());
         assert!(notices.drain().is_empty());
     }
 
@@ -269,9 +260,11 @@ mod tests {
         plugin(config.path(), "wordcount", &manifest("wordcount"));
         plugin(project.path(), "wordcount", &manifest("wordcount"));
         let notices = Notices::default();
-        let found = discover(
+        let found = approved(
             &[config.path().to_path_buf(), project.path().to_path_buf()],
+            &[],
             &notices,
+            None,
         );
         assert_eq!(found.len(), 2);
         assert_eq!(found[0].root, config.path().join("wordcount"));
@@ -287,7 +280,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         std::fs::create_dir_all(dir.path().join("notes")).expect("a plain directory");
         let notices = Notices::default();
-        assert!(discover(&[dir.path().to_path_buf()], &notices).is_empty());
+        assert!(approved(&[dir.path().to_path_buf()], &[], &notices, None).is_empty());
         assert!(notices.drain().is_empty());
     }
 
@@ -296,7 +289,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         plugin(dir.path(), "broken", "{ this is not json");
         let notices = Notices::default();
-        assert!(discover(&[dir.path().to_path_buf()], &notices).is_empty());
+        assert!(approved(&[dir.path().to_path_buf()], &[], &notices, None).is_empty());
         let said = notices.drain();
         assert_eq!(said.len(), 1);
         assert_eq!(said[0].code, "PLUGIN_UNREADABLE");
@@ -307,7 +300,7 @@ mod tests {
         let dir = tempfile::tempdir().expect("a directory");
         plugin(dir.path(), "wordcount", &manifest("linecount"));
         let notices = Notices::default();
-        assert!(discover(&[dir.path().to_path_buf()], &notices).is_empty());
+        assert!(approved(&[dir.path().to_path_buf()], &[], &notices, None).is_empty());
         let said = notices.drain();
         assert_eq!(said.len(), 1);
         assert_eq!(said[0].code, "PLUGIN_MISNAMED");
@@ -318,7 +311,7 @@ mod tests {
     fn what_is_found_is_the_directory_and_the_manifest_in_it() {
         let dir = tempfile::tempdir().expect("a directory");
         plugin(dir.path(), "wordcount", &manifest("wordcount"));
-        let found = discover(&[dir.path().to_path_buf()], &Notices::default());
+        let found = approved(&[dir.path().to_path_buf()], &[], &Notices::default(), None);
         assert_eq!(found[0].name, "wordcount");
         assert_eq!(found[0].root, dir.path().join("wordcount"));
         assert_eq!(found[0].manifest.entry().unwrap().command, "python3");

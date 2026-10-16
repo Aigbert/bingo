@@ -32,7 +32,7 @@ impl Services {
         Self {
             commands: Vec::new(),
             command_sources: Vec::new(),
-            host: Weak::<Unreachable>::new(),
+            host: Weak::<crate::host::Unavailable>::new(),
             drawings: super::Drawings::default(),
         }
     }
@@ -411,69 +411,6 @@ fn named(table: &[Arc<dyn Command>], name: &str) -> Option<Arc<dyn Command>> {
             spec.name == name || spec.aliases.iter().any(|a| a == name)
         })
         .cloned()
-}
-
-/// A host that is never there, for `Services::none`.
-struct Unreachable;
-
-#[async_trait::async_trait]
-impl HostApi for Unreachable {
-    async fn sessions(&self, _: SessionFilter) -> Result<Vec<SessionSummary>, KernelError> {
-        unreachable!("never constructed")
-    }
-    async fn open(
-        &self,
-        _: SessionSelector,
-        _: ClientIdentity,
-        _: OpenOptions,
-    ) -> Result<Attachment, KernelError> {
-        unreachable!("never constructed")
-    }
-    async fn close(&self, _: &SessionId, _: CloseReason) -> Result<(), KernelError> {
-        unreachable!("never constructed")
-    }
-    async fn delete(&self, _: &SessionId) -> Result<(), KernelError> {
-        unreachable!("never constructed")
-    }
-
-    async fn deliver(
-        &self,
-        _to: &SessionId,
-        _intent: IntentId,
-        _input: Input,
-        _delivery: Delivery,
-    ) -> Result<(), KernelError> {
-        unreachable!("never constructed")
-    }
-
-    async fn extend(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("never constructed")
-    }
-
-    async fn signal(
-        &self,
-        _session: &SessionId,
-        _plugin: &str,
-        _kind: &str,
-        _payload: serde_json::Value,
-    ) -> Result<(), KernelError> {
-        unreachable!("never constructed")
-    }
-    async fn catalog(&self, _: CatalogKind) -> Result<Catalog, KernelError> {
-        unreachable!("never constructed")
-    }
-    fn gateway_events(&self) -> GatewayStream {
-        unreachable!("never constructed")
-    }
-    fn service_any(&self, _: &str) -> Option<Arc<dyn std::any::Any + Send + Sync>> {
-        unreachable!("never constructed")
-    }
 }
 
 #[cfg(test)]

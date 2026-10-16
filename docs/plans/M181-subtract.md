@@ -119,3 +119,8 @@ Brick gates use `cargo check -p <crates> --all-targets --locked`, then
 ```text
 Brick 1 (context, surface-tui): check 0; clippy 0; test 0 (1,422 passed, 2 ignored).
 ```
+
+```text
+Brick 2 (core, sdk, provider-acp, provider-openai, surface-rpc, update,
+         mods, plugin-host): check 0; clippy 0; test 0.
+```
