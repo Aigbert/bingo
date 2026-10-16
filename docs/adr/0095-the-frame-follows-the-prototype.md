@@ -38,10 +38,11 @@ every drawing that shows them (status, footer, header, receipts).
    question or form: skip, the model decides, the turn goes on. On an ask set
    aside behind a draft: back to the ask. On a pager or expanded diff: close it,
    nothing else.
-5. **shift+tab** cycles `default → accept edits → plan`. A session that started
-   in a mode outside the three keeps that mode in its cycle, after plan, so the
-   person is never trapped out of the mode they chose. Mode words are shown in
-   plain English, never camelCase.
+5. **shift+tab** cycles `default → accept edits → plan → bypass` (the person,
+   2026-10-16: bypass belongs in the cycle). `dontAsk` joins the cycle only for
+   a session that started in it, after bypass, so nobody is trapped out of the
+   mode they chose. Mode words are plain English, never camelCase; bypass shows
+   in the bad colour so it is never mistaken for default.
 6. **Thinking** is not a transcript row. It folds into the turn's steps and is
    read by expanding the fold or in Browse.
 7. **A stopped turn** prints `■ you stopped the turn · N of M steps had run;

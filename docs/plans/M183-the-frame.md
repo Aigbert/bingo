@@ -25,13 +25,14 @@ layout, glyphs and words, except the `KeyBar` row (M184) and the transcript fold
 4. **Rule and prompt line** replace the rounded box: a `─` rule, then ` ▍ ` and
    the draft; placeholder `ask anything` idle, empty while a turn runs. The
    border breathing goes; the presence colour on `▍` carries it.
-5. **Footer** always shows `⏵⏵ default` / `⏵⏵ accept edits` / `⏸ plan` (or the
-   session's own mode in words), `◆ solo` or the crew faces, `▰▱▱▱▱▱▱▱ 14k /
+5. **Footer** always shows `⏵⏵ default` / `⏵⏵ accept edits` / `⏸ plan`, `⏵⏵ bypass` in
+   the bad colour (or the session's own mode in words), `◆ solo` or the crew faces, `▰▱▱▱▱▱▱▱ 14k /
    200k` (bad colour above 90%), and `model ∴ effort · this session` with a
    1.4 s glow flash on change. The middle slot and the notice line go; repo
    waiting and other-sessions-need-you move to toasts until M184 gives them pairs.
-6. **shift+tab** cycles three modes, plus the start mode if outside them
-   (ADR-0095 §5), in the permissions plugin's `Mode` slot.
+6. **shift+tab** cycles `default → accept edits → plan → bypass`, plus
+   `dontAsk` after bypass only when the session started in it (ADR-0095 §5),
+   in the permissions plugin's `Mode` slot; `/permission` still names all five.
 7. **Narrow widths**: header drops title then branch; footer drops crew, then
    the bar, keeping mode and model.
 
