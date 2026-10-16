@@ -40,7 +40,7 @@ them on their seat. Both use the same SDK contract, never body text parsing.
 - [x] Snapshot per state from the prototype's `_keys.txt` list.
 - [x] A test per mod: no hint text inside its body.
 - [x] tmux drive of five states with captures in Verified.
-- [ ] Gates as in M182: native gates pass; Windows TUI cross-check remains blocked.
+- [x] Gates as in M182: native gates pass; Windows TUI cross-check remains blocked.
 
 ## Non-goals
 
@@ -83,3 +83,26 @@ Windows TUI compilation is unverified: this Mac has no MSVC C headers/toolchain
 Discipline's data-driven snapshot-name warnings are non-fatal; the budget reported
 a 30 GB target directory above its 5 GB soft limit before the required cleanup.
 Cleanup removed both the target symlink and its resolved build directory.
+
+Rebase verified — 2026-10-16: onto dev `c957120a`. Conflicts: palette `draw.rs`
+kept dev's held-key args (no `key_props`) and M184's root `hints`; pty picture tests
+now live in `pictures.rs` (dev), their wait string moved to `/ commands`. Dev's
+eighty-column notice test moved to `keybar/tests.rs`; `HERDR_OFF` reaches the KeyBar
+as a 2.8 s toast. Review fixes: one `KeyBarProps::fitting` brick for host and mod;
+toast keys no longer placed are forgotten again; the busy box is empty as M183 says;
+the smoke waits for the login pane, since the palette's KeyBar also says `↑↓ pick`.
+Private `tmux -L m184v`, temp HOME/cwd, fake provider, 120×40: idle, `/` palette,
+`/model ` args, `/status` pane and the permission ask (sealed: `↑↓ pick · ⏎ answer ·
+esc no, stop the turn`) all one KeyBar row above the footer; 12 sent Up/Down keys
+settled 16–17 ms after the last one.
+
+```text
+exit 0 — cargo fmt --all -- --check
+exit 0 — cargo clippy --workspace --all-targets --locked -- -D warnings
+exit 0 — RUST_TEST_THREADS=4 cargo test --workspace --locked --no-fail-fast: 116 suites, 6191 passed, 0 failed
+exit 0 — scripts/check_discipline.sh: discipline ok (after renaming `room`, a kernel noun)
+exit 0 — scripts/budget.sh: 422/422 dependencies; warm core 1s/20s; budget ok
+exit 0 — cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+exit 0 — TUI_SMOKE_SOCKET_PREFIX=m184v-smoke scripts/tui-smoke.sh: tui-smoke ok, 4 of 4
+exit 0 — cargo check -p bingo-sdk -p bingo-mod-keybar --all-targets --locked --target x86_64-pc-windows-msvc
+```
