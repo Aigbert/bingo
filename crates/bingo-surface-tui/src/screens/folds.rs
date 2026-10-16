@@ -195,3 +195,39 @@ fn an_ended_step_hangs_no_action() {
     assert!(screen.contains("   ✓ bash cargo test -q"), "{screen}");
     assert!(!screen.contains("background"), "{screen}");
 }
+
+/// `ctrl+o` opens the latest folded turn where it stands.
+#[test]
+fn ctrl_o_opens_the_latest_folded_turn() {
+    let (tree, mut ui, now) = finished();
+    draw_tree(80, 24, &tree, &mut ui, now);
+    crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
+    let screen = draw_tree(80, 24, &tree, &mut ui, now);
+    assert!(screen.contains("   ▾ 4 steps"), "{screen}");
+    assert!(screen.contains("   ✓ edit src/main.rs"), "{screen}");
+}
+
+/// A click on the folded line opens it and a second folds it again; `⏎` on
+/// the line the click left held opens it once more.
+#[test]
+fn a_click_or_enter_on_the_folded_line_opens_it() {
+    let (tree, mut ui, now) = finished();
+    let line = |ui: &mut Ui| {
+        let screen = draw_tree(80, 24, &tree, ui, now);
+        (row_carrying(&screen, "4 steps"), screen)
+    };
+    let (row, _) = line(&mut ui);
+    crate::pointer::on_mouse(&mut ui, &tree, click(5, row), now);
+    let (row, opened) = line(&mut ui);
+    assert!(opened.contains("   ▾ 4 steps"), "{opened}");
+    assert!(opened.contains("   ✓ edit src/main.rs"), "{opened}");
+
+    crate::pointer::on_mouse(&mut ui, &tree, click(5, row), now);
+    let (_, shut) = line(&mut ui);
+    assert!(shut.contains("   ▸ 4 steps"), "{shut}");
+    assert!(!shut.contains("✓ edit src/main.rs"), "{shut}");
+
+    crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now);
+    let (_, again) = line(&mut ui);
+    assert!(again.contains("   ▾ 4 steps"), "{again}");
+}
