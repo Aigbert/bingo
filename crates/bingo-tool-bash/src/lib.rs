@@ -172,6 +172,7 @@ impl BashTool {
                 Ok(output::shape(
                     &args.command,
                     &finished.output,
+                    finished.whole,
                     finished.ended,
                 ))
             }

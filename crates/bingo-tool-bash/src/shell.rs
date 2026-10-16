@@ -204,6 +204,7 @@ mod tests {
     fn an_ending_that_reached_no_exit_code_gets_its_own_last_line() {
         let timed_out = run::Run {
             output: "started\n".into(),
+            whole: true,
             ended: Ended::Timeout { after_ms: 120_000 },
         };
         assert_eq!(wrote(&timed_out), "started\n[timed out after 120s]");

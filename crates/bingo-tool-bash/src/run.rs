@@ -45,6 +45,9 @@ const DRAIN: Duration = Duration::from_secs(2);
 #[derive(Debug)]
 pub struct Run {
     pub output: String,
+    /// Whether `output` is everything the command wrote, nothing cut from its
+    /// middle.
+    pub whole: bool,
     pub ended: Ended,
 }
 
@@ -202,8 +205,13 @@ pub async fn conclude(
         }
     };
     drain(running.readers).await;
-    let output = running.sink.lock().await.finish();
-    Ok(Run { output, ended })
+    let sink = running.sink.lock().await;
+    let (output, whole) = (sink.finish(), sink.whole());
+    Ok(Run {
+        output,
+        whole,
+        ended,
+    })
 }
 
 /// `SIGKILL` to the whole group — the wrapper's `start_kill` is a `killpg`, so a

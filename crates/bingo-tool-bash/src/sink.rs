@@ -49,6 +49,15 @@ impl Sink {
         }
     }
 
+    /// Whether [`Sink::finish`] is everything the command wrote. A file is
+    /// read back elsewhere, so a waiting call has none of it.
+    pub fn whole(&self) -> bool {
+        match self {
+            Sink::Buffer(bounded) => bounded.whole(),
+            Sink::File(_) => false,
+        }
+    }
+
     /// Everything a waiting call gets back.
     pub fn finish(&self) -> String {
         match self {

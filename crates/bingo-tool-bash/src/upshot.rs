@@ -6,9 +6,13 @@ use bingo_sdk::Upshot;
 
 use crate::output::Ended;
 
-pub fn upshot(body: &str, ended: Ended) -> Upshot {
+/// `whole` says `body` is everything the command wrote: a count summed over
+/// output cut in the middle would undercount, in good ink.
+pub fn upshot(body: &str, whole: bool, ended: Ended) -> Upshot {
     match ended {
-        Ended::Exited(0) => passed(body)
+        Ended::Exited(0) => whole
+            .then(|| passed(body))
+            .flatten()
             .map(|count| Upshot::good(format!("{count} passed")))
             .unwrap_or_else(|| Upshot::good("ok")),
         Ended::Exited(code) => Upshot::bad(format!("exit {code}")),
@@ -20,19 +24,24 @@ pub fn upshot(body: &str, ended: Ended) -> Upshot {
 /// Tests passed, summed over every summary line a runner printed: cargo's
 /// `test result:` (one per test binary), jest's `Tests:` and pytest's
 /// `=== 3 passed in 0.1s ===`. A line that only mentions the word elsewhere is
-/// not a count.
+/// not a count, and nothing passed is not news.
 fn passed(body: &str) -> Option<u32> {
-    let counts: Vec<u32> = body
+    let total: u32 = body
         .lines()
         .map(str::trim)
         .filter(|line| summary(line))
         .filter_map(count_before_passed)
-        .collect();
-    (!counts.is_empty()).then(|| counts.iter().sum())
+        .sum();
+    (total > 0).then_some(total)
 }
 
 fn summary(line: &str) -> bool {
-    line.starts_with("test result:") || line.starts_with("Tests:") || line.starts_with('=')
+    line.starts_with("test result:") || line.starts_with("Tests:") || pytest(line)
+}
+
+/// pytest's closing rule: the counts between two runs of `=`.
+fn pytest(line: &str) -> bool {
+    line.len() > 2 && line.starts_with("==") && line.ends_with("==")
 }
 
 fn count_before_passed(line: &str) -> Option<u32> {
@@ -65,9 +74,11 @@ mod tests {
             ),
             ("built\n", "ok"),
             ("the 2 passed checks are logged", "ok"),
+            ("= 2 passed, not a rule", "ok"),
+            ("test result: ok. 0 passed; 0 failed; 0 ignored", "ok"),
         ] {
             assert_eq!(
-                upshot(body, Ended::Exited(0)),
+                upshot(body, true, Ended::Exited(0)),
                 Upshot::good(expected),
                 "{body}"
             );
@@ -77,11 +88,26 @@ mod tests {
     #[test]
     fn an_unclean_end_is_bad_news_whatever_the_output_says() {
         let body = "test result: FAILED. 2 passed; 1 failed";
-        assert_eq!(upshot(body, Ended::Exited(101)), Upshot::bad("exit 101"));
         assert_eq!(
-            upshot("", Ended::Timeout { after_ms: 1_000 }),
+            upshot(body, true, Ended::Exited(101)),
+            Upshot::bad("exit 101")
+        );
+        assert_eq!(
+            upshot("", true, Ended::Timeout { after_ms: 1_000 }),
             Upshot::bad("timed out")
         );
-        assert_eq!(upshot("tick", Ended::Interrupted), Upshot::bad("stopped"));
+        assert_eq!(
+            upshot("tick", true, Ended::Interrupted),
+            Upshot::bad("stopped")
+        );
+    }
+
+    /// Output cut in the middle lost summary lines with it: whatever is left
+    /// would undercount, so the step says only that it went well.
+    #[test]
+    fn output_cut_in_the_middle_is_not_counted() {
+        let body = "test result: ok. 3 passed; 0 failed\n[… 9 chars truncated …]\n\
+                    test result: ok. 2 passed; 0 failed";
+        assert_eq!(upshot(body, false, Ended::Exited(0)), Upshot::good("ok"));
     }
 }

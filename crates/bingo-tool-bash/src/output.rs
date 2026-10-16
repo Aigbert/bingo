@@ -74,6 +74,12 @@ impl Bounded {
         out
     }
 
+    /// Whether everything that arrived was kept: nothing fell out between the
+    /// head and the tail.
+    pub fn whole(&self) -> bool {
+        self.total <= self.head_max + self.tail_max
+    }
+
     /// The last `n` lines collected so far, for the progress tail. The first of
     /// them is a fragment once the output has outgrown the buffer.
     pub fn tail_lines(&self, n: usize) -> String {
@@ -111,8 +117,9 @@ pub enum Ended {
 
 /// The command as it was asked for, what it wrote, and one line saying how it
 /// ended. Anything but a clean exit is an error result, because the output is
-/// not the answer the model asked for.
-pub fn shape(command: &str, output: &str, ended: Ended) -> ToolOutput {
+/// not the answer the model asked for. `whole` says nothing was cut from the
+/// middle of `output`, so a count read from it is the command's own.
+pub fn shape(command: &str, output: &str, whole: bool, ended: Ended) -> ToolOutput {
     let footer = match ended {
         Ended::Exited(code) => format!("[Exited with code {code}]"),
         Ended::Timeout { after_ms } => format!("[Killed after {}s timeout]", seconds(after_ms)),
@@ -126,7 +133,7 @@ pub fn shape(command: &str, output: &str, ended: Ended) -> ToolOutput {
         ToolOutput::error(text)
     };
     result.display = Some(bingo_sdk::View::text(display(body, ended)));
-    result.with_upshot(crate::upshot::upshot(body, ended))
+    result.with_upshot(crate::upshot::upshot(body, whole, ended))
 }
 
 fn display(body: &str, ended: Ended) -> String {
@@ -205,7 +212,7 @@ mod tests {
                 "$ sleep 5\ntick\n[Killed by the interrupt; output so far]",
             ),
         ] {
-            let out = shape(command, text, ended);
+            let out = shape(command, text, true, ended);
             assert_eq!(out.parts[0].as_text(), Some(expected), "{command}");
             assert_eq!(out.is_error, error, "{command}");
             let tone = out.outcome().map(|upshot| match upshot {
@@ -232,12 +239,12 @@ mod tests {
             (Ended::Interrupted, "hi\n[interrupted]"),
         ] {
             assert_eq!(
-                shape("echo hi", "hi\n", end).display,
+                shape("echo hi", "hi\n", true, end).display,
                 Some(bingo_sdk::View::text(expected))
             );
         }
         assert_eq!(
-            shape("true", "", Ended::Exited(0)).display,
+            shape("true", "", true, Ended::Exited(0)).display,
             Some(bingo_sdk::View::text(String::new()))
         );
     }
@@ -275,6 +282,12 @@ mod tests {
         assert!(out.starts_with(&text[..50]), "{out}");
         assert!(out.ends_with(&text[150..]), "{out}");
         assert!(out.contains("[… 100 chars truncated …]"), "{out}");
+    }
+
+    #[test]
+    fn output_is_whole_until_something_falls_out_of_its_middle() {
+        assert!(collect(100, &"x".repeat(100)).whole());
+        assert!(!collect(100, &"x".repeat(101)).whole());
     }
 
     #[test]
