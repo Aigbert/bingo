@@ -129,7 +129,8 @@ Submit `/model` to open the model picker with the current model selected;
 effort, * toggles the pin, Tab keeps, Enter uses, Escape backs out; Alt+M cycles pins, Alt+T efforts.
 Unpinning keeps the same model selected in its provider group and shows a brief toast.
 Enter on a filter nothing matches uses that name, on the current model's
-provider when it names none. `/guide models` explains provider setup.
+provider when it names none. `/login` opens the provider list with an unsigned
+provider selected when available; one Escape closes it. `/guide models` explains setup.
 `/model openai/gpt-5.4` tries a model in this session; `--keep` also saves it for
 new sessions. Project and command-line settings win; `--model` and `--provider` write none.
 

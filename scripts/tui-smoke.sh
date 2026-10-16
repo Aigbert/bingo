@@ -172,6 +172,16 @@ keys Escape
 vanish '↑↓ pick'
 finish
 
+step 'login opens one pane and one escape closes it'
+start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
+keys '/login' Enter
+await '↑↓ pick'
+keys Escape
+vanish '↑↓ pick'
+keys 'composer returned'
+await '> composer returned'
+finish
+
 step 'esc interrupts a turn that is still waiting'
 start '{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"too late"}]}]}'
 keys 'wait for it' Enter

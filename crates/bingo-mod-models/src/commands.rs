@@ -134,17 +134,34 @@ async fn opening(
         .find(|r| r.model() == Some(current.as_str()))
         .map(crate::rows::Row::key);
     crate::keys::keep_cursor(&mut picker, &rows);
-    if matches!(name, "login" | "logout")
-        && let Some(provider) = providers
-            .iter()
-            .find(|p| p.id == args)
-            .or_else(|| {
-                providers
-                    .iter()
-                    .find(|p| current.split_once('/').is_some_and(|(id, _)| p.id == id))
-            })
-            .or_else(|| providers.first())
-    {
+    start_provider(&mut picker, &providers, &current, name);
+    Ok((picker, providers))
+}
+
+fn start_provider(
+    picker: &mut crate::state::Picker,
+    providers: &[CatalogEntry],
+    current: &str,
+    name: &str,
+) {
+    if !matches!(name, "login" | "logout") {
+        return;
+    }
+    let provider = providers
+        .iter()
+        .find(|p| name == "login" && crate::label::reach(p) == crate::label::Reach::Missing)
+        .or_else(|| {
+            providers
+                .iter()
+                .find(|p| current.split_once('/').is_some_and(|(id, _)| p.id == id))
+        })
+        .or_else(|| providers.first());
+    let Some(provider) = provider else {
+        return;
+    };
+    if name == "login" {
+        picker.props.selected = Some(crate::rows::Row::Provider(provider.id.clone()).key());
+    } else {
         picker.sheet = Some(crate::sheet::Sheet::Manage {
             provider: provider.id.clone(),
             selected: 0,
@@ -152,7 +169,6 @@ async fn opening(
             confirm: false,
         });
     }
-    Ok((picker, providers))
 }
 
 #[cfg(test)]
@@ -167,5 +183,51 @@ mod tests {
         assert!(filters("openai/"), "a provider prefix filters");
         assert!(!filters("/"));
         assert!(!filters("/gpt-5"));
+    }
+    #[tokio::test]
+    async fn login_opens_on_an_unsigned_provider_and_one_escape_closes_it() {
+        let (host, command) = crate::test_support::host();
+        let (models, mut providers) = crate::test_support::entries();
+        providers.push(CatalogEntry {
+            id: "unsigned".into(),
+            label: "unsigned".into(),
+            meta: json!({"auth":{"kind":"missing"}}),
+        });
+        host.on_catalog(move |kind| {
+            let entries = if kind == CatalogKind::Models {
+                models.clone()
+            } else {
+                providers.clone()
+            };
+            async move { Ok(Catalog { kind, entries }) }
+        });
+        let cx = HookContext {
+            session: command.session.clone(),
+            cwd: command.cwd.clone(),
+            host: command.host.clone(),
+            item: None,
+            turn: None,
+            provider: None,
+            model: None,
+        };
+        let (picker, _) = opening("login", "", &cx).await.unwrap();
+        assert!(picker.sheet.is_none(), "login starts at the provider list");
+        assert_eq!(picker.props.selected.as_deref(), Some("provider:unsigned"));
+        let shared = crate::Shared::default();
+        shared
+            .lock()
+            .unwrap()
+            .insert(command.session.clone(), picker.clone());
+        crate::keys::Handler(shared.clone())
+            .run(
+                &json!({"handler":picker.id,"event":"press","value":{"key":"esc"}}).to_string(),
+                &command,
+            )
+            .await
+            .unwrap();
+        assert!(shared.lock().unwrap().is_empty());
+        assert!(host.calls().iter().any(|call| matches!(call,
+            testing::HostCall::Signal { kind, payload, .. } if kind == "picker" && payload.is_null()
+        )));
     }
 }

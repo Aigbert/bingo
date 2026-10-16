@@ -104,3 +104,6 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
   includes viewport height so a smaller drawing keeps its selected row visible.
   The supplied settled filtered captures already show a cursor; the failing
   regression covers height reuse, rather than claiming those frames lack one.
+- Bare `/login` starts at the provider list, preferring an unsigned provider,
+  then the current provider, then the first. Enter opens its management sheet;
+  Escape at the list closes the picker. Argument-based sign-in remains explicit.
