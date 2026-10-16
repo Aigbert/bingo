@@ -231,11 +231,13 @@ impl PermissionPolicy for PermissionsPolicy {
         bingo_sdk::slot::with(
             payload,
             [bingo_sdk::slot::Slot::Mode {
-                current: self.mode_for(session).to_string(),
-                modes: Mode::ALL
+                current: self.mode_for(session).label().to_string(),
+                modes: self
+                    .mode
+                    .cycle()
                     .iter()
                     .map(|mode| bingo_sdk::ActionItem {
-                        label: mode.to_string(),
+                        label: mode.label().to_string(),
                         key: None,
                         action: bingo_sdk::Action {
                             name: "permission".into(),
@@ -353,9 +355,9 @@ mod tests {
             panic!("mode")
         };
         assert_eq!(current, "default");
-        assert_eq!(modes.len(), Mode::ALL.len());
+        assert_eq!(modes.len(), Mode::Default.cycle().len());
         for (item, mode) in modes.iter().zip(Mode::ALL) {
-            assert_eq!(item.label, mode.as_str());
+            assert_eq!(item.label, mode.label());
             assert_eq!(item.action.name, "permission");
             assert_eq!(item.action.args, json!(mode));
         }

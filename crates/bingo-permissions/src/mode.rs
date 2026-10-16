@@ -32,6 +32,29 @@ impl Mode {
         Self::DontAsk,
     ];
 
+    pub fn cycle(self) -> Vec<Self> {
+        let mut modes = vec![
+            Self::Default,
+            Self::AcceptEdits,
+            Self::Plan,
+            Self::BypassPermissions,
+        ];
+        if !modes.contains(&self) {
+            modes.push(self);
+        }
+        modes
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::AcceptEdits => "accept edits",
+            Self::Plan => "plan",
+            Self::BypassPermissions => "bypass",
+            Self::DontAsk => "don't ask",
+        }
+    }
+
     pub(crate) fn tightens(self, before: Self) -> bool {
         self == before
             || matches!(
@@ -110,6 +133,32 @@ impl FromStr for Mode {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_cycle_always_includes_bypass_and_retains_a_dont_ask_start() {
+        assert_eq!(
+            Mode::Default.cycle(),
+            vec![
+                Mode::Default,
+                Mode::AcceptEdits,
+                Mode::Plan,
+                Mode::BypassPermissions
+            ]
+        );
+        {
+            let start = Mode::DontAsk;
+            assert_eq!(
+                start.cycle(),
+                vec![
+                    Mode::Default,
+                    Mode::AcceptEdits,
+                    Mode::Plan,
+                    Mode::BypassPermissions,
+                    start
+                ]
+            );
+        }
+    }
 
     #[test]
     fn a_mode_reads_back_from_its_own_name() {
