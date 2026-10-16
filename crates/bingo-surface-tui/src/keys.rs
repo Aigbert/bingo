@@ -7,81 +7,66 @@ pub struct Binding {
     /// The chord, lowercase and `+`-joined; ` · ` separates alternatives.
     pub keys: &'static str,
     pub description: &'static str,
-    pub group: &'static str,
 }
 
 /// In the order the panel lists them.
 pub const BINDINGS: &[Binding] = &[
     Binding {
         keys: "ctrl+f",
-        group: "move",
         description: "line search / browse",
     },
     Binding {
         keys: "/",
-        group: "sessions",
-        description: "commands in the palette",
+        description: "commands, in this list",
     },
     Binding {
         keys: "enter",
-        group: "write",
         description: "send · open focused block",
     },
     Binding {
         keys: "shift+enter",
-        group: "write",
         description: "newline (ctrl+j · alt+enter · \\ enter)",
     },
     Binding {
         // The stack of [`ESCAPES`], in the order it is obeyed; a test holds
         // the two together.
         keys: "esc",
-        group: "turn",
         description: "sheet → card → dropdown → interrupt",
     },
     Binding {
         keys: "esc esc",
-        group: "turn",
         description: "rewind to an earlier turn",
     },
     Binding {
         keys: "ctrl+c",
-        group: "turn",
         description: "stop · clear · twice exits",
     },
     Binding {
         keys: "ctrl+d",
-        group: "turn",
         description: "exit on an empty input",
     },
     Binding {
         keys: "up/down",
-        group: "move",
         description: "history at first/last input line",
     },
     Binding {
         keys: "down",
-        group: "sessions",
         description: "next history entry",
     },
     Binding {
         keys: "ctrl+a/e",
-        group: "write",
         description: "line start/end (home · end)",
     },
     Binding {
         keys: "alt+b/f",
-        group: "write",
         description: "move one word",
     },
     Binding {
         keys: "ctrl+w/u/k",
-        group: "write",
         description: "delete word · to start · to end",
     },
     Binding {
         keys: "pgup/pgdn",
-        group: "move",
         description: "scroll the transcript",
     },
     Binding {
@@ -91,54 +76,44 @@ pub const BINDINGS: &[Binding] = &[
         // whole transcript, reaching what has scrolled away — and the page
         // says what holding it past an edge does.
         keys: "v · drag",
-        group: "move",
         description: "select; arrows/drag extend; y/ctrl+c/release copy",
     },
     Binding {
         keys: "ctrl+r",
-        group: "sessions",
-        description: "sessions in the palette",
+        description: "sessions, in this list",
     },
     Binding {
         keys: "ctrl+t",
-        group: "turn",
-        description: "show/hide tasks",
+        description: "tasks band on and off",
     },
     Binding {
         // The stack of [`TABS`], in the order it is obeyed; a test holds the
         // two together.
         keys: "tab",
-        group: "turn",
         description: "complete → queue → next row",
     },
     Binding {
         keys: "shift+tab",
-        group: "turn",
         description: "cycle permission mode",
     },
     Binding {
         keys: "1-9 · y/a/n",
-        group: "turn",
         description: "answer the open dialog",
     },
     Binding {
         keys: "ctrl+e",
-        group: "turn",
         description: "expand preview",
     },
     Binding {
         keys: "alt+p",
-        group: "move",
         description: "cycle pane place",
     },
     Binding {
         keys: "ctrl+o",
-        group: "move",
         description: "expand result · then all",
     },
     Binding {
         keys: "ctrl+b",
-        group: "turn",
         description: "background running command",
     },
     Binding {
@@ -146,13 +121,11 @@ pub const BINDINGS: &[Binding] = &[
         // tmux it wants `set -g mouse on`, and without it a click is the
         // multiplexer's own (M56).
         keys: "click",
-        group: "move",
         description: "a picture · open it",
     },
     Binding {
         keys: "?",
-        group: "sessions",
-        description: "keys in the palette",
+        description: "keys, in this list",
     },
 ];
 

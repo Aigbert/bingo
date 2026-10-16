@@ -57,7 +57,7 @@ where you are, the window used against the whole, and the model.
 - `/ · !` — `/` opens commands in the palette; `!` runs a shell line in the session's directory.
 - `click` — on a picture, open it. Mouse reporting has to reach us at all:
   inside tmux that wants `set -g mouse on`.
-- `?` — keys in the palette; type to search commands and sessions too.
+- `?` — keys in the palette; type to search commands, skills, sessions and keys together.
 
 ## The composer
 

@@ -79,12 +79,7 @@ fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
     PaletteProps {
         key_hints: crate::keys::BINDINGS
             .iter()
-            .map(|binding| {
-                (
-                    binding.keys.into(),
-                    format!("{} · {}", binding.group, binding.description),
-                )
-            })
+            .map(|binding| (binding.keys.into(), binding.description.into()))
             .collect(),
         query: ui.composer.text().into(),
         open: open.first,
