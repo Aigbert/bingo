@@ -10,6 +10,9 @@
 // An integration test is not `cfg(test)`; the test-only lint relief is spelled
 // out.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+// The scenes and helpers only the picture tests use are unused where those
+// tests do not run ([`pictures`]).
+#![cfg_attr(not(unix), allow(dead_code))]
 
 use std::io::{Read, Write};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -27,6 +30,11 @@ mod isolated;
 
 mod look;
 
+/// Only a unix terminal is asked about pictures (the surface's
+/// `terminal::probe::exchange`), so on Windows no answer is ever read, no
+/// picture is ever drawn and no notice is ever said: these scenes could not
+/// pass there, and are not run there.
+#[cfg(unix)]
 mod pictures;
 
 /// How long any one wait may take before the run is called stalled.

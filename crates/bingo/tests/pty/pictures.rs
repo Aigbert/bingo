@@ -346,8 +346,7 @@ fn ghostty_draws_a_picture_an_answer_named_under_home() {
 
 /// A herdr pane with `kitty_graphics` on says `OK` and a bare `libghostty`,
 /// and never its cell — but its window has pixels, and the cell is read from
-/// them. A pty's pixel size is a unix ioctl; ConPTY has none.
-#[cfg(unix)]
+/// them.
 #[test]
 fn a_herdr_pane_that_draws_pictures_is_sent_the_picture() {
     let mut terminal = Terminal::opened(&[], READS_A_PICTURE, Answers::HerdrOn);
