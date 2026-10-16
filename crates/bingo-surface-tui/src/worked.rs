@@ -162,7 +162,7 @@ mod tests {
             now,
             "Worked for",
         );
-        assert!(done.contains("Worked for 15m 11s · done "), "{done}");
+        assert!(done.contains("Worked for 15m 11s · done 22:28"), "{done}");
         assert!(!done.contains('('), "no key, no token count: {done}");
 
         let stopped = bingo_sdk::TurnStatus::Interrupted {

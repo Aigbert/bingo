@@ -15,6 +15,17 @@
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
+use jiff::tz::TimeZone;
+
+/// The zone a wall-clock time is said in: the terminal's own. Under test it is
+/// UTC, so a snapshot that shows an hour reads the same on every machine.
+pub fn zone() -> TimeZone {
+    if cfg!(test) {
+        TimeZone::UTC
+    } else {
+        TimeZone::system()
+    }
+}
 
 /// One frame of motion: thirty a second (§6).
 pub const FRAME: Duration = Duration::from_millis(33);

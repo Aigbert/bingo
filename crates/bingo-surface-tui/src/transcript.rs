@@ -919,7 +919,7 @@ pub(crate) fn component_closing(
             let when = state
                 .last_turn
                 .as_ref()
-                .map(|turn| crate::worked::words(turn, now.wall, &jiff::tz::TimeZone::system()).1)
+                .map(|turn| crate::worked::words(turn, now.wall, &crate::clock::zone()).1)
                 .unwrap_or_default();
             vec![Line::from(Span::styled(
                 format!(
