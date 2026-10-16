@@ -26,6 +26,7 @@ use crate::views;
 
 mod interaction;
 mod mode;
+mod turn;
 
 pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
@@ -239,7 +240,7 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
         return;
     };
     if let Some(line) = ui.shown.blocks.roles().line_of(state, &id) {
-        open_turn(ui, tree, now, line);
+        turn::open(ui, tree, now, line);
         return;
     }
     let Some(item) = item_of(state, &id) else {
@@ -251,21 +252,6 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
         }
         None => {
             pager::open_block(ui, tree, now, Some(&id));
-        }
-    }
-}
-
-/// A finished turn opens under its line: its steps, what they brought back,
-/// its thoughts. Opened, the next press takes the line's own step whole into
-/// the pager, as `ctrl+o` always goes one way.
-fn open_turn(ui: &mut Ui, tree: &Tree, now: Now, line: bingo_sdk::ItemId) {
-    let opened = ui.folds.get(&line) == Some(&fold::Fold::Open);
-    match opened {
-        true => {
-            pager::open_block(ui, tree, now, Some(&line));
-        }
-        false => {
-            ui.folds.insert(line, fold::Fold::Open);
         }
     }
 }
@@ -832,7 +818,7 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     if ui.composer.is_empty()
         && let Some(block) = ui.select.block.clone()
     {
-        if let Some(line) = folded_line(ui, tree, &block) {
+        if let Some(line) = turn::folded_line(ui, tree, &block) {
             ui.folds.insert(line, fold::Fold::Open);
             return Vec::new();
         }
@@ -854,14 +840,6 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         Delivery::Wake
     };
     submit(ui, tree, now, delivery)
-}
-
-/// The folded line `⏎` on the held block opens: the block is that line, and
-/// its turn is not opened yet.
-fn folded_line(ui: &Ui, tree: &Tree, block: &bingo_sdk::ItemId) -> Option<bingo_sdk::ItemId> {
-    let line = ui.shown.blocks.roles().line_of(tree.viewed(), block)?;
-    let shut = &line == block && ui.folds.get(&line) != Some(&fold::Fold::Open);
-    shut.then_some(line)
 }
 
 /// A line a key or a panel runs for the person: it does what their typed
