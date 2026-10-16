@@ -128,11 +128,13 @@ fn searched(groups: &mut [Group], query: &str) {
         groups[commands..=skills].rotate_right(1);
     }
 }
-/// How well a row answers the query, lower first: the exact name, then a
-/// match in the name, then one in the description.
-fn score(row: &Row, query: &str) -> (bool, bool) {
+/// Lower is better: the name itself, then a name it begins, then any match
+/// in the name before one in the description alone.
+fn score(row: &Row, query: &str) -> (bool, bool, bool) {
+    let name = row.label.trim_start_matches('/');
     (
-        row.label.trim_start_matches('/') != query,
+        name != query,
+        !name.starts_with(query),
         row.marks.is_empty(),
     )
 }

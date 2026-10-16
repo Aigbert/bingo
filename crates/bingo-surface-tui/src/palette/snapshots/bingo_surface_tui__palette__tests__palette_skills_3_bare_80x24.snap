@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/palette/tests.rs
+expression: screen
+---
+" bingo▍ /tmp/project                                                 session 1  "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"────────────────────────────────────────────────────────────────────────────────"
+" ▍ /                                                                            "
+"   commands                                                                     "
+" ❯ /model        choose model                                       fake/small  "
+"   /think        choose think                                             high  "
+"   /permission   choose permission                                     default  "
+"   /rename       choose rename                                   Release notes  "
+"   /resume       choose resume                                                  "
+"   /clear        start a fresh session here                                     "
+"   /exit         leave bingo                                                    "
+"   skills                                                                       "
+"   ▸ 2 skills · 1 guide                                                         "
+"   type to search commands, skills, sessions and keys together                  "

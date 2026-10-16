@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/palette/tests.rs
+expression: screen
+---
+" bingo▍ /tmp/project                                                 session 1  "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"────────────────────────────────────────────────────────────────────────────────"
+" ▍ /d                                                                           "
+"   skills                                                                       "
+" ❯ /deploy          ship the current branch to staging                 project  "
+"   /standup         write today's standup from the git log               yours  "
+"   guide › memory   how memory is kept and recalled                             "
+"   commands                                                                     "
+"   /model   choose model                                            fake/small  "
+"   this conversation                                                            "
+"   ◆ project  idle                                                    this one  "
+"   keys                                                                         "
+"   shift+tab     turn · cycle permission mode                          default  "
+"   /             sessions · commands in the palette                             "
+"   esc           turn · sheet → card → dropdown → interrupt                     "

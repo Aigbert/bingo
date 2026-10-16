@@ -228,6 +228,65 @@ async fn prototype_scenarios_at_both_sizes() {
         }
     }
 }
+/// `count` skills on the shelves a person has, a plugin's guide among the
+/// first three.
+fn skills(ui: &mut Ui, count: usize) {
+    const NAMED: [(&str, &str, &str); 3] = [
+        ("deploy", "ship the current branch to staging", "project"),
+        ("standup", "write today's standup from the git log", "yours"),
+        ("guide-memory", "how memory is kept and recalled", "guide"),
+    ];
+    let skills = (0..count).map(|n| match NAMED.get(n) {
+        Some((name, hint, shelf)) => ((*name).to_owned(), (*hint).to_owned(), *shelf),
+        None => (
+            format!("docs-{n:02}"),
+            format!("write the docs page number {n} from its outline"),
+            "project",
+        ),
+    });
+    ui.catalogs
+        .commands
+        .extend(skills.map(|(name, hint, shelf)| {
+            serde_json::from_value::<bingo_sdk::CommandSpec>(json!({
+                "name": name,
+                "hint": hint,
+                "args": {"kind": "free", "hint": ""},
+                "family": format!("skill/{shelf}"),
+            }))
+            .unwrap()
+        }));
+}
+#[tokio::test]
+async fn the_skills_group_at_zero_three_and_twenty() {
+    for (width, height) in [(108, 30), (80, 24)] {
+        for count in [0, 3, 20] {
+            for (name, query) in [("bare", "/"), ("search", "/d")] {
+                let fixture = Fixture::new();
+                let (state, mut ui, now) = setup();
+                skills(&mut ui, count);
+                open(&mut ui, PaletteOpen::Commands, now);
+                ui.composer.set(query);
+                let screen = fixture.paint(&mut ui, &state, now, width, height).await;
+                let reachable = count == 0 || screen.contains("skill");
+                assert!(reachable, "every skill stays reachable from /: {screen}");
+                insta::assert_snapshot!(
+                    format!("palette_skills_{count}_{name}_{width}x{height}"),
+                    screen
+                );
+            }
+        }
+    }
+}
+#[tokio::test]
+async fn a_query_nothing_matches_says_so() {
+    let fixture = Fixture::new();
+    let (state, mut ui, now) = setup();
+    open(&mut ui, PaletteOpen::Commands, now);
+    ui.composer.set("/zz");
+    let screen = fixture.paint(&mut ui, &state, now, 80, 24).await;
+    assert!(screen.contains("nothing matches “zz”"), "{screen}");
+    insta::assert_snapshot!("palette_nothing_matches_80x24", screen);
+}
 #[tokio::test]
 async fn search_arguments_escape_and_resume_use_the_same_site() {
     let fixture = Fixture::new();
