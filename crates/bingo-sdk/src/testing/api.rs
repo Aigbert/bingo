@@ -348,7 +348,7 @@ impl HostApi for TestHost {
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
         self.record(HostCall::Catalog { kind });
-        let script = locked(&self.inner.scripts).catalog.clone();
+        let script = locked(&self.inner.scripts).catalog.read.clone();
         if let Some(script) = script {
             return script((kind,)).await;
         }
@@ -364,7 +364,7 @@ impl HostApi for TestHost {
             session: session.clone(),
             kind,
         });
-        let script = locked(&self.inner.scripts).catalog_for.clone();
+        let script = locked(&self.inner.scripts).catalog.for_session.clone();
         if let Some(script) = script {
             return script((session.clone(), kind)).await;
         }

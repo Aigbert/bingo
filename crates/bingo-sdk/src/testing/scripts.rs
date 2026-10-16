@@ -36,8 +36,13 @@ pub(super) struct Scripts {
     pub rewind: Option<Script<(SessionId, TurnId), u32>>,
     pub withdraw: Option<Script<(SessionId, IntentId, ClientIdentity), Input>>,
     pub reconfigure: Option<Script<(SessionId, SessionChange), ()>>,
-    pub catalog: Option<Script<(CatalogKind,), Catalog>>,
-    pub catalog_for: Option<Script<(SessionId, CatalogKind), Catalog>>,
+    pub catalog: CatalogScripts,
+}
+
+#[derive(Default)]
+pub(super) struct CatalogScripts {
+    pub read: Option<Script<(CatalogKind,), Catalog>>,
+    pub for_session: Option<Script<(SessionId, CatalogKind), Catalog>>,
 }
 
 #[derive(Default)]
@@ -281,7 +286,8 @@ impl TestHost {
         F: Fn(CatalogKind) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Catalog, KernelError>> + Send + 'static,
     {
-        locked(&self.inner.scripts).catalog = Some(Arc::new(move |(kind,)| Box::pin(script(kind))));
+        locked(&self.inner.scripts).catalog.read =
+            Some(Arc::new(move |(kind,)| Box::pin(script(kind))));
     }
 
     /// Override `catalog_for`; the call is recorded before this script runs.
@@ -290,7 +296,7 @@ impl TestHost {
         F: Fn(SessionId, CatalogKind) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<Catalog, KernelError>> + Send + 'static,
     {
-        locked(&self.inner.scripts).catalog_for = Some(Arc::new(move |(session, kind)| {
+        locked(&self.inner.scripts).catalog.for_session = Some(Arc::new(move |(session, kind)| {
             Box::pin(script(session, kind))
         }));
     }
