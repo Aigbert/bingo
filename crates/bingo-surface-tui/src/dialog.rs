@@ -6,6 +6,7 @@
 //! interaction is still in `state.interactions`, so the dialog stays on screen
 //! with a `…` marker until `InteractionResolved` removes it.
 
+use bingo_sdk::component::{Step, StepState};
 use bingo_sdk::{
     Activation, Answer, AnswerSpec, Interaction, InteractionId, InteractionKind, LoginFlow,
     Preview, Question,
@@ -312,7 +313,7 @@ pub fn rows(
         out.extend(answering(dialog));
         return out;
     }
-    let mut out = vec![(title(dialog, interaction, agent), None)];
+    let mut out = vec![(title(interaction, agent, cwd, width), None)];
     let mut preview = body(dialog, interaction);
     let limit = room.saturating_sub(options(interaction).len() + 5).max(3);
     if preview.len() > limit {
@@ -377,21 +378,31 @@ fn answering(dialog: &Dialog) -> Vec<(Line<'static>, Option<usize>)> {
     )]
 }
 
-/// What kind of card this is, in one word a person reads first. A form draws
-/// its own head, which is the tab row (see [`form::rows`]).
-fn title(_dialog: &Dialog, interaction: &Interaction, agent: Option<&str>) -> Line<'static> {
-    if matches!(interaction.kind, InteractionKind::Permission { .. }) {
-        return Line::from(Span::styled(
-            format!(
-                "   {} {}{} · needs you",
-                theme::row_mark('◆'),
-                named(interaction),
-                agent.map(|name| format!(" · {name}")).unwrap_or_default()
-            ),
-            theme::presence(),
-        ));
+/// What kind of card this is, in the words a person reads first. A
+/// permission is the row of the step that asks, which is where it opened; a
+/// form draws its own head, which is the tab row (see [`form::rows`]).
+fn title(interaction: &Interaction, agent: Option<&str>, cwd: &str, width: usize) -> Line<'static> {
+    if let InteractionKind::Permission { tool, input, .. } = &interaction.kind {
+        return crate::transcript::asked(&asking(tool, input, agent, cwd), width);
     }
     Line::from(form::head(&named(interaction), agent))
+}
+
+/// The step a permission asks about, in its row's words.
+fn asking(tool: &str, input: &serde_json::Value, agent: Option<&str>, cwd: &str) -> Step {
+    let target = crate::transcript::summarize(input);
+    let target = shorten(target.lines().next().unwrap_or_default(), cwd);
+    Step {
+        verb: crate::turns::verb(tool),
+        target: match agent {
+            Some(name) if target.is_empty() => format!("\u{b7} {name}"),
+            Some(name) => format!("{target} \u{b7} {name}"),
+            None => target,
+        },
+        state: StepState::Asked,
+        upshot: None,
+        answer: None,
+    }
 }
 
 fn named(interaction: &Interaction) -> String {

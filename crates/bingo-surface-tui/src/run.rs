@@ -1178,7 +1178,7 @@ mod tests {
             "the tree's handle routes an answer to whoever asked"
         );
         assert!(
-            harness.recorder.last().contains("Edit · reviewer"),
+            harness.recorder.last().contains("edit · reviewer"),
             "the dialog names the child: {}",
             harness.recorder.last()
         );

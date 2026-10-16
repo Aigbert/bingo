@@ -34,6 +34,7 @@ mod pictured;
 mod ran;
 /// A turn's parts at column 3: its steps, its folded line, its stop line.
 mod steps;
+pub(crate) use steps::asked;
 /// The rows a thought draws, one of them or a run of them (§4, §6).
 mod thinking;
 

@@ -53,7 +53,13 @@ pub fn splice(
         drawing.rows.insert(
             0,
             (
-                Line::from(Span::styled("   ◆ asks you · needs you", theme::presence())),
+                Line::from(Span::styled(
+                    format!(
+                        "   {} asks you · needs you",
+                        theme::glyphs().chrome.steps[1]
+                    ),
+                    theme::presence(),
+                )),
                 None,
             ),
         );

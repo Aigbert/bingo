@@ -1,10 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/ask/tests/mod.rs
+assertion_line: 109
 expression: "draw_tree(width, height, &tree, &mut ui, now)"
 ---
 " bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
-"   ◆ Bash · needs you                                                                                       "
+"   ◆ bash rm -rf build                                                                           needs you  "
 "     ╭                                                                                                      "
 "     │ /work                                                                                                "
 "     │ $ rm -rf build                                                                                       "
