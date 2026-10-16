@@ -1295,6 +1295,8 @@ export type StateValue = { "value": unknown; "version": number; [key: string]: u
 export type StatusProps = { "config"?: ConfigView; "context"?: (ContextUsage | null); "selected"?: (string | null); "summary"?: SessionSummary; [key: string]: unknown; };
 /** One tool call of a turn, in the words a row shows. */
 export type Step = {
+  /** What the person answered when the step asked: `you: yes`. */
+  "answer"?: (Upshot | null);
   "state": StepState;
   /** What it does it to, shortened for one row. */
   "target": string;

@@ -6262,6 +6262,17 @@
             }
           ],
           "description": "What the tool said the call came to."
+        },
+        "answer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Upshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the person answered when the step asked: `you: yes`."
         }
       },
       "required": [

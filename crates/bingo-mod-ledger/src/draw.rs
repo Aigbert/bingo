@@ -51,6 +51,7 @@ fn piece(piece: Piece) -> TextChild {
     let (color, dim) = match piece.ink {
         Ink::Plain => (None, false),
         Ink::Dim => (None, true),
+        Ink::Ash => (Some("ash"), false),
         Ink::Good => (Some("good"), false),
         Ink::Bad => (Some("bad"), false),
         Ink::Glow => (Some("glow"), false),
@@ -89,6 +90,7 @@ mod tests {
             target: "src/main.rs".into(),
             state,
             upshot,
+            answer: None,
         }
     }
 

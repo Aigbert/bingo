@@ -7,6 +7,8 @@
 pub enum Ink {
     Plain,
     Dim,
+    /// Quieter than dim: what the person already said.
+    Ash,
     Good,
     Bad,
     /// Wants a person.

@@ -34,6 +34,9 @@ pub struct Step {
     /// What the tool said the call came to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upshot: Option<Upshot>,
+    /// What the person answered when the step asked: `you: yes`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer: Option<Upshot>,
 }
 
 /// How a turn ended, for its folded line.
@@ -96,7 +99,9 @@ impl Step {
         }
     }
 
-    /// The step's row: `   ✓ read src/parse.rs` with the outcome right-aligned.
+    /// The step's row: `   ✓ read src/parse.rs` with the outcome
+    /// right-aligned — or, where the person answered the step, the outcome
+    /// after the words and the answer at the right.
     pub fn row(&self, glyph: &str, width: usize, cells: impl Fn(&str) -> usize) -> Vec<Piece> {
         let words = match self.target.is_empty() {
             true => self.verb.clone(),
@@ -106,15 +111,28 @@ impl Step {
             StepState::Asked => Ink::Glow,
             _ => Ink::Plain,
         };
-        let left = vec![
+        let mut left = vec![
             Piece::new(STEP_INDENT, Ink::Plain),
             Piece::new(format!("{glyph} "), self.ink()),
             Piece::new(words, words_ink),
         ];
-        let right = self
-            .outcome()
-            .map(|o| pieces(&o, Ink::Dim))
-            .unwrap_or_default();
+        let right = match &self.answer {
+            Some(answer) => {
+                if let Some(upshot) = self
+                    .upshot
+                    .as_ref()
+                    .filter(|_| self.state != StepState::Running)
+                {
+                    left.push(Piece::new("  ", Ink::Plain));
+                    left.extend(pieces(upshot, Ink::Dim));
+                }
+                pieces(answer, Ink::Dim)
+            }
+            None => self
+                .outcome()
+                .map(|o| pieces(&o, Ink::Dim))
+                .unwrap_or_default(),
+        };
         laid(left, right, width, cells)
     }
 }
@@ -265,6 +283,12 @@ impl TurnFoldProps {
             TurnEnd::Failed => Some(" \u{b7} failed"),
         };
         out.extend(ended.map(|words| Piece::new(words, Ink::Bad)));
+        for answer in self.steps.iter().filter_map(|s| s.answer.as_ref()) {
+            let Upshot::Words { text, .. } = answer else {
+                continue;
+            };
+            out.push(Piece::new(format!(" \u{b7} {text}"), Ink::Ash));
+        }
         Some(out)
     }
 }
@@ -322,6 +346,7 @@ mod tests {
             target: target.into(),
             state,
             upshot,
+            answer: None,
         }
     }
     fn text(pieces: &[Piece]) -> String {
@@ -460,6 +485,40 @@ mod tests {
         let found = step("grep", "x", StepState::Done, Some(Upshot::plain("2 files")));
         let row = found.row("\u{2713}", 60, cells);
         assert_eq!(row.last().map(|p| p.ink), Some(Ink::Dim));
+    }
+
+    #[test]
+    fn an_answered_step_says_the_answer_at_the_right_and_the_fold_repeats_it() {
+        let mut edit = step(
+            "edit",
+            "src/main.rs",
+            StepState::Done,
+            Some(Upshot::Diff {
+                added: 1,
+                removed: 1,
+            }),
+        );
+        edit.answer = Some(Upshot::plain("you: yes"));
+        let row = text(&edit.row("\u{2713}", 60, cells));
+        assert!(
+            row.starts_with("   \u{2713} edit src/main.rs  +1 \u{2212}1 "),
+            "{row:?}"
+        );
+        assert!(row.ends_with(" you: yes"), "{row:?}");
+        let fold = TurnFoldProps {
+            steps: vec![step("read", "a", StepState::Done, None), edit],
+            outcome: TurnEnd::Done,
+            elapsed: 1_000,
+            thought: false,
+            is_expanded: false,
+        };
+        let pieces = fold.row(GLYPHS, 80, cells).unwrap();
+        assert!(
+            text(&pieces).contains("edit +1 \u{2212}1 \u{b7} you: yes"),
+            "{:?}",
+            text(&pieces)
+        );
+        assert!(pieces.iter().any(|p| p.ink == Ink::Ash));
     }
 
     #[test]
