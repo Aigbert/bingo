@@ -296,10 +296,11 @@ finish
 step 'the keys palette opens on ? and closes on esc'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '?'
-await '⏎ do it'
+# The palette takes the KeyBar's row while open: wait for its own words.
+await 'keys, in this list'
 keys Escape
 await '/ commands'
-vanish '⏎ do it'
+vanish 'keys, in this list'
 finish
 
 step 'ctrl+r opens the session palette and esc closes it'
