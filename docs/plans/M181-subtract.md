@@ -27,7 +27,7 @@ Spread across the workspace; the audit notes name each. No production behaviour 
 
 - [ ] Bricks 1–10 each land as their own commit (or a few), each passing the gates.
 - [ ] Test count and summed test time before/after recorded in Verified.
-- [ ] `git grep` shows no reference to a removed item; discipline and budget pass.
+- [ ] `git grep` shows no executable/dependency reference to a removed item; historical records and legacy wire strings are documented exceptions; discipline and budget pass.
 - [ ] tui-smoke passes on bingo-mod-hello instead of the demo.
 - [ ] Windows all-target check for each touched crate (known C-toolchain deferral recorded).
 
@@ -60,6 +60,8 @@ Fixing the flaky tests the audit found (tool-bash 150 ms race, channels "nothing
 
 - The binary adds the existing `bingo-mod-hello` workspace edge. Its scripted `Harness` supplies board/progress contributions; ordinary `Hello` keeps its immediate switch contract. Publication is serialized through the SDK token, retaining concurrent edits and late row placement without a mirrored state.
 - Legacy demo flags/keys remain parseable with a stderr notice; historical ADR text and persisted demo-name fixtures remain intentionally. No production composition includes the hello harness without both fake-provider switches.
+
+- Keep all 29 event snapshot values as compact `fixtures/record/frames.jsonl` rows, including all three Form cases and the shell item. The record test pins serialization and round-tripping before deleting the old test/snapshot; existing per-variant fixtures remain. Historical milestone references name the old evidence and are not rewritten.
 
 ## Verified — 2026-10-16
 
@@ -95,4 +97,8 @@ Brick 8: bin — check 0; clippy 0; test 0 (506 passed)
 Brick 9: bin, mod-hello, mods, surface-tui — check 0; clippy 0; test 0
          legacy CLI/NDJSON 2 passed; RPC lanes/concurrency 4 passed
          isolated hello smoke: 80x24, 120x40, 200x50 passed
+Brick 10: sdk — check 0; clippy 0; test 0 (231 passed)
+          record contract passed before removal; all 29 JSON values identical
+BINGO_UPDATE_SCHEMA=1 cargo test -p <sdk/plugin-rpc/mods> --locked
+          all three exit 0; schema/ and sdk/typescript regeneration has no diff
 ```

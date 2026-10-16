@@ -208,3 +208,22 @@ fn quiet_tool_calls_keep_their_flag_and_old_calls_keep_their_shape() {
         assert_eq!(serde_json::to_string(&body).unwrap(), wire.trim_end());
     }
 }
+
+#[test]
+fn frame_cases_preserve_the_envelope_and_nested_interactions() {
+    for (row, wire) in include_str!("../fixtures/record/frames.jsonl")
+        .lines()
+        .enumerate()
+    {
+        let frame: bingo_sdk::Frame = serde_json::from_str(wire).unwrap();
+        let expected: serde_json::Value = serde_json::from_str(wire).unwrap();
+        assert_eq!(
+            serde_json::to_value(&frame).unwrap(),
+            expected,
+            "row {}",
+            row + 1
+        );
+        let rebuilt: bingo_sdk::Frame = serde_json::from_value(expected).unwrap();
+        assert_eq!(rebuilt, frame, "row {}", row + 1);
+    }
+}
