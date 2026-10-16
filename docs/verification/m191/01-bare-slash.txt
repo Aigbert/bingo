@@ -1,0 +1,24 @@
+ bingo▍ /tmp/…/cwd                                                                   session 01M5
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /
+   commands
+ ❯ /model          model, thinking and providers                                                           fake/fake-1
+   /think          how hard it thinks                                                                              off
+   /permission     what it may do without asking                                                               default
+   /rename         name this session
+   /compact        summarise older turns
+   /resume         reopen a session
+   /login          sign in to a provider                                                                  3 signed out
+   /logout         forget a provider's key
+   /status         session, context and cost
+   /plugins        plugins on and off, and their trust
+   /memory         what is remembered, about you and about this project
+   /help           keys, in this list
+   /sessions       find every session
+   /browse         read and search conversation turns
+   /crew           agents, rooms, tasks and team in one panel
+   /!              run a shell command
+   /bash.promote   background the running shell command
+   /schedule       what fires later, and whether anything will fire it
+   type to search commands, skills, sessions and keys together

@@ -1,0 +1,23 @@
+ bingo▍ /tmp/…/cwd                                                                   session 01M5
+
+ MCP servers   37 plugins · 0 MCP servers · one list                                 ● on   ○ off   ✗ failed   ◌ waiting
+   MCP servers  their tools always ask                        │ built in
+   plugins · built in  compiled into bingo                    │ compiled into bingo, each one a mod
+ ❯  ▸ 37 built in        all on · 2 drawn over                │
+                                                              │ any of them can be drawn over: a mod in
+                                                              │ ~/.bingo/plugins that draws the same site
+                                                              │ is asked first and may call next
+                                                              │
+                                                              │ turn one off and the plain drawing is used
+                                                              │ 5 are needed and stay on
+                                                              │
+                                                              │ show all 37
+                                                              │
+                                                              │
+                                                              │
+                                                              │
+                                                              │
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /mcp › plugins and MCP servers
+                                                                                     ↑↓ pick · ⏎ show them · esc close
+ ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                                           fake-1

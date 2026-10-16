@@ -1,0 +1,12 @@
+ bingo▍ /tmp/…/cwd                                                                   session 01M5
+
+crew                                                                                                             above ▾
+crew · agents (0) │ ❯ rooms (1) │ tasks (0) │ team (0)
+❯ #lab   —
+    seats
+    holder  parent
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /crew
+                                     ] switch · ↑↓ pick · ⏎ open · p purpose · a seat · u unseat · c close · esc close
+ ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                                           fake-1

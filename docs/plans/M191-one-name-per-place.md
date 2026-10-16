@@ -107,10 +107,10 @@ fold one into the other by the rule below, else leave both.
 - [x] `/crew rooms` opens on rooms; `⏎` on a room steps into its chat; esc back.
 - [x] Channel menu test: folded commands kept, `terminal` family dropped.
 - [x] `/permission`, `/rename` bare open their inline level; `/mcp` cursor on MCP.
-- [ ] tmux drive (own `tmux -L`, `-f /dev/null`, temp HOME, fake provider,
+- [x] tmux drive (own `tmux -L`, `-f /dev/null`, temp HOME, fake provider,
       `OPENAI_*`/`ANTHROPIC_*` unset): bare `/`, `/agents`, `/crew rooms` → `⏎`
-      → esc, `/rewind`, `/mcp`; capture evidence belongs in the PR review.
-- [ ] Gates: `cargo fmt --all -- --check`, `cargo check --workspace --all-targets
+      → esc, `/rewind`, `/mcp`; captures in `docs/verification/m191/`.
+- [x] Gates: `cargo fmt --all -- --check`, `cargo check --workspace --all-targets
       --locked`, `cargo clippy … -D warnings`, `cargo test --workspace --locked`,
       `scripts/check_discipline.sh`, `scripts/budget.sh`, `cargo deny check`,
       tui-smoke, and `cargo check -p <non-TUI crates touched> --all-targets
@@ -133,9 +133,29 @@ fold one into the other by the rule below, else leave both.
 
 ## Verified
 
-Verification evidence is in the PR review, outside the code repository.
-Terminal checks remain incomplete; further Windows verification is deferred.
-The unchecked exit criteria above are not claimed complete.
+Review on macOS (arm64), 2026-10-17, PR #101 head `d50ac0ec`, with
+`OPENAI_*`/`ANTHROPIC_*` unset:
+
+```
+== fmt exit 0 · clippy -D warnings exit 0 · test exit 0 (6290 passed, 0 failed)
+== discipline exit 0 · budget exit 0 · deny exit 0 · tui-smoke exit 0
+```
+
+tmux drive (`docs/verification/m191/drive.sh`, 120x40, fake provider):
+bare `/` lists none of the folded names (`01`); `/age` finds `/crew` (`02`);
+`/crew rooms` shows `#lab` with `⏎ open` (`05`); `⏎` steps into the room
+(`06`); `esc` returns to the root (`07`); `/rewind` after one turn opens
+browse with the rewind sheet (`c2`); `/crew team` (`a2`); `/permission` bare
+lists the modes (`10`); `/agents stop nobody` still runs the verb (`12`).
+
+Open:
+- `/mcp` with no MCP server configured rests on the built-in row (`09`): the
+  MCP group has no row to land on; the landing with a server is covered by the PR's test, not driven here.
+- The Windows cross-check from macOS stops at `aws-lc-sys` (no `windows.h`);
+  CI's `windows` job fails on dead code in `graphics/probe.rs`, which is red
+  on `dev` before this change too.
+- CI `test (ubuntu-latest)`: `an_interrupted_turn` snapshots assume UTC+8;
+  latent on `dev`, which failed earlier on a clippy lint this PR fixes.
 
 ## Implementation decisions
 

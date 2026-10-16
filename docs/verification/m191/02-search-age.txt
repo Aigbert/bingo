@@ -1,0 +1,15 @@
+ bingo▍ /tmp/…/cwd                                                                   session 01M5
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /age
+   commands
+ ❯ /crew   agents, rooms, tasks and team in one panel
+   skills
+   guide › agents   Sub-agents as child sessions: how `SpawnAgent` staffs one and what becomes of its answer, how…
+   /guide           The map of bingo itself: what it is, running it, sessions, the commands the kernel and…   built in
+   guide › acp      Another coding agent driving as a model: the `acp.adapters` rows that spawn one, the `agent`…
+   guide › memory   What the agent knows before anybody types and keeps for next time: the two memory directories…
+   · 7 more skills
+   keys
+   ctrl+n   agents, rooms, tasks and team in one panel
+

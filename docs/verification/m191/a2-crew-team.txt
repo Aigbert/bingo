@@ -1,0 +1,10 @@
+ bingo▍ /tmp/…/cwd                                                                  session 01M5
+
+crew                                                                                                             above ▾
+crew · agents (0) │ rooms (0) │ tasks (0) │ ❯ team (0)
+This project declares no team roles.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /crew
+                                                                                        ] switch · ↑↓ pick · esc close
+ ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                                           fake-1
