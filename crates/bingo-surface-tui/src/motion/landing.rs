@@ -6,7 +6,7 @@
 use bingo_sdk::{Event, ItemStatus};
 use ratatui::style::Style;
 
-use super::{running_bash, screen, style_of};
+use super::{screen, style_of};
 use crate::clock::Now;
 use crate::test_support::*;
 use crate::theme;
@@ -14,9 +14,13 @@ use crate::tree::Tree;
 
 /// A tool call that has just come back, with the cache warm on the frame
 /// before — which is what makes it a completion a person watched, rather than
-/// a row that was already there.
+/// a row that was already there. Outside any turn, so it is its own row: a
+/// turn's step lands as its step row does.
 fn just_landed(ok: bool, ui: &mut crate::ui::Ui, now: Now) -> Tree {
-    let mut state = folded(running_bash());
+    let mut state = folded(vec![
+        frame(1, started("trn_1")),
+        started_tool(2, loose(running_tool("itm_1", "Bash", "compiling…"))),
+    ]);
     crate::painted::painted(80, 24, &solo(&state), ui, now);
     let output = match ok {
         true => bingo_sdk::ToolOutput::text("ok"),
@@ -28,7 +32,7 @@ fn just_landed(ok: bool, ui: &mut crate::ui::Ui, now: Now) -> Tree {
     state.apply(&frame(
         3,
         Event::ItemCompleted {
-            item: tool(
+            item: loose(tool(
                 "itm_1",
                 "Bash",
                 serde_json::json!({"command": "cargo test"}),
@@ -37,7 +41,7 @@ fn just_landed(ok: bool, ui: &mut crate::ui::Ui, now: Now) -> Tree {
                     true => ItemStatus::Completed,
                     false => ItemStatus::Failed,
                 },
-            ),
+            )),
         },
     ));
     solo(&state)
@@ -77,7 +81,7 @@ fn a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh() {
         assert_eq!(
             landed_runs(&done, &mut ui, later(now, 198)),
             vec![
-                ("⏺ ".to_string(), theme::as_drawn(theme::good())),
+                (" ▍ ".to_string(), theme::as_drawn(theme::good())),
                 ("Bash".to_string(), theme::as_drawn(theme::bold())),
                 ("(cargo test)".to_string(), theme::as_drawn(theme::text())),
             ],
@@ -118,7 +122,7 @@ fn a_failure_flares_and_cools_into_the_words_behind_it() {
             "into the row's own words, twelve frames on"
         );
         assert_eq!(
-            style_of(&failed, &mut ui, later(now, 396), "⏺"),
+            style_of(&failed, &mut ui, later(now, 396), " ▍ "),
             theme::as_drawn(theme::bad()),
             "the bullet stays `bad`: what cooled is how fresh it is"
         );

@@ -1,12 +1,12 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 54
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
 " › have it reviewed                                                                                                     "
-"                                                                                                                        "
-"◗ reviewer(review the diff)                                                                                             "
+" ◗ reviewer(review the diff)                                                                                            "
 "  ⎿  asking                                                                                                             "
 "   ◆ Edit · reviewer · needs you                                                                                        "
 "                                                                                                                        "
@@ -14,6 +14,7 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 "   ❯ 1  Yes                                                                                                             "
 "     2  Yes for this session                                                                                            "
 "     3  No, and tell it why                                                                                             "
+"                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "

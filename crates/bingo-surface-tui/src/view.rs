@@ -570,6 +570,17 @@ fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: R
         if to <= frame.top || from >= frame.top + usize::from(area.height) {
             continue;
         }
+        let role = frame.blocks.roles().of_item(&item.id);
+        if role != &crate::turns::Role::Own {
+            let keys = crate::turns::requests(item, role)
+                .into_iter()
+                .filter_map(|(id, props)| {
+                    crate::component::key(state, &id, &props, area.width, area.height)
+                })
+                .collect::<Vec<_>>();
+            frame.pulls.extend(keys);
+            continue;
+        }
         for receipt in crate::ask::receipts::linked(state, &item.id) {
             if let Some(props) = crate::component::items::props(receipt, false)
                 && let Some(key) = crate::component::key(
@@ -855,6 +866,7 @@ mod tests {
             ),
         ]);
         let (mut ui, now) = mid_turn();
+        let now = still(now);
         insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
@@ -868,15 +880,16 @@ mod tests {
             display: None,
             upshot: None,
         };
+        // Outside a turn, the call is a row of its own with its output under it.
         let state = folded(vec![item_frame(
             1,
-            tool(
+            loose(tool(
                 "itm_1",
                 "Read",
                 json!({"file_path": "src/lib.rs"}),
                 Some(output),
                 ItemStatus::Completed,
-            ),
+            )),
         )]);
         let (mut ui, now) = scene();
         insta::assert_snapshot!(render(&state, &mut ui, now));
@@ -1486,13 +1499,13 @@ mod tests {
         };
         let state = folded(vec![item_frame(
             1,
-            tool(
+            loose(tool(
                 "itm_1",
                 "Board",
                 json!({}),
                 Some(output),
                 ItemStatus::Completed,
-            ),
+            )),
         )]);
         let (mut ui, now) = scene();
         let screen = render(&state, &mut ui, now);
@@ -1764,13 +1777,13 @@ mod tests {
         };
         let state = folded(vec![item_frame(
             1,
-            tool(
+            loose(tool(
                 "itm_1",
                 "Read",
                 json!({"file_path": "src/lib.rs"}),
                 Some(output),
                 ItemStatus::Completed,
-            ),
+            )),
         )]);
         let (mut ui, now) = scene();
         assert!(render(&state, &mut ui, now).contains("+4 lines (ctrl+o to expand)"));

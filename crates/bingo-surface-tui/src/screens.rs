@@ -22,6 +22,9 @@ use crate::ui::{Open, Ui};
 /// (ADR-0035 §4).
 /// Where the colour lands on these same scenes (§4).
 mod colours;
+/// The screens a turn that did some work is read through, and the left edge
+/// they all keep (ADR-0095 §6–§8).
+mod folds;
 /// The screens a set of questions asked together is read through (§2's band).
 mod forms;
 /// The screen a transcript held back from its foot is read through (M95).
@@ -212,6 +215,7 @@ fn stopping() {
         ),
     ]);
     let (mut ui, now) = mid_turn();
+    let now = still(now);
     ui.stop_asked = Some(TurnId::from_raw("trn_1"));
     both("stopping", &solo(&state), &mut ui, now);
 }
@@ -230,6 +234,7 @@ fn tool_running() {
         ),
     ]);
     let (mut ui, now) = mid_turn();
+    let now = still(now);
     both("tool_running", &solo(&state), &mut ui, now);
 }
 
@@ -248,6 +253,7 @@ fn running_together() -> Vec<bingo_sdk::Frame> {
 #[test]
 fn two_tools_running_at_once() {
     let (mut ui, now) = mid_turn();
+    let now = still(now);
     both(
         "tools_running_together",
         &solo(&folded(running_together())),
@@ -281,7 +287,7 @@ fn tool_done_with_output() {
         item(
             3,
             item_of(ItemBody::PermissionReceipt {
-                item: None,
+                item: Some(bingo_sdk::ItemId::from_raw("itm_1")),
                 interaction: bingo_sdk::InteractionId::from_raw("int_1"),
                 tool: "Read".into(),
                 decision: bingo_sdk::DecisionKind::AllowSession,

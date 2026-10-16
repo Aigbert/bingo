@@ -1,18 +1,19 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 54
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
 " › what is in this workspace?                                                                                           "
-"                                                                                                                        "
-"▏ Thought for 4s                                                                                                        "
-"  ⎿  The manifest first, because the lockfile only says what the manifest already asked for.                            "
+"   ▾ thought                                                                                                        4s  "
+"     The manifest first, because the lockfile only says what the manifest already asked for.                            "
 "     Then the crate map, which is the one place the layering is written down.                                           "
 "     The plan after that: it says which of the two is allowed to move.                                                  "
 "     Only then the code, and only the file the plan names.                                                              "
 "     Anything else is a second reading of the same three facts.                                                         "
 "     So: manifest, map, plan.                                                                                           "
+"                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "

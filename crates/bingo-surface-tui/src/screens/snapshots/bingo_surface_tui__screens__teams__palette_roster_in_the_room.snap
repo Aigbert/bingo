@@ -1,17 +1,18 @@
 ---
 source: crates/bingo-surface-tui/src/screens/teams.rs
+assertion_line: 316
 expression: screen
 ---
 " bingo▍ /tmp/project                                      #design · session 10  "
 "                                                                                "
-"● watcher: post 1                                                               "
+" ● watcher: post 1                                                              "
 "  members: reviewer, watcher                                                    "
+"   post 2                                                                       "
+"   post 3                                                                       "
+"   post 4                                                                       "
 "                                                                                "
-"  post 2                                                                        "
 "                                                                                "
-"  post 3                                                                        "
 "                                                                                "
-"  post 4                                                                        "
 "                                                                                "
 "                                                                                "
 "                                                                                "

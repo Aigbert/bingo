@@ -372,14 +372,14 @@ async fn a_deep_match_in_a_grouped_thought_is_visible_and_restores_its_fold() {
         .map(|i| i.as_ref().clone())
         .collect::<Vec<_>>();
     for (id, text) in [("r1", text), ("r2", "second thought".into())] {
-        items.push(item(
+        items.push(loose(item(
             id,
             ItemStatus::Completed,
             ItemBody::Reasoning {
                 text,
                 provider_metadata: Default::default(),
             },
-        ));
+        )));
     }
     state.transcript = items.into_iter().collect();
     ui.folds

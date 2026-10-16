@@ -1,13 +1,14 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 53
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"⏺ Bash(cargo test)                                                              "
-"  ⎿     Compiling bingo-sdk v0.1.0                                              "
-"        Compiling bingo-core v0.1.0                                             "
-"        Compiling bingo-surface-tui v0.1.0                                      "
+"   ◌ bash cargo test                                                            "
+"                                                                                "
+"                                                                                "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

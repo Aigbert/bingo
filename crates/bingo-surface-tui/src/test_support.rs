@@ -15,8 +15,10 @@ use serde_json::{Value, json};
 mod external;
 mod pressed;
 mod rendered;
+mod worked;
 
 pub use external::agent_call;
+pub use worked::*;
 
 pub use crate::test_lanes::*;
 pub use pressed::*;
@@ -298,6 +300,22 @@ pub fn folded(frames: Vec<Frame>) -> SessionState {
         state.apply(frame);
     }
     state
+}
+
+/// An item outside any turn, which draws its own block: a turn's steps and
+/// thoughts fold under its line ([`crate::turns`]).
+pub fn loose(item: Item) -> Item {
+    Item { turn: None, ..item }
+}
+
+/// Every finished turn opened under its line, as a click on each would.
+pub fn open_the_turns(ui: &mut Ui, state: &SessionState) {
+    let roles = crate::turns::Roles::of(state, &Default::default(), &ui.folds);
+    for item in state.transcript.items() {
+        if matches!(roles.of_item(&item.id), crate::turns::Role::Fold { .. }) {
+            ui.folds.insert(item.id.clone(), crate::fold::Fold::Open);
+        }
+    }
 }
 
 pub fn item(id: &str, status: ItemStatus, body: ItemBody) -> Item {

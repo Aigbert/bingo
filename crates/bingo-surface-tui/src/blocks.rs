@@ -17,7 +17,7 @@
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{Item, ItemBody, ItemId, ItemStatus, Seq, SessionState};
+use bingo_sdk::{Item, ItemBody, ItemId, ItemStatus, Seq, SessionState, TurnId};
 use ratatui::text::Line;
 
 use crate::clock::Now;
@@ -25,6 +25,7 @@ use crate::fold::{self, Fold};
 use crate::graphics::Picture;
 use crate::transcript::{self, Cue, Place, Rows};
 use crate::tree::Agents;
+use crate::turns::{Role, Roles};
 
 /// What can change about an item's block while it is on the screen. A
 /// terminal item's revision never moves again, so its block is rendered once.
@@ -73,6 +74,9 @@ struct Revision {
     /// can turn them on under a running surface, and a block drawn before it
     /// holds the chip where the picture now goes.
     graphics: crate::graphics::Graphics,
+    /// The part it plays in its turn: a step's row holds the step's words, and
+    /// a folded line every step of its turn, so a neighbour moving redraws it.
+    role: Role,
 }
 
 fn revision(
@@ -88,7 +92,12 @@ fn revision(
             .map(|receipt| receipt.id.clone())
             .collect(),
         component: (
-            rows.pulled.map_or(0, |memo| memo.version(&request)),
+            // A folded line is asked for by the item holding it, a call's rows
+            // by the call: an answer to either draws the block again.
+            rows.pulled.map_or(0, |memo| {
+                memo.version(&request)
+                    .max(memo.version(&item.id.to_string()))
+            }),
             rows.state
                 .invalidated
                 .get(&request)
@@ -122,6 +131,7 @@ fn revision(
         slots: rows.placed_on(&item.id).cloned().collect(),
         look: crate::theme::current(),
         graphics: crate::graphics::chosen(),
+        role: place.role.clone(),
     }
 }
 
@@ -221,6 +231,8 @@ struct Entry {
     revision: Revision,
     /// A receipt hangs from the row above it: no blank row before it.
     joins: bool,
+    /// The turn it was said or done in: no blank row parts a turn's own rows.
+    turn: Option<TurnId>,
     lines: Vec<Line<'static>>,
     /// The pictures these lines stand for (§5). They are kept with the lines
     /// because they are the same rendering: a block drawn once and cloned
@@ -264,6 +276,8 @@ pub struct Blocks {
     /// Whether any block would draw differently on the next frame, as the
     /// last sync left it.
     moving: bool,
+    /// The part each item played in its turn, as the last sync read it.
+    roles: Roles,
 }
 
 impl Blocks {
@@ -274,9 +288,11 @@ impl Blocks {
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
+        self.roles = Roles::of(state, agents, rows.folds);
         let mut kept = 0;
         for (at, item) in state.transcript.items().iter().enumerate() {
-            let place = Place::of(state.transcript.items(), at);
+            let role = self.roles.of_item(&item.id).clone();
+            let place = Place::of(state.transcript.items(), at).playing(role);
             kept += self.block(kept, item, &place, agents, rows);
         }
         // Whatever is left behind the last item was rewound away.
@@ -315,8 +331,12 @@ impl Blocks {
         self.moving
     }
 
+    /// When the transcript next draws differently: the next frame while a
+    /// block moves, the spinner's next turn while a step runs.
     pub fn next_change(&self, now: Now) -> Option<Instant> {
-        self.moving().then_some(now.instant + crate::clock::FRAME)
+        let frame = self.moving().then_some(now.instant + crate::clock::FRAME);
+        let spin = (self.roles.spinning() && now.motion).then(|| crate::spinner::next(now));
+        frame.into_iter().chain(spin).min()
     }
 
     /// Keep the block at `at` when it is still this item's, else draw it.
@@ -361,6 +381,7 @@ impl Blocks {
             id: item.id.clone(),
             revision,
             joins: transcript::joins_the_row_above(item),
+            turn: item.turn.clone(),
             lines: drawn.lines,
             pictures: drawn.pictures,
             wanted: drawn.wanted,
@@ -384,6 +405,11 @@ impl Blocks {
         let finished = held.is_some_and(|entry| !entry.revision.status.is_terminal())
             && item.status.is_terminal();
         Motion::new(now.instant, settles(item, finished, now.motion), finished)
+    }
+
+    /// The part each item plays in its turn, as the last sync drew it.
+    pub fn roles(&self) -> &Roles {
+        &self.roles
     }
 
     /// Where an item's block sits in the transcript: its first line, and the
@@ -507,13 +533,14 @@ impl Blocks {
     }
 
     /// Every segment in transcript order. A blank row separates a segment
-    /// from whatever is above it — never from the top of the transcript, and
-    /// never a receipt from the row it answers.
+    /// from whatever is above it — never from the top of the transcript, never
+    /// a receipt from the row it answers, and never one row of a turn from
+    /// another of the same turn.
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> {
-        let mut above = false;
+        let mut above: Option<&Entry> = None;
         let blocks = self.blocks.iter().map(move |entry| {
-            let gap = above && !entry.joins;
-            above = true;
+            let gap = above.is_some_and(|above| parted(above, entry));
+            above = Some(entry);
             Segment {
                 gap,
                 id: Some(&entry.id),
@@ -528,6 +555,13 @@ impl Blocks {
         });
         blocks.chain(tail)
     }
+}
+
+/// Whether a blank row goes between two blocks: they are not one turn's, and
+/// the lower one does not answer the upper.
+fn parted(above: &Entry, below: &Entry) -> bool {
+    let one_turn = below.turn.is_some() && below.turn == above.turn;
+    !below.joins && !one_turn
 }
 
 impl std::fmt::Debug for Blocks {
@@ -550,11 +584,13 @@ mod tests {
         Blocks::default()
     }
 
+    /// `n` answers, each its own turn's, so a blank row parts every two.
     fn many(n: usize) -> SessionState {
         let mut state = state();
         state.transcript = (0..n)
-            .map(|i| {
-                assistant(
+            .map(|i| Item {
+                turn: Some(TurnId::from_raw(format!("trn_{i}"))),
+                ..assistant(
                     &format!("itm_{i}"),
                     &format!("Answer {i} — a line of prose that wraps a little."),
                     ItemStatus::Completed,
@@ -783,6 +819,8 @@ mod tests {
             },
         );
         thought.completed_at = Some(ts() + jiff::SignedDuration::from_secs(seconds));
+        // Outside any turn: a turn's thoughts fold under its line.
+        thought.turn = None;
         thought
     }
 
@@ -816,7 +854,7 @@ mod tests {
         assert_eq!(
             &lines[top..],
             [
-                "▏ Thought for 5s",
+                " ▏ Thought for 5s",
                 "  ⎿  The manifest first.",
                 "     Then the crate map.",
             ],

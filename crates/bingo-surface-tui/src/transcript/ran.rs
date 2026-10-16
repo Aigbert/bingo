@@ -39,7 +39,7 @@ pub(super) fn lines(
 
 /// The line as it was typed, on the bar the person's own words are drawn on.
 fn typed(command: &str, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let mark = Span::styled(format!("{PROMPT} "), theme::dim());
+    let mark = Span::styled(format!(" {PROMPT} "), theme::dim());
     let body = vec![Line::from(Span::styled(command.to_string(), theme::text()))];
     said::barred(
         under(mark, body, speaks_indent(), rows.measured()),

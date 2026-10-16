@@ -353,9 +353,9 @@ fn a_single_answered_step_uses_the_singular() {
         frame(3, bingo_sdk::Event::ItemCompleted { item: receipt }),
         frame(4, completed("trn_1", bingo_sdk::TurnStatus::Completed)),
     ]);
-    let text = super::receipts::folded(&state).unwrap();
-    assert!(text.contains("1 step ·"), "{text}");
     let (mut ui, now) = scene();
     let screen = draw_sized(108, 30, &state, &mut ui, still(now));
-    assert!(!screen.contains("⏺ Form"), "{screen}");
+    assert!(screen.contains("▸ 1 step ·"), "{screen}");
+    assert!(screen.contains("· you: Beta"), "{screen}");
+    assert!(!screen.contains("Form"), "{screen}");
 }

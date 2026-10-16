@@ -161,15 +161,22 @@ pub struct Glyphs {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChromeGlyphs {
     pub pause: &'static str,
+    /// A step of a turn: `[0]` done, `[1]` asks a person, `[2]` waits — what
+    /// a running step stands still as where nothing moves — `[3]` failed.
     pub steps: [&'static str; 4],
-    pub fold: &'static str,
+    /// A running step turns through these, one per `spin`, on the wall clock
+    /// so every running row is on the same frame.
+    pub spinner: &'static [&'static str],
+    pub spin: std::time::Duration,
+    /// A finished turn's line: `[0]` folded, `[1]` opened.
+    pub fold: [&'static str; 2],
     pub stop: &'static str,
     pub receipts: [&'static str; 4],
     pub context: [&'static str; 2],
 }
 
 pub const UNICODE: Glyphs = Glyphs {
-    bullet: "⏺",
+    bullet: "▍",
     connector: "⎿",
     user: "›",
     cursor: "❯",
@@ -181,8 +188,12 @@ pub const UNICODE: Glyphs = Glyphs {
     mode: "⏵⏵",
     chrome: ChromeGlyphs {
         pause: "⏸",
+        // `◆` is East-Asian ambiguous: a CJK-width terminal draws it in two
+        // cells, and the row after it shifts by one there.
         steps: ["✓", "◆", "◌", "✗"],
-        fold: "▸",
+        spinner: &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        spin: std::time::Duration::from_millis(80),
+        fold: ["▸", "▾"],
         stop: "■",
         receipts: ["⇄", "✎", "⟲", "⇣"],
         context: ["▰", "▱"],
@@ -215,9 +226,11 @@ pub const ASCII: Glyphs = Glyphs {
     mode: ">>",
     chrome: ChromeGlyphs {
         pause: "||",
-        steps: ["x", "*", "o", "!"],
-        fold: ">",
-        stop: "#",
+        steps: ["+", "*", "o", "!"],
+        spinner: &["-", "\\", "|", "/"],
+        spin: std::time::Duration::from_millis(130),
+        fold: [">", "v"],
+        stop: "x",
         receipts: ["=", "/", "<", "v"],
         context: ["#", "-"],
     },
@@ -525,7 +538,7 @@ pub fn raised() -> Style {
     }
 }
 
-/// bingo's own colour: the sparkle, a live `⏺`, a card's border, the focused
+/// bingo's own colour: the sparkle, a running step, a card's border, the focused
 /// row. The one warm colour, and the only one that moves.
 pub fn presence() -> Style {
     current().fg(Color::Yellow, |p| p.presence)
@@ -634,7 +647,7 @@ pub fn breath(level: f32) -> Style {
     }
 }
 
-/// A live `⏺` pulsing between `presence` and its glow.
+/// A live mark pulsing between `presence` and its glow.
 pub fn pulse(level: f32) -> Style {
     match current().colors {
         Colors::Plain => Style::new(),
@@ -923,7 +936,7 @@ pub fn glyphs() -> &'static Glyphs {
     current().glyphs
 }
 
-/// What the model says and does: `⏺` at column 0, its text at 2.
+/// What the model says and does: `▍` at column 1, its text at 3.
 pub fn bullet() -> &'static str {
     glyphs().bullet
 }
@@ -1198,6 +1211,7 @@ mod tests {
                     "transcript/ran.rs",
                     "transcript/said.rs",
                     "transcript/slots.rs",
+                    "transcript/steps.rs",
                     "view.rs",
                     "views/actions.rs",
                     "views/input.rs",
@@ -1238,6 +1252,7 @@ mod tests {
                     "transcript/ran.rs",
                     "transcript/said.rs",
                     "transcript/slots.rs",
+                    "transcript/steps.rs",
                     "transcript/thinking.rs",
                     "view.rs",
                     "view/header.rs",
@@ -1280,9 +1295,11 @@ mod tests {
                     "select.rs",
                     "status.rs",
                     "transcript.rs",
+                    "transcript/steps.rs",
                     "view/header.rs",
                     "views/actions.rs",
                     "views/badge.rs",
+                    "views/text.rs",
                 ],
             ),
             (
@@ -1294,6 +1311,7 @@ mod tests {
                     "keybar/tests.rs",
                     "opening/frame.rs",
                     "status.rs",
+                    "transcript/steps.rs",
                     "view.rs",
                     "views/text.rs",
                 ],
@@ -1304,7 +1322,9 @@ mod tests {
                     "activity.rs",
                     "status.rs",
                     "transcript.rs",
+                    "transcript/steps.rs",
                     "views/badge.rs",
+                    "views/text.rs",
                 ],
             ),
             (
@@ -1314,8 +1334,10 @@ mod tests {
                     "status.rs",
                     "transcript.rs",
                     "transcript/ran.rs",
+                    "transcript/steps.rs",
                     "views/badge.rs",
                     "views/button.rs",
+                    "views/text.rs",
                 ],
             ),
             ("mode", &["markdown/mentions.rs", "status.rs"]),

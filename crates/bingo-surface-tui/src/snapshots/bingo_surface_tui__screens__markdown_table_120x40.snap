@@ -1,11 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 54
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
 " › how many tests are there?                                                                                            "
-"                                                                                                                        "
 " ▍ Per crate:                                                                                                           "
 "                                                                                                                        "
 "   crate        tests  time                                                                                             "
@@ -13,6 +13,7 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 "   sdk             41  0.02                                                                                             "
 "   core           137  1.40                                                                                             "
 "   surface-tui      9     –                                                                                             "
+"                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "

@@ -383,15 +383,37 @@ fn running_bash() -> Vec<bingo_sdk::Frame> {
     ]
 }
 
+/// The glyph a running step's row starts with, on the frame at `now`.
+fn spinner_at(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> String {
+    let drawn = row(tree, ui, now, "bash cargo test");
+    drawn.trim_start().chars().take(1).collect()
+}
+
+/// A running step turns in presence, one frame a beat of the wall clock, so
+/// two rows running side by side turn together.
 #[test]
-fn a_live_bullet_pulses_between_presence_and_its_glow() {
+fn a_running_step_spins_in_presence_on_the_wall_clock() {
     let tree = solo(&folded(running_bash()));
     let (mut ui, now) = mid_turn();
+    let beat = i64::try_from(crate::spinner::beat().as_millis()).unwrap_or(80);
+    let frames = theme::glyphs().chrome.spinner.len() as i64;
+    let start = spinner_at(&tree, &mut ui, now);
+    assert_ne!(
+        start,
+        spinner_at(&tree, &mut ui, later(now, beat)),
+        "the next beat turns it"
+    );
+    assert_eq!(
+        start,
+        spinner_at(&tree, &mut ui, later(now, beat * frames)),
+        "and a whole turn brings it back"
+    );
     crate::theme::with(crate::painted::truecolor(), || {
-        let mut at = |ms| style_of(&tree, &mut ui, later(now, ms), "⏺");
-        let (start, half, whole) = (at(0), at(600), at(1_200));
-        assert_ne!(start, half, "it is somewhere else half a pulse in");
-        assert_eq!(start, whole, "and back where it began after 1.2 s");
+        assert_eq!(
+            style_of(&tree, &mut ui, now, &start),
+            theme::as_drawn(theme::presence()),
+            "in presence"
+        );
     });
 }
 
@@ -717,9 +739,8 @@ fn the_transcript_crossfades_through_dim_into_the_session_stepped_into() {
     let mut tree = spawned_tree(busy_child("reviewer"));
     tree.show(&child_id());
     let (mut ui, now) = scene();
-    let row = |ui: &mut crate::ui::Ui, at| {
-        crate::painted::painted(80, 24, &tree, ui, at).row("Read(src/lib.rs)")
-    };
+    let row =
+        |ui: &mut crate::ui::Ui, at| crate::painted::painted(80, 24, &tree, ui, at).row("read ×3");
     let plain = row(&mut ui, now);
 
     ui.switched = Some(now.instant);
@@ -753,12 +774,13 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
         "and holds its first glyph: {drawn}"
     );
 
-    // A live bullet and a tail are both absent rather than frozen.
+    // A spinner stands as the waiting glyph, and a tail is absent rather
+    // than frozen.
     let bash = solo(&folded(running_bash()));
     assert_eq!(
-        style_of(&bash, &mut ui, still, "⏺"),
-        theme::as_drawn(theme::presence()),
-        "a live bullet does not pulse"
+        spinner_at(&bash, &mut ui, still),
+        theme::glyphs().chrome.steps[2],
+        "a running step does not spin"
     );
     let tail = crate::painted::painted(80, 24, &streaming(), &mut ui, still);
     assert!(

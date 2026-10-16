@@ -97,7 +97,7 @@ fn thought_rows(text: &str, fold: Fold, width: usize) -> Vec<Line<'static>> {
 /// The `▏` and what it says beside it.
 fn marked(text: String, style: Style) -> Line<'static> {
     Line::from(vec![
-        Span::styled(format!("{} ", theme::thinking()), theme::dim()),
+        Span::styled(format!(" {} ", theme::thinking()), theme::dim()),
         Span::styled(text, style),
     ])
 }

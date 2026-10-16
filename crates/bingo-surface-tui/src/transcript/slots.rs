@@ -83,7 +83,7 @@ fn placed_heading(heading: &mut Line<'static>, mark: Option<char>, badge: Option
     if let Some(mark) = mark
         && let Some(bullet) = heading.spans.first_mut()
     {
-        bullet.content = format!("{} ", theme::row_mark(mark)).into();
+        bullet.content = format!(" {} ", theme::row_mark(mark)).into();
     }
     if let Some(badge) = badge {
         heading

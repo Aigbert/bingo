@@ -1,15 +1,16 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 53
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › run the tests                                                                "
+"   ▸ 1 step · bash failed                                                   1s  "
 "                                                                                "
-"⏺ Bash(cargo test)                                                              "
-"  ⎿  exit 101                                                                   "
+" ▍ no route to the provider                                                     "
 "                                                                                "
-"⏺ no route to the provider                                                      "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

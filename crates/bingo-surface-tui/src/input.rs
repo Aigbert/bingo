@@ -238,6 +238,10 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
     let Some(id) = latest(state, focused.as_ref(), opens) else {
         return;
     };
+    if let Some(line) = ui.shown.blocks.roles().line_of(state, &id) {
+        open_turn(ui, tree, now, line);
+        return;
+    }
     let Some(item) = item_of(state, &id) else {
         return;
     };
@@ -247,6 +251,21 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
         }
         None => {
             pager::open_block(ui, tree, now, Some(&id));
+        }
+    }
+}
+
+/// A finished turn opens under its line: its steps, what they brought back,
+/// its thoughts. Opened, the next press takes the line's own step whole into
+/// the pager, as `ctrl+o` always goes one way.
+fn open_turn(ui: &mut Ui, tree: &Tree, now: Now, line: bingo_sdk::ItemId) {
+    let opened = ui.folds.get(&line) == Some(&fold::Fold::Open);
+    match opened {
+        true => {
+            pager::open_block(ui, tree, now, Some(&line));
+        }
+        false => {
+            ui.folds.insert(line, fold::Fold::Open);
         }
     }
 }
@@ -812,9 +831,14 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     // being typed: it opens whole (design §5). A message outranks it.
     if ui.composer.is_empty()
         && let Some(block) = ui.select.block.clone()
-        && pager::open_block(ui, tree, now, Some(&block))
     {
-        return Vec::new();
+        if let Some(line) = folded_line(ui, tree, &block) {
+            ui.folds.insert(line, fold::Fold::Open);
+            return Vec::new();
+        }
+        if pager::open_block(ui, tree, now, Some(&block)) {
+            return Vec::new();
+        }
     }
     if ui.composer.text().ends_with('\\') {
         ui.composer.backspace();
@@ -830,6 +854,14 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         Delivery::Wake
     };
     submit(ui, tree, now, delivery)
+}
+
+/// The folded line `⏎` on the held block opens: the block is that line, and
+/// its turn is not opened yet.
+fn folded_line(ui: &Ui, tree: &Tree, block: &bingo_sdk::ItemId) -> Option<bingo_sdk::ItemId> {
+    let line = ui.shown.blocks.roles().line_of(tree.viewed(), block)?;
+    let shut = &line == block && ui.folds.get(&line) != Some(&fold::Fold::Open);
+    shut.then_some(line)
 }
 
 /// A line a key or a panel runs for the person: it does what their typed
@@ -2144,13 +2176,13 @@ mod tests {
         folded(vec![frame(
             1,
             bingo_sdk::Event::ItemCompleted {
-                item: tool(
+                item: crate::test_support::loose(tool(
                     "itm_1",
                     "Read",
                     serde_json::json!({"file_path": "src/lib.rs"}),
                     Some(output),
                     bingo_sdk::ItemStatus::Completed,
-                ),
+                )),
             },
         )])
     }
@@ -2229,6 +2261,7 @@ mod tests {
             },
         );
         item.completed_at = Some(ts() + jiff::SignedDuration::from_secs(2));
+        let item = crate::test_support::loose(item);
         folded(vec![frame(1, bingo_sdk::Event::ItemCompleted { item })])
     }
 
@@ -2346,7 +2379,7 @@ mod tests {
                 },
             );
             item.completed_at = Some(ts() + jiff::SignedDuration::from_secs(seconds));
-            item
+            crate::test_support::loose(item)
         };
         folded(vec![
             frame(
@@ -2391,14 +2424,14 @@ mod tests {
     #[test]
     fn ctrl_o_walks_past_a_run_whose_last_thought_is_still_being_had() {
         let mut state = thought(&steps());
-        let mut being_had = crate::test_support::item(
+        let mut being_had = crate::test_support::loose(crate::test_support::item(
             "itm_2",
             bingo_sdk::ItemStatus::Running,
             bingo_sdk::ItemBody::Reasoning {
                 text: "and now the lockfile".into(),
                 provider_metadata: Default::default(),
             },
-        );
+        ));
         state.apply(&frame(
             2,
             bingo_sdk::Event::ItemStarted {
@@ -2753,6 +2786,12 @@ mod tests {
         )])
     }
 
+    /// The read's turn opened: a step's picture is drawn under it there.
+    fn open_the_read(ui: &mut Ui) {
+        ui.folds
+            .insert(bingo_sdk::ItemId::from_raw("itm_1"), fold::Fold::Open);
+    }
+
     /// The row of the screen a picture's cells are on.
     fn cells_row(screen: &str) -> u16 {
         row_carrying(screen, &crate::graphics::kitty::PLACEHOLDER.to_string())
@@ -2771,6 +2810,7 @@ mod tests {
     fn a_click_inside_a_picture_opens_it() {
         let state = read_a_picture();
         let (mut ui, now) = scene();
+        open_the_read(&mut ui);
         crate::graphics::with(crate::graphics::drawing(), || {
             let screen = render(&state, &mut ui, now);
             let row = cells_row(&screen);
@@ -2780,7 +2820,11 @@ mod tests {
                 ui.focus.selection().is_none(),
                 "opening a picture is not selecting"
             );
-            assert!(ui.folds.is_empty(), "and it is not the block's fold");
+            assert_eq!(
+                ui.folds.get(&bingo_sdk::ItemId::from_raw("itm_1")),
+                Some(&fold::Fold::Open),
+                "and it is not the turn's fold"
+            );
         });
     }
 
@@ -2790,14 +2834,19 @@ mod tests {
     fn a_click_beside_a_picture_is_still_the_blocks() {
         let state = read_a_picture();
         let (mut ui, now) = scene();
+        open_the_read(&mut ui);
         crate::graphics::with(crate::graphics::drawing(), || {
             let screen = render(&state, &mut ui, now);
-            let row = row_carrying(&screen, "Read(shot.png)");
+            let row = row_carrying(&screen, "read shot.png");
             assert!(
                 on_mouse(&mut ui, &solo(&state), click(4, row), now).is_empty(),
-                "the row above the cells cycles the fold"
+                "the step's row above the cells folds its turn"
             );
-            assert!(!ui.folds.is_empty(), "which is what it wrote");
+            assert_eq!(
+                ui.folds.get(&bingo_sdk::ItemId::from_raw("itm_1")),
+                Some(&fold::Fold::Peek),
+                "which is what it wrote"
+            );
             let cells = cells_row(&screen);
             // Ten cells from column 5, so column 60 is past the picture.
             assert!(
@@ -2813,6 +2862,7 @@ mod tests {
     fn a_chip_is_words_and_a_click_on_it_opens_nothing() {
         let state = read_a_picture();
         let (mut ui, now) = scene();
+        open_the_read(&mut ui);
         let screen = render(&state, &mut ui, now);
         let row = row_carrying(&screen, "[image: image/png]");
         assert!(on_mouse(&mut ui, &solo(&state), click(6, row), now).is_empty());

@@ -315,11 +315,15 @@ fn quiet_is_a_record_flag_and_still_shows_displays_and_failures() {
     };
     *quiet = true;
     let state = folded(vec![frame(1, Event::ItemCompleted { item: item.clone() })]);
-    let screen = render(&state, &mut ui, now);
-    assert!(screen.contains("placed result") && !screen.contains("Unfamiliar"));
+    let screen = render(&state, &mut ui, now).to_lowercase();
+    assert!(screen.contains("placed result") && !screen.contains("unfamiliar"));
     item.status = ItemStatus::Failed;
     let state = folded(vec![frame(1, Event::ItemCompleted { item })]);
-    assert!(render(&state, &mut ui, now).contains("Unfamiliar"));
+    let failed = render(&state, &mut ui, now);
+    assert!(
+        failed.contains("unfamiliar failed"),
+        "a step of its turn: {failed}"
+    );
 }
 
 #[test]
@@ -359,7 +363,7 @@ fn a_row_with_no_body_keeps_the_item_and_a_wide_mark_keeps_the_bullet() {
     ]);
     let screen = render(&state, &mut ui, now);
     assert!(
-        screen.contains("⏺ original words") && screen.contains("badge"),
+        screen.contains("▍ original words") && screen.contains("badge"),
         "{screen}"
     );
     assert!(!screen.contains('界'));

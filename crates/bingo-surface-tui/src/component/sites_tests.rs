@@ -78,6 +78,18 @@ fn working_frame_requests_spinner() {
 fn site(component: Component) -> bingo_sdk::SessionState {
     use bingo_sdk::{ItemStatus, ToolOutput};
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
+    // A turn's steps and thoughts are its rows and its line; the item's own
+    // site draws one outside any turn.
+    let own = |item| completed_item(loose(item));
+    let sample = || {
+        tool(
+            "itm_one",
+            "sample",
+            json!({"text":"original"}),
+            Some(ToolOutput::text("original")),
+            ItemStatus::Completed,
+        )
+    };
     match component {
         Component::KeyBar
         | Component::Composer
@@ -97,14 +109,13 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         Component::AssistantMessage => {
             completed_item(assistant("itm_one", "original", ItemStatus::Completed))
         }
-        Component::ToolUse | Component::ToolResult | Component::ToolGroup => completed_item(tool(
-            "itm_one",
-            "sample",
-            json!({"text":"original"}),
-            Some(ToolOutput::text("original")),
-            ItemStatus::Completed,
-        )),
-        Component::ToolProgress => completed_item(running_tool("itm_one", "sample", "original")),
+        Component::ToolUse | Component::ToolResult | Component::ToolGroup => own(sample()),
+        Component::ToolProgress => own(running_tool("itm_one", "sample", "original")),
+        Component::Ledger => folded(vec![
+            frame(1, started("trn_1")),
+            started_tool(2, running_tool("itm_one", "sample", "original")),
+        ]),
+        Component::TurnFold => completed_item(sample()),
         Component::CommandOutput => completed_item(item(
             "itm_one",
             ItemStatus::Completed,
@@ -133,9 +144,7 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         Component::PromptHint
         | Component::AbovePrompt
         | Component::SessionStatus
-        | Component::Welcome
-        | Component::Ledger
-        | Component::TurnFold => state(),
+        | Component::Welcome => state(),
         Component::Toast | Component::Pane | Component::Status => placed_site(component),
         Component::Reasoning
         | Component::Compaction
@@ -329,14 +338,15 @@ fn fact_site(component: Component) -> bingo_sdk::SessionState {
             .unwrap(),
     )
     .unwrap();
-    let mut record = item(
+    // Outside any turn: a turn folds its thoughts and its stop away.
+    let mut record = loose(item(
         "itm_one",
         bingo_sdk::ItemStatus::Completed,
         bingo_sdk::ItemBody::Reasoning {
             text: String::new(),
             provider_metadata: Default::default(),
         },
-    );
+    ));
     super::facts::change(&mut record, &props);
     folded(vec![frame(1, Event::ItemCompleted { item: record })])
 }
@@ -437,6 +447,8 @@ screen_test!(turnprogress_backend, TurnProgress);
 screen_test!(sessionstatus_backend, SessionStatus);
 screen_test!(toast_backend, Toast);
 screen_test!(welcome_backend, Welcome);
+screen_test!(ledger_backend, Ledger);
+screen_test!(turn_fold_backend, TurnFold);
 
 #[test]
 fn every_builtin_site_keeps_pixels_when_answered_with_engine() {

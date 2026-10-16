@@ -106,6 +106,8 @@ mod sessions;
 /// What a person may set about this surface: the measure prose is drawn to,
 /// and the check the welcome box says the answer to.
 pub mod settings;
+/// A running step's spinner (M185).
+mod spinner;
 /// The shells the session has running in the background (M75): a word under
 /// the row that started one, a count on the status line, and no card.
 mod status;
@@ -119,6 +121,9 @@ mod thoughts;
 mod toast;
 mod transcript;
 mod tree;
+/// Which part each item plays in its turn: a step, a folded line, a stop
+/// line (M185).
+mod turns;
 mod ui;
 mod view;
 /// Handing a picture to whatever this system opens pictures with (M56).

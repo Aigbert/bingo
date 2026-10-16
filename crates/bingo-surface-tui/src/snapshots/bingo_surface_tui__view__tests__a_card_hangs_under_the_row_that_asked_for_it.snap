@@ -1,25 +1,26 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
+assertion_line: 1021
 expression: screen
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › edit it                                                                      "
-"                                                                                "
 "   ◆ Edit · needs you                                                           "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "
 "     2  Yes for this session                                                    "
 "     3  No, and tell it why                                                     "
-"                                                                                "
 " ▍ after 3                                                                      "
-"                                                                                "
 " ▍ after 4                                                                      "
-"                                                                                "
 " ▍ after 5                                                                      "
-"                                                                                "
 " ▍ after 6                                                                      "
+" ▍ after 7                                                                      "
+" ▍ after 8                                                                      "
+" ▍ after 9                                                                      "
+"                                                                                "
+"                                                                                "
 "                                                                                "
 " ▍ waiting for you                                                              "
 "────────────────────────────────────────────────────────────────────────────────"

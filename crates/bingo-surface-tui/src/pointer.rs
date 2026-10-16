@@ -128,6 +128,14 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
 ///
 /// It writes the map `ctrl+o` writes, so a block is open in one way only.
 fn cycle_fold(ui: &mut Ui, state: &SessionState, id: &bingo_sdk::ItemId) {
+    if let Some(line) = ui.shown.blocks.roles().line_of(state, id) {
+        let next = match ui.folds.get(&line) {
+            Some(fold::Fold::Open) => fold::Fold::Peek,
+            _ => fold::Fold::Open,
+        };
+        ui.folds.insert(line, next);
+        return;
+    }
     let Some(item) = item_of(state, id) else {
         return;
     };

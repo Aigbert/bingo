@@ -67,6 +67,26 @@ fn returned(block: &mut Block, item: &Item, images: &[&Image], fold: Fold, rows:
     }
 }
 
+/// What a step of an opened turn answered with, at its whole height, standing
+/// at `indent` under the step's words — where the rest of its answer hangs.
+pub(super) fn under_the_step(block: &mut Block, item: &Item, indent: usize, rows: &Rows<'_>) {
+    let images = picture::pictures_of(&item.body);
+    let room = room(rows.measured().saturating_sub(indent));
+    for (part, image) in images.iter().enumerate() {
+        let source = Source::Journal {
+            item: item.id.clone(),
+            part,
+        };
+        match drawn(source, image, room, height(Fold::Open), rows) {
+            Some((picture, cells)) => {
+                block.lines.extend(at_column(cells, indent));
+                block.pictures.push(picture);
+            }
+            None => block.lines.extend(at_column(vec![chip(image)], indent)),
+        }
+    }
+}
+
 /// The pictures a person handed over, as one band of thumbnails above their
 /// own line — the band the composer had them in before `⏎`, so the record and
 /// its preview are the same shape (M62). It stands in the block's own column,
@@ -156,7 +176,7 @@ fn named(block: &mut Block, image: &markdown::Linked, fold: Fold, rows: &Rows<'_
 
 /// The same rows, moved right by `indent` columns — a picture among an
 /// answer's words, whose lines are put in before the block is marked and
-/// indented under its `⏺` ([`in_the_words`]).
+/// indented under its `▍` ([`in_the_words`]).
 fn at_column(cells: Vec<Line<'static>>, indent: usize) -> Vec<Line<'static>> {
     if indent == 0 {
         return cells;
@@ -272,6 +292,13 @@ mod tests {
                 quiet: false,
             },
         )
+    }
+
+    /// The read's turn opened, which is where a step's picture is drawn.
+    fn opened() -> crate::fold::Folds {
+        [(bingo_sdk::ItemId::from_raw("itm_1"), Fold::Open)]
+            .into_iter()
+            .collect()
     }
 
     /// A person's line with a picture behind its token (M45).
@@ -457,7 +484,7 @@ mod tests {
         );
         assert_eq!(
             cells_at(&drawn[2]),
-            Some(speaks_indent() + 1),
+            Some(speaks_indent()),
             "in the block's own column: {drawn:?}"
         );
     }
@@ -561,6 +588,7 @@ mod tests {
     fn the_frame_draws_the_cells_and_names_the_picture() {
         let state = folded(vec![said(read(&png(100, 200)))]);
         let (mut ui, now) = scene();
+        ui.folds = opened();
         let screen = graphics::with(graphics::drawing(), || {
             let drawn = crate::test_support::draw_tree(80, 24, &solo(&state), &mut ui, now);
             let pictures = ui.shown.blocks.pictures();
@@ -588,7 +616,7 @@ mod tests {
     fn a_pictures_cells_are_not_printed_back_into_the_shell() {
         let state = folded(vec![said(read(&png(100, 200)))]);
         let pictures = Decoded::default();
-        let folds = crate::fold::Folds::new();
+        let folds = opened();
         let linked = Linked::default();
         let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
         let tail = graphics::with(graphics::drawing(), || {
@@ -598,7 +626,7 @@ mod tests {
             blocks.tail(height)
         });
         assert!(
-            tail.iter().any(|line| line.contains("Read(shot.png)")),
+            tail.iter().any(|line| line.contains("read shot.png")),
             "the row survives: {tail:?}"
         );
         assert!(
@@ -614,7 +642,7 @@ mod tests {
     fn a_block_kept_between_frames_keeps_its_picture() {
         let state = folded(vec![said(read(&png(100, 200)))]);
         let pictures = Decoded::default();
-        let folds = crate::fold::Folds::new();
+        let folds = opened();
         let linked = Linked::default();
         let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
         graphics::with(graphics::drawing(), || {
@@ -635,7 +663,7 @@ mod tests {
     fn a_block_drawn_as_a_chip_draws_its_picture_once_the_terminal_does() {
         let state = folded(vec![said(read(&png(100, 200)))]);
         let pictures = Decoded::default();
-        let folds = crate::fold::Folds::new();
+        let folds = opened();
         let linked = Linked::default();
         let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
         let mut blocks = Blocks::default();
@@ -671,7 +699,7 @@ mod tests {
         );
         assert_eq!(
             cells_at(&drawn[3]),
-            Some(speaks_indent() + 1),
+            Some(speaks_indent()),
             "at the words' own column: {drawn:?}"
         );
         assert!(
@@ -691,7 +719,7 @@ mod tests {
     }
 
     /// A picture in a plain paragraph stands at the words' own column, which is
-    /// the `⏺` indent and nothing more (M56).
+    /// the `▍` indent and nothing more (M56).
     #[test]
     fn a_picture_in_a_paragraph_stands_at_the_words_column() {
         let linked = memo("docs/x.png", Ok(png(100, 200)));
@@ -702,12 +730,12 @@ mod tests {
             &linked,
         );
         let drawn = text(&block);
-        assert_eq!(cells_at(&drawn[1]), Some(speaks_indent() + 1), "{drawn:?}");
+        assert_eq!(cells_at(&drawn[1]), Some(speaks_indent()), "{drawn:?}");
         assert_eq!(block.pictures[0].cols, 10, "and it has the whole measure");
     }
 
     /// A picture in a bulleted answer stands at the bullet's *text* column, not
-    /// at the block's own edge (M56): the marker's width past the `⏺` indent,
+    /// at the block's own edge (M56): the marker's width past the `▍` indent,
     /// which is where its chip stands too — and the room it is fitted to is
     /// what is left of the measure, so it is never pushed past the margin.
     #[test]
@@ -723,10 +751,10 @@ mod tests {
         assert!(drawn[0].contains("[image: shot]"), "the chip: {drawn:?}");
         assert_eq!(
             cells_at(&drawn[1]),
-            Some(speaks_indent() + 3),
+            Some(speaks_indent() + 2),
             "past the bullet: {drawn:?}"
         );
-        // 60 columns of measure, less the `⏺` indent and the marker: 56.
+        // 60 columns of measure, less the `▍` indent and the marker: 56.
         assert_eq!(block.pictures[0].cols, 55, "fitted to the room it has");
         assert!(
             drawn.iter().all(|line| line.width() <= 60),
@@ -746,13 +774,13 @@ mod tests {
         let nested = drawn("- one\n  - ![shot](docs/x.png)");
         assert_eq!(
             cells_at(&nested[2]),
-            Some(speaks_indent() + 5),
+            Some(speaks_indent() + 4),
             "{nested:?}"
         );
         let quoted = drawn("> ![shot](docs/x.png)");
         assert_eq!(
             cells_at(&quoted[1]),
-            Some(speaks_indent() + 3),
+            Some(speaks_indent() + 2),
             "{quoted:?}"
         );
     }

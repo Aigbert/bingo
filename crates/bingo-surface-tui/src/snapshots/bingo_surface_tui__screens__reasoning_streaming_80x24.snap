@@ -1,14 +1,15 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 53
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › what is in this workspace?                                                   "
 "                                                                                "
-"▏ Thinking…                                                                     "
-"  ⎿  The plan after that: it says which of the two is allowed to move.          "
-"     Only then the code, and only the                                           "
+"                                                                                "
+"                                                                                "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

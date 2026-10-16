@@ -117,7 +117,7 @@ mod tests {
     /// rows its cells were drawn on and the columns they stand in.
     #[test]
     fn a_pictures_rows_are_one_rectangle_of_the_screen() {
-        let drawn = vec![words("⏺ [image: shot]"), row(7, 2, 10), row(7, 2, 10)];
+        let drawn = vec![words("▍ [image: shot]"), row(7, 2, 10), row(7, 2, 10)];
         assert_eq!(
             cells(&drawn, AREA),
             vec![Placed {

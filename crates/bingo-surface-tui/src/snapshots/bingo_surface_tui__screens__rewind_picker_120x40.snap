@@ -1,17 +1,18 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 54
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
 " › run the tests                                                                                                        "
-"                                                                                                                        "
 " ▍ All 33 pass.                                                                                                         "
 "                                                                                                                        "
 "   • `wrap` is done                                                                                                     "
 "   • `keys` is done                                                                                                     "
 "                                                                                                                        "
 " › now write me a note and run the tests                                                                                "
+"                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "

@@ -1,6 +1,6 @@
-//! One item to styled lines, in Claude Code's grammar (`docs/design/tui.md`
-//! §4): `⏺` for what the model says and does, `⎿` for what came back, `>` on a
-//! raised bar for what you said. The reducer is the only history: nothing here
+//! One item to styled lines (`docs/design/tui.md` §4, ADR-0095 §6): every mark
+//! at column 1 — `▍` for what the model says, `›` on a raised bar for what you
+//! said — and a turn's steps at column 3 under one folded line. The reducer is the only history: nothing here
 //! remembers a thing, and [`crate::blocks`] stacks and memoises what it draws.
 
 use std::time::{Duration, Instant};
@@ -32,6 +32,8 @@ mod output;
 mod pictured;
 /// A shell line the person ran themselves (`!<command>`).
 mod ran;
+/// A turn's parts at column 3: its steps, its folded line, its stop line.
+mod steps;
 /// The rows a thought draws, one of them or a run of them (§4, §6).
 mod thinking;
 
@@ -290,6 +292,8 @@ pub struct Place<'a> {
     /// Whether a newer thought has joined this one: then the run's block hangs
     /// on that one and this draws nothing at all.
     pub joined: bool,
+    /// The part it plays in its turn ([`crate::turns`]).
+    pub role: crate::turns::Role,
 }
 
 impl<'a> Place<'a> {
@@ -311,7 +315,13 @@ impl<'a> Place<'a> {
                 false => Vec::new(),
             },
             joined: thought && thoughts::next_is_thought(items, at),
+            role: crate::turns::Role::Own,
         }
+    }
+
+    /// The same place, with the part the item plays in its turn.
+    pub fn playing(self, role: crate::turns::Role) -> Self {
+        Self { role, ..self }
     }
 
     /// The run this item ends, itself last: the thoughts one block draws.
@@ -336,6 +346,9 @@ pub fn item_block(
     if crate::ask::receipts::source(item).is_some_and(|id| rows.state.transcript.get(id).is_some())
     {
         return Block::default();
+    }
+    if let Some(block) = steps::part(item, &place.role, rows) {
+        return block;
     }
     // How much of this block is on the screen — what `ctrl+o` and a click both
     // write, over the start its kind has. One question, asked once, here.
@@ -379,12 +392,13 @@ fn default_item_lines(
         }
         ItemBody::Compaction { before, after, .. } => compacted(*before, *after, rows).into(),
         ItemBody::Rewind { dropped, .. } => rewound(*dropped, rows).into(),
-        ItemBody::Interruption { marker } => {
-            vec![Line::from(Span::styled(marker.clone(), theme::dim()))].into()
-        }
-        ItemBody::Notice { level, text, .. } => {
-            vec![Line::from(Span::styled(text.clone(), theme::level(*level)))].into()
-        }
+        ItemBody::Interruption { marker } => vec![indented(marker, theme::dim())].into(),
+        ItemBody::Notice { level, text, .. } => speaks(
+            theme::level(*level),
+            vec![Line::from(Span::styled(text.clone(), theme::level(*level)))],
+            rows,
+        )
+        .into(),
         ItemBody::QuestionAnswer {
             question, answer, ..
         } => answered(question, answer, rows).into(),
@@ -394,12 +408,20 @@ fn default_item_lines(
             feedback,
             ..
         } => receipt(tool, *decision, feedback.as_deref(), place.previous, rows).into(),
-        ItemBody::Asset { asset, label } => vec![Line::from(Span::styled(
-            format!("[{}]", label.clone().unwrap_or_else(|| asset.clone())),
+        ItemBody::Asset { asset, label } => vec![indented(
+            &format!("[{}]", label.clone().unwrap_or_else(|| asset.clone())),
             theme::dim(),
-        ))]
+        )]
         .into(),
     }
+}
+
+/// A line of words where a mark's text starts, with no mark before it.
+fn indented(text: &str, style: Style) -> Line<'static> {
+    Line::from(vec![
+        Span::raw(" ".repeat(speaks_indent())),
+        Span::styled(text.to_owned(), style),
+    ])
 }
 
 /// The seam a compaction left, across the width of the transcript.
@@ -491,9 +513,10 @@ fn called(
 
 // ---- the two marks ------------------------------------------------------
 
-/// Where the text under a `⏺` starts: column 2 (design §4).
+/// Where the text after a mark starts: the mark at column 1, its text at 3
+/// (design §4), as every row of the transcript has it.
 fn speaks_indent() -> usize {
-    theme::bullet().width() + 1
+    theme::bullet().width() + 2
 }
 
 /// The `  ⎿  ` a result hangs from, and where its text starts: column 5.
@@ -537,7 +560,7 @@ fn marked(
     body: Vec<Line<'static>>,
     rows: &Rows<'_>,
 ) -> Vec<Line<'static>> {
-    let mark = Span::styled(format!("{glyph} "), style);
+    let mark = Span::styled(format!(" {glyph} "), style);
     under(mark, body, speaks_indent(), rows.measured())
 }
 
@@ -555,7 +578,7 @@ fn returns(body: Vec<Line<'static>>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 
 // ---- the kinds ----------------------------------------------------------
 
-/// The answer: the brightest text on the screen, after a white `⏺` — and,
+/// The answer: the brightest text on the screen, after the presence `▍` — and,
 /// while it is still arriving, a comet tail on the cells that just landed.
 ///
 /// The words may name a picture themselves (M51). The tail is lit first: a row
@@ -935,7 +958,7 @@ pub(crate) fn component_closing(
     match props {
         bingo_sdk::component::Props::InfoNotice(props) => vec![Line::from(Span::styled(
             format!(
-                "{} {}{}",
+                " {} {}{}",
                 theme::bullet(),
                 props.text,
                 props
@@ -952,28 +975,23 @@ pub(crate) fn component_closing(
                 .as_ref()
                 .map(|turn| crate::worked::words(turn, now.wall, &jiff::tz::TimeZone::system()).1)
                 .unwrap_or_default();
-            let mut lines: Vec<Line<'static>> = crate::ask::receipts::folded(state)
-                .into_iter()
-                .map(|text| Line::from(Span::styled(text, theme::dim())))
-                .collect();
-            lines.push(Line::from(Span::styled(
+            vec![Line::from(Span::styled(
                 format!(
-                    "{} {} {}{when}",
+                    " {} {} {}{when}",
                     theme::mark(),
                     props.word,
                     crate::worked::duration(std::time::Duration::from_millis(props.duration_ms))
                 ),
                 theme::dim(),
-            )));
-            lines
+            ))]
         }
         _ => Vec::new(),
     }
 }
 
-/// A full-width divider with its reason in the middle of the left run.
+/// A divider from column 1 to the edge, with its reason in the left run.
 fn rule(text: &str, width: usize) -> Line<'static> {
-    let head = format!("{0}{0}{0} {text} ", theme::rule());
+    let head = format!(" {0}{0}{0} {text} ", theme::rule());
     let tail = width.saturating_sub(head.width());
     Line::from(Span::styled(
         format!("{head}{}", theme::rule().repeat(tail)),
@@ -1019,7 +1037,7 @@ mod tests {
 
     use super::*;
     use crate::test_support::{
-        agent_call, assistant, completed, delivered, extended, folded, frame, item, post,
+        agent_call, assistant, completed, delivered, extended, folded, frame, item, loose, post,
         receipt_item, running_tool, scene, started, started_tool, tool, ts, user as person, voiced,
     };
     use bingo_sdk::{Event, ItemId};
@@ -1046,7 +1064,7 @@ mod tests {
             .iter()
             .map(|c| c.symbol())
             .collect();
-        assert!(text.contains("⏺ Read note.md"), "{text}");
+        assert!(text.contains(" ▍ Read note.md"), "{text}");
         assert!(text.contains("hello"), "{text}");
     }
 
@@ -1079,10 +1097,13 @@ mod tests {
         )
     }
 
+    /// Every item outside any turn, so each draws its own block: these tests
+    /// pin each kind's grammar, and how a turn folds them is `turns_tests`'.
     fn stated(items: Vec<Item>) -> SessionState {
         crate::test_support::with_skill_tool_rows(folded(
             items
                 .into_iter()
+                .map(loose)
                 .enumerate()
                 .map(|(i, item)| frame(i as u64 + 1, Event::ItemCompleted { item }))
                 .collect(),
@@ -1151,6 +1172,7 @@ mod tests {
         frames.extend(
             calls
                 .into_iter()
+                .map(loose)
                 .enumerate()
                 .map(|(i, item)| frame(i as u64 + 2, Event::ItemCompleted { item })),
         );
@@ -1298,7 +1320,7 @@ mod tests {
                 Some("scout"),
                 "Two nits, else fine."
             )]),
-            vec!["⏺ scout: Two nits, else fine.".to_string()],
+            vec![" ▍ scout: Two nits, else fine.".to_string()],
         );
         assert_eq!(
             drawn(vec![delivered(
@@ -1378,9 +1400,9 @@ mod tests {
                 "found it\n\nit was the cursor all along",
             )]),
             vec![
-                "✦ scout: found it".to_string(),
+                " ✦ scout: found it".to_string(),
                 String::new(),
-                "  it was the cursor all along".to_string(),
+                "   it was the cursor all along".to_string(),
             ],
             "no `⎿`, nothing dim, nothing folded: a message is read whole"
         );
@@ -1393,7 +1415,7 @@ mod tests {
     fn an_unsigned_post_is_the_holders_and_says_so() {
         assert_eq!(
             drawn_in_room(vec![person("itm_1", "then let us ship it")]),
-            vec!["✦ parent: then let us ship it"],
+            vec![" ✦ parent: then let us ship it"],
         );
     }
 
@@ -1422,7 +1444,7 @@ mod tests {
         ] {
             assert_eq!(
                 drawn(vec![delivered("itm_1", surface, None, "it ended")]),
-                vec!["⏺ it ended".to_string()],
+                vec![" ▍ it ended".to_string()],
                 "{surface} is quiet"
             );
         }
@@ -1478,7 +1500,7 @@ mod tests {
                  `BashOutput` with id \"ab12cd34\" reads what it wrote.",
             )]),
             vec![
-                "⏺ Background job ab12cd34 exited with code 1 after 2m.".to_string(),
+                " ▍ Background job ab12cd34 exited with code 1 after 2m.".to_string(),
                 "  ⎿  `BashOutput` with id \"ab12cd34\" reads what it wrote.".to_string(),
             ],
         );
@@ -1506,7 +1528,7 @@ mod tests {
         assert_eq!(
             drawn_knowing_the_skill(vec![skill_prompt()]),
             vec![
-                "❖ Skill(guide) the wire format".to_string(),
+                " ❖ Skill(guide) the wire format".to_string(),
                 "  ⎿  Base directory for this skill: /skills/guide".to_string(),
                 String::new(),
                 "     Read this before answering about bingo itself.".to_string(),
@@ -1522,7 +1544,7 @@ mod tests {
         assert_eq!(
             drawn(vec![skill_prompt()]),
             vec![
-                "⏺ /guide the wire format".to_string(),
+                " ▍ /guide the wire format".to_string(),
                 "  ⎿  Base directory for this skill: /skills/guide".to_string(),
                 String::new(),
                 "     Read this before answering about bingo itself.".to_string(),
@@ -1553,7 +1575,7 @@ mod tests {
         assert_eq!(
             called,
             vec![
-                "❖ Skill(guide) the wire format".to_string(),
+                " ❖ Skill(guide) the wire format".to_string(),
                 "  ⎿  Base directory for this skill: /skills/guide".to_string(),
             ],
             "the catalogue is not consulted: the call says what it is",
@@ -1571,7 +1593,7 @@ mod tests {
                 None,
                 ItemStatus::Running,
             )]),
-            vec!["❖ Skill(guide)".to_string()],
+            vec![" ❖ Skill(guide)".to_string()],
         );
     }
 
@@ -1587,7 +1609,7 @@ mod tests {
                 None,
                 ItemStatus::Running,
             )]),
-            vec!["⏺ Skill(the wire format)".to_string()],
+            vec![" ▍ Skill(the wire format)".to_string()],
         );
     }
 
@@ -1601,7 +1623,7 @@ mod tests {
                 Some("reviewer"),
                 "done, two nits"
             )]),
-            vec!["⏺ reviewer: done, two nits".to_string()],
+            vec![" ▍ reviewer: done, two nits".to_string()],
         );
     }
 
@@ -1617,7 +1639,7 @@ mod tests {
             &format!("the nightly run is in{body}"),
         )]);
         assert_eq!(drawn.len(), OUTPUT_ROWS + 2);
-        assert_eq!(drawn[0], "⏺ the nightly run is in");
+        assert_eq!(drawn[0], " ▍ the nightly run is in");
         assert_eq!(drawn.last().map(String::as_str), Some("     … +4 lines"));
     }
 
@@ -1649,7 +1671,7 @@ mod tests {
                 ItemStatus::Completed,
             )]),
             vec![
-                "⏺ Read(Cargo.toml)".to_string(),
+                " ▍ Read(Cargo.toml)".to_string(),
                 "  ⎿  Read 3 lines".to_string(),
             ],
             "the path is named from the session's own directory"
@@ -1677,12 +1699,12 @@ mod tests {
     fn a_running_tool_shows_the_last_rows_of_its_tail() {
         let state = folded(vec![started_tool(
             1,
-            running_tool("itm_1", "Bash", "one\ntwo\nthree\nfour"),
+            loose(running_tool("itm_1", "Bash", "one\ntwo\nthree\nfour")),
         )]);
         assert_eq!(
             rendered(&state),
             vec![
-                "⏺ Bash(cargo test)".to_string(),
+                " ▍ Bash(cargo test)".to_string(),
                 "  ⎿  two".to_string(),
                 "     three".to_string(),
                 "     four".to_string(),
@@ -1739,7 +1761,7 @@ mod tests {
                 thought_at("itm_2", "Then the crate map.", 3),
             ]),
             vec![
-                "▏ Thought for 5s".to_string(),
+                " ▏ Thought for 5s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
                 "     Then the crate map.".to_string(),
             ],
@@ -1759,7 +1781,7 @@ mod tests {
                 thinking_at("itm_3", "The plan after that."),
             ]),
             vec![
-                "▏ Thinking…".to_string(),
+                " ▏ Thinking…".to_string(),
                 "  ⎿  Then the crate map.".to_string(),
                 "     The plan after that.".to_string(),
             ],
@@ -1783,13 +1805,13 @@ mod tests {
                 thought_at("itm_3", "Then the crate map.", 3),
             ]),
             vec![
-                "▏ Thought for 2s".to_string(),
+                " ▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
                 String::new(),
-                "⏺ Read(Cargo.toml)".to_string(),
+                " ▍ Read(Cargo.toml)".to_string(),
                 "  ⎿  Read 3 lines".to_string(),
                 String::new(),
-                "▏ Thought for 3s".to_string(),
+                " ▏ Thought for 3s".to_string(),
                 "  ⎿  Then the crate map.".to_string(),
             ],
         );
@@ -1806,7 +1828,7 @@ mod tests {
         ]);
         assert_eq!(
             drawn.first().map(String::as_str),
-            Some("▏ Thought for 3m 21s"),
+            Some(" ▏ Thought for 3m 21s"),
             "{drawn:?}"
         );
     }
@@ -1815,13 +1837,13 @@ mod tests {
     fn thinking_streams_and_then_holds_the_rows_it_streamed() {
         assert_eq!(
             drawn(vec![thinking_item("the manifest")]),
-            vec!["▏ Thinking…".to_string(), "  ⎿  the manifest".to_string()],
+            vec![" ▏ Thinking…".to_string(), "  ⎿  the manifest".to_string()],
             "a thought being had is read as it is thought"
         );
         assert_eq!(
             drawn(vec![thought_item("The manifest first.", 2)]),
             vec![
-                "▏ Thought for 2s".to_string(),
+                " ▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
             ],
             "and once it is over it holds: the heading's words are the whole of the change"
@@ -1865,7 +1887,7 @@ mod tests {
         assert_eq!(
             drawn(vec![thinking_item("first\nsecond\nthird\nfourth")]),
             vec![
-                "▏ Thinking…".to_string(),
+                " ▏ Thinking…".to_string(),
                 "  ⎿  third".to_string(),
                 "     fourth".to_string(),
             ],
@@ -1901,7 +1923,7 @@ mod tests {
                         Compiling bingo-provider-fake v0.1.0 (/tmp/project/crates/bingo-provider-fake)";
         let state = folded(vec![started_tool(
             1,
-            running_tool("itm_1", "Bash", progress),
+            loose(running_tool("itm_1", "Bash", progress)),
         )]);
         let drawn = rendered(&state);
         assert_eq!(drawn.len(), 1 + TAIL_ROWS, "{drawn:?}");
@@ -1950,7 +1972,7 @@ mod tests {
         let state = folded(vec![frame(
             1,
             Event::ItemCompleted {
-                item: thought_item(&text, 3),
+                item: loose(thought_item(&text, 3)),
             },
         )]);
         let at = |fold| {
@@ -1960,7 +1982,7 @@ mod tests {
         assert_eq!(
             at(Fold::Peek),
             vec![
-                "▏ Thought for 3s".to_string(),
+                " ▏ Thought for 3s".to_string(),
                 "  ⎿  step 8".to_string(),
                 "     step 9".to_string(),
             ],
@@ -1971,7 +1993,7 @@ mod tests {
         assert_eq!(open.last().map(String::as_str), Some("     step 9"));
         assert_eq!(
             at(Fold::Shut),
-            vec!["▏ Thought for 3s".to_string()],
+            vec![" ▏ Thought for 3s".to_string()],
             "and one more click puts the thought away"
         );
     }
@@ -1982,7 +2004,7 @@ mod tests {
     fn a_thought_with_nothing_in_it_yet_is_the_row_alone() {
         assert_eq!(
             drawn(vec![thinking_item("")]),
-            vec!["▏ Thinking…".to_string()],
+            vec![" ▏ Thinking…".to_string()],
         );
     }
 
@@ -2012,7 +2034,7 @@ mod tests {
                 }),
             )]),
             vec![
-                "⏺ Read src/lib.rs (1 - 50)".to_string(),
+                " ▍ Read src/lib.rs (1 - 50)".to_string(),
                 "  ⎿  pub mod wire;".to_string(),
             ],
         );
@@ -2026,7 +2048,7 @@ mod tests {
         assert_eq!(
             drawn(vec![thinking_item("read Read src/lib.rs (1 - 50)")]),
             vec![
-                "▏ Thinking…".to_string(),
+                " ▏ Thinking…".to_string(),
                 "  ⎿  read Read src/lib.rs (1 - 50)".to_string(),
             ],
         );
@@ -2039,7 +2061,7 @@ mod tests {
         assert_eq!(
             drawn(vec![thought_item("The manifest first.", 2)]),
             vec![
-                "▏ Thought for 2s".to_string(),
+                " ▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
             ],
         );
@@ -2050,7 +2072,7 @@ mod tests {
                 serde_json::json!({ "title": "not a call" }),
             )]),
             vec![
-                "▏ Thought for 1s".to_string(),
+                " ▏ Thought for 1s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
             ],
             "a namespace without the flag is somebody's private note, not a call"
@@ -2067,7 +2089,7 @@ mod tests {
                 "tool something",
                 serde_json::json!({ "external": true }),
             )]),
-            vec!["⏺ Tool".to_string()],
+            vec![" ▍ Tool".to_string()],
         );
     }
 
@@ -2092,7 +2114,7 @@ mod tests {
         assert_eq!(
             rendered(&state),
             vec![
-                "⏺ toolu_04Bash".to_string(),
+                " ▍ toolu_04Bash".to_string(),
                 "  ⎿  no such file".to_string(),
             ],
         );
@@ -2109,7 +2131,7 @@ mod tests {
         assert_eq!(
             drawn(vec![thought_item(&text, 3)]),
             vec![
-                "▏ Thought for 3s".to_string(),
+                " ▏ Thought for 3s".to_string(),
                 "  ⎿  step 98".to_string(),
                 "     step 99".to_string(),
             ],
@@ -2122,7 +2144,7 @@ mod tests {
     fn an_empty_thought_is_the_row_and_nothing_else() {
         assert_eq!(
             drawn(vec![thought_item("", 1)]),
-            vec!["▏ Thought for 1s".to_string()],
+            vec![" ▏ Thought for 1s".to_string()],
         );
         assert_eq!(thought(&thought_item("   \n", 1)), None);
         assert_eq!(thought(&thought_item("why", 1)), Some("why"));
@@ -2142,7 +2164,7 @@ mod tests {
                 receipt_item("itm_2", "Edit", DecisionKind::Deny, Some("use cargo clean")),
             ]),
             vec![
-                "⏺ Edit(src/lib.rs)".to_string(),
+                " ▍ Edit(src/lib.rs)".to_string(),
                 "  ⎿  you: no — use cargo clean".to_string(),
             ],
             "no blank line, and the tool is named once"
@@ -2181,7 +2203,7 @@ mod tests {
         ]);
         assert_eq!(
             rendered(&state).last().map(String::as_str),
-            Some("⏺ no route to the provider")
+            Some(" ▍ no route to the provider")
         );
     }
 

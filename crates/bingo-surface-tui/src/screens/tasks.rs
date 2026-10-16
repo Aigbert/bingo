@@ -116,6 +116,7 @@ fn between_turns(records: serde_json::Value) -> bingo_sdk::SessionState {
 #[test]
 fn tasks_at_work() {
     let (mut ui, now) = mid_turn();
+    let now = still(now);
     let state = at_work(three());
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(screen.contains(" ▍ Shipping it · 1s"), "{screen}");
@@ -163,6 +164,7 @@ fn tasks_cut_to_five() {
 #[test]
 fn activity_hidden() {
     let (mut ui, now) = mid_turn();
+    let now = still(now);
     ui.activity_hidden = true;
     let state = at_work(three());
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
