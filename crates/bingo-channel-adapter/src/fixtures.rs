@@ -20,6 +20,8 @@ pub fn ts() -> Timestamp {
 
 pub fn summary() -> SessionSummary {
     SessionSummary {
+        effort: None,
+        model_scope: None,
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,

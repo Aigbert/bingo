@@ -153,24 +153,13 @@ async fn set(
             "model switch cancelled",
         ));
     }
-    host.reconfigure(
-        &cx.session,
-        SessionChange::Model {
-            provider: Some(choice.endpoint.id().to_owned()),
-            model: choice.id.clone(),
-        },
-    )
-    .await?;
-    let keys = [
-        ("provider", json!(choice.endpoint.id())),
-        ("model", json!(choice.id)),
-    ];
+    let saved = apply_choice(host, cx, &choice, keep).await?;
     let mut message = format!(
         "⇄ {} · {} · thinking {} · {}",
         choice.id,
         choice.endpoint.id(),
         Effort::word(choice.reasoning),
-        super::kept(host, keep, &keys)
+        saved
     );
     if let Some((before, after)) = compacted {
         message.push_str(&format!(" · compacted {before} → {after}"));
@@ -181,6 +170,34 @@ async fn set(
     Ok(CommandOutcome::Applied {
         message: Some(message),
     })
+}
+
+async fn apply_choice(
+    host: &Host,
+    cx: &CommandContext,
+    choice: &ModelChoice,
+    keep: bool,
+) -> Result<String, KernelError> {
+    let change = |scope| SessionChange::Model {
+        provider: Some(choice.endpoint.id().to_owned()),
+        model: choice.id.clone(),
+        scope,
+    };
+    host.reconfigure(&cx.session, change(ChoiceScope::Session))
+        .await?;
+    if !keep {
+        return Ok("this session".into());
+    }
+    let keys = [
+        ("provider", json!(choice.endpoint.id())),
+        ("model", json!(choice.id)),
+    ];
+    if let Some(error) = super::remember(host, &keys) {
+        return Ok(error);
+    }
+    host.reconfigure(&cx.session, change(ChoiceScope::Default))
+        .await?;
+    Ok("kept for new sessions".into())
 }
 
 /// What the session's next turn runs on, resolved as the turn will resolve

@@ -1282,6 +1282,26 @@
             "null"
           ]
         },
+        "modelScope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChoiceScope"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Effort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "systemExtra": {
           "type": [
             "string",
@@ -1403,6 +1423,26 @@
         }
       ],
       "description": "What a session does with what it is told (ADR-0011 §1)."
+    },
+    "ChoiceScope": {
+      "type": "string",
+      "enum": [
+        "session",
+        "default"
+      ],
+      "description": "Whether the chosen model applies only here or is the default for new sessions."
+    },
+    "Effort": {
+      "type": "string",
+      "enum": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xHigh",
+        "max"
+      ],
+      "description": "Reasoning effort, in the vocabulary providers converge on."
     },
     "Usage": {
       "type": "object",
@@ -3787,18 +3827,6 @@
         "user",
         "assistant"
       ]
-    },
-    "Effort": {
-      "type": "string",
-      "enum": [
-        "minimal",
-        "low",
-        "medium",
-        "high",
-        "xHigh",
-        "max"
-      ],
-      "description": "Reasoning effort, in the vocabulary providers converge on."
     },
     "Completed": {
       "type": "object",

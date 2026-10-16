@@ -122,6 +122,8 @@ props!(TurnProgressProps {
     stopping: bool
 });
 props!(SessionStatusProps {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    model_scope: Option<crate::ChoiceScope>,
     title: Option<String>, cwd: String, provider: Option<String>, model: Option<String>, effort: Option<crate::Effort>, context: Option<crate::ContextUsage>, usage: crate::Usage });
 props!(ToastProps {
     text: String,
@@ -159,6 +161,8 @@ impl From<&crate::SessionState> for StatusFacts {
     fn from(state: &crate::SessionState) -> Self {
         Self {
             summary: crate::SessionSummary {
+                effort: None,
+                model_scope: None,
                 history: crate::SessionHistory::default(),
                 ..state.summary.clone()
             },

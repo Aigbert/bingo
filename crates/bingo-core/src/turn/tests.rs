@@ -92,6 +92,8 @@ impl TurnHost for RecordingHost {
 fn summary() -> SessionSummary {
     let ts = Timestamp::from_second(0).unwrap();
     SessionSummary {
+        effort: None,
+        model_scope: None,
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,

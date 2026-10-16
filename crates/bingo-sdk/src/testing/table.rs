@@ -87,6 +87,8 @@ impl Table {
         }
         let id = self.next_id();
         let summary = SessionSummary {
+            effort: None,
+            model_scope: None,
             history: crate::SessionHistory {
                 first_ask: None,
                 forked_from: None,

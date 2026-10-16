@@ -470,6 +470,8 @@ mod tests {
 
     fn summary() -> SessionSummary {
         SessionSummary {
+            effort: None,
+            model_scope: None,
             history: crate::SessionHistory {
                 first_ask: None,
                 forked_from: None,
@@ -704,6 +706,8 @@ mod tests {
             },
         ));
         let head = SessionSummary {
+            effort: None,
+            model_scope: None,
             history: crate::SessionHistory {
                 messages: st.summary.history.messages,
                 ..summary().history

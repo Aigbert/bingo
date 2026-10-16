@@ -1453,6 +1453,14 @@
         "decision"
       ]
     },
+    "ChoiceScope": {
+      "type": "string",
+      "enum": [
+        "session",
+        "default"
+      ],
+      "description": "Whether the chosen model applies only here or is the default for new sessions."
+    },
     "Classify": {
       "type": "object",
       "properties": {
@@ -9049,6 +9057,16 @@
     "SessionStatusProps": {
       "type": "object",
       "properties": {
+        "modelScope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChoiceScope"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "title": {
           "type": [
             "string",
@@ -9138,6 +9156,26 @@
           "type": [
             "string",
             "null"
+          ]
+        },
+        "modelScope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChoiceScope"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "effort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Effort"
+            },
+            {
+              "type": "null"
+            }
           ]
         },
         "systemExtra": {

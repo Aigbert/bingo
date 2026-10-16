@@ -172,6 +172,7 @@ impl Plan {
 
     fn spec(&self, name: &str, cx: &ToolContext) -> SessionSpec {
         SessionSpec {
+            model_scope: None,
             driver: Default::default(),
             cwd: cx.cwd.clone(),
             key: Some(format!("agent/{}/{name}", cx.session)),

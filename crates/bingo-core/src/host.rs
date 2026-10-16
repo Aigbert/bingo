@@ -107,11 +107,16 @@ pub struct Host {
 fn apply(change: SessionChange, spec: &mut SessionSpec) {
     match change {
         SessionChange::Key(key) => spec.key = key,
-        SessionChange::Model { provider, model } => {
+        SessionChange::Model {
+            provider,
+            model,
+            scope,
+        } => {
             if provider.is_some() {
                 spec.provider = provider;
             }
             spec.model = Some(model);
+            spec.model_scope = Some(scope);
         }
         SessionChange::Thinking(level) => spec.thinking = Some(level),
         SessionChange::Title(title) => spec.title = crate::spec::titled(&title),

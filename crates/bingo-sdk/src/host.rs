@@ -55,6 +55,8 @@ pub struct SessionSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_scope: Option<crate::ChoiceScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub system_extra: Option<String>,
     /// Restrict the tool set by name; `None` means every registered tool.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -91,6 +93,7 @@ pub enum SessionChange {
         /// Stays as it was when absent.
         provider: Option<String>,
         model: String,
+        scope: crate::ChoiceScope,
     },
     Thinking(Option<Effort>),
     /// What the session is called from now on. A blank title clears the

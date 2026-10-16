@@ -360,7 +360,25 @@ async fn model_is_remembered_in_the_user_settings() {
     let host = host_in(home.path(), None).await;
     let mut client = Client::open(&host).await;
 
+    assert_eq!(client.state.summary.model_scope, Some(ChoiceScope::Default));
+    client.ack("/model m2").await;
+    assert_eq!(
+        host.session_state(&client.state.summary.id)
+            .await
+            .unwrap()
+            .summary
+            .model_scope,
+        Some(ChoiceScope::Session)
+    );
     let (ack, _) = client.ack("/model m2 --keep").await;
+    assert_eq!(
+        host.session_state(&client.state.summary.id)
+            .await
+            .unwrap()
+            .summary
+            .model_scope,
+        Some(ChoiceScope::Default)
+    );
     assert_eq!(
         message(&ack),
         "⇄ m2 · scripted · thinking off · kept for new sessions"

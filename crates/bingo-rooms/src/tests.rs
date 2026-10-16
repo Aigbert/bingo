@@ -514,6 +514,8 @@ pub(crate) fn hook_context(session: &SessionId, fleet: &Fleet, cwd: &Path) -> Ho
 
 pub(crate) fn summary(id: &str, title: Option<&str>, parent: Option<SessionId>) -> SessionSummary {
     SessionSummary {
+        effort: None,
+        model_scope: None,
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,
@@ -544,6 +546,8 @@ pub(crate) fn summary(id: &str, title: Option<&str>, parent: Option<SessionId>) 
 /// this plugin.
 pub(crate) fn room_summary(id: &str, parent: &SessionId, name: &str) -> SessionSummary {
     SessionSummary {
+        effort: None,
+        model_scope: None,
         key: Some(format!("{}{parent}/{name}", room::KEY)),
         driver: Driver::Log,
         ..summary(id, Some(&crate::name::title(name)), Some(parent.clone()))

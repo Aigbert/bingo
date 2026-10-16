@@ -137,6 +137,8 @@ pub(crate) fn said(text: &str, surface: &str) -> Item {
 
 fn summary(cwd: &Path) -> SessionSummary {
     SessionSummary {
+        effort: None,
+        model_scope: None,
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,

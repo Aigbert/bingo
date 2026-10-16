@@ -44,6 +44,7 @@ async fn concurrent_model_and_thinking_changes_keep_both() {
     let model = host.reconfigure(
         id,
         SessionChange::Model {
+            scope: bingo_sdk::ChoiceScope::Session,
             provider: None,
             model: "m2".into(),
         },
@@ -63,12 +64,15 @@ async fn concurrent_model_and_thinking_changes_keep_both() {
     assert_eq!(live.spec.thinking, Some(Some(Effort::High)));
     let state = host.session_state(id).await.unwrap();
     assert_eq!(state.summary.model.as_deref(), Some("m2"));
+    assert_eq!(state.summary.model_scope, Some(ChoiceScope::Session));
+    assert_eq!(state.summary.effort, Some(Effort::High));
     assert_eq!(state.config.kernel["thinking"], json!("high"));
     host.shutdown().await;
 }
 
 fn variants(parent: SessionId) -> Vec<SessionSpec> {
     let full = SessionSpec {
+        model_scope: Some(bingo_sdk::ChoiceScope::Session),
         cwd: "/work".into(),
         key: Some("test/spec".into()),
         parent: Some(ParentLink {
@@ -134,6 +138,7 @@ async fn every_spec_field_survives_the_journal_round_trip() {
     host.reconfigure(
         &parent.session,
         SessionChange::Model {
+            scope: bingo_sdk::ChoiceScope::Session,
             provider: None,
             model: "m3".into(),
         },

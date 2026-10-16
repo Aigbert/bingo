@@ -23,6 +23,8 @@ impl Asked {
     pub fn new() -> Self {
         Self {
             session: SessionSummary {
+                effort: None,
+                model_scope: None,
                 history: bingo_sdk::SessionHistory {
                     first_ask: None,
                     forked_from: None,

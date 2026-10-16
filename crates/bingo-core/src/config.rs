@@ -45,13 +45,21 @@ pub(crate) async fn change(
         SessionChange::Thinking(effort) => {
             SessionChange::Thinking(value(host, session, "thinking", effort).await?)
         }
-        SessionChange::Model { provider, model } => {
+        SessionChange::Model {
+            provider,
+            model,
+            scope,
+        } => {
             let provider = match provider {
                 Some(provider) => Some(value(host, session, "provider", provider).await?),
                 None => None,
             };
             let model = value(host, session, "model", model).await?;
-            SessionChange::Model { provider, model }
+            SessionChange::Model {
+                provider,
+                model,
+                scope,
+            }
         }
     })
 }

@@ -130,6 +130,7 @@ async fn spec(
         .or(definition.map(|d| d.system.as_str()))
         .unwrap_or_default();
     SessionSpec {
+        model_scope: None,
         driver: Driver::Model,
         cwd: cx.cwd.clone(),
         key: Some(format!("agent/{}/{}", cx.session, role.name)),

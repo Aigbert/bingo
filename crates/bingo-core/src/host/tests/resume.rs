@@ -500,6 +500,7 @@ async fn a_log_session_needs_no_provider_and_answers_nothing() {
         .reconfigure(
             &journal.session,
             SessionChange::Model {
+                scope: bingo_sdk::ChoiceScope::Session,
                 provider: None,
                 model: "m".into(),
             },

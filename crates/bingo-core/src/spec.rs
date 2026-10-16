@@ -20,9 +20,10 @@ pub(crate) fn stated(
         driver,
         provider: _,
         model: _,
+        model_scope,
         system_extra,
         tools,
-        thinking: _, // ConfigChanged carries the level, never the summary.
+        thinking: _,
     } = spec;
     SessionSummary {
         cwd: cwd.display().to_string(),
@@ -32,6 +33,14 @@ pub(crate) fn stated(
         driver: *driver,
         provider: choice.map(|c| c.endpoint.id().to_string()),
         model: choice.map(|c| c.id.clone()),
+        effort: choice.and_then(|c| c.reasoning),
+        model_scope: choice.map(|_| {
+            model_scope.unwrap_or(if spec.model.is_some() {
+                bingo_sdk::ChoiceScope::Session
+            } else {
+                bingo_sdk::ChoiceScope::Default
+            })
+        }),
         system_extra: system_extra.clone(),
         tools: tools.clone(),
         ..became
@@ -57,6 +66,7 @@ pub(crate) fn spec_of(state: &SessionState) -> SessionSpec {
         driver: summary.driver,
         provider: summary.provider.clone(),
         model: summary.model.clone(),
+        model_scope: summary.model_scope,
         system_extra: summary.system_extra.clone(),
         tools: summary.tools.clone(),
         thinking: state

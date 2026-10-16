@@ -638,6 +638,8 @@ pub(crate) fn hook_context(session: &SessionId, host: HostHandle) -> HookContext
 
 pub(crate) fn summary(id: &str, title: Option<&str>, parent: Option<SessionId>) -> SessionSummary {
     SessionSummary {
+        effort: None,
+        model_scope: None,
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,

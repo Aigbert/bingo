@@ -389,6 +389,7 @@ async fn a_child_inherits_the_model_and_effort_its_parent_stands_on() {
     host.reconfigure(
         &root.session,
         SessionChange::Model {
+            scope: bingo_sdk::ChoiceScope::Session,
             provider: None,
             model: "m-later".into(),
         },

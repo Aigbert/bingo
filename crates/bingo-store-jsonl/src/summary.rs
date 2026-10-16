@@ -58,6 +58,8 @@ fn rebuild(dir: &Path) -> Result<Option<SessionSummary>, KernelError> {
         })
         .next_back()
         .map(|summary| SessionSummary {
+            effort: None,
+            model_scope: None,
             history: bingo_sdk::SessionHistory {
                 first_ask,
                 messages: Some(messages as u64),
@@ -81,6 +83,8 @@ pub fn count_message(dir: &Path, first_ask: Option<String>) -> Result<(), Kernel
         Some((messages, summary)) => write(
             dir,
             &SessionSummary {
+                effort: None,
+                model_scope: None,
                 history: bingo_sdk::SessionHistory {
                     first_ask: summary.history.first_ask.or(first_ask),
                     messages: Some(messages + 1),
@@ -258,6 +262,8 @@ mod tests {
     fn a_file_that_never_counted_is_rebuilt_rather_than_guessed() {
         let dir = planted();
         let old = SessionSummary {
+            effort: None,
+            model_scope: None,
             history: bingo_sdk::SessionHistory {
                 messages: None,
                 ..summary().history

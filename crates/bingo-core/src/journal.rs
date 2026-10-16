@@ -149,6 +149,8 @@ mod tests {
     fn summary(id: &str, cwd: &str, second: i64) -> SessionSummary {
         let ts = Timestamp::from_second(second).unwrap();
         SessionSummary {
+            effort: None,
+            model_scope: None,
             history: bingo_sdk::SessionHistory {
                 first_ask: None,
                 forked_from: None,

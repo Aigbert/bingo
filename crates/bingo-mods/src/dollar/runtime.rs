@@ -481,6 +481,7 @@ async fn invoke(caller: &Caller, input: Invoke) -> Result<Value, String> {
 async fn setting(caller: &Caller, input: Setting) -> Result<Value, String> {
     let change = match input.key.as_str() {
         "model" => SessionChange::Model {
+            scope: bingo_sdk::ChoiceScope::Session,
             provider: None,
             model: parse(input.value)?,
         },

@@ -187,6 +187,8 @@ mod plugin_tests {
             let summaries = session
                 .iter()
                 .map(|id| SessionSummary {
+                    effort: None,
+                    model_scope: None,
                     id: id.clone(),
                     ..crate::tests::summary()
                 })

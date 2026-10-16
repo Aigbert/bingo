@@ -11,7 +11,14 @@ pub(crate) async fn proposed_model(
     model: String,
 ) -> Result<ModelChoice, KernelError> {
     let mut spec = host.live(session)?.spec;
-    apply(SessionChange::Model { provider, model }, &mut spec);
+    apply(
+        SessionChange::Model {
+            provider,
+            model,
+            scope: bingo_sdk::ChoiceScope::Session,
+        },
+        &mut spec,
+    );
     host.model_for(&spec)
         .await?
         .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, "a log session has no model"))

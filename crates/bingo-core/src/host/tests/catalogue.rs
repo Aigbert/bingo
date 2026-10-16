@@ -152,6 +152,7 @@ async fn a_denied_setting_changes_neither_the_session_nor_the_file() {
         .reconfigure(
             &session,
             SessionChange::Model {
+                scope: bingo_sdk::ChoiceScope::Session,
                 provider: None,
                 model: "changed".into(),
             },

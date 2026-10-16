@@ -701,6 +701,10 @@ pub struct SessionSummary {
     pub driver: Driver,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_scope: Option<ChoiceScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<crate::Effort>,
     /// What the session was opened with and a resume must give it back:
     /// the prompt appended to the kernel's own, and the tool set it is held to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -726,6 +730,14 @@ pub struct SessionSummary {
     pub asking: bool,
     #[serde(flatten)]
     pub history: SessionHistory,
+}
+
+/// Whether the chosen model applies only here or is the default for new sessions.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ChoiceScope {
+    Session,
+    Default,
 }
 
 // Journal facts used to find and describe a conversation without replaying it.
@@ -780,6 +792,33 @@ impl ConfigView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn frame_summary_reads_old_records_and_round_trips_choice_facts() {
+        let mut value = serde_json::from_str::<serde_json::Value>(include_str!(
+            "../fixtures/record/compat/summary-before-asking.json"
+        ))
+        .unwrap()["summary"]
+            .clone();
+        value["effort"] = serde_json::json!("medium");
+        value["modelScope"] = serde_json::json!("session");
+        let summary: SessionSummary = serde_json::from_value(value).unwrap();
+        assert_eq!(summary.effort, Some(crate::Effort::Medium));
+        assert_eq!(summary.model_scope, Some(ChoiceScope::Session));
+        let encoded = serde_json::to_value(summary).unwrap();
+        assert_eq!(encoded["modelScope"], "session");
+        assert_eq!(encoded["effort"], "medium");
+        let old: SessionSummary = serde_json::from_value(
+            serde_json::from_str::<serde_json::Value>(include_str!(
+                "../fixtures/record/compat/summary-before-asking.json"
+            ))
+            .unwrap()["summary"]
+                .clone(),
+        )
+        .unwrap();
+        assert_eq!(old.model_scope, None);
+        assert_eq!(old.effort, None);
+    }
 
     #[test]
     fn a_summary_before_asking_defaults_to_false() {
