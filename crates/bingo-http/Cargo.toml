@@ -25,3 +25,6 @@ thiserror.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "net"] }
+
+[lib]
+doctest = false

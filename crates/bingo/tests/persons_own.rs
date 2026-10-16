@@ -134,7 +134,7 @@ fn script() -> serde_json::Value {
 
 async fn queued_wake(note: &str) -> (Probe, IntentOutcome) {
     let mut probe = Probe::new(json!({"responses":[
-        {"steps":[{"toolCall":{"name":"Wake","input":{"after":"10s","note":note}}}]},
+        {"steps":[{"toolCall":{"name":"Wake","input":{"after":"1s","note":note}}}]},
         waiting(), {"steps":[{"text":"Read as plain text."}]}
     ]}))
     .await;

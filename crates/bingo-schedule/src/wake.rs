@@ -53,8 +53,8 @@ pub struct Held {
 /// `asked`, held between [`WAKE_LEAST`] and [`WAKE_MOST`]. The clamp is
 /// carried rather than swallowed: a model that asked for a second is told it
 /// got ten, in the same breath as the wake it did get.
-pub fn hold(asked: SignedDuration) -> Held {
-    let after = asked.clamp(WAKE_LEAST, WAKE_MOST);
+pub fn hold(asked: SignedDuration, least: SignedDuration) -> Held {
+    let after = asked.clamp(least, WAKE_MOST);
     Held {
         after,
         clamped: (after != asked).then_some(asked),
@@ -108,6 +108,21 @@ mod tests {
     use super::*;
 
     #[test]
+    fn an_injected_floor_changes_only_the_lower_bound() {
+        for least in [WAKE_LEAST, SignedDuration::from_secs(1)] {
+            for (asked, after) in [
+                (SignedDuration::ZERO, least),
+                (SignedDuration::from_mins(5), SignedDuration::from_mins(5)),
+                (SignedDuration::from_hours(9), WAKE_MOST),
+            ] {
+                let held = hold(asked, least);
+                assert_eq!(held.after, after);
+                assert_eq!(held.clamped, (asked != after).then_some(asked));
+            }
+        }
+    }
+
+    #[test]
     fn journal_payload_bytes_stay_unchanged() {
         let wake = set(
             Timestamp::UNIX_EPOCH,
@@ -125,7 +140,7 @@ mod tests {
         for seconds in [10, 60, 900, 3600] {
             let asked = SignedDuration::from_secs(seconds);
             assert_eq!(
-                hold(asked),
+                hold(asked, WAKE_LEAST),
                 Held {
                     after: asked,
                     clamped: None
@@ -136,15 +151,15 @@ mod tests {
 
     #[test]
     fn an_interval_outside_them_is_held_and_says_what_was_asked_for() {
-        let brief = hold(SignedDuration::from_secs(1));
+        let brief = hold(SignedDuration::from_secs(1), WAKE_LEAST);
         assert_eq!(brief.after, WAKE_LEAST);
         assert_eq!(brief.clamped, Some(SignedDuration::from_secs(1)));
 
-        let long = hold(SignedDuration::from_hours(9));
+        let long = hold(SignedDuration::from_hours(9), WAKE_LEAST);
         assert_eq!(long.after, WAKE_MOST);
         assert_eq!(long.clamped, Some(SignedDuration::from_hours(9)));
 
-        let backwards = hold(SignedDuration::from_secs(-30));
+        let backwards = hold(SignedDuration::from_secs(-30), WAKE_LEAST);
         assert_eq!(backwards.after, WAKE_LEAST, "a wake never comes before now");
     }
 

@@ -34,3 +34,6 @@ serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "rt"] }
 # M1: the fail-closed invariants are properties, not examples.
 proptest.workspace = true
+
+[lib]
+doctest = false

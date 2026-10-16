@@ -32,3 +32,6 @@ bingo-pictures = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
 # The wider picture in a stream-json block is base64 on the wire.
 base64.workspace = true
+
+[lib]
+doctest = false

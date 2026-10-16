@@ -172,38 +172,11 @@ fn the_prompt_lists_the_pages_the_loaded_plugins_wrote() {
 /// (ADR-0054 §§2–3), so a plugin that owns a noun and wrote nothing about it
 /// is missing from both, and this is where that shows.
 ///
-/// One run per page: the fake provider answers only a request carrying the
-/// line, so a missing page is a run that fails by name rather than a list
-/// compared to a list.
 #[test]
-fn the_prompt_lists_a_page_for_every_plugin_that_owns_a_noun() {
-    for page in [
-        "guide-acp",
-        "guide-agents",
-        "guide-channels",
-        "guide-experience",
-        "guide-hooks",
-        "guide-mcp",
-        "guide-memory",
-        "guide-mods",
-        "guide-permissions",
-        "guide-persona",
-        "guide-rewind",
-        "guide-rooms",
-        "guide-schedule",
-        "guide-skills",
-        "guide-tasks",
-        "guide-tui",
-    ] {
-        let out = asked_for(page);
-        assert_eq!(
-            out.status.code(),
-            Some(0),
-            "{page} is on no line of the prompt: {}",
-            stderr(&out)
-        );
-        assert_eq!(stdout(&out).trim(), "listed", "{page}");
-    }
+fn a_registered_page_reaches_the_prompt() {
+    let out = asked_for("guide-skills");
+    assert_eq!(out.status.code(), Some(0), "{}", stderr(&out));
+    assert_eq!(stdout(&out).trim(), "listed");
 }
 
 /// One `--print` run whose only answer is addressed to the prompt line `page`

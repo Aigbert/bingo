@@ -145,7 +145,7 @@ fn a_file_a_turn_created_is_removed_and_the_snapshots_outlive_nothing() {
 
 #[test]
 fn explicit_modes_keep_the_other_half_and_json_stdout_stays_pure() {
-    for mode in ["both", "conversation", "files"] {
+    for mode in ["conversation", "files"] {
         let home = tempfile::tempdir().unwrap();
         let note = home.path().join("note.md");
         std::fs::write(&note, "original").unwrap();

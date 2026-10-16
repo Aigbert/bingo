@@ -175,7 +175,7 @@ mod tests {
     /// its base is where every other thumbnail's is.
     #[test]
     fn a_short_thumbnail_stands_on_the_bands_last_row() {
-        let band = band(&[(1200, 100)], 60);
+        let band = band(&[(240, 20)], 60);
         assert_eq!((band.pictures[0].cols, band.pictures[0].rows), (12, 1));
         let blank = |row: usize| {
             band.lines[row]
@@ -231,7 +231,7 @@ mod tests {
     /// were fitted to.
     #[test]
     fn four_thumbnails_and_a_count_fit_seventy_four_columns() {
-        let band = band(&[(1200, 600); 5], 74);
+        let band = band(&[(240, 120); 5], 74);
         for line in &band.lines {
             assert!(width_of(line) <= 74, "{}", width_of(line));
         }

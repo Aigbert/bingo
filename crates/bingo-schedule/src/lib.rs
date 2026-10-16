@@ -64,6 +64,9 @@ pub use spec::{Spec, SpecError};
 pub use store::{Shelf, Store};
 pub use tools::{ScheduleCreateTool, ScheduleForgetTool, ScheduleListTool, WakeTool};
 
+/// Minimum wake delay override accepted by an explicitly scripted harness.
+pub const WAKE_FLOOR_ENV: &str = "BINGO_FAKE_WAKE_FLOOR_MS";
+
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.schedule",
     version: env!("CARGO_PKG_VERSION"),
@@ -134,7 +137,16 @@ pub struct SchedulePlugin {
     /// Built in `register`, where the environment is; used by `start` and
     /// `stop`, which are handed nothing but the host.
     schedules: OnceLock<Arc<Schedules>>,
+    wake_floor: Option<std::time::Duration>,
     service: OnceLock<Arc<service::Owner>>,
+}
+
+impl SchedulePlugin {
+    /// Override the minimum wake delay for an isolated scripted harness.
+    pub fn with_wake_floor(mut self, least: std::time::Duration) -> Self {
+        self.wake_floor = Some(least.min(std::time::Duration::from_secs(3600)));
+        self
+    }
 }
 
 #[async_trait]
@@ -153,7 +165,11 @@ impl Plugin for SchedulePlugin {
         // refuse at the call spends its description on every request of every
         // turn to say what the absence says for nothing.
         if settings.schedule.wakes {
-            registrar.tool(Arc::new(WakeTool::new(schedules.clone())) as Arc<dyn Tool>);
+            let least = self
+                .wake_floor
+                .map(|floor| jiff::SignedDuration::from_millis(floor.as_millis() as i64))
+                .unwrap_or(wake::WAKE_LEAST);
+            registrar.tool(Arc::new(WakeTool::new(schedules.clone()).with_floor(least)) as Arc<dyn Tool>);
         }
         registrar.add(Contribution::Command(
             Arc::new(ScheduleCommand::new(schedules.clone())) as Arc<dyn Command>,

@@ -66,7 +66,7 @@ impl Ask {
     /// What this call wants, or the sentence that says why it is not a call.
     /// Pure: the whole of the input's meaning, decided before anything is
     /// read from disk.
-    fn wanted(self) -> Result<Wanted, String> {
+    fn wanted(self, least: SignedDuration) -> Result<Wanted, String> {
         if self.stop {
             return Ok(Wanted::Stop);
         }
@@ -85,7 +85,7 @@ impl Ask {
             format!("{why} — `after` is a length of time, like `30s`, `5m` or `1h`.")
         })?;
         Ok(Wanted::Set {
-            held: wake::hold(asked),
+            held: wake::hold(asked, least),
             note,
         })
     }
@@ -95,11 +95,20 @@ impl Ask {
 #[derive(Debug)]
 pub struct WakeTool {
     schedules: Arc<Schedules>,
+    least: SignedDuration,
 }
 
 impl WakeTool {
     pub fn new(schedules: Arc<Schedules>) -> Self {
-        Self { schedules }
+        Self {
+            schedules,
+            least: WAKE_LEAST,
+        }
+    }
+
+    pub(crate) fn with_floor(mut self, least: SignedDuration) -> Self {
+        self.least = least;
+        self
     }
 
     /// A wake takes the place of the one that stood. It is this process's
@@ -147,8 +156,8 @@ fn clamp(held: Held) -> String {
     let Some(asked) = held.clamped else {
         return String::new();
     };
-    let bound = match held.after == WAKE_LEAST {
-        true => format!("{} is the least a wake may be", written(WAKE_LEAST)),
+    let bound = match held.after > asked {
+        true => format!("{} is the least a wake may be", written(held.after)),
         false => format!("{} is the most", written(WAKE_MOST)),
     };
     format!(
@@ -197,7 +206,7 @@ impl Tool for WakeTool {
     async fn call(&self, input: Value, cx: &ToolContext) -> Result<ToolOutput, ToolError> {
         let args: Ask =
             serde_json::from_value(input).map_err(|e| ToolError::InvalidInput(e.to_string()))?;
-        let wanted = match args.wanted() {
+        let wanted = match args.wanted(self.least) {
             Ok(wanted) => wanted,
             // Words the tool cannot read are something the model rewrites.
             Err(message) => return Ok(ToolOutput::error(message)),
@@ -378,20 +387,20 @@ mod tests {
     #[test]
     fn what_a_call_wants_is_decided_before_anything_is_read() {
         let stop: Ask = serde_json::from_value(json!({"stop": true})).expect("an ask");
-        assert_eq!(stop.wanted(), Ok(Wanted::Stop));
+        assert_eq!(stop.wanted(WAKE_LEAST), Ok(Wanted::Stop));
         let set: Ask =
             serde_json::from_value(json!({"after": " 5m ", "note": " hi "})).expect("an ask");
         assert_eq!(
-            set.wanted(),
+            set.wanted(WAKE_LEAST),
             Ok(Wanted::Set {
-                held: wake::hold(SignedDuration::from_mins(5)),
+                held: wake::hold(SignedDuration::from_mins(5), WAKE_LEAST),
                 note: "hi".into()
             })
         );
         let both: Ask =
             serde_json::from_value(json!({"after": "nonsense", "stop": true})).expect("an ask");
         assert_eq!(
-            both.wanted(),
+            both.wanted(WAKE_LEAST),
             Ok(Wanted::Stop),
             "a stop reads nothing else: there is nothing to set"
         );

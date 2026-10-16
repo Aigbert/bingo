@@ -35,3 +35,6 @@ thiserror.workspace = true
 # `reqwest`, which would pull `aws-lc-sys` and take the Windows cross-check
 # with it (ADR-0041's note, ADR-0042).
 tokio = { workspace = true, features = ["net", "macros", "rt", "time"] }
+
+[lib]
+doctest = false

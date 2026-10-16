@@ -47,3 +47,6 @@ bingo-pictures = { workspace = true, features = ["testing"] }
 wiremock.workspace = true
 # `tokio::time::pause`, so the 20s search bound costs a test no wall time.
 tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
+
+[lib]
+doctest = false

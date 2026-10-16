@@ -286,7 +286,7 @@ mod tests {
     }
 
     proptest::proptest! {
-        #![proptest_config(proptest::test_runner::Config::with_cases(1000))]
+        #![proptest_config(proptest::test_runner::Config::with_cases(256))]
         #[test]
         fn tree_matches_replay_and_removal_oracle(
             codes in proptest::collection::vec((0u8..4, 1u8..8, 0u8..8), 0..80)

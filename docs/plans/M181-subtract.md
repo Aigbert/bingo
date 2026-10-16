@@ -109,6 +109,11 @@ plugin-rpc `holdsContext` stays until ADR-0076 says otherwise.
 - ACP uses the existing loopback token edge and identical comparison/redaction
   cases; its random-source failure retains the original ACP error message.
 
+- Keep both plugin enable/disable rows: they exercise distinct states. The
+  harness wake floor is one second; normal runs retain ten. Tree sequences
+  retain 80 operations; only the case count drops to 256. Empty rustdoc
+  targets are identified by the baseline; SDK and the hello example stay on.
+
 ## Verified — 2026-10-16
 
 Commands run in this worktree with disposable HOME/data, provider environment
@@ -140,4 +145,6 @@ Brick 5: surface-tui, rooms, schedule, experience, provider-openai,
 Brick 6: bin, sdk, core, auth-oauth, http, provider-acp, provider-openai,
          provider-anthropic, permissions, surface-print, surface-rpc, surface-tui
          — check 0; clippy 0; test 0; SDK gates repeated for fixed checksum vectors
+Brick 7: workspace (empty rustdoc targets touch most libraries)
+         — check 0; clippy 0; test 0; both queued-wake consent cases pass
 ```

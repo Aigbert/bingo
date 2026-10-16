@@ -51,3 +51,6 @@ rmcp = { workspace = true, features = ["client"] }
 [[bin]]
 name = "bingo-fake-acp-agent"
 path = "src/bin/fake_agent/main.rs"
+
+[lib]
+doctest = false

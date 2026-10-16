@@ -16,3 +16,6 @@ bingo-sdk.workspace = true
 bingo-services.workspace = true
 async-trait.workspace = true
 serde_json.workspace = true
+
+[lib]
+doctest = false

@@ -36,3 +36,6 @@ bingo-sdk = { workspace = true, features = ["testing"] }
 # `jiff::Timestamp`, so writing one needs one.
 jiff.workspace = true
 tempfile.workspace = true
+
+[lib]
+doctest = false

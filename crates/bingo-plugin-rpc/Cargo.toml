@@ -33,3 +33,6 @@ bingo-pictures = { workspace = true, features = ["testing"] }
 bingo-sdk = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "test-util"] }
+
+[lib]
+doctest = false

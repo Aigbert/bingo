@@ -6,24 +6,7 @@ fn every_registered_page_has_a_short_description_and_body() {
     let home = tempfile::tempdir().unwrap();
     let env = Env::rooted(home.path());
     let plugins = plugins(Composition::default(), &platforms(&env), home.path()).unwrap();
-    let mut expected = std::collections::BTreeMap::from([
-        ("bingo.agents", "agents"),
-        ("bingo.surface.channels", "channels"),
-        ("bingo.checkpoints", "rewind"),
-        ("bingo.context", "memory"),
-        ("bingo.experience", "experience"),
-        ("bingo.hooks.shell", "hooks"),
-        ("bingo.mcp", "mcp"),
-        ("bingo.mods", "mods"),
-        ("bingo.permissions", "permissions"),
-        ("bingo.persona", "persona"),
-        ("bingo.acp", "acp"),
-        ("bingo.rooms", "rooms"),
-        ("bingo.schedule", "schedule"),
-        ("bingo.skills", "skills"),
-        ("bingo.surface.tui", "tui"),
-        ("bingo.tasks", "tasks"),
-    ]);
+    let mut expected = primary_pages();
     for plugin in plugins {
         let id = plugin.manifest().id;
         let service = Pages::key(id);
@@ -69,4 +52,25 @@ fn shape(id: &str, page: &Page) {
     );
     assert!(!page.body.is_empty(), "{id}: {}", page.name);
     assert!(page.body.lines().count() < 200, "{id}: {}", page.name);
+}
+
+fn primary_pages() -> std::collections::BTreeMap<&'static str, &'static str> {
+    std::collections::BTreeMap::from([
+        ("bingo.agents", "agents"),
+        ("bingo.surface.channels", "channels"),
+        ("bingo.checkpoints", "rewind"),
+        ("bingo.context", "memory"),
+        ("bingo.experience", "experience"),
+        ("bingo.hooks.shell", "hooks"),
+        ("bingo.mcp", "mcp"),
+        ("bingo.mods", "mods"),
+        ("bingo.permissions", "permissions"),
+        ("bingo.persona", "persona"),
+        ("bingo.acp", "acp"),
+        ("bingo.rooms", "rooms"),
+        ("bingo.schedule", "schedule"),
+        ("bingo.skills", "skills"),
+        ("bingo.surface.tui", "tui"),
+        ("bingo.tasks", "tasks"),
+    ])
 }

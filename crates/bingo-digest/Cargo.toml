@@ -13,3 +13,6 @@ tier = "library"
 
 [lints]
 workspace = true
+
+[lib]
+doctest = false

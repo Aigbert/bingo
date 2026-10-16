@@ -43,3 +43,6 @@ tempfile.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
 # M179: a live test session is a channel of frames; already a workspace crate.
 futures.workspace = true
+
+[lib]
+doctest = false

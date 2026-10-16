@@ -57,3 +57,6 @@ insta.workspace = true
 # at the client. It adds `url`, which reqwest already brings, so the tree is
 # the size it was.
 rmcp = { workspace = true, features = ["server", "transport-io", "elicitation"] }
+
+[lib]
+doctest = false

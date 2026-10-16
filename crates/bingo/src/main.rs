@@ -735,7 +735,7 @@ fn plugins(
         Box::new(RoomsPlugin::default()),
         Box::new(TasksPlugin::default()),
         Box::new(ExperiencePlugin::default()),
-        Box::new(SchedulePlugin::default()),
+        Box::new(schedule_plugin()),
         Box::new(CheckpointsPlugin::default()),
         Box::new(PrintPlugin::new(composition.print)),
         Box::new(RpcPlugin::new(composition.rpc)),
@@ -746,6 +746,20 @@ fn plugins(
         all.push(Box::new(DemoUiPlugin::default()));
     }
     Ok(all)
+}
+
+fn schedule_plugin() -> SchedulePlugin {
+    let plugin = SchedulePlugin::default();
+    if std::env::var_os(bingo_provider_fake::SCRIPT_ENV).is_none() {
+        return plugin;
+    }
+    match std::env::var(bingo_schedule::WAKE_FLOOR_ENV)
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+    {
+        Some(ms) => plugin.with_wake_floor(std::time::Duration::from_millis(ms)),
+        None => plugin,
+    }
 }
 
 fn builtin_mods() -> [Box<dyn Plugin>; 10] {

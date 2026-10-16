@@ -52,3 +52,6 @@ tracing-subscriber.workspace = true
 [dev-dependencies]
 bingo-channel-feishu.workspace = true
 tempfile.workspace = true
+
+[lib]
+doctest = false

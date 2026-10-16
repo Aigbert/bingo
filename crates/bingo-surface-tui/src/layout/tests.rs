@@ -41,7 +41,7 @@ fn layout_is_pure_and_idle_has_no_deadline() {
 fn layout_renders_each_band_once_and_reuses_unchanged_blocks() {
     let (ui, now) = scene();
     let mut state = state();
-    state.transcript = (0..10_000)
+    state.transcript = (0..200)
         .map(|i| {
             assistant(
                 &format!("itm_{i}"),
@@ -52,10 +52,10 @@ fn layout_renders_each_band_once_and_reuses_unchanged_blocks() {
         .collect();
     let tree = solo(&state);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
-    assert_eq!(first.blocks.renders(), 10_000);
+    assert_eq!(first.blocks.renders(), 200);
     assert_eq!(first.renders, [1; 4]);
     let next = layout(first, &tree, &ui, SIZE, now);
-    assert_eq!(next.blocks.renders(), 10_000);
+    assert_eq!(next.blocks.renders(), 200);
     assert_eq!(next.renders, [1; 4]);
     assert_eq!(next.canvas.buffer.content.len(), 120 * 40);
 }

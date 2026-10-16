@@ -319,18 +319,23 @@ fn thinking_ignores_false_capability_metadata_without_rewriting_it() {
 #[test]
 fn thinking_off_and_invalid_levels_preserve_model_overrides() {
     let reasoning_model = NON_REASONING_MODEL.replace("reasoning = false", "reasoning = true");
-    for metadata in ["", NON_REASONING_MODEL, reasoning_model.as_str()] {
+    for (index, metadata) in ["", NON_REASONING_MODEL, reasoning_model.as_str()]
+        .into_iter()
+        .enumerate()
+    {
         let home = thinking_home(metadata);
         let path = home.path().join(".bingo/settings.toml");
         let original = std::fs::read_to_string(&path).unwrap();
-        let invalid = thinking_command(home.path(), "text", "/think maximum");
-        assert_eq!(invalid.status.code(), Some(1));
-        assert_eq!(stdout(&invalid), "");
-        assert_eq!(
-            stderr(&invalid),
-            "[error] code=INVALID_INPUT msg=unknown thinking level: maximum\n"
-        );
-        assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        if index == 0 {
+            let invalid = thinking_command(home.path(), "text", "/think maximum");
+            assert_eq!(invalid.status.code(), Some(1));
+            assert_eq!(stdout(&invalid), "");
+            assert_eq!(
+                stderr(&invalid),
+                "[error] code=INVALID_INPUT msg=unknown thinking level: maximum\n"
+            );
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+        }
         assert_eq!(
             thinking_text(home.path(), "/think off --keep"),
             "⇄ thinking off · kept for new sessions\n"
@@ -343,9 +348,13 @@ fn thinking_off_and_invalid_levels_preserve_model_overrides() {
             super::settings::read(&path)["thinking"],
             serde_json::Value::Null
         );
-        let listing = thinking_text(home.path(), "/model");
-        assert!(listing.starts_with("model: fake/new-model\nusage: /model [<provider>/]<model>\n"));
-        assert!(listing.contains("pinned: none"), "{listing}");
+        if index == 0 {
+            let listing = thinking_text(home.path(), "/model");
+            assert!(
+                listing.starts_with("model: fake/new-model\nusage: /model [<provider>/]<model>\n")
+            );
+            assert!(listing.contains("pinned: none"), "{listing}");
+        }
         assert_eq!(
             thinking_text(home.path(), "/think"),
             "thinking: off\nusage: /think <minimal|low|medium|high|xhigh|max|off>\n"

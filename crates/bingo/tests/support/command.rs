@@ -19,7 +19,9 @@ pub fn at(binary: impl AsRef<OsStr>) -> Command {
 }
 
 pub fn bingo() -> Command {
-    at(env!("CARGO_BIN_EXE_bingo"))
+    let mut command = at(env!("CARGO_BIN_EXE_bingo"));
+    command.env("BINGO_FAKE_WAKE_FLOOR_MS", "1000");
+    command
 }
 
 #[test]

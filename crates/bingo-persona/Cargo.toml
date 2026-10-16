@@ -27,3 +27,6 @@ jiff.workspace = true
 # M99: the empty settings slice a registrar is built with.
 serde_json.workspace = true
 tokio.workspace = true
+
+[lib]
+doctest = false

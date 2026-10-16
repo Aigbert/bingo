@@ -29,3 +29,6 @@ futures.workspace = true
 # M9: a `SessionSummary` the double writes down is stamped with a `jiff::Timestamp`.
 jiff.workspace = true
 tokio.workspace = true
+
+[lib]
+doctest = false

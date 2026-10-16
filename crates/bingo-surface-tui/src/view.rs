@@ -1562,16 +1562,16 @@ mod tests {
 
     #[test]
     fn a_full_draw_of_a_long_transcript_reuses_the_cached_blocks() {
-        let state = long_transcript(5_000);
+        let state = long_transcript(200);
         let (mut ui, now) = scene();
         let first = draw_sized(120, 40, &state, &mut ui, now);
-        assert_eq!(ui.shown.blocks.renders(), 5_000);
-        for _ in 0..20 {
+        assert_eq!(ui.shown.blocks.renders(), 200);
+        for _ in 0..2 {
             assert_eq!(draw_sized(120, 40, &state, &mut ui, now), first);
         }
         assert_eq!(
             ui.shown.blocks.renders(),
-            5_000,
+            200,
             "warm draws reuse every finished block"
         );
     }

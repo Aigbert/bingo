@@ -511,7 +511,7 @@ mod ownership;
 /// same session once the interval — the least there is — has passed.
 const WAKE_AND_RETURN: &str = r#"{"responses":[
     {"steps":[{"toolCall":{"name":"Wake","input":{
-        "after":"10s",
+        "after":"1s",
         "note":"look at the build again"
     }}}]},
     {"steps":[{"text":"I will look again."}]},

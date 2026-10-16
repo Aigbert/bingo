@@ -33,3 +33,6 @@ tempfile.workspace = true
 insta.workspace = true
 schemars.workspace = true
 proptest.workspace = true
+
+[lib]
+doctest = false

@@ -27,3 +27,6 @@ tracing.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }
 # Frame timestamps in the fixtures; the surface mints none.
 jiff.workspace = true
+
+[lib]
+doctest = false

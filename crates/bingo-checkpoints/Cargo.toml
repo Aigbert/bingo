@@ -29,3 +29,6 @@ futures.workspace = true
 jiff.workspace = true
 tempfile.workspace = true
 tokio = { workspace = true }
+
+[lib]
+doctest = false

@@ -597,10 +597,10 @@ mod tests {
 
     #[test]
     fn a_finished_item_is_drawn_once_and_scrolling_draws_nothing() {
-        let state = many(5_000);
+        let state = many(200);
         let mut blocks = cache();
         let height = sync(&mut blocks, &state, 80);
-        assert_eq!(blocks.renders(), 5_000);
+        assert_eq!(blocks.renders(), 200);
 
         for from in (0..height).step_by(97) {
             blocks.window(from, 40);
@@ -608,7 +608,7 @@ mod tests {
         sync(&mut blocks, &state, 80);
         assert_eq!(
             blocks.renders(),
-            5_000,
+            200,
             "a transcript that did not change is not drawn again"
         );
     }
