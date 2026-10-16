@@ -113,37 +113,7 @@ impl Manager {
         for module in self.modules() {
             self.publish_callbacks(module);
         }
-        self.write_types(&host).await;
         self.watch();
-    }
-    pub(crate) async fn write_types(&self, host: &HostHandle) {
-        let result = async {
-            let events = host
-                .catalog(CatalogKind::Events)
-                .await
-                .map_err(|e| e.to_string())?;
-            let tools = host
-                .catalog(CatalogKind::Tools)
-                .await
-                .map_err(|e| e.to_string())?;
-            for module in self
-                .modules()
-                .into_iter()
-                .filter(|module| module.found.origin != PluginOrigin::Project)
-            {
-                if let Err(reason) = crate::types::write(&module.found.root, &events, &tools) {
-                    self.notices.push(Notice::warn(
-                        "MOD_TYPES",
-                        format!("{}: {reason}", module.found.name),
-                    ));
-                }
-            }
-            Ok::<_, String>(())
-        }
-        .await;
-        if let Err(reason) = result {
-            self.notices.push(Notice::warn("MOD_TYPES", reason));
-        }
     }
     pub(crate) async fn testing_call(
         &self,

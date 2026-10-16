@@ -602,3 +602,37 @@ fn a_plugin_warning_stays_off_stdout() {
         "{err}"
     );
 }
+
+/// A run never writes into a plugin's directory: author types are laid only
+/// by `bingo plugins types|test|validate`, so two builds sharing one home
+/// never rewrite, and so never reload, each other's mods.
+#[test]
+fn a_session_leaves_a_personal_mod_directory_as_the_author_wrote_it() {
+    let home = tempfile::tempdir().unwrap();
+    let fixture =
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/mods/counter");
+    let plugin = home.path().join(".bingo/plugins/counter");
+    std::fs::create_dir_all(&plugin).unwrap();
+    for file in ["plugin.json", "main.ts"] {
+        std::fs::copy(fixture.join(file), plugin.join(file)).unwrap();
+    }
+    let unused = script(UNUSED);
+    let out = run(bingo()
+        .envs(home_env(home.path()))
+        .env("BINGO_FAKE_SCRIPT", unused.path())
+        .args(["--print", "--cwd"])
+        .arg(home.path())
+        .arg("/modules"));
+    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    assert!(stdout(&out).contains("counter"), "{}", stdout(&out));
+    let mut held: Vec<_> = std::fs::read_dir(&plugin)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+        .collect();
+    held.sort();
+    assert_eq!(
+        held,
+        ["main.ts", "plugin.json"],
+        "no .bingo/, no tsconfig.json"
+    );
+}

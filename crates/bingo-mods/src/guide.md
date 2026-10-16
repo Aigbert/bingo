@@ -130,7 +130,7 @@ export interface PluginState { 'counter': { calls: number } }
 
 ## Types and checks
 
-Loading a personal mod writes host-derived `bingo`, `bingo/testing` and `bingo-tools` types under `.bingo/types/`, plus `.bingo/tsconfig.json` and an absent root `tsconfig.json`. Repository startup leaves approved bytes unchanged.
+`bingo plugins types <dir>` writes host-derived `bingo`, `bingo/testing` and `bingo-tools` types under `.bingo/types/`, plus `.bingo/tsconfig.json` and an absent root `tsconfig.json`, and prints each file it changed; `plugins test` and `plugins validate` write them first too. A run never writes into a plugin's directory. The types cover this build's events, tools and services. A service another plugin serves is declared only when its process starts, so the types leave it out; call it through `$` untyped.
 Run `tsc --noEmit -p <dir>/tsconfig.json` separately; the runtime strips types without checking them.
 
 - `bingo plugins validate <dir>` statically checks the module and reports events,

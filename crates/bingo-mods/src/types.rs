@@ -1,17 +1,24 @@
-//! Host-derived author types are written only when their bytes change.
+//! Host-derived author types, written when an author asks and only when
+//! their bytes change. A run never writes them: the runtime embeds the API.
 use bingo_sdk::Catalog;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 mod files;
 mod render;
-pub fn write(root: &Path, events: &Catalog, tools: &Catalog) -> Result<(), String> {
+/// The files whose bytes changed, in writing order.
+pub fn write(root: &Path, events: &Catalog, tools: &Catalog) -> Result<Vec<PathBuf>, String> {
     let root = root.canonicalize().map_err(|e| e.to_string())?;
+    let mut written = Vec::new();
     for (name, text) in sources(events, tools) {
-        files::changed(&root, &format!(".bingo/{name}"), text.as_bytes())?;
+        written.extend(files::changed(
+            &root,
+            &format!(".bingo/{name}"),
+            text.as_bytes(),
+        )?);
     }
     if !root.join("tsconfig.json").exists() {
-        files::changed(&root,"tsconfig.json", b"{\"extends\":\"./.bingo/tsconfig.json\",\"include\":[\"**/*.ts\",\"**/*.tsx\",\".bingo/types/**/*.ts\"]}\n")?;
+        written.extend(files::changed(&root,"tsconfig.json", b"{\"extends\":\"./.bingo/tsconfig.json\",\"include\":[\"**/*.ts\",\"**/*.tsx\",\".bingo/types/**/*.ts\"]}\n")?);
     }
-    Ok(())
+    Ok(written)
 }
 fn sources(events: &Catalog, tools: &Catalog) -> Vec<(&'static str, String)> {
     let mut files = vec![
@@ -82,7 +89,7 @@ mod tests {
                 meta: json!({"inputSchema":{"type":"object","properties":{"text":{"type":"string"}},"required":["text"]}}),
             }],
         };
-        write(root.path(), &events, &tools).unwrap();
+        assert!(!write(root.path(), &events, &tools).unwrap().is_empty());
         let event_path = root.path().join(".bingo/types/bingo/events.ts");
         let text = std::fs::read_to_string(&event_path).unwrap();
         assert!(
@@ -96,7 +103,10 @@ mod tests {
                 .contains("Echo")
         );
         let time = std::fs::metadata(&event_path).unwrap().modified().unwrap();
-        write(root.path(), &events, &tools).unwrap();
+        assert_eq!(
+            write(root.path(), &events, &tools).unwrap(),
+            Vec::<PathBuf>::new()
+        );
         assert_eq!(
             std::fs::metadata(&event_path).unwrap().modified().unwrap(),
             time

@@ -1,6 +1,6 @@
 # ADR-0078 — A mod is a module the host runs
 
-Status: accepted · 2026-10-14 · M136/M137/M138/M139/M142 (§8 author kit).
+Status: accepted · 2026-10-14 · M136/M137/M138/M139/M142 (§8 author kit) · amended 2026-10-16 (§8).
 Plans: M137 (runtime), M138 (host), M139 (world), M140 (§6 render integration), M142 (kit).
 Amends: ADR-0074 §1 §3 and Non-goals, ADR-0075 §2 and Non-goals, ADR-0069 §3, ADR-0031 §6
 
@@ -101,8 +101,8 @@ ADR-0079's render pair; the runtime is a plugin, `$` maps onto doors.
      against the real host with the fake provider. `bingo/testing`
      supplies `test`, `expect`, `mock.*` and `$.ui.mount`.
    - `'bingo'` exports `Register`, each event's types under Claude
-     Code's names, and `atom`, `derive`, `read`, `update`, `memberOf`. On
-     load, types are written into the mod's `.bingo/types/`.
+     Code's names, and `atom`, `derive`, `read`, `update`, `memberOf`. Only
+     `bingo plugins types|test|validate` writes them to `.bingo/types/`.
 
 ## Consequences
 

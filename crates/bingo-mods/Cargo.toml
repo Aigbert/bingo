@@ -12,7 +12,7 @@ description = "Sandboxed in-process module plugins"
 workspace = true
 
 [dependencies]
-# M142: render host schemas into author types on load.
+# M142: render host schemas into author types when an author asks.
 bingo-schema-ts.workspace = true
 # M141: send mod logs through the existing application subscriber.
 tracing.workspace = true

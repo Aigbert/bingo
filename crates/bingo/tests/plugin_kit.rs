@@ -132,6 +132,10 @@ fn wordcount_validates_with_the_existing_protocol() {
         text.contains("protocol 2") && text.contains("tool:"),
         "{text}"
     );
+    assert!(
+        !plugin.join(".bingo").exists(),
+        "a process plugin is untyped"
+    );
 }
 
 #[test]
@@ -554,33 +558,75 @@ fn clock_and_environment_mocks_keep_grants_and_hook_budgets() {
     assert!(success(&run(home.path(), "test", &plugin)).starts_with("PASS"));
 }
 
-#[test]
-fn a_second_module_load_keeps_generated_types_untouched() {
-    let home = tempfile::tempdir().unwrap();
-    let plugin = fixture(home.path(), "ts-status");
-    success(&run(home.path(), "test", &plugin));
-    let paths = [
-        "bingo/index.d.ts",
-        "bingo/events.ts",
-        "bingo/testing.d.ts",
-        "bingo-tools/index.d.ts",
-    ];
-    let metadata = || {
-        paths.map(|path| {
+const LAID: [&str; 4] = [
+    "bingo/index.d.ts",
+    "bingo/events.ts",
+    "bingo/testing.d.ts",
+    "bingo-tools/index.d.ts",
+];
+
+fn laid_times(plugin: &Path) -> Vec<std::time::SystemTime> {
+    LAID.iter()
+        .map(|path| {
             std::fs::metadata(plugin.join(".bingo/types").join(path))
                 .unwrap()
                 .modified()
                 .unwrap()
         })
-    };
-    let first = metadata();
+        .collect()
+}
+
+#[test]
+fn types_are_laid_on_request_and_keep_the_authors_tsconfig() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = fixture(home.path(), "ts-status");
+    let authors = std::fs::read(plugin.join("tsconfig.json")).unwrap();
+    let written = success(&run(home.path(), "types", &plugin));
+    for path in LAID {
+        let laid = Path::new(".bingo/types").join(path);
+        assert!(
+            written.lines().any(|line| Path::new(line).ends_with(&laid)),
+            "{path} not listed: {written}"
+        );
+    }
+    assert!(
+        written.lines().all(|line| Path::new(line).is_file()),
+        "{written}"
+    );
+    assert_eq!(
+        std::fs::read(plugin.join("tsconfig.json")).unwrap(),
+        authors
+    );
+    let first = laid_times(&plugin);
+    assert_eq!(success(&run(home.path(), "types", &plugin)), "");
     success(&run(home.path(), "test", &plugin));
-    assert_eq!(metadata(), first);
+    assert_eq!(laid_times(&plugin), first);
     println!("type mtimes unchanged: {first:?}");
     let events = std::fs::read_to_string(plugin.join(".bingo/types/bingo/events.ts")).unwrap();
     assert!(
         events.contains("ToolCall") && events.contains("ClockNow") && events.contains("UiRender")
     );
+    assert!(events.contains("agent.spawn"), "shipped services are typed");
+}
+
+#[test]
+fn validate_and_test_lay_types_but_never_into_a_process_plugin() {
+    for verb in ["validate", "test"] {
+        let home = tempfile::tempdir().unwrap();
+        let plugin = fixture(home.path(), "band");
+        success(&run(home.path(), verb, &plugin));
+        assert!(
+            plugin.join(".bingo/types/bingo/index.d.ts").is_file(),
+            "{verb}"
+        );
+    }
+    let home = tempfile::tempdir().unwrap();
+    let plugin = fixture(home.path(), "wordcount");
+    let refused = run(home.path(), "types", &plugin);
+    assert_eq!(refused.status.code(), Some(1));
+    assert!(refused.stdout.is_empty());
+    assert!(String::from_utf8_lossy(&refused.stderr).contains("module plugins"));
+    assert!(!plugin.join(".bingo").exists() && !plugin.join("tsconfig.json").exists());
 }
 
 #[test]

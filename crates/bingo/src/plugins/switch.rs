@@ -32,6 +32,8 @@ pub enum Action {
         #[arg(long)]
         json: bool,
     },
+    /// Write a module plugin's editor types under .bingo/types; print each path written.
+    Types { dir: std::path::PathBuf },
     /// List plugins for the next start; use /plugins reload in a running session.
     List,
     /// Approve the current bytes of one repository plugin.
@@ -92,7 +94,10 @@ pub fn run(
     );
     apply_trust(&mut listed, &settings.kernel.plugin_trust);
     let said = match action {
-        Action::Approve { .. } | Action::Validate { .. } | Action::Test { .. } => {
+        Action::Approve { .. }
+        | Action::Validate { .. }
+        | Action::Test { .. }
+        | Action::Types { .. } => {
             return Err(invalid(
                 "author kit action reached the switch command".into(),
             ));

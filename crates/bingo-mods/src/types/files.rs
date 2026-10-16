@@ -1,5 +1,10 @@
-use std::path::{Component, Path};
-pub(super) fn changed(root: &Path, relative: &str, bytes: &[u8]) -> Result<(), String> {
+use std::path::{Component, Path, PathBuf};
+/// The path written, or `None` when it already held these bytes.
+pub(super) fn changed(
+    root: &Path,
+    relative: &str,
+    bytes: &[u8],
+) -> Result<Option<PathBuf>, String> {
     let path = root.join(relative);
     let parent = Path::new(relative)
         .parent()
@@ -25,7 +30,8 @@ pub(super) fn changed(root: &Path, relative: &str, bytes: &[u8]) -> Result<(), S
         return Err(format!("{} is a symlink", path.display()));
     }
     if std::fs::read(&path).is_ok_and(|held| held == bytes) {
-        return Ok(());
+        return Ok(None);
     }
-    std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))
+    std::fs::write(&path, bytes).map_err(|e| format!("{}: {e}", path.display()))?;
+    Ok(Some(path))
 }

@@ -8,6 +8,7 @@ pub async fn run(root: &Path) -> Result<(), KernelError> {
         manifest.launch,
         bingo_plugin_host::manifest::Launch::Module(_)
     ) {
+        super::types::write(&root).await?;
         return module(&root, &manifest);
     }
     let home = tempfile::tempdir().map_err(super::invalid)?;

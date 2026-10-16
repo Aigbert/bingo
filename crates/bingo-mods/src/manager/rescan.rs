@@ -45,9 +45,6 @@ impl Manager {
                 }
             }
         }
-        if let Some(host) = self.host.get() {
-            self.write_types(host).await;
-        }
         self.baseline(project);
         self.report_changes(&report);
         Ok(report)
