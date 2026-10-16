@@ -457,10 +457,10 @@ async fn session_and_journal_hooks_observe_without_delaying_anything() {
         .map(|n| n.parse().unwrap())
         .collect();
     let closed = seen.last().copied().unwrap();
-    // The head frames (seq 1, 2) preceded the attach, so they are the
+    // The head frames (seq 1–3) preceded the attach, so they are the
     // observer's alone; after them, every frame the client saw but the deltas.
     assert_eq!(
-        &seen[2..seen.len() - 1],
+        &seen[3..seen.len() - 1],
         &durable[..],
         "every frame but the deltas, in order; the last is the close itself"
     );

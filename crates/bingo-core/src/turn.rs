@@ -17,6 +17,7 @@ mod contributors;
 mod host;
 mod late;
 mod measure;
+mod resting;
 mod ruler;
 mod stream;
 
@@ -29,6 +30,7 @@ pub use config::{Breaker, ModelChoice, TurnBudget, TurnConfig};
 pub use host::TurnHost;
 use late::Late;
 pub use late::{CompactorSet, ContributorSet, HookSet, ProviderSet, ToolSet};
+pub(crate) use resting::{context_used, reading as resting_reading, restates};
 use ruler::Ruler;
 pub use stream::{MAX_RETRY_DELAY, MAX_SERVER_RETRY_DELAY, backoff};
 use stream::{Streamed, stopped_early};

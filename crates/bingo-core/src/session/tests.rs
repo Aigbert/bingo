@@ -113,8 +113,8 @@ async fn submit_starts_a_turn_and_streams_it_to_the_end() {
     let (mut state, mut events) = mailbox.attach().await.unwrap();
     assert_eq!(
         state.seq,
-        Seq(2),
-        "the journal head is the summary frame, then the config"
+        Seq(3),
+        "the journal head is the summary frame, the context, then the config"
     );
 
     let intent = IntentId::mint();
@@ -593,8 +593,8 @@ async fn a_journal_cut_inside_a_turn_resumes_with_that_turn_lost() {
     let (mut state, mut events) = mailbox.attach().await.unwrap();
     assert_eq!(
         state.seq,
-        Seq(5),
-        "a new head and its config, then the old turn closed"
+        Seq(6),
+        "a new head, its context and its config, then the old turn closed"
     );
     assert!(state.turn.is_none() && !state.busy());
     assert!(

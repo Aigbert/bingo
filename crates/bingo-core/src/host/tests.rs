@@ -26,6 +26,7 @@ mod providers;
 mod question_receipt;
 mod queue;
 mod reserved;
+mod resting;
 mod resume;
 mod rewind;
 mod routes;

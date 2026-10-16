@@ -1,7 +1,8 @@
 //! Resolve a proposed choice before mutating the session or its settings.
 
 use super::*;
-use crate::context::{ContextView, budget::Thresholds, estimate_tokens};
+use crate::context::{ContextView, budget::Thresholds};
+use crate::turn::context_used;
 use futures::StreamExt;
 
 pub(crate) async fn proposed_model(
@@ -104,14 +105,6 @@ impl bingo_sdk::switch::ModelSwitch for Switches {
         }
         catalog
     }
-}
-
-fn context_used(state: &SessionState) -> u64 {
-    let estimate = estimate_tokens(&[], &ContextView::model_view(&state.transcript), &[]);
-    // An unfinished turn can have grown since the last measured response.
-    state
-        .context
-        .map_or(estimate, |context| context.used.max(estimate))
 }
 
 fn trigger(target: &ModelChoice) -> u64 {
