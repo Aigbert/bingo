@@ -173,8 +173,8 @@ fn a_new_block_takes_its_own_room_and_walks_nowhere_after_it() {
         .collect();
     assert_eq!(
         row_of(&frames[0], "first"),
-        was - 2,
-        "the row above moves up by the new block and its blank row, no further"
+        was,
+        "short transcripts grow down from the header"
     );
     for (at, drawn) in frames.iter().enumerate().skip(1) {
         assert_eq!(

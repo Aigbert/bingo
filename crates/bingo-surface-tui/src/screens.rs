@@ -810,7 +810,7 @@ fn a_permission_card_previews_a_word_level_diff() {
         }),
     ));
     both("permission_word_diff", &tree, &mut ui, now);
-    let painted = painted(80, 24, &tree, &mut ui, now);
+    let painted = painted(108, 30, &tree, &mut ui, now);
     let emphasised: Vec<String> = painted
         .row("+    match busy")
         .into_iter()

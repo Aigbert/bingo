@@ -37,6 +37,11 @@ use unicode_width::UnicodeWidthStr;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Palette {
     pub raised: Color,
+    pub rule: Color,
+    pub ash: Color,
+    pub code: Color,
+    pub panel: Color,
+    pub pick: Color,
     pub crew: [Color; 5],
     pub presence: Color,
     pub glow: Color,
@@ -59,6 +64,11 @@ pub const DARK: Palette = Palette {
         Color::Rgb(0xf0, 0x8c, 0xc0),
     ],
     raised: Color::Rgb(0x21, 0x1d, 0x17),
+    rule: Color::Rgb(0x3a, 0x34, 0x2b),
+    ash: Color::Rgb(0x5f, 0x58, 0x4d),
+    code: Color::Rgb(0xe9, 0xc8, 0x9a),
+    panel: Color::Rgb(0x1d, 0x19, 0x14),
+    pick: Color::Rgb(0x2e, 0x26, 0x19),
     presence: Color::Rgb(0xf0, 0x88, 0x3e),
     glow: Color::Rgb(0xff, 0xc2, 0x78),
     good: Color::Rgb(0x8f, 0xcf, 0x8a),
@@ -81,6 +91,11 @@ pub const LIGHT: Palette = Palette {
         Color::Rgb(0xb0, 0x3a, 0x7a),
     ],
     raised: Color::Rgb(0xee, 0xe8, 0xdd),
+    rule: Color::Rgb(0xcf, 0xc5, 0xb5),
+    ash: Color::Rgb(0x85, 0x7b, 0x6b),
+    code: Color::Rgb(0x79, 0x51, 0x24),
+    panel: Color::Rgb(0xf4, 0xef, 0xe5),
+    pick: Color::Rgb(0xe5, 0xd8, 0xbf),
     presence: Color::Rgb(0xa8, 0x4d, 0x12),
     glow: Color::Rgb(0xe0, 0x7a, 0x2a),
     good: Color::Rgb(0x35, 0x72, 0x30),
@@ -99,6 +114,7 @@ pub enum Colors {
     Ansi,
     /// 24-bit, the native look.
     True(Palette),
+    Indexed(Palette),
 }
 
 // ---- the glyphs ---------------------------------------------------------
@@ -131,6 +147,12 @@ pub struct Glyphs {
     pub tick: &'static str,
     /// The permission mode on the status line.
     pub mode: &'static str,
+    pub pause: &'static str,
+    pub steps: [&'static str; 4],
+    pub fold: &'static str,
+    pub stop: &'static str,
+    pub receipts: [&'static str; 4],
+    pub context: [&'static str; 2],
     /// A tree node: `[0]` with siblings under it, `[1]` the last one. One
     /// field because it is one fact in two states, as the todo box is.
     pub tree: [&'static str; 2],
@@ -144,7 +166,7 @@ pub struct Glyphs {
 pub const UNICODE: Glyphs = Glyphs {
     bullet: "⏺",
     connector: "⎿",
-    user: ">",
+    user: "›",
     cursor: "❯",
     caret: "▌",
     mark: ["▍", "▏"],
@@ -152,6 +174,12 @@ pub const UNICODE: Glyphs = Glyphs {
     task: ["◻", "◼", "✔"],
     tick: "✔",
     mode: "⏵⏵",
+    pause: "⏸",
+    steps: ["✓", "◆", "◌", "✗"],
+    fold: "▸",
+    stop: "■",
+    receipts: ["⇄", "✎", "⟲", "⇣"],
+    context: ["▰", "▱"],
     tree: ["├", "└"],
     ellipsis: "…",
     point: "•",
@@ -178,6 +206,12 @@ pub const ASCII: Glyphs = Glyphs {
     task: ["-", "*", "x"],
     tick: "x",
     mode: ">>",
+    pause: "||",
+    steps: ["x", "*", "o", "!"],
+    fold: ">",
+    stop: "#",
+    receipts: ["=", "/", "<", "v"],
+    context: ["#", "-"],
     tree: ["+", "+"],
     ellipsis: "...",
     point: "-",
@@ -233,6 +267,7 @@ pub struct Ask {
     pub no_color: bool,
     /// `COLORTERM` says 24 bits are safe.
     pub truecolor: bool,
+    pub indexed: bool,
     pub ascii: bool,
     pub look: Look,
 }
@@ -250,6 +285,7 @@ pub fn choose(ask: Ask, light: Option<bool>) -> Theme {
     let colors = match (ask.no_color, ask.truecolor) {
         (true, _) => Colors::Plain,
         (false, true) => Colors::True(palette),
+        (false, false) if ask.indexed => Colors::Indexed(palette),
         (false, false) => Colors::Ansi,
     };
     Theme {
@@ -266,6 +302,7 @@ impl Theme {
             Colors::Plain => Style::new(),
             Colors::Ansi => Style::new().fg(ansi),
             Colors::True(palette) => Style::new().fg(exact(palette)),
+            Colors::Indexed(palette) => Style::new().fg(nearest(exact(palette))),
         }
     }
 }
@@ -276,12 +313,56 @@ pub fn current() -> Theme {
 }
 
 /// Pure detection, shared by the run and the fixtures.
-pub fn detect(ask: Ask, light: Option<bool>) -> Theme {
-    choose(ask, light)
+pub fn detect(ask: Ask, ground: Option<(u16, u16, u16)>) -> Theme {
+    let light = ground.map(|(r, g, b)| background_is_light(r, g, b));
+    let mut theme = choose(ask, light);
+    if follows(ask)
+        && let Some(ground) = ground
+    {
+        match &mut theme.colors {
+            Colors::True(palette) | Colors::Indexed(palette) => blend_ground(palette, ground),
+            _ => {}
+        }
+    }
+    theme
+}
+
+/// Keep the prototype's contrast on its ground; carry surface tints with a
+/// different terminal ground. Foreground accents and prose are unaffected.
+fn blend_ground(palette: &mut Palette, ground: (u16, u16, u16)) {
+    let base = reference_ground(*palette == LIGHT);
+    let shift = |color| {
+        let Color::Rgb(r, g, b) = color else {
+            return color;
+        };
+        let channel = |value: u8, at: u16, reference: u16| {
+            (i32::from(value) + (i32::from(at) - i32::from(reference)) * 3 / (257 * 4))
+                .clamp(0, 255) as u8
+        };
+        Color::Rgb(
+            channel(r, ground.0, base.0),
+            channel(g, ground.1, base.1),
+            channel(b, ground.2, base.2),
+        )
+    };
+    palette.rule = shift(palette.rule);
+    palette.raised = shift(palette.raised);
+    palette.panel = shift(palette.panel);
+    palette.pick = shift(palette.pick);
+    palette.good_tint = shift(palette.good_tint);
+    palette.bad_tint = shift(palette.bad_tint);
+}
+
+pub(crate) fn reference_ground(light: bool) -> (u16, u16, u16) {
+    if light {
+        (65535, 65535, 65535)
+    } else {
+        (0x1515, 0x1212, 0x0e0e)
+    }
 }
 
 pub fn follows(ask: Ask) -> bool {
-    !ask.no_color && ask.truecolor && ask.look == Look::Terminal
+    !ask.no_color && (ask.truecolor || ask.indexed) && ask.look == Look::Terminal
 }
 
 /// How long a probe of the terminal is given, this one and the graphics probe
@@ -312,16 +393,11 @@ pub const PROBE_THROUGH: std::time::Duration =
 /// ground is likely ([`crate::run::look`]): `OSC 11`, the background colour,
 /// which is what the probe asks for too. The answer comes back through
 /// crossterm's key stream, where [`crate::late`] hears it whole and
-/// [`answered`] reads it.
+/// [`answered_ground`] reads it.
 pub const QUESTION: &[u8] = b"\x1b]11;?\x1b\\";
 
-/// What an `OSC 11` reply says the ground is: `Some(true)` for a light one.
-/// Anything that is not an answer to that question — the graphics probe's own
-/// replies, an `OSC 10` foreground, a colour spec in a shape `xparsecolor`
-/// never wrote — is `None`, and leaves the look standing.
-pub fn answered(reply: &[u8]) -> Option<bool> {
-    let (red, green, blue) = colour(spec(reply)?)?;
-    Some(background_is_light(red, green, blue))
+pub(crate) fn answered_ground(reply: &[u8]) -> Option<(u16, u16, u16)> {
+    colour(spec(reply)?)
 }
 
 /// The colour spec inside the reply, between `ESC ] 11 ;` and whichever
@@ -409,6 +485,7 @@ pub fn with<R>(theme: Theme, f: impl FnOnce() -> R) -> R {
 pub fn crew(index: usize) -> Style {
     match current().colors {
         Colors::True(palette) => Style::new().fg(palette.crew[index % 5]),
+        Colors::Indexed(palette) => Style::new().fg(nearest(palette.crew[index % 5])),
         _ => text(),
     }
 }
@@ -434,6 +511,7 @@ pub fn dim() -> Style {
 pub fn raised() -> Style {
     match current().colors {
         Colors::True(palette) => Style::new().bg(palette.raised),
+        Colors::Indexed(palette) => Style::new().bg(nearest(palette.raised)),
         _ => Style::new(),
     }
 }
@@ -477,8 +555,43 @@ pub fn removed() -> Style {
 fn tinted(fg: Style, tint: fn(Palette) -> Color) -> Style {
     match current().colors {
         Colors::True(palette) => fg.bg(tint(palette)),
+        Colors::Indexed(palette) => fg.bg(nearest(tint(palette))),
         _ => fg,
     }
+}
+
+/// The fixed xterm cube and grey ramp; indices 0–15 belong to the terminal.
+fn nearest(color: Color) -> Color {
+    let Color::Rgb(red, green, blue) = color else {
+        return color;
+    };
+    let distance = |index: u8| {
+        let (r, g, b) = indexed_rgb(index);
+        let square = |a: u8, b: u8| (i32::from(a) - i32::from(b)).pow(2);
+        square(red, r) + square(green, g) + square(blue, b)
+    };
+    Color::Indexed(
+        (16..=255)
+            .min_by_key(|index| distance(*index))
+            .unwrap_or(16),
+    )
+}
+
+fn indexed_rgb(index: u8) -> (u8, u8, u8) {
+    if index >= 232 {
+        let v = 8 + (index - 232) * 10;
+        return (v, v, v);
+    }
+    let index = index.saturating_sub(16);
+    let cube = |v: u8| if v == 0 { 0 } else { 55 + v * 40 };
+    (cube(index / 36), cube(index / 6 % 6), cube(index % 6))
+}
+
+pub fn rule_style() -> Style {
+    current().fg(Color::DarkGray, |p| p.rule)
+}
+pub fn ash() -> Style {
+    current().fg(Color::DarkGray, |p| p.ash)
 }
 
 // ---- what moves (design §6) ---------------------------------------------
@@ -504,7 +617,7 @@ pub fn breath(level: f32) -> Style {
     let level = steps(level, BREATH_STEPS);
     match current().colors {
         Colors::Plain => Style::new(),
-        Colors::Ansi => two_ways(level, dim(), presence()),
+        Colors::Ansi | Colors::Indexed(_) => two_ways(level, dim(), presence()),
         Colors::True(palette) => Style::new().fg(scaled(
             palette.presence,
             BREATH_FLOOR + (1.0 - BREATH_FLOOR) * level,
@@ -516,7 +629,7 @@ pub fn breath(level: f32) -> Style {
 pub fn pulse(level: f32) -> Style {
     match current().colors {
         Colors::Plain => Style::new(),
-        Colors::Ansi => two_ways(level, presence(), glow()),
+        Colors::Ansi | Colors::Indexed(_) => two_ways(level, presence(), glow()),
         Colors::True(palette) => Style::new().fg(mix(palette.presence, palette.glow, level)),
     }
 }
@@ -531,7 +644,7 @@ pub fn comet(age: f32) -> Style {
     let age = settled(age);
     match current().colors {
         Colors::Plain => Style::new(),
-        Colors::Ansi => two_ways(age, glow(), text()),
+        Colors::Ansi | Colors::Indexed(_) => two_ways(age, glow(), text()),
         Colors::True(palette) if age < SETTLES => {
             Style::new().fg(mix(palette.glow, palette.presence, age / SETTLES))
         }
@@ -591,6 +704,7 @@ pub fn cooling(t: f32) -> Style {
 /// window fills. It starts where secondary text does, which is a weight and
 /// no colour at all (M73), so the notice takes `bad` at [`SETTLES`] rather
 /// than creeping towards it through a grey.
+#[cfg(test)]
 pub fn warming(t: f32) -> Style {
     match current().colors {
         Colors::Plain => Style::new(),
@@ -732,7 +846,15 @@ pub fn spendable() -> std::collections::HashSet<Color> {
             out.insert(colour);
         }
     };
-    for style in [presence(), glow(), good(), bad(), mode()] {
+    for style in [
+        presence(),
+        glow(),
+        good(),
+        bad(),
+        mode(),
+        rule_style(),
+        ash(),
+    ] {
         keep(style);
     }
     for index in 0..5 {
@@ -905,6 +1027,11 @@ mod tests {
         }
     }
 
+    fn answered(reply: &[u8]) -> Option<bool> {
+        let (r, g, b) = answered_ground(reply)?;
+        Some(background_is_light(r, g, b))
+    }
+
     /// Every drawing source of this crate, with its test module cut off, as
     /// `scripts/check_discipline.sh` cuts them. This file, the fixtures and
     /// the screen catalogue are left out: one holds the table and the others
@@ -961,6 +1088,66 @@ mod tests {
     }
 
     #[test]
+    fn tints_follow_the_ground_without_recolouring_prose_or_accents() {
+        let ask = Ask {
+            truecolor: true,
+            ..Ask::default()
+        };
+        let reference = detect(ask, Some(reference_ground(false)));
+        assert_eq!(reference.colors, Colors::True(DARK));
+        let changed = detect(ask, Some((0x3030, 0x3030, 0x3030)));
+        let Colors::True(palette) = changed.colors else {
+            panic!("truecolour")
+        };
+        assert_ne!(palette.rule, DARK.rule);
+        assert_ne!(palette.good_tint, DARK.good_tint);
+        assert_eq!(palette.presence, DARK.presence);
+        with(changed, || {
+            assert_eq!(text().fg, Some(Color::Reset));
+            assert!(dim().add_modifier.contains(Modifier::DIM));
+        });
+        let indexed = Ask {
+            truecolor: false,
+            indexed: true,
+            ..ask
+        };
+        assert!(follows(indexed));
+        with(detect(indexed, Some(reference_ground(true))), || {
+            assert_eq!(rule_style().fg, Some(nearest(LIGHT.rule)));
+        });
+    }
+
+    #[test]
+    fn chrome_has_light_pairs_and_fixed_xterm_nearest_colours() {
+        for (dark, light) in [
+            (DARK.rule, LIGHT.rule),
+            (DARK.ash, LIGHT.ash),
+            (DARK.code, LIGHT.code),
+            (DARK.panel, LIGHT.panel),
+            (DARK.pick, LIGHT.pick),
+        ] {
+            assert_ne!(dark, light);
+        }
+        assert_eq!(nearest(Color::Rgb(95, 135, 175)), Color::Indexed(67));
+        assert_eq!(nearest(Color::Rgb(128, 128, 128)), Color::Indexed(244));
+        for palette in [DARK, LIGHT] {
+            with(
+                Theme {
+                    colors: Colors::Indexed(palette),
+                    glyphs: &UNICODE,
+                },
+                || {
+                    assert!(matches!(presence().fg, Some(Color::Indexed(_))));
+                    assert!(matches!(rule_style().fg, Some(Color::Indexed(_))));
+                    assert_eq!(text().fg, Some(Color::Reset));
+                    assert_eq!(dim().fg, None);
+                    assert!(dim().add_modifier.contains(Modifier::DIM));
+                },
+            );
+        }
+    }
+
+    #[test]
     fn no_view_names_a_colour_of_its_own() {
         let leaked: Vec<String> = sources()
             .into_iter()
@@ -1013,7 +1200,6 @@ mod tests {
                     "views/table.rs",
                     "views/text.rs",
                     "views/tree.rs",
-                    "welcome.rs",
                 ],
             ),
             (
@@ -1044,6 +1230,7 @@ mod tests {
                     "transcript/slots.rs",
                     "transcript/thinking.rs",
                     "view.rs",
+                    "view/header.rs",
                     "views/actions.rs",
                     "views/badge.rs",
                     "views/button.rs",
@@ -1058,7 +1245,6 @@ mod tests {
                     "views/table.rs",
                     "views/text.rs",
                     "views/tree.rs",
-                    "welcome.rs",
                     "window.rs",
                 ],
             ),
@@ -1082,13 +1268,23 @@ mod tests {
                     "form.rs",
                     "search.rs",
                     "select.rs",
+                    "status.rs",
                     "transcript.rs",
+                    "view/header.rs",
                     "views/actions.rs",
                     "views/badge.rs",
-                    "welcome.rs",
                 ],
             ),
-            ("glow", &["activity.rs", "opening/frame.rs"]),
+            (
+                "glow",
+                &[
+                    "activity.rs",
+                    "composer.rs",
+                    "opening/frame.rs",
+                    "status.rs",
+                    "view.rs",
+                ],
+            ),
             (
                 "good",
                 &[
@@ -1111,7 +1307,7 @@ mod tests {
             ),
             ("mode", &["markdown/mentions.rs", "status.rs"]),
             ("breath", &["activity.rs"]),
-            ("pulse", &["transcript.rs", "view.rs", "views/progress.rs"]),
+            ("pulse", &["transcript.rs", "views/progress.rs"]),
             (
                 "comet",
                 &[
@@ -1124,9 +1320,9 @@ mod tests {
             ("landing", &["transcript.rs"]),
             ("cooling", &["transcript.rs"]),
             ("fading", &["status.rs"]),
-            ("warming", &["status.rs"]),
+            ("warming", &[]),
             ("ink", &["highlight.rs"]),
-            ("crew", &["face.rs"]),
+            ("crew", &["face.rs", "status.rs"]),
         ];
         for (token, files) in allowed {
             let mut seen: Vec<String> = sources()

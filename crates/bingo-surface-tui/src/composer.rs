@@ -1,8 +1,4 @@
-//! The prompt editor: a `String`, a grapheme-aligned cursor, and the motions a
-//! readline user expects. It owns no terminal, so every one of its rules is
-//! testable as a function of text and offset — and, at the end of the file,
-//! the rows of the box it is drawn in (design §4: `╭─╮ │ > ▌ │ ╰─╯`, one to
-//! ten rows, the border dim). Where that box sits is the frame's.
+//! The prompt editor and its rows, independent of terminal geometry.
 
 use bingo_sdk::{Driver, SessionState};
 use ratatui::text::{Line, Span};
@@ -259,7 +255,7 @@ fn seek(text: &str, start: usize, end: usize, column: usize) -> usize {
 pub fn prompt(state: &SessionState) -> String {
     match state.summary.driver {
         Driver::Log => format!("{} {} ", tree::name(state), theme::user()),
-        Driver::Model => format!("{} ", theme::user()),
+        Driver::Model => format!(" {} ", theme::mark()),
     }
 }
 
@@ -285,7 +281,7 @@ pub fn box_lines(
 
 fn row(index: usize, text: &str, prompt: &str, placeholder: Option<&str>) -> Line<'static> {
     let lead = match index {
-        0 => Span::styled(prompt.to_string(), theme::dim()),
+        0 => Span::styled(prompt.to_string(), theme::glow()),
         _ => Span::raw(" ".repeat(prompt.width())),
     };
     let body = match placeholder.filter(|_| index == 0) {

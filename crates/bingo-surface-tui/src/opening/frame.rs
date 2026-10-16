@@ -12,7 +12,7 @@ pub fn frame(t: f32, rows: &[Line<'static>]) -> Vec<Line<'static>> {
     }
     let compact = rows
         .first()
-        .is_some_and(|row| row.to_string().starts_with("bingo"));
+        .is_some_and(|row| row.to_string().trim_start().starts_with("bingo"));
     let mark_rows = if compact { 1 } else { 4 };
     let caret_row = if compact { 0 } else { 2 };
     let end = rows

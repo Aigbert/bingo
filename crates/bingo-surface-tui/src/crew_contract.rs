@@ -147,7 +147,7 @@ fn strip_names_the_work_and_yields_to_notices() {
         "{narrow}"
     );
     ui.notify(Level::Info, "saved", now.instant);
-    let notice = status::line(&tree, &ui, 120, later(now, 1000)).to_string();
+    let notice = status::hints(&tree, &ui, 120, later(now, 1000), &mut Vec::new()).to_string();
     assert!(
         notice.contains("saved") && !notice.contains("reviewer"),
         "{notice}"
@@ -205,7 +205,10 @@ fn a_child_permission_and_room_posts_keep_the_selected_room_in_front() {
             .focus_on(tree.open_interaction().map(|(_, ask)| ask));
         assert_eq!(tree.view(), &log_id(), "step {step}");
         let screen = draw_tree(120, 40, &tree, &mut ui, now);
-        assert!(screen.contains("in #design"), "step {step}: {screen}");
+        assert!(
+            screen.contains("#design · session"),
+            "step {step}: {screen}"
+        );
         assert_eq!(tree.open_interaction().is_some(), step == 0);
         assert_eq!(
             crate::focus::owner(&ui, &tree),
@@ -351,10 +354,10 @@ fn a_placed_status_outranks_crew_until_it_expires() {
             ),
         ),
     ));
-    let placed = status::line(&tree, &ui, 120, now).to_string();
+    let placed = status::hints(&tree, &ui, 120, now, &mut Vec::new()).to_string();
     assert!(placed.contains("scheduled") && !placed.contains("reviewer"));
     draw_tree(120, 40, &tree, &mut ui, now);
-    assert!(ui.shown.crew.is_none());
+    assert!(ui.shown.crew.is_some(), "the footer retains the crew");
     assert!(
         status::line(&tree, &ui, 120, later(now, 2001))
             .to_string()

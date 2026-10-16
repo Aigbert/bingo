@@ -50,7 +50,7 @@ pub fn current() -> Render {
 #[derive(Clone, Debug)]
 pub struct Detection {
     pub ask: theme::Ask,
-    pub light: Option<bool>,
+    pub ground: Option<(u16, u16, u16)>,
     pub heard: Option<crate::graphics::Heard>,
     pub motion: bool,
 }
@@ -59,7 +59,7 @@ impl Default for Detection {
     fn default() -> Self {
         Self {
             ask: theme::Ask::default(),
-            light: None,
+            ground: None,
             heard: None,
             motion: true,
         }
@@ -73,11 +73,14 @@ impl From<Render> for Detection {
         Self {
             ask: theme::Ask {
                 no_color: render.look.colors == theme::Colors::Plain,
+                indexed: matches!(render.look.colors, theme::Colors::Indexed(_)),
                 truecolor: matches!(render.look.colors, theme::Colors::True(_)),
                 ascii: render.look.glyphs == &theme::ASCII,
                 look: theme::Look::Terminal,
             },
-            light: Some(render.look.colors == theme::Colors::True(theme::LIGHT)),
+            ground: Some(theme::reference_ground(
+                matches!(render.look.colors, theme::Colors::True(palette) | theme::Colors::Indexed(palette) if palette == theme::LIGHT),
+            )),
             heard: match render.graphics {
                 Graphics::Off => None,
                 Graphics::Kitty { cell, transport } => Some(Heard {
@@ -101,7 +104,7 @@ impl From<Render> for Detection {
 impl Detection {
     pub fn render(&self) -> Render {
         Render {
-            look: theme::detect(self.ask, self.light),
+            look: theme::detect(self.ask, self.ground),
             graphics: crate::graphics::detect(self.heard.as_ref()).graphics,
             motion: self.motion,
         }
@@ -110,8 +113,8 @@ impl Detection {
         crate::graphics::detect(self.heard.as_ref()).notice
     }
     pub fn reply(&mut self, reply: &[u8]) {
-        if let Some(light) = theme::answered(reply) {
-            self.light = Some(light);
+        if let Some(ground) = theme::answered_ground(reply) {
+            self.ground = Some(ground);
         }
         if let Some(heard) = &mut self.heard {
             heard.and(crate::graphics::probe::parse(reply));
@@ -163,7 +166,7 @@ mod tests {
         ] {
             let detection = Detection {
                 ask,
-                light,
+                ground: light.map(theme::reference_ground),
                 motion: false,
                 heard: None,
             };
@@ -204,7 +207,7 @@ mod tests {
         detection.reply(b"\x1b]11;rgb:0000/0000/0000\x07");
         assert_eq!(
             detection.render().look.colors,
-            theme::Colors::True(theme::DARK)
+            theme::detect(detection.ask, Some((0, 0, 0))).colors
         );
     }
 

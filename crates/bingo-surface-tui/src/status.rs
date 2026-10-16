@@ -1,11 +1,5 @@
-//! The one line of furniture, under the input box: mode on the left, what is
-//! true now in the middle, where you are on the right (design §3).
-//!
-//! Every slot is derived at render time — the mode from the config the policy
-//! published, the counts from the tree, the context from the reducer's last
-//! `ContextUsage` — so nothing here is a second copy of a fact. The middle is
-//! the slot that gives way when the line does not fit: it is the one whose
-//! words are already the shortest true thing to say.
+//! The persistent mode, crew, context and model footer, plus transitional hints.
+//! All facts come from the folded session and plugin slots.
 
 use bingo_sdk::{Effort, SessionState};
 use ratatui::text::{Line, Span};
@@ -18,11 +12,6 @@ use crate::{keys, theme};
 
 /// Cells between two slots.
 const GAP: usize = 2;
-/// The context count starts warming towards `bad` at this share of the
-/// compaction trigger…
-const CONTEXT_WARM: u64 = 80;
-/// …and says the way out from here, where it is `bad` outright.
-const CONTEXT_BAD: u64 = 90;
 /// What the middle says when nothing else is true and nothing is typed.
 pub const HINT: &str = keys::FOOTER_HINT;
 
@@ -41,37 +30,119 @@ pub fn components(
         width,
         pulls,
     };
-    let right = clip(right(tree, &mut site), width);
-    let left = clip(
-        mode(tree.viewed(), &mut site),
-        width.saturating_sub(cells(&right)),
-    );
-    let gaps = GAP * (!left.is_empty() as usize + !right.is_empty() as usize);
-    let room = width.saturating_sub(cells(&left) + cells(&right) + gaps);
-    let (middle, crew) = middle(tree, ui, width, room, now, &mut site);
-    let middle = clip(middle, room);
-    let slack = width.saturating_sub(cells(&left) + cells(&middle) + cells(&right));
-    let before = if left.is_empty() { 0 } else { slack / 2 };
-    let start = cells(&left) + before;
-    let hit = (crew && !middle.is_empty()).then_some(start..start + cells(&middle));
-    (place(left, middle, right, width), hit)
+    let right = right(tree, &mut site, now);
+    let left = mode(tree.viewed(), &mut site);
+    let mut crew = crate::crew::spans(tree, width, width, now);
+    if crew.is_empty() {
+        crew = vec![
+            Span::styled(theme::glyphs().steps[1], theme::crew(0)),
+            dimmed(" solo".into()),
+        ];
+    }
+    let context = context_bar(tree.viewed().context);
+    footer(left, crew, context, right, width)
+}
+
+fn footer(
+    mut mode: Vec<Span<'static>>,
+    mut crew: Vec<Span<'static>>,
+    mut context: Vec<Span<'static>>,
+    model: Vec<Span<'static>>,
+    width: usize,
+) -> (Line<'static>, Option<std::ops::Range<usize>>) {
+    let room = width.saturating_sub(3);
+    let fits = |crew: &[Span<'static>], context: &[Span<'static>]| {
+        cells(&mode)
+            + cells(crew)
+            + cells(context)
+            + cells(&model)
+            + 3 * (usize::from(!crew.is_empty()) + usize::from(!context.is_empty()))
+            + GAP
+            <= room
+    };
+    if !fits(&crew, &context) {
+        crew.clear();
+    }
+    if !fits(&crew, &context) {
+        context.clear();
+    }
+    let crew_start = 1 + cells(&mode) + 3;
+    let hit = (!crew.is_empty()).then_some(crew_start..crew_start + cells(&crew));
+    for part in [crew, context] {
+        if !part.is_empty() {
+            mode.push(pad(3));
+            mode.extend(part);
+        }
+    }
+    let mut spans = vec![pad(1)];
+    spans.extend(place(mode, Vec::new(), model, room).spans);
+    spans.push(pad(2));
+    (Line::from(clip(spans, width)), hit)
+}
+
+fn context_bar(context: Option<bingo_sdk::ContextUsage>) -> Vec<Span<'static>> {
+    let Some(context) = context else {
+        return vec![
+            Span::styled(theme::glyphs().context[1].repeat(8), theme::ash()),
+            dimmed(" ? / ?".into()),
+        ];
+    };
+    let share = context.used as f64 / context.window.max(1) as f64;
+    let fill = if context.window == 0 {
+        0
+    } else {
+        (share * 8.0).round().clamp(1.0, 8.0) as usize
+    };
+    let [full, empty] = theme::glyphs().context;
+    vec![
+        Span::styled(
+            full.repeat(fill),
+            if share > 0.9 {
+                theme::bad()
+            } else {
+                theme::presence()
+            },
+        ),
+        Span::styled(empty.repeat(8 - fill), theme::ash()),
+        dimmed(format!(
+            " {} / {}",
+            crate::count::count(context.used),
+            crate::count::count(context.window)
+        )),
+    ]
+}
+
+/// Transitional hints keep their existing words until KeyBar owns this row.
+pub fn hints(
+    tree: &Tree,
+    ui: &Ui,
+    width: usize,
+    now: Now,
+    pulls: &mut Vec<crate::pulled::Key>,
+) -> Line<'static> {
+    let mut site = crate::component::Site {
+        state: tree.viewed(),
+        memo: &ui.placed.pulled,
+        width,
+        pulls,
+    };
+    let (spans, _) = middle(tree, ui, width, width, now, &mut site);
+    Line::from(clip(spans, width))
 }
 
 fn mode(state: &SessionState, site: &mut crate::component::Site<'_>) -> Vec<Span<'static>> {
     let modes: Vec<String> = bingo_sdk::slot::placed(state)
         .into_iter()
         .filter_map(|placed| match placed.slot {
-            bingo_sdk::slot::Slot::Mode { current, modes }
-                if modes.first().is_none_or(|mode| mode.label != current) =>
-            {
-                Some(current)
-            }
+            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
             _ => None,
         })
         .collect();
-    if modes.is_empty() {
-        return Vec::new();
-    }
+    let modes = if modes.is_empty() {
+        vec!["default".into()]
+    } else {
+        modes
+    };
     let props =
         bingo_sdk::component::Props::SessionMode(bingo_sdk::component::SessionModeProps { modes });
     site.draw("SessionMode", &props, |changed, _| {
@@ -92,32 +163,41 @@ fn mode(state: &SessionState, site: &mut crate::component::Site<'_>) -> Vec<Span
     .spans
 }
 
-/// A mode may leave its first, resting choice unsaid.
+/// Every mode has a visible label, including the resting default.
 fn left(state: &SessionState) -> Vec<Span<'static>> {
-    bingo_sdk::slot::placed(state)
+    let label = bingo_sdk::slot::placed(state)
         .into_iter()
-        .filter_map(|placed| {
-            let bingo_sdk::slot::Slot::Mode { current, modes } = placed.slot else {
-                return None;
-            };
-            if modes.first().is_some_and(|mode| mode.label == current) {
-                return None;
-            }
-            Some(vec![
-                Span::styled(format!("{} {current}", theme::glyphs().mode), theme::mode()),
-                Span::styled(" (shift+tab to cycle)", theme::dim()),
-            ])
+        .find_map(|placed| match placed.slot {
+            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
+            _ => None,
         })
-        .flatten()
-        .collect()
+        .unwrap_or_else(|| "default".into());
+    let label = match label.as_str() {
+        "acceptEdits" => "accept edits",
+        "bypassPermissions" => "bypass",
+        "dontAsk" => "don't ask",
+        other => other,
+    };
+    let style = match label {
+        "accept edits" => theme::good(),
+        "plan" => theme::crew(2),
+        "bypass" => theme::bad(),
+        _ => theme::mode(),
+    };
+    let glyph = if label == "plan" {
+        theme::glyphs().pause
+    } else {
+        theme::glyphs().mode
+    };
+    vec![Span::styled(format!("{glyph} {label}"), style)]
 }
 
 /// Only what is true now, in the order the eye should take it.
 fn middle(
     tree: &Tree,
     ui: &Ui,
-    width: usize,
-    room: usize,
+    _width: usize,
+    _room: usize,
     now: Now,
     site: &mut crate::component::Site<'_>,
 ) -> (Vec<Span<'static>>, bool) {
@@ -137,10 +217,6 @@ fn middle(
     }
     if let Some(waiting) = repository_waiting(ui, now) {
         return (vec![waiting], false);
-    }
-    let crew = crate::crew::spans(tree, width, room, now);
-    if !crew.is_empty() {
-        return (crew, true);
     }
     if let Some(waiting) = tree::count(tree, Wants::Attention, Scope::Others) {
         return (
@@ -186,6 +262,15 @@ fn repository_waiting(ui: &Ui, now: Now) -> Option<Span<'static>> {
     ))
 }
 
+fn model_flash(state: &SessionState, now: Now) -> Option<std::time::Instant> {
+    let changed = state.transcript.items().iter().rev().find(|item| {
+        matches!(&item.body, bingo_sdk::ItemBody::Notice { text, .. } if text.starts_with("⇄ "))
+    })?;
+    let duration = std::time::Duration::from_millis(1_400);
+    let elapsed = now.past(changed.started_at);
+    (elapsed < duration).then(|| now.instant + duration.saturating_sub(elapsed))
+}
+
 pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
     let slots = bingo_sdk::slot::placed(tree.viewed());
     let attention = crate::tree::count(tree, crate::tree::Wants::Attention, crate::tree::Scope::Others).is_some()
@@ -217,6 +302,7 @@ pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
             Some(now.instant + delay)
         })
         .chain(pulse)
+        .chain(model_flash(tree.viewed(), now))
         .min()
 }
 
@@ -245,39 +331,6 @@ fn placed_status(state: &SessionState, now: Now) -> Vec<Span<'static>> {
             Some(Span::styled(text, style))
         })
         .collect()
-}
-
-/// What the next request carries against the model's window — `41k/200k`,
-/// used over the whole — before the model it goes to. Always there once a
-/// turn has run, because how much room is left is a fact a person wants
-/// without asking; it warms from `dim` towards `bad` across the last fifth of
-/// the compaction trigger and, past [`CONTEXT_BAD`], says the way out.
-fn usage(context: Option<bingo_sdk::ContextUsage>) -> Option<Span<'static>> {
-    let context = context.filter(|c| c.window > 0)?;
-    let share = context
-        .used
-        .saturating_mul(100)
-        .checked_div(context.trigger)
-        .unwrap_or(0);
-    let tail = match share >= CONTEXT_BAD {
-        true => " · /compact",
-        false => "",
-    };
-    Some(Span::styled(
-        format!(
-            "{}/{}{tail}",
-            crate::count::count(context.used),
-            crate::count::count(context.window)
-        ),
-        theme::warming(warmth(share)),
-    ))
-}
-
-/// How far the context count has warmed: nothing until [`CONTEXT_WARM`] % of
-/// the trigger, all the way at the trigger itself.
-fn warmth(share: u64) -> f32 {
-    let span = (100 - CONTEXT_WARM) as f32;
-    (share.saturating_sub(CONTEXT_WARM) as f32 / span).clamp(0.0, 1.0)
 }
 
 /// What the kernel or the surface had to say, while it is being said: one at
@@ -314,7 +367,7 @@ fn notice(ui: &Ui, now: Now) -> Vec<Span<'static>> {
 /// kernel stamps from the choice a turn will actually run on, and the config
 /// view's `thinking`, which is the one place a client reads the level
 /// (ADR-0008 §4). Nothing here is a second copy of either.
-fn right(tree: &Tree, site: &mut crate::component::Site<'_>) -> Vec<Span<'static>> {
+fn right(tree: &Tree, site: &mut crate::component::Site<'_>, now: Now) -> Vec<Span<'static>> {
     let state = tree.viewed();
     let props = bingo_sdk::component::Props::SessionStatus(session_facts(state));
     let lines = site.draw("SessionStatus", &props, |props, _| {
@@ -322,17 +375,30 @@ fn right(tree: &Tree, site: &mut crate::component::Site<'_>) -> Vec<Span<'static
             return Vec::new();
         };
         let mut facts = Vec::new();
-        if tree.viewing().is_some() {
-            let name = props
-                .title
-                .clone()
-                .unwrap_or_else(|| tree::directory(&props.cwd));
-            facts.push(dimmed(format!("in {name}")));
+        if let Some(model) = &props.model {
+            facts.push(Span::styled(
+                model.clone(),
+                if model_flash(state, now).is_some() {
+                    theme::glow().patch(theme::bold())
+                } else {
+                    theme::text()
+                },
+            ));
         }
-        facts.extend(usage(props.context));
-        facts.extend(answering(props).map(dimmed));
-        facts.extend(props.effort.map(|level| dimmed(level.name().into())));
-        vec![Line::from(join(facts))]
+        if let Some(effort) = props.effort {
+            facts.push(Span::styled(
+                format!(" ∴ {}", effort.name()),
+                if model_flash(state, now).is_some() {
+                    theme::glow()
+                } else {
+                    theme::dim()
+                },
+            ));
+        }
+        if props.model_scope == Some(bingo_sdk::ChoiceScope::Session) {
+            facts.push(Span::styled(" · this session", theme::ash()));
+        }
+        vec![Line::from(facts)]
     });
     lines.into_iter().next().unwrap_or_default().spans
 }
@@ -343,11 +409,14 @@ pub(crate) fn session_facts(state: &SessionState) -> bingo_sdk::component::Sessi
         cwd: state.summary.cwd.clone(),
         provider: state.summary.provider.clone(),
         model: state.summary.model.clone(),
-        effort: state
-            .config
-            .kernel
-            .get("thinking")
-            .and_then(|level| serde_json::from_value::<Effort>(level.clone()).ok()),
+        model_scope: state.summary.model_scope,
+        effort: state.summary.effort.or_else(|| {
+            state
+                .config
+                .kernel
+                .get("thinking")
+                .and_then(|level| serde_json::from_value::<Effort>(level.clone()).ok())
+        }),
         context: state.context,
         usage: state.summary.usage,
     }
@@ -355,17 +424,6 @@ pub(crate) fn session_facts(state: &SessionState) -> bingo_sdk::component::Sessi
 
 fn dimmed(text: String) -> Span<'static> {
     Span::styled(text, theme::dim())
-}
-
-/// `provider/model`, or the model alone where no provider is named — an
-/// older journal's summary, or a session nothing answers.
-fn answering(props: &bingo_sdk::component::SessionStatusProps) -> Option<String> {
-    let model = props.model.clone().filter(|m| !m.is_empty())?;
-    let provider = props.provider.as_deref().filter(|p| !p.is_empty());
-    Some(match provider {
-        Some(provider) => format!("{provider}/{model}"),
-        None => model,
-    })
 }
 
 fn join(parts: Vec<Span<'static>>) -> Vec<Span<'static>> {
@@ -494,442 +552,192 @@ pub fn styles(line: &Line<'static>) -> Vec<(String, ratatui::style::Style)> {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
     use crate::test_support::*;
-    use bingo_sdk::{ContextUsage, Event, ItemBody, ItemStatus, TurnId};
-
-    fn text(tree: &Tree, ui: &Ui, width: usize) -> String {
-        at(tree, ui, width, scene().1)
-    }
-
-    fn at(tree: &Tree, ui: &Ui, width: usize, now: Now) -> String {
-        line(tree, ui, width, now).to_string()
-    }
-
-    fn with_context(used: u64) -> Tree {
-        solo(&folded(vec![frame(
-            1,
-            Event::TurnUsage {
-                turn: TurnId::from_raw("trn_1"),
-                usage: Default::default(),
-                context: ContextUsage {
-                    parts: None,
-                    used,
-                    window: 200_000,
-                    trigger: 100_000,
-                },
-            },
-        )]))
-    }
+    use bingo_sdk::{ContextUsage, Effort, Event, ItemBody, ItemStatus};
 
     #[test]
-    fn repository_waiting_count_is_drawn_from_catalogue_states() {
-        let (mut ui, now) = scene();
-        ui.catalogs.plugins.push(bingo_sdk::CatalogEntry {
-            id: "plugins:repo".into(),
-            label: "repo".into(),
-            meta: serde_json::json!({"state":{"kind":"waiting","changed":false}}),
-        });
-        let tree = solo(&state_without_a_model());
-        let (line, _) = components(&tree, &ui, 120, now, &mut Vec::new());
-        let mut terminal =
-            ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 1)).unwrap();
-        terminal
-            .draw(|frame| {
-                frame.render_widget(ratatui::widgets::Paragraph::new(line.clone()), frame.area())
-            })
-            .unwrap();
-        let drawn: String = terminal
-            .backend()
-            .buffer()
-            .content
-            .iter()
-            .map(|cell| cell.symbol())
-            .collect();
-        assert!(drawn.contains("1 from this repo waits for you"), "{drawn}");
-        ui.catalogs.plugins[0].meta = serde_json::json!({"state":{"kind":"on"}});
-        assert!(!at(&tree, &ui, 120, now).contains("waits for you"));
-    }
-
-    #[test]
-    fn an_idle_root_says_only_the_hint_and_the_model() {
-        let (ui, _) = scene();
-        let drawn = text(&solo(&state()), &ui, 80);
-        assert!(drawn.contains(HINT), "{drawn}");
-        assert!(drawn.ends_with("fake-1"), "{drawn}");
-        assert!(!drawn.contains("in "), "the root is not somewhere else");
-        assert_eq!(drawn.width(), 80, "the line fills its row");
-    }
-
-    #[test]
-    fn the_hint_goes_when_something_is_typed() {
-        let (mut ui, now) = scene();
-        write(&mut ui, &state(), "x", now);
-        assert!(!text(&solo(&state()), &ui, 80).contains(HINT));
-    }
-
-    #[test]
-    fn the_mode_the_policy_published_sits_on_the_left() {
-        let (ui, _) = scene();
-        let drawn = text(&solo(&with_permission_mode("acceptEdits")), &ui, 80);
+    fn footer_always_names_mode_crew_and_model() {
+        let (ui, now) = scene();
+        let drawn = line(&solo(&state()), &ui, 108, now).to_string();
+        assert!(drawn.starts_with(" ⏵⏵ default   ◆ solo"), "{drawn}");
         assert!(
-            drawn.starts_with("⏵⏵ acceptEdits (shift+tab to cycle)"),
+            drawn.contains("▱▱▱▱▱▱▱▱ ? / ?"),
+            "unknown is not zero: {drawn}"
+        );
+        assert!(drawn.ends_with("fake-1  "), "{drawn}");
+        assert!(!drawn.contains("fake/"));
+        assert!(!drawn.contains(HINT));
+        assert!(
+            hints(&solo(&state()), &ui, 108, now, &mut Vec::new())
+                .to_string()
+                .contains(HINT)
+        );
+    }
+
+    #[test]
+    fn model_effort_and_scope_are_summary_facts() {
+        let mut state = state();
+        state.summary.effort = Some(Effort::Medium);
+        state.summary.model_scope = Some(bingo_sdk::ChoiceScope::Session);
+        let (ui, now) = scene();
+        let drawn = line(&solo(&state), &ui, 108, now).to_string();
+        assert!(
+            drawn.ends_with("fake-1 ∴ medium · this session  "),
             "{drawn}"
         );
+        state.summary.model_scope = Some(bingo_sdk::ChoiceScope::Default);
         assert!(
-            !text(&solo(&with_permission_mode("default")), &ui, 80).contains("⏵⏵"),
-            "default is what a session already is"
+            !line(&solo(&state), &ui, 108, now)
+                .to_string()
+                .contains("this session")
         );
     }
 
-    /// A wake standing on this session, `n` seconds after the scene's own
-    /// wall clock — the one the line is drawn against.
-    fn with_wake(now: Now, seconds: i64) -> Tree {
-        let at = now.wall + jiff::SignedDuration::from_secs(seconds);
-        solo(&folded(vec![frame(1, pending_wake(&at.to_string()))]))
+    #[test]
+    fn old_journals_keep_their_configured_effort() {
+        let state = folded(vec![frame(1, thinking_view(Some(Effort::High)))]);
+        let (ui, now) = scene();
+        assert!(
+            line(&solo(&state), &ui, 108, now)
+                .to_string()
+                .contains("∴ high")
+        );
     }
 
-    /// The one thing on this line the model set in motion, in the words every
-    /// other span of time on the screen is said in.
     #[test]
-    fn a_pending_wake_is_counted_down_and_goes_when_it_is_taken_back() {
+    fn a_withdrawn_wake_leaves_the_hint_row() {
         let (ui, now) = scene();
-        for (seconds, said) in [
-            (40, "wake in 40s"),
-            (245, "wake in 4m"),
-            (3600, "wake in 1h"),
+        let at = (now.wall + jiff::SignedDuration::from_secs(60)).to_string();
+        let mut state = folded(vec![frame(1, pending_wake(&at))]);
+        assert!(
+            hints(&solo(&state), &ui, 108, now, &mut Vec::new())
+                .to_string()
+                .contains("wake in")
+        );
+        state.apply(&frame(2, wake_taken_back()));
+        assert!(
+            !hints(&solo(&state), &ui, 108, now, &mut Vec::new())
+                .to_string()
+                .contains("wake in")
+        );
+    }
+
+    #[test]
+    fn every_mode_uses_words_and_the_right_tone() {
+        for (mode, expected, style) in [
+            ("default", "⏵⏵ default", theme::mode()),
+            ("acceptEdits", "⏵⏵ accept edits", theme::good()),
+            ("plan", "⏸ plan", theme::crew(2)),
+            ("bypassPermissions", "⏵⏵ bypass", theme::bad()),
+            ("dontAsk", "⏵⏵ don't ask", theme::mode()),
         ] {
-            let drawn = at(&with_wake(now, seconds), &ui, 80, now);
-            assert!(drawn.contains(said), "{seconds}s: {drawn}");
+            let state = folded(vec![frame(1, permission_view(mode))]);
+            let spans = left(&state);
+            assert_eq!(spans[0].content, expected);
+            assert_eq!(spans[0].style, style);
         }
-        let past = at(&with_wake(now, -5), &ui, 80, now);
-        assert!(
-            !past.contains("wake"),
-            "a wake on its way in says nothing: {past}"
-        );
-        let removed = folded(vec![
-            frame(
-                1,
-                pending_wake(&(now.wall + jiff::SignedDuration::from_secs(40)).to_string()),
-            ),
-            frame(2, wake_taken_back()),
-        ]);
-        let none = at(&solo(&removed), &ui, 80, now);
-        assert!(!none.contains("wake"), "{none}");
     }
 
     #[test]
-    fn a_pending_wake_is_furniture_and_the_whole_line_still_fits() {
+    fn context_bar_uses_the_window_and_turns_bad_only_above_ninety_percent() {
+        for (used, fill, bad) in [
+            (14_000, 1, false),
+            (180_000, 7, false),
+            (180_001, 7, true),
+            (300_000, 8, true),
+        ] {
+            let context = ContextUsage {
+                used,
+                window: 200_000,
+                trigger: 100_000,
+                parts: None,
+            };
+            let spans = context_bar(Some(context));
+            assert_eq!(spans[0].content, "▰".repeat(fill));
+            assert_eq!(spans[1].content, "▱".repeat(8 - fill));
+            assert_eq!(
+                spans[0].style,
+                if bad { theme::bad() } else { theme::presence() }
+            );
+            assert_eq!(spans[2].style, theme::dim());
+            assert!(spans[2].content.contains(" / 200k"));
+        }
+    }
+
+    #[test]
+    fn narrow_footer_drops_crew_then_context_and_keeps_mode_and_model() {
         let (ui, now) = scene();
-        let tree = with_wake(now, 245);
-        let styled = styles(&line(&tree, &ui, 80, now));
-        assert_eq!(
-            styled
-                .iter()
-                .find(|(text, _)| text.starts_with("wake in"))
-                .map(|(_, style)| *style),
-            Some(theme::dim()),
-            "it says what is true, it does not ask for anything"
-        );
-        for width in [40usize, 80, 120] {
-            assert_eq!(at(&tree, &ui, width, now).width(), width);
+        let mut state = state();
+        state.context = Some(ContextUsage {
+            used: 14_000,
+            window: 200_000,
+            trigger: 180_000,
+            parts: None,
+        });
+        state.summary.model = Some("a-model-with-a-long-name".into());
+        for width in [108, 80, 65, 50, 40, 12, 0] {
+            let drawn = line(&solo(&state), &ui, width, now);
+            assert!(drawn.width() <= width, "{width}: {drawn}");
+            if width >= 40 {
+                assert!(drawn.to_string().contains("default"));
+                assert!(drawn.to_string().contains("a-model-with-a-long-name"));
+            }
         }
-        insta::assert_snapshot!("wake_pending", at(&tree, &ui, 80, now));
+        let medium = line(&solo(&state), &ui, 65, now).to_string();
+        assert!(!medium.contains("solo"));
+        assert!(medium.contains("14k / 200k"));
+        let narrow = line(&solo(&state), &ui, 50, now).to_string();
+        assert!(!narrow.contains("14k / 200k"));
     }
 
-    /// The count is always there once a turn has run, used over the whole
-    /// window, and sits before the model on the right.
     #[test]
-    fn the_context_count_sits_before_the_model_and_says_the_way_out_late() {
-        let (ui, _) = scene();
-        let early = text(&with_context(41_000), &ui, 80);
-        assert!(early.contains("41k/200k"), "{early}");
-        assert!(!early.contains("/compact"), "{early}");
-        let bad = text(&with_context(90_000), &ui, 80);
-        assert!(bad.contains("90k/200k · /compact"), "{bad}");
-        assert!(
-            !text(&solo(&folded(vec![])), &ui, 80).contains("/200k"),
-            "no turn has run, so there is nothing to count"
-        );
-        assert_eq!(crate::count::count(999), "999");
-        assert_eq!(crate::count::count(41_900), "41k");
-    }
-
-    /// An ACP session as the frames arrive (ADR-0055): the agent's own count
-    /// against the agent's own window, and the cut the agent made drawn as
-    /// the compaction row it is. Nothing here is a rendering change — it is
-    /// the numbers the kernel now sends, on the screen a person reads.
-    #[test]
-    fn a_context_the_agent_holds_reads_as_its_own_count_and_its_own_cut() {
+    fn notices_and_repository_waits_leave_the_footer_unchanged() {
         let (mut ui, now) = scene();
-        let state = folded(vec![
-            frame(
-                1,
-                Event::TurnUsage {
-                    turn: TurnId::from_raw("trn_1"),
-                    usage: Default::default(),
-                    context: ContextUsage {
-                        parts: None,
-                        used: 400_000,
-                        window: 1_000_000,
-                        trigger: 1_000_000,
-                    },
-                },
-            ),
-            frame(
-                2,
-                Event::ItemCompleted {
-                    item: item(
-                        "itm_1",
-                        ItemStatus::Completed,
-                        ItemBody::Compaction {
-                            summary: String::new(),
-                            replaced: 0,
-                            before: 400_000,
-                            after: 120_000,
-                            duration_ms: 0,
-                        },
-                    ),
-                },
-            ),
-        ]);
-        let screen = render(&state, &mut ui, now);
-        assert!(screen.contains("400k/1.0M"), "{screen}");
+        let tree = solo(&state());
+        let footer = line(&tree, &ui, 108, now);
+        ui.catalogs.plugins.push(bingo_sdk::CatalogEntry {
+            id: "repo".into(),
+            label: "repo".into(),
+            meta: serde_json::json!({"state":{"kind":"waiting"}}),
+        });
         assert!(
-            !screen.contains("/compact"),
-            "the agent cuts its own context, and 40% is not a warning: {screen}"
+            hints(&tree, &ui, 108, now, &mut Vec::new())
+                .to_string()
+                .contains("1 from this repo waits for you")
         );
-        assert!(
-            screen.contains("context compacted (400000 → 120000 tokens)"),
-            "{screen}"
-        );
-    }
-
-    #[test]
-    fn the_context_count_is_dim_until_it_is_bad() {
-        let (ui, _) = scene();
-        let style = |used| {
-            styles(&line(&with_context(used), &ui, 80, scene().1))
-                .into_iter()
-                .find(|(text, _)| text.contains("/200k"))
-                .map(|(_, style)| style)
-        };
-        assert_eq!(style(70_000), Some(theme::dim()));
-        assert_eq!(style(90_000), Some(theme::bad()));
-    }
-
-    #[test]
-    fn the_children_that_want_you_and_work_wear_faces() {
-        let tree = folded_tree(vec![
-            child_frame(1, announced("reviewer")),
-            child_frame(2, started("trn_9")),
-        ]);
-        let (ui, _) = scene();
-        assert!(text(&tree, &ui, 80).contains(crate::face::face("reviewer").sigil()));
-
-        let waiting = folded_tree(vec![
-            child_frame(1, announced("reviewer")),
-            child_frame(2, opened(child_permission())),
-        ]);
-        let drawn = text(&waiting, &ui, 80);
-        assert!(
-            drawn.contains(crate::face::face("reviewer").sigil()),
-            "{drawn}"
-        );
-    }
-
-    #[test]
-    fn the_session_in_view_is_never_one_of_its_own_notices() {
-        let mut tree = folded_tree(vec![
-            child_frame(1, announced("reviewer")),
-            child_frame(2, started("trn_9")),
-        ]);
-        tree.show(&child_id());
-        let (ui, _) = scene();
-        let drawn = text(&tree, &ui, 80);
-        assert!(!drawn.contains("running"), "{drawn}");
-        assert!(drawn.contains("in reviewer · fake/fake-1"), "{drawn}");
-    }
-
-    /// The whole of a notice's life: the frames it arrives in, its window,
-    /// and the frames it leaves in.
-    #[test]
-    fn multiline_notices_separate_report_lines() {
-        let (mut ui, now) = scene();
         ui.notify(
             bingo_sdk::Level::Info,
             "conversation was kept\nput back a.txt",
             now.instant,
         );
-        let text = super::notice(&ui, now)
-            .iter()
-            .map(|s| s.content.as_ref())
-            .collect::<String>();
-        assert_eq!(text, "conversation was kept · put back a.txt");
-    }
-
-    fn notice_life() -> i64 {
-        (crate::ui::NOTICE_FADE + crate::ui::NOTICE + crate::ui::NOTICE_FADE).as_millis() as i64
+        assert!(
+            hints(&tree, &ui, 108, now, &mut Vec::new())
+                .to_string()
+                .contains("conversation was kept · put back a.txt")
+        );
+        assert_eq!(footer, line(&tree, &ui, 108, now));
     }
 
     #[test]
-    fn a_notice_takes_the_middle_while_it_lasts() {
-        let (mut ui, now) = scene();
-        ui.notify(bingo_sdk::Level::Warn, "estimating", now.instant);
-        assert!(text(&solo(&state()), &ui, 80).contains("estimating"));
-        ui.expire(later(now, notice_life()));
-        assert!(!text(&solo(&state()), &ui, 80).contains("estimating"));
-    }
-
-    /// Every slot filled: the mode the child's policy published, three
-    /// notices, and where the person is with the model that answers there.
-    fn every_slot() -> (Tree, Ui) {
-        let mut tree = folded_tree(vec![
-            // The root is at work, and it is not the session in view.
-            frame(1, started("trn_1")),
-            child_frame(1, announced("reviewer")),
-            child_frame(2, permission_view("acceptEdits")),
-            child_frame(
-                3,
-                Event::TurnUsage {
-                    turn: TurnId::from_raw("trn_9"),
-                    usage: Default::default(),
-                    context: ContextUsage {
-                        parts: None,
-                        used: 150_000,
-                        window: 200_000,
-                        trigger: 180_000,
-                    },
-                },
-            ),
-            // A room wants a person, somewhere else in the tree.
-            log_frame(1, log_announced("#design")),
-            log_frame(2, opened(room_question())),
-        ]);
-        tree.show(&child_id());
-        let (mut ui, now) = scene();
-        ui.notify(bingo_sdk::Level::Info, "estimating", now.instant);
-        (tree, ui)
-    }
-
-    /// A room asking something, so a session other than the one in view
-    /// wants a person.
-    fn room_question() -> bingo_sdk::Interaction {
-        bingo_sdk::Interaction {
-            id: bingo_sdk::InteractionId::from_raw("int_3"),
-            session: log_id(),
-            ..confirm()
-        }
-    }
-
-    #[test]
-    fn every_slot_filled_and_every_slot_empty() {
-        let (tree, ui) = every_slot();
-        let filled: Vec<String> = [80usize, 120]
-            .iter()
-            .map(|width| text(&tree, &ui, *width))
-            .collect();
-        assert_eq!(filled[0].width(), 80);
-        assert_eq!(filled[1].width(), 120);
-        insta::assert_snapshot!("every_slot_filled", filled.join("\n"));
-
-        // Nothing published, nothing running, nothing to say, and something
-        // half-typed — so even the hint is untrue.
-        let bare = solo(&state_without_a_model());
-        let (mut ui, now) = scene();
-        write(&mut ui, bare.viewed(), "half a thought", now);
-        let empty: Vec<String> = [80usize, 120]
-            .iter()
-            .map(|width| text(&bare, &ui, *width))
-            .collect();
-        assert_eq!(empty[0], " ".repeat(80));
-        assert_eq!(empty[1], " ".repeat(120));
-        insta::assert_snapshot!("every_slot_empty", empty.join("\n"));
-    }
-
-    fn state_without_a_model() -> bingo_sdk::SessionState {
-        let mut state = state();
-        state.summary.model = None;
-        state
-    }
-
-    /// Who serves it, which model, and how hard it thinks — the three facts
-    /// the right slot carries, each from the frame that says it.
-    #[test]
-    fn the_right_slot_says_provider_model_and_effort() {
-        let (ui, _) = scene();
-        let idle = text(&solo(&state()), &ui, 80);
-        assert!(idle.ends_with("fake/fake-1"), "{idle}");
-
-        let thinking = solo(&folded(vec![frame(
+    fn a_model_receipt_flashes_for_fourteen_hundred_milliseconds() {
+        let state = folded(vec![frame(
             1,
-            thinking_view(Some(bingo_sdk::Effort::XHigh)),
-        )]));
-        let drawn = text(&thinking, &ui, 80);
-        assert!(drawn.ends_with("fake/fake-1 · xhigh"), "{drawn}");
-
-        let off = solo(&folded(vec![frame(1, thinking_view(None))]));
-        let drawn = text(&off, &ui, 80);
-        assert!(
-            drawn.ends_with("fake/fake-1"),
-            "a turn that asks for no effort shows none: {drawn}"
-        );
-    }
-
-    /// `/rename` reaches the screen the way every other fact does: the
-    /// kernel publishes a `SessionUpdated` and the slot reads it at render
-    /// time, so nothing here remembers a name.
-    #[test]
-    fn a_renamed_session_is_renamed_on_the_line() {
-        let mut tree = folded_tree(vec![
-            child_frame(1, announced("reviewer")),
-            child_frame(2, announced("the release")),
-        ]);
-        tree.show(&child_id());
-        let (ui, _) = scene();
-        let drawn = text(&tree, &ui, 80);
-        assert!(drawn.contains("in the release · fake/fake-1"), "{drawn}");
-    }
-
-    /// A summary written before the kernel stamped the provider on it.
-    #[test]
-    fn a_model_with_no_provider_stands_alone() {
-        let (ui, _) = scene();
-        let mut state = state();
-        state.summary.provider = None;
-        let drawn = text(&solo(&state), &ui, 80);
-        assert!(drawn.ends_with("fake-1"), "{drawn}");
-        assert!(!drawn.contains("/fake-1"), "{drawn}");
-    }
-
-    #[test]
-    fn the_middle_is_the_slot_that_gives_way() {
-        let tree = solo(&with_permission_mode("bypassPermissions"));
-        let (mut ui, now) = scene();
-        ui.notify(
-            bingo_sdk::Level::Info,
-            "a notice far longer than any narrow terminal could hold",
-            now.instant,
-        );
-        for width in [40usize, 60, 80] {
-            let drawn = text(&tree, &ui, width);
-            assert_eq!(drawn.width(), width, "{width}: {drawn}");
-            assert!(drawn.ends_with("fake-1"), "{width}: {drawn}");
-        }
-        assert!(
-            text(&tree, &ui, 60).contains('…'),
-            "the middle is cut, not dropped, while there is room for it"
-        );
-    }
-
-    #[test]
-    fn a_line_too_narrow_for_three_slots_keeps_the_place() {
-        let tree = solo(&with_permission_mode("bypassPermissions"));
-        let (ui, _) = scene();
-        for width in [1usize, 6, 12, 20] {
-            let drawn = text(&tree, &ui, width);
-            assert!(drawn.width() <= width, "{width}: {drawn}");
-        }
+            Event::ItemCompleted {
+                item: item(
+                    "change",
+                    ItemStatus::Completed,
+                    ItemBody::Notice {
+                        level: bingo_sdk::Level::Info,
+                        code: "model".into(),
+                        text: "⇄ fake-1 · thinking medium".into(),
+                    },
+                ),
+            },
+        )]);
+        let (_, now) = scene();
+        assert!(model_flash(&state, later(now, 1_399)).is_some());
+        assert!(model_flash(&state, later(now, 1_400)).is_none());
+        assert!(next_change(&solo(&state), now).is_some());
     }
 }

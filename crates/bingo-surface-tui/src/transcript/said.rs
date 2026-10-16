@@ -284,7 +284,7 @@ fn mark(origin: &Origin) -> Span<'static> {
         true => &origin.surface,
         false => theme::user(),
     };
-    Span::styled(format!("{word} "), theme::dim())
+    Span::styled(format!(" {word} "), theme::dim())
 }
 
 /// The raised bar behind a `>` line: it runs to the edge of the transcript,

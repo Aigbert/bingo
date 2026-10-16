@@ -2,7 +2,7 @@
 source: crates/bingo-surface-tui/src/sessions/tests.rs
 expression: screen
 ---
-"                                                                                                            "
+" bingo▍ /tmp/project                                                                          session curr  "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -28,7 +28,7 @@ expression: screen
 "  schedule (1)                                                                                             ▸"
 "────────────────────────────────────────────────────────────────────────────────────────────────────────────"
 " session is open elsewhere; close it before renaming                                                        "
-"╭──────────────────────────────────────────────────────────────────────────────────────────────────────────╮"
-"│ > ask anything · / for commands · ! for shell                                                            │"
-"╰──────────────────────────────────────────────────────────────────────────────────────────────────────────╯"
-"? for shortcuts                                                                                  fake/fake-1"
+"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
+" ▍ ask anything                                                                                             "
+"? for shortcuts                                                                                             "
+" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                               fake-1  "

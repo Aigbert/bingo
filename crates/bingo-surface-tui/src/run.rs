@@ -1570,7 +1570,7 @@ mod tests {
         );
         assert_eq!(
             ended.screen.last().map(String::as_str),
-            Some("▍ answer 30"),
+            Some(" ▍ answer 30"),
             "{:?}",
             ended.screen
         );
@@ -2594,16 +2594,21 @@ mod tests {
         crate::theme::with(crate::painted::truecolor(), || {
             run.detection = crate::render::current().into();
             run.answered_late(b"\x1b]11;rgb:fdfd/f6f6/e3e3\x1b\\");
-            assert_eq!(
-                run.detection.render().look.colors,
-                crate::theme::Colors::True(crate::theme::LIGHT),
-                "the ground turned light"
+            let light = run.detection.render().look.colors;
+            let crate::theme::Colors::True(palette) = light else {
+                panic!("truecolour")
+            };
+            assert_eq!(palette.presence, crate::theme::LIGHT.presence);
+            assert_ne!(
+                palette.rule,
+                crate::theme::LIGHT.rule,
+                "the tint follows the measured ground"
             );
             run.answered_late(b"\x1b_Gi=31;OK\x1b\\");
             assert_eq!(
                 run.detection.render().look.colors,
-                crate::theme::Colors::True(crate::theme::LIGHT),
-                "and another probe's reply is not an answer to this question"
+                light,
+                "another probe does not change the ground"
             );
         });
     }
@@ -2717,7 +2722,7 @@ mod tests {
         let (mut run, mut waiting) =
             replying(folded(vec![frame(1, Event::ItemCompleted { item: read })]));
         // A store with rows in it, so the list that comes down is a list.
-        let stored: Vec<SessionSummary> = (0..4)
+        let stored: Vec<SessionSummary> = (0..20)
             .map(|at| stored_summary(&format!("ses_{at}"), &format!("scout {at}")))
             .collect();
         run.host = TestHost::with_stored(vec![], stored).0;

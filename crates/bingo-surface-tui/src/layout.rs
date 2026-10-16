@@ -71,19 +71,14 @@ impl Layout {
         placed
     }
 
-    /// The blank rows a short transcript leaves above itself: it hangs from
-    /// the composer, not from the top of the screen, so those rows are nobody's
-    /// lines.
-    pub fn padding(&self) -> usize {
-        let rows = usize::from(self.regions.transcript.height);
-        rows - self.height.min(rows)
-    }
-
     /// The transcript line drawn at a row of the transcript region, when that
     /// row carries one. The one mapping from the screen back into the
     /// transcript: a click, a drag and a mark are all answered by it.
     pub fn line_at(&self, row: usize) -> Option<usize> {
-        let line = self.top + row.checked_sub(self.padding())?;
+        let line = self.top + row;
+        if line >= self.height {
+            return None;
+        }
         match self.inline {
             Some((at, _, count)) if line >= at && line < at + count => None,
             Some((at, removed, count)) if line >= at + count => Some(line - count + removed),
@@ -98,7 +93,7 @@ impl Layout {
             Some((at, removed, count)) if line >= at + removed => line + count - removed,
             _ => line,
         };
-        let row = u16::try_from(line.checked_sub(self.top)? + self.padding()).ok()?;
+        let row = u16::try_from(line.checked_sub(self.top)?).ok()?;
         (row < self.regions.transcript.height).then_some(row)
     }
 }

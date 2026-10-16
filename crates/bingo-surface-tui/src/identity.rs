@@ -45,11 +45,9 @@ fn caret_phase_styles() {
 #[test]
 fn opening_wordmark_and_frames() {
     let rows = welcome::lines(&state(), 80, None);
-    assert_eq!(rows[0].to_string(), "█      ▀");
-    assert_eq!(rows[1].to_string(), "█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█");
-    assert_eq!(rows[2].to_string(), "█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍");
-    assert_eq!(rows[3].to_string(), "                ▄▄▄▄▄█");
-    assert_eq!(welcome::lines(&state(), 38, None)[0].to_string(), "bingo▍");
+    assert_eq!(rows.len(), 1);
+    assert!(rows[0].to_string().starts_with(" bingo▍ /tmp/project"));
+    assert!(rows[0].to_string().contains("session 1"));
 }
 
 #[test]

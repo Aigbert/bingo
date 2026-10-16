@@ -393,6 +393,7 @@ pub fn restore() {
 /// Read environment and probe I/O once; the resulting inputs belong to the run.
 fn detect() -> Detection {
     let ask = crate::theme::Ask {
+        indexed: std::env::var("TERM").is_ok_and(|term| term.contains("256color")),
         no_color: std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty()),
         truecolor: matches!(
             std::env::var("COLORTERM").ok().as_deref(),
@@ -401,21 +402,21 @@ fn detect() -> Detection {
         ascii: std::env::var_os("BINGO_ASCII").is_some_and(|v| v == "1"),
         look: crate::theme::look(std::env::var("BINGO_THEME").ok().as_deref()),
     };
-    let light = crate::theme::follows(ask).then(background).flatten();
+    let ground = crate::theme::follows(ask).then(background).flatten();
     Detection {
         ask,
-        light,
+        ground,
         heard: graphics_probe(),
         motion: crate::clock::moves(std::env::var("BINGO_MOTION").ok().as_deref()),
     }
 }
 
-fn background() -> Option<bool> {
+fn background() -> Option<(u16, u16, u16)> {
     let mut options = terminal_colorsaurus::QueryOptions::default();
     options.timeout = crate::theme::PROBE;
-    terminal_colorsaurus::theme_mode(options)
+    terminal_colorsaurus::background_color(options)
         .ok()
-        .map(|mode| mode == terminal_colorsaurus::ThemeMode::Light)
+        .map(|color| (color.r, color.g, color.b))
 }
 
 fn graphics_probe() -> Option<crate::graphics::Heard> {

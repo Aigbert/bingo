@@ -2,6 +2,7 @@
 source: crates/bingo-surface-tui/src/view.rs
 expression: screen
 ---
+" bingo▍ /tmp/project                                      #design · session 10  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -21,8 +22,7 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"                                                                                "
-"╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ #design > post to the room                                                   │"
-"╰──────────────────────────────────────────────────────────────────────────────╯"
-"? for shortcuts                                                       in #design"
+"────────────────────────────────────────────────────────────────────────────────"
+"#design › post to the room                                                      "
+"? for shortcuts                                                                 "
+" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                           "

@@ -358,7 +358,14 @@ fn default_item_lines(
         ItemBody::User { parts, origin } => {
             said::lines(item, parts, origin, place, fold, rows).into()
         }
-        ItemBody::Assistant { text } => assistant(text, item.status, fold, rows, cue),
+        ItemBody::Assistant { text } => assistant(
+            text,
+            item.status,
+            fold,
+            rows,
+            cue,
+            latest_answer(item, rows.state),
+        ),
         ItemBody::Reasoning { .. } => thinking::lines(item, place, fold, rows).into(),
         ItemBody::ToolCall { .. } => called(item, agents, fold, rows, cue).into(),
         ItemBody::Shell {
@@ -554,27 +561,43 @@ fn returns(body: Vec<Line<'static>>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 /// The words may name a picture themselves (M51). The tail is lit first: a row
 /// of placeholder cells is not text, and cooling it would spend the colour the
 /// picture's own number is carried in.
-fn assistant(text: &str, status: ItemStatus, fold: Fold, rows: &Rows<'_>, cue: Cue) -> Block {
-    let written = markdown::mentioned(
-        text,
-        rows.measured().saturating_sub(speaks_indent()),
-        &rows.names,
-    );
+pub(crate) fn latest_answer(item: &Item, state: &SessionState) -> bool {
+    state
+        .transcript
+        .items()
+        .iter()
+        .rev()
+        .find(|item| matches!(item.body, ItemBody::Assistant { .. }))
+        .is_some_and(|latest| latest.id == item.id)
+}
+
+fn assistant(
+    text: &str,
+    status: ItemStatus,
+    fold: Fold,
+    rows: &Rows<'_>,
+    cue: Cue,
+    latest: bool,
+) -> Block {
+    let written = markdown::mentioned(text, rows.measured().saturating_sub(3), &rows.names);
     let lit = match arriving(status, rows, cue) {
         Some(age) => comet(written.lines, age),
         None => written.lines,
     };
     let body = pictured::in_the_words(lit, &written.images, fold, rows);
     Block {
-        lines: marked(
-            theme::mark(),
-            if status == ItemStatus::Running {
-                theme::presence()
-            } else {
-                theme::text().patch(theme::bold())
-            },
+        lines: under(
+            Span::styled(
+                format!(" {} ", theme::mark()),
+                if latest {
+                    theme::presence()
+                } else {
+                    theme::ash()
+                },
+            ),
             body.lines,
-            rows,
+            3,
+            rows.measured(),
         ),
         ..body
     }
@@ -1214,7 +1237,6 @@ mod tests {
     }
 
     fn rendered_with(state: &SessionState, folds: &Folds, commands: &[CommandSpec]) -> Vec<String> {
-        let welcomed = crate::welcome::lines(state, 60, None).len();
         let mut blocks = crate::blocks::Blocks::default();
         let pictures = Decoded::default();
         let linked = Linked::default();
@@ -1223,7 +1245,6 @@ mod tests {
         let mut rows: Vec<String> = blocks
             .window(0, height)
             .iter()
-            .skip(welcomed)
             .map(|line| line.to_string().trim_end().to_string())
             .collect();
         if rows.first().is_some_and(String::is_empty) {
@@ -1260,7 +1281,7 @@ mod tests {
                 ),
                 person("itm_4", "thanks"),
             ]),
-            vec!["> thanks".to_string()],
+            vec![" › thanks".to_string()],
             "the nudge, the reading and a copied post are the room's"
         );
     }
@@ -1380,7 +1401,7 @@ mod tests {
     fn a_second_line_of_yours_stays_on_the_bar_under_the_first() {
         assert_eq!(
             drawn(vec![person("itm_1", "one\ntwo")]),
-            vec!["> one".to_string(), "  two".to_string()],
+            vec![" › one".to_string(), "   two".to_string()],
         );
     }
 
@@ -1416,7 +1437,7 @@ mod tests {
         for loud in bingo_sdk::PERSON_SURFACES {
             assert_eq!(
                 drawn(vec![delivered("itm_1", loud, None, "it ended")]),
-                vec!["> it ended".to_string()],
+                vec![" › it ended".to_string()],
                 "{loud} is a person surface"
             );
         }
@@ -1438,8 +1459,8 @@ mod tests {
                 bingo_sdk::Voice::Note
             )]),
             vec![
-                "wake check the build again".to_string(),
-                "     and say what you find".to_string(),
+                " wake check the build again".to_string(),
+                "      and say what you find".to_string(),
             ],
         );
     }
@@ -1609,8 +1630,8 @@ mod tests {
                 ItemStatus::Completed,
             )]),
             vec![
-                "▍ alpha bravo charlie delta echo foxtrot golf hotel india".to_string(),
-                "  juliet".to_string(),
+                " ▍ alpha bravo charlie delta echo foxtrot golf hotel india".to_string(),
+                "   juliet".to_string(),
             ],
             "a wrapped answer hangs under its own bullet"
         );
@@ -2166,7 +2187,6 @@ mod tests {
 
     /// The widest row a state draws at `width`, past the welcome box.
     fn widest_row(state: &SessionState, width: usize, measure: Option<usize>) -> usize {
-        let welcomed = crate::welcome::lines(state, width, None).len();
         let mut blocks = crate::blocks::Blocks::default();
         let folds = Folds::new();
         let pictures = Decoded::default();
@@ -2177,7 +2197,6 @@ mod tests {
         blocks
             .window(0, height)
             .iter()
-            .skip(welcomed)
             .map(|line| line.to_string().trim_end().width())
             .max()
             .unwrap_or(0)

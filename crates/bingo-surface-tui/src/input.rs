@@ -1467,7 +1467,7 @@ mod tests {
         assert!(ui.composer.is_empty(), "text goes first");
 
         assert!(press(&mut ui, &state(), ctrl('c'), now).is_empty());
-        let line = crate::status::line(&solo(&state()), &ui, 80, now).to_string();
+        let line = crate::status::hints(&solo(&state()), &ui, 80, now, &mut Vec::new()).to_string();
         assert!(line.contains(ARM_HINT), "{line}");
         let late = Now {
             instant: now.instant + crate::ui::EXIT_WINDOW,
@@ -1925,7 +1925,7 @@ mod tests {
             panic!("y copies: {copied:?}")
         };
         assert_eq!(
-            text.lines().count(),
+            text.split('\n').count(),
             2,
             "a run of two lines, cut where the far end is: {text:?}"
         );
@@ -2116,7 +2116,8 @@ mod tests {
         render(&state, &mut ui, now);
         // Row 17 is the transcript's last: the reserved activity band holds
         // the two rows beneath it (view.rs's demand).
-        on_mouse(&mut ui, &solo(&state), click(4, 17), now);
+        let last = ui.shown.regions.transcript.bottom() - 1;
+        on_mouse(&mut ui, &solo(&state), click(4, last), now);
         assert_eq!(
             ui.select.block,
             Some(bingo_sdk::ItemId::from_raw("itm_59")),
@@ -2145,7 +2146,11 @@ mod tests {
 
     /// The last row the transcript drew, which is the row a fold sits on.
     fn last_row(ui: &Ui) -> u16 {
-        ui.shown.regions.transcript.bottom() - 1
+        ui.shown.regions.transcript.y
+            + ui.shown
+                .height
+                .min(usize::from(ui.shown.regions.transcript.height)) as u16
+            - 1
     }
 
     /// A click on a fold is one gesture that opens it and folds it again — the
@@ -2442,7 +2447,7 @@ mod tests {
     #[test]
     fn a_drag_copies_the_cells_it_went_over() {
         for (text, from, to, copied) in
-            [("run the tests", 2, 5, "run"), ("你好 warm", 2, 6, "你好")]
+            [("run the tests", 3, 6, "run"), ("你好 warm", 3, 7, "你好")]
         {
             let state = folded(vec![frame(
                 1,
@@ -2690,7 +2695,11 @@ mod tests {
         ]);
         let (mut ui, now) = scene();
         render_tree(&tree, &mut ui, now);
-        let row = ui.shown.regions.transcript.bottom() - 1;
+        let row = ui.shown.regions.transcript.y
+            + ui.shown
+                .height
+                .min(usize::from(ui.shown.regions.transcript.height)) as u16
+            - 1;
         assert_eq!(
             on_mouse(&mut ui, &tree, click(4, row), now),
             vec![Effect::View(child_id())],

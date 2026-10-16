@@ -156,6 +156,8 @@ fn the_resume_picker_offers_twenty_newest_roots_and_never_a_child_or_a_room() {
     let request = crate::palette::request(&run.ui).unwrap().to_owned();
     let mut sessions = vec![child_summary("reviewer"), log_summary("#design")];
     sessions.extend((0..25).map(|at| SessionSummary {
+        effort: None,
+        model_scope: None,
         id: SessionId::from_raw(format!("ses_root{at}")),
         updated_at: now.wall + std::time::Duration::from_secs(at),
         ..summary()

@@ -144,7 +144,7 @@ mod tests {
         let mut recorder = Recorder::default();
         run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         assert!(
-            !recorder.last().contains("█▀▀▀▀█"),
+            !recorder.last().contains("bingo▍"),
             "the first second of the piece has said nothing yet:\n{}",
             recorder.last()
         );
@@ -157,7 +157,7 @@ mod tests {
         run.painted = crate::run::older_than_a_frame();
         run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         assert!(
-            recorder.last().contains("█▀▀▀▀█"),
+            recorder.last().contains("bingo▍"),
             "and by the last beat the box is whole:\n{}",
             recorder.last()
         );

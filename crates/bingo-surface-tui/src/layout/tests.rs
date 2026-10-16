@@ -128,7 +128,7 @@ fn layout_finds_the_foot_in_the_current_transcript() {
     };
     let frame = layout(Layout::default(), &solo(&state), &ui, SIZE, now);
     let foot = frame.foot.expect("held transcript");
-    assert_eq!(foot.y, frame.regions.activity.y);
+    assert_eq!(foot.y, frame.regions.hints.y);
     assert!(
         frame.canvas.buffer[(foot.x + 1, foot.y)]
             .symbol()

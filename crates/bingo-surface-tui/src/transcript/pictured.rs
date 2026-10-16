@@ -19,7 +19,7 @@
 use bingo_sdk::{Image, Item, ItemBody};
 use ratatui::text::{Line, Span};
 
-use super::{Block, Rows, returns, speaks_indent};
+use super::{Block, Rows, returns};
 use crate::fold::Fold;
 use crate::graphics::picture::{self, Source};
 use crate::graphics::{self as graphics, Graphics, Picture, band, kitty};
@@ -94,7 +94,7 @@ fn above_the_words(block: &mut Block, item: &Item, images: &[&Image], rows: &Row
             )
         })
         .collect();
-    let indent = speaks_indent();
+    let indent = 3;
     let band = band::of(
         &thumbnails,
         cell,
@@ -143,10 +143,7 @@ fn named(block: &mut Block, image: &markdown::Linked, fold: Fold, rows: &Rows<'_
     };
     // The chip's own column, so the picture stands where the words it belongs
     // to stand rather than at the block's edge (M56).
-    let room = room(
-        rows.measured()
-            .saturating_sub(speaks_indent() + image.indent),
-    );
+    let room = room(rows.measured().saturating_sub(3 + image.indent));
     let Some((picture, cells)) = drawn(source, read_in, room, height(fold), rows) else {
         return;
     };
@@ -247,6 +244,7 @@ mod tests {
     use crate::graphics::linked::Answer;
     use crate::graphics::{Decoded, Linked, kitty::PLACEHOLDER};
     use crate::test_support::{folded, item, scene, solo};
+    use crate::transcript::speaks_indent;
     use crate::tree::Agents;
     use bingo_pictures::testing::{png, unreadable};
     use bingo_sdk::{ContentPart, ItemStatus, Origin, ToolOutput};
@@ -458,7 +456,7 @@ mod tests {
         );
         assert_eq!(
             cells_at(&drawn[2]),
-            Some(speaks_indent()),
+            Some(speaks_indent() + 1),
             "in the block's own column: {drawn:?}"
         );
     }
@@ -652,7 +650,7 @@ mod tests {
         );
         assert_eq!(
             cells_at(&drawn[3]),
-            Some(speaks_indent()),
+            Some(speaks_indent() + 1),
             "at the words' own column: {drawn:?}"
         );
         assert!(
@@ -683,7 +681,7 @@ mod tests {
             &linked,
         );
         let drawn = text(&block);
-        assert_eq!(cells_at(&drawn[1]), Some(speaks_indent()), "{drawn:?}");
+        assert_eq!(cells_at(&drawn[1]), Some(speaks_indent() + 1), "{drawn:?}");
         assert_eq!(block.pictures[0].cols, 10, "and it has the whole measure");
     }
 
@@ -704,11 +702,11 @@ mod tests {
         assert!(drawn[0].contains("[image: shot]"), "the chip: {drawn:?}");
         assert_eq!(
             cells_at(&drawn[1]),
-            Some(speaks_indent() + 2),
+            Some(speaks_indent() + 3),
             "past the bullet: {drawn:?}"
         );
         // 60 columns of measure, less the `⏺` indent and the marker: 56.
-        assert_eq!(block.pictures[0].cols, 56, "fitted to the room it has");
+        assert_eq!(block.pictures[0].cols, 55, "fitted to the room it has");
         assert!(
             drawn.iter().all(|line| line.width() <= 60),
             "and nothing past the margin: {drawn:?}"
@@ -727,13 +725,13 @@ mod tests {
         let nested = drawn("- one\n  - ![shot](docs/x.png)");
         assert_eq!(
             cells_at(&nested[2]),
-            Some(speaks_indent() + 4),
+            Some(speaks_indent() + 5),
             "{nested:?}"
         );
         let quoted = drawn("> ![shot](docs/x.png)");
         assert_eq!(
             cells_at(&quoted[1]),
-            Some(speaks_indent() + 2),
+            Some(speaks_indent() + 3),
             "{quoted:?}"
         );
     }
@@ -755,7 +753,7 @@ mod tests {
             Fold::Peek,
             &linked,
         );
-        assert_eq!(text(&block), vec!["▍ [image: shot]"]);
+        assert_eq!(text(&block), vec![" ▍ [image: shot]"]);
         assert!(block.pictures.is_empty());
     }
 
@@ -769,7 +767,7 @@ mod tests {
             Fold::Peek,
             &Linked::default(),
         );
-        assert_eq!(text(&block), vec!["▍ [image: shot]"]);
+        assert_eq!(text(&block), vec![" ▍ [image: shot]"]);
         assert!(block.pictures.is_empty(), "nothing to send yet");
         assert_eq!(block.wanted, vec!["docs/x.png".to_string()]);
     }
@@ -784,7 +782,7 @@ mod tests {
             Fold::Peek,
             &linked,
         );
-        assert_eq!(text(&block), vec!["▍ [image: shot] (not found)"]);
+        assert_eq!(text(&block), vec![" ▍ [image: shot] (not found)"]);
         let spans = &block.lines[0].spans;
         assert_eq!(
             spans.last().map(|s| s.style),

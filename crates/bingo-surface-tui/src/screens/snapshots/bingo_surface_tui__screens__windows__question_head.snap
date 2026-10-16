@@ -2,6 +2,8 @@
 source: crates/bingo-surface-tui/src/screens/windows.rs
 expression: screen.clone()
 ---
+" bingo▍ /tmp/project                                                 session 1  "
+"                                                                                "
 "   ◆ asks you · needs you                                                       "
 "Auth                                                                            "
 "                                                                                "
@@ -16,13 +18,11 @@ expression: screen.clone()
 "        what option 04 means                                                    "
 "     5  option 05                                                               "
 "        what option 05 means                                                    "
-"     6  option 06                                                               "
-"        what option 06 means                                                    "
 "  …                                                                             "
 "                                                                                "
 " ▍ waiting for you                                                              "
 "   ↑↓ pick · enter answer · esc skip                                            "
-"╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ > answer above · typing here leaves it for later                             │"
-"╰──────────────────────────────────────────────────────────────────────────────╯"
-"? for shortcuts                                                      fake/fake-1"
+"────────────────────────────────────────────────────────────────────────────────"
+" ▍ answer above · typing here leaves it for later                               "
+"? for shortcuts                                                                 "
+" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "

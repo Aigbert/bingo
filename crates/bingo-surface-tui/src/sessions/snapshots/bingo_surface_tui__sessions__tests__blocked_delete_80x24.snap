@@ -2,6 +2,7 @@
 source: crates/bingo-surface-tui/src/sessions/tests.rs
 expression: screen
 ---
+" bingo▍ /tmp/project                                              session curr  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -14,15 +15,14 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"█      ▀                                                                        "
-"█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█                                                   "
+"                                                                                "
 " sessions · here (tab: all) ·                                             3 of 4"
 " Cannot delete: 1 of 2 session(s) blocked, reasons below.                       "
 "   review: action FIFO · open elsewhere                                         "
 "   fix the stale-edit race                                                      "
 "────────────────────────────────────────────────────────────────────────────────"
 " esc back                                                                       "
-"╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ > ask anything · / for commands · ! for shell                                │"
-"╰──────────────────────────────────────────────────────────────────────────────╯"
-"? for shortcuts                                                      fake/fake-1"
+"────────────────────────────────────────────────────────────────────────────────"
+" ▍ ask anything                                                                 "
+"? for shortcuts                                                                 "
+" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "

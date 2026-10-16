@@ -2,6 +2,8 @@
 source: crates/bingo-surface-tui/src/component/model_picker_tests.rs
 expression: screen
 ---
+" bingo▍ /tmp/project                                                 session 1  "
+"                                                                                "
 "model                                                                           "
 "   1 match for “qwen”    ★ pinned · ∴ thinks · ▣ sees images                    "
 "   work  ● store  84 ms         │ qwen3-coder-30b                               "
@@ -20,9 +22,7 @@ expression: screen
 "                                │                                               "
 " ↑↓ pick  ←→ effort  * pin  tab keep  ⏎ compact, then use  esc close            "
 "   /model qwen                                                                  "
-"                                                                                "
-"                                                                                "
-"╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ > ask anything · / for commands · ! for shell                                │"
-"╰──────────────────────────────────────────────────────────────────────────────╯"
-"? for shortcuts                                                      fake/fake-1"
+"────────────────────────────────────────────────────────────────────────────────"
+" ▍ ask anything                                                                 "
+"? for shortcuts                                                                 "
+" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "

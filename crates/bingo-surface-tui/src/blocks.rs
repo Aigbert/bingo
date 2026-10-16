@@ -25,8 +25,6 @@ use crate::fold::{self, Fold};
 use crate::graphics::Picture;
 use crate::transcript::{self, Cue, Place, Rows};
 use crate::tree::Agents;
-#[cfg(test)]
-use crate::welcome;
 
 /// What can change about an item's block while it is on the screen. A
 /// terminal item's revision never moves again, so its block is rendered once.
@@ -63,6 +61,7 @@ struct Revision {
     /// draws nothing now, and the entry has to go the frame it stops.
     run: usize,
     last: bool,
+    latest_answer: bool,
     /// The look it was drawn in. A style is baked into a `Line`, and the
     /// terminal may change which palette a token is worth under a running
     /// surface (M71): the lines are then a memo of a drawing nobody would make
@@ -114,6 +113,7 @@ fn revision(
         fold,
         run: place.run.len(),
         last: !place.joined,
+        latest_answer: transcript::latest_answer(item, rows.state),
         linked: rows.linked.answers(),
         slots: rows.placed_on(&item.id).cloned().collect(),
         look: crate::theme::current(),
@@ -246,8 +246,6 @@ pub struct Blocks {
     /// design §7). It is beside the width because it is the other half of the
     /// geometry a block is a rendering of, and neither half is on the item.
     measure: Option<usize>,
-    /// The welcome box, on a session this surface opened; it belongs to no item.
-    head: Vec<Line<'static>>,
     blocks: Vec<Entry>,
     /// The transcript's height in wrapped lines, counted while the blocks are
     /// brought up to date rather than walked for again.
@@ -264,10 +262,6 @@ pub struct Blocks {
 }
 
 impl Blocks {
-    pub fn welcome_rows(&self) -> usize {
-        self.head.len()
-    }
-
     pub fn closing_start(&self) -> usize {
         self.height.saturating_sub(self.tail.len())
     }
@@ -275,13 +269,6 @@ impl Blocks {
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
-        let boxed = crate::component::welcome::draw(rows);
-        // The opening plays in the welcome box's place and lands on it, so while
-        // it runs the box *is* the frame (M70, M72; design §11).
-        self.head = match rows.opening {
-            Some(t) => crate::opening::frame(t, &boxed),
-            None => boxed,
-        };
         let mut kept = 0;
         for (at, item) in state.transcript.items().iter().enumerate() {
             let place = Place::of(state.transcript.items(), at);
@@ -518,12 +505,7 @@ impl Blocks {
     /// from whatever is above it — never from the top of the transcript, and
     /// never a receipt from the row it answers.
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> {
-        let head = (!self.head.is_empty()).then_some(Segment {
-            gap: false,
-            id: None,
-            lines: self.head.as_slice(),
-        });
-        let mut above = !self.head.is_empty();
+        let mut above = false;
         let blocks = self.blocks.iter().map(move |entry| {
             let gap = above && !entry.joins;
             above = true;
@@ -533,13 +515,13 @@ impl Blocks {
                 lines: entry.lines.as_slice(),
             }
         });
-        let opened = !(self.head.is_empty() && self.blocks.is_empty());
+        let opened = !self.blocks.is_empty();
         let tail = (!self.tail.is_empty()).then_some(Segment {
             gap: opened,
             id: None,
             lines: self.tail.as_slice(),
         });
-        head.into_iter().chain(blocks).chain(tail)
+        blocks.chain(tail)
     }
 }
 
@@ -587,12 +569,6 @@ mod tests {
         let linked = crate::graphics::Linked::default();
         let rows = Rows::of(state, width, &folds, &[], &pictures, &linked, now);
         blocks.sync(state, &Agents::new(), &rows)
-    }
-
-    /// The rows the welcome box takes at the top, plus the blank under it.
-    fn head(state: &SessionState, width: usize) -> usize {
-        let rows = welcome::lines(state, width, None).len();
-        rows + usize::from(rows > 0)
     }
 
     #[test]
@@ -763,7 +739,7 @@ mod tests {
         sync(&mut blocks, &state, 60);
         let first = ItemId::from_raw("itm_0");
         let second = ItemId::from_raw("itm_1");
-        let top = head(&state, 60);
+        let top = 0;
         assert_eq!(blocks.span(&first), Some((top, top + 1)));
         assert_eq!(
             blocks.span(&second),
@@ -787,11 +763,7 @@ mod tests {
             .map(ToString::to_string)
             .collect();
         assert!(!lines[0].trim().is_empty(), "{lines:?}");
-        let under_the_welcome = usize::from(head(&state, 60) > 0);
-        assert_eq!(
-            lines.iter().filter(|l| l.trim().is_empty()).count(),
-            1 + 2 * under_the_welcome
-        );
+        assert_eq!(lines.iter().filter(|l| l.trim().is_empty()).count(), 1);
     }
 
     /// A thought, once it is one.
@@ -821,7 +793,7 @@ mod tests {
             .collect();
         let mut blocks = cache();
         let alone = sync(&mut blocks, &state, 60);
-        let top = head(&state, 60);
+        let top = 0;
         assert_eq!(blocks.at(top), Some(ItemId::from_raw("itm_1")));
 
         state.transcript.apply(&bingo_sdk::Event::ItemCompleted {

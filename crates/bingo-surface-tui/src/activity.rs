@@ -35,16 +35,16 @@ const BREATH_BLOCKED: std::time::Duration = std::time::Duration::from_millis(220
 const BLINK: std::time::Duration = std::time::Duration::from_millis(530);
 /// bingo's own words for working, selected from the turn id.
 const VERBS: [&str; 10] = [
-    "Kindling",
-    "Stoking",
-    "Smouldering",
-    "Foraging",
-    "Tracking",
-    "Burrowing",
-    "Sniffing around",
-    "Pouncing",
-    "Sifting",
-    "Tinkering",
+    "kindling",
+    "stoking",
+    "smouldering",
+    "foraging",
+    "tracking",
+    "burrowing",
+    "sniffing around",
+    "pouncing",
+    "sifting",
+    "tinkering",
 ];
 
 pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant> {
@@ -295,7 +295,7 @@ fn working(
     let props = bingo_sdk::component::Props::Spinner(bingo_sdk::component::SpinnerProps {
         word: placed_verb.unwrap_or_else(|| verb(&turn.id)).into(),
         message: stopping.then(|| STOPPING.into()),
-        suffix: "…".into(),
+        suffix: String::new(),
         mode: if stopping { "stopping" } else { "working" }.into(),
     });
     let mut lines = site.draw("Spinner", &props, |props, _| {
@@ -345,7 +345,7 @@ fn waiting(tree: &Tree, now: Now) -> Option<Line<'static>> {
     let running = tree::count(tree, Wants::Running, Scope::Under(&viewed.summary.id))?;
     Some(Line::from(vec![
         Span::styled(
-            format!("{} ", theme::mark()),
+            format!(" {} ", theme::mark()),
             breathing_at(BREATH_BLOCKED, now),
         ),
         Span::styled(waiting_for(running), theme::text()),
@@ -393,7 +393,7 @@ fn spinner(
         return Vec::new();
     };
     let mut spans = vec![Span::styled(
-        format!("{} ", theme::mark()),
+        format!(" {} ", theme::mark()),
         caret_style(state, stopping, now),
     )];
     let suffix = if props.suffix == "…" {
@@ -420,12 +420,16 @@ fn progress(props: &bingo_sdk::component::Props, _: usize) -> Vec<Line<'static>>
     } else {
         ""
     };
-    let tokens = match props.tokens_out {
-        0 => String::new(),
-        tokens => format!(" · ↓ {}", crate::count::count(tokens)),
-    };
     vec![Line::from(Span::styled(
-        format!(" ({hint}{}s{tokens})", props.elapsed_ms / 1000),
+        format!(
+            " · {}s{}",
+            props.elapsed_ms / 1000,
+            if hint.is_empty() {
+                ""
+            } else {
+                " · esc to interrupt"
+            }
+        ),
         theme::dim(),
     ))]
 }
@@ -538,7 +542,7 @@ pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'s
 #[cfg(test)]
 mod tests {
     #[test]
-    fn twelve_tokens_are_visible_early_in_a_turn() {
+    fn tokens_do_not_compete_with_the_activity_clock() {
         let state = folded(vec![
             frame(1, started("trn_1")),
             frame(
@@ -555,7 +559,8 @@ mod tests {
         ]);
         let (mut ui, now) = scene();
         let screen = draw_tree(80, 24, &solo(&state), &mut ui, later(now, 4_000));
-        assert!(screen.contains("↓ 12"), "{screen}");
+        assert!(!screen.contains("↓ 12"), "{screen}");
+        assert!(screen.contains("4s"), "{screen}");
         assert!(!screen.contains("0.0k"), "{screen}");
     }
 

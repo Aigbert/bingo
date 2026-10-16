@@ -132,7 +132,8 @@ Enter on a filter nothing matches uses that name, on the current model's
 provider when it names none. `/login` opens the provider list with an unsigned
 provider selected when available; one Escape closes it. `/guide models` explains setup.
 `/model openai/gpt-5.4` tries a model in this session; `--keep` also saves it for
-new sessions. Project and command-line settings win; `--model` and `--provider` write none.
+new sessions. The footer shows model and effort, with `this session` for a temporary choice.
+Project and command-line settings win; `--model` and `--provider` write none.
 
 `/think high` changes the requested effort for this session. Add `--keep`
 to save it for new sessions. `/think off` omits the reasoning parameter;

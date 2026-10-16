@@ -13,7 +13,7 @@ fn an_answer_row_is_white_after_its_bullet() {
         &painted,
         "All 33 pass.",
         &[
-            ("▍ ", crate::theme::text().patch(crate::theme::bold())),
+            (" ▍ ", crate::theme::presence()),
             ("All 33 pass.", crate::theme::text()),
         ],
     );
@@ -163,8 +163,8 @@ fn the_status_line_spends_no_colour_but_the_mode() {
     let painted = painted(80, 24, &solo(&state), &mut ui, now);
     assert_eq!(
         painted.coloured("? for shortcuts"),
-        vec!["⏵⏵ acceptEdits".to_string()],
-        "the mode is the one thing the line is allowed to colour"
+        Vec::<String>::new(),
+        "hints keep the terminal dim; mode and crew belong to the footer"
     );
 }
 

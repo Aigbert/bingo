@@ -82,7 +82,7 @@ pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
     let Some(row) = at.checked_sub(frame.top) else {
         return;
     };
-    let y = area.y + (row + frame.padding()) as u16;
+    let y = area.y + row as u16;
     let height = (drawing.rows.len() as u16).min(area.bottom().saturating_sub(y));
     let rect = Rect::new(area.x, y, area.width, height);
     drawing.place(rect);

@@ -378,7 +378,7 @@ fn spinner_and_progress_keep_meaning_and_tick_once_per_second() {
         .find(|key| key.request.component == Component::Spinner)
         .unwrap();
     assert_eq!(spinner.request.props["message"], json!(null));
-    assert_eq!(spinner.request.props["suffix"], json!("…"));
+    assert_eq!(spinner.request.props["suffix"], json!(""));
     let first = ui
         .shown
         .pulls
@@ -579,7 +579,7 @@ fn session_status_replacement_owns_the_child_identity() {
     tree.show(&child_id());
     let (mut ui, now) = scene();
     let original = draw_tree(80, 30, &tree, &mut ui, now);
-    assert!(original.contains("in reviewer"));
+    assert!(original.contains("reviewer · session"));
     let key = ui
         .shown
         .pulls
@@ -595,7 +595,7 @@ fn session_status_replacement_owns_the_child_identity() {
         .answer(key, bingo_sdk::View::text("replacement status"));
     let screen = draw_tree(80, 30, &tree, &mut ui, now);
     assert!(screen.contains("replacement status"));
-    assert!(!screen.contains("in reviewer"));
+    assert!(screen.contains("reviewer · session"));
     assert!(!screen.contains("fake/fake-1"));
 }
 

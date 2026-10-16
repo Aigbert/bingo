@@ -1,19 +1,17 @@
 //! Where each region of the screen is, and nothing about what goes in them.
 //!
-//! Nothing sits above the transcript: it starts at row 0 and grows down to a
-//! fixed baseline — the activity rows, the input box and the one status line —
-//! which are cut from the bottom first, so the box never moves when the
-//! transcript does. The transcript takes the full width.
+//! A header and spacer sit above the transcript. The rule, prompt, hint row
+//! and footer are cut from the bottom, so typing keeps a fixed baseline.
 //!
 //! It is pure geometry over a [`Demand`], so every size is a table row in a
 //! test rather than a screen someone has to look at.
 
 use ratatui::layout::Rect;
 
-/// The input box at its smallest: two borders and one row to type in.
-pub const COMPOSER_MIN: u16 = 3;
-/// The input box at its largest: two borders and ten rows.
-pub const COMPOSER_MAX: u16 = 12;
+/// The rule and one row to type in.
+pub const COMPOSER_MIN: u16 = 2;
+/// The rule and ten rows of draft.
+pub const COMPOSER_MAX: u16 = 11;
 
 /// What the frame must make room for, measured before the geometry is cut.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -32,6 +30,8 @@ pub struct Demand {
 /// the input box are the last to go.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Regions {
+    pub header: Rect,
+    pub hints: Rect,
     pub transcript: Rect,
     pub activity: Rect,
     /// The thumbnails' rows, directly on the box's top border.
@@ -58,13 +58,23 @@ impl Regions {
 pub fn regions(size: Rect, demand: Demand) -> Regions {
     let mut rest = size;
     let status = take_bottom(&mut rest, 1);
+    let hint_rows = u16::from(rest.height > COMPOSER_MIN);
+    let hints = take_bottom(&mut rest, hint_rows);
     let rows = composer_rows(demand.composer, rest.height);
     let composer = take_bottom(&mut rest, rows);
+    let header = Rect {
+        height: if rest.height >= 3 { 2 } else { 0 },
+        ..rest
+    };
+    rest.y += header.height;
+    rest.height -= header.height;
     let rows = strip_rows(demand.strip, rest.height);
     let strip = take_bottom(&mut rest, rows);
     let rows = activity_rows(demand.activity, rest.height);
     let activity = take_bottom(&mut rest, rows);
     Regions {
+        header,
+        hints,
         transcript: rest,
         activity,
         strip,
@@ -76,7 +86,7 @@ pub fn regions(size: Rect, demand: Demand) -> Regions {
 /// The box grows with the draft and stops at ten rows; it never shrinks below
 /// one row, and it takes what is left when even that does not fit.
 fn composer_rows(text: u16, room: u16) -> u16 {
-    text.saturating_add(2)
+    text.saturating_add(1)
         .clamp(COMPOSER_MIN, COMPOSER_MAX)
         .min(room)
 }
@@ -131,8 +141,12 @@ mod tests {
                 (height - 1).min(COMPOSER_MIN),
                 "{width}x{height}"
             );
-            let used =
-                r.transcript.height + r.activity.height + r.composer.height + r.status.height;
+            let used = r.header.height
+                + r.hints.height
+                + r.transcript.height
+                + r.activity.height
+                + r.composer.height
+                + r.status.height;
             assert_eq!(used, height, "{width}x{height} leaves no gap");
         }
     }
@@ -153,7 +167,7 @@ mod tests {
         };
         assert_eq!(rows(0), COMPOSER_MIN);
         assert_eq!(rows(1), COMPOSER_MIN);
-        assert_eq!(rows(4), 6);
+        assert_eq!(rows(4), 5);
         assert_eq!(rows(10), COMPOSER_MAX);
         assert_eq!(rows(40), COMPOSER_MAX, "it never eats the transcript");
     }
@@ -200,11 +214,11 @@ mod tests {
                 },
             )
         };
-        assert_eq!(at_height(7).strip.height, 0, "three rows are not spare");
-        assert_eq!(at_height(7).composer.height, COMPOSER_MIN);
-        assert_eq!(at_height(8).strip.height, 3, "the transcript keeps a row");
-        assert_eq!(at_height(8).transcript.height, 1);
-        assert!(at_height(7).above().height > 0, "the band still has rows");
+        assert_eq!(at_height(9).strip.height, 0, "three rows are not spare");
+        assert_eq!(at_height(9).composer.height, COMPOSER_MIN);
+        assert_eq!(at_height(10).strip.height, 3, "the transcript keeps a row");
+        assert_eq!(at_height(10).transcript.height, 1);
+        assert!(at_height(9).above().height > 0, "the band still has rows");
     }
 
     #[test]
@@ -218,7 +232,7 @@ mod tests {
             },
         );
         assert_eq!(r.activity.height, 3);
-        assert_eq!(r.transcript.height, 17);
+        assert_eq!(r.transcript.height, 15);
 
         let tight = at(
             80,
@@ -245,10 +259,10 @@ mod tests {
         );
         assert_eq!(r.transcript.bottom(), r.activity.y);
         assert_eq!(r.activity.bottom(), r.composer.y);
-        assert_eq!(r.composer.bottom(), r.status.y);
+        assert_eq!(r.composer.bottom(), r.hints.y);
         assert_eq!(
             r.above(),
-            Rect::new(0, 0, 120, r.transcript.height + r.activity.height)
+            Rect::new(0, 2, 120, r.transcript.height + r.activity.height)
         );
     }
 }
@@ -328,6 +342,74 @@ mod m148 {
                 ),
             ]);
             assert_eq!(draw_sized(width, 40, &state, &mut ui, now), before);
+        }
+    }
+}
+
+#[cfg(test)]
+mod m183 {
+    use crate::test_support::*;
+    use bingo_sdk::{ContextUsage, Effort, Event, ItemStatus};
+
+    #[test]
+    fn prototype_frame_idle_running_done_and_narrow() {
+        let mut state = state();
+        state.summary.id = bingo_sdk::SessionId::from_raw("ses_3f2a");
+        state.summary.cwd = crate::paths::home()
+            .map(|home| format!("{home}/src/demo"))
+            .unwrap_or_else(|| "~/src/demo".into());
+        state.summary.title = Some("label the total in main".into());
+        state.summary.model = Some("claude-sonnet-5-5".into());
+        state.summary.effort = Some(Effort::Medium);
+        state.context = Some(ContextUsage {
+            parts: None,
+            used: 14_000,
+            window: 200_000,
+            trigger: 180_000,
+        });
+        state
+            .extensions
+            .entry("_bingo.context".into())
+            .or_default()
+            .insert(
+                "location".into(),
+                serde_json::json!({"cwd":state.summary.cwd, "branch":"main"}),
+            );
+        let (mut ui, now) = scene();
+        for (name, events) in [
+            ("idle", vec![]),
+            (
+                "running",
+                vec![
+                    started("turn_burrowing"),
+                    Event::ItemStarted {
+                        item: user("ask", "label the total in main"),
+                    },
+                ],
+            ),
+            (
+                "done",
+                vec![
+                    Event::ItemCompleted {
+                        item: assistant(
+                            "answer",
+                            "Done. main now prints a labelled total.",
+                            ItemStatus::Completed,
+                        ),
+                    },
+                    completed("turn_burrowing", bingo_sdk::TurnStatus::Completed),
+                ],
+            ),
+        ] {
+            for event in events {
+                state.apply(&frame(state.seq.0 + 1, event));
+            }
+            for (width, height) in [(108, 30), (80, 24)] {
+                insta::assert_snapshot!(
+                    format!("frame_{name}_{width}x{height}"),
+                    draw_sized(width, height, &state, &mut ui, later(now, 3_000))
+                );
+            }
         }
     }
 }

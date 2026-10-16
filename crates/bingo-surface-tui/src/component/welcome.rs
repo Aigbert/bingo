@@ -13,9 +13,6 @@ pub fn props(rows: &Rows<'_>) -> Props {
 }
 
 pub fn draw(rows: &Rows<'_>) -> Vec<Line<'static>> {
-    if !welcome::wanted(rows.state) {
-        return Vec::new();
-    }
     let props = props(rows);
     super::resolve(
         rows.state,
@@ -53,9 +50,7 @@ pub fn draw(rows: &Rows<'_>) -> Vec<Line<'static>> {
 }
 
 pub fn request(rows: &Rows<'_>) -> Option<crate::pulled::Key> {
-    welcome::wanted(rows.state)
-        .then(|| super::key(rows.state, "Welcome", &props(rows), rows.width as u16, 0))
-        .flatten()
+    super::key(rows.state, "Welcome", &props(rows), rows.width as u16, 1)
 }
 
 fn changed_state(facts: &WelcomeProps) -> SessionState {

@@ -1,16 +1,8 @@
 //! The wordmark and the facts of this session, at the head of its transcript.
-use crate::{paths, theme};
+
 use bingo_sdk::{Driver, SessionState, SessionSummary};
 use jiff::Timestamp;
-use ratatui::text::{Line, Span};
-
-/// The site's cell grid, paired into half-block rows.
-const WORDMARK: [&str; 4] = [
-    "█      ▀",
-    "█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█",
-    "█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█",
-    "                ▄▄▄▄▄█",
-];
+use ratatui::text::Line;
 
 /// Host answers shown at the opening, independent of session state.
 #[derive(Debug, Default)]
@@ -89,84 +81,8 @@ pub fn draw(
     update: Option<&str>,
     now: Timestamp,
 ) -> Vec<Line<'static>> {
-    if !wanted(state) {
-        return Vec::new();
-    }
-    let mut rows = mark(width, entrance.height);
-    rows.push(Line::from(Span::styled(facts(state, width), theme::dim())));
-    rows.push(Line::from(Span::styled(
-        resume(entrance.resume, width, now),
-        theme::dim(),
-    )));
-    if let Some(version) = update {
-        rows.push(Line::from(Span::styled(
-            crate::views::clip(&format!("↑ v{version} is out · bingo update"), width),
-            theme::presence(),
-        )));
-    }
-    rows
-}
-
-fn mark(width: usize, height: u16) -> Vec<Line<'static>> {
-    if width < 40 || height < 16 || theme::glyphs() == &theme::ASCII {
-        return vec![Line::from(vec![
-            Span::styled("bingo", theme::text()),
-            Span::styled(theme::mark(), theme::presence()),
-        ])];
-    }
-    WORDMARK
-        .iter()
-        .enumerate()
-        .map(|(row, text)| {
-            let mut spans = vec![Span::styled(*text, theme::text())];
-            if row == 2 {
-                spans.push(Span::styled(
-                    format!(" {}", theme::mark()),
-                    theme::presence(),
-                ));
-            }
-            Line::from(spans)
-        })
-        .collect()
-}
-
-fn facts(state: &SessionState, width: usize) -> String {
-    let mut parts: Vec<String> = state.summary.model.clone().into_iter().collect();
-    if let Some(level) = state
-        .config
-        .kernel
-        .get("thinking")
-        .and_then(|value| serde_json::from_value::<bingo_sdk::Effort>(value.clone()).ok())
-    {
-        parts.push(level.name().into());
-    }
-    parts.extend(bingo_sdk::slot::modes(state));
-    let prefix = parts.join(" · ");
-    let room = width.saturating_sub(
-        unicode_width::UnicodeWidthStr::width(prefix.as_str())
-            + if prefix.is_empty() { 0 } else { 3 },
-    );
-    let cwd = paths::short(&state.summary.cwd, "", paths::home());
-    parts.push(paths::elide(&cwd, room));
-    crate::views::clip(&parts.join(" · "), width)
-}
-
-fn resume(previous: Option<&SessionSummary>, width: usize, now: Timestamp) -> String {
-    let Some(previous) = previous else {
-        return String::new();
-    };
-    let arrow = if theme::glyphs() == &theme::ASCII {
-        "<"
-    } else {
-        "↺"
-    };
-    let title = previous.title.as_deref().unwrap_or("previous session");
-    let suffix = format!(" · {} · /resume", bingo_sdk::ago(now, previous.updated_at));
-    let room = width.saturating_sub(suffix.chars().count() + 2);
-    crate::views::clip(
-        &format!("{arrow} {}{suffix}", crate::views::clip(title, room)),
-        width,
-    )
+    let _ = (entrance.height, update, now);
+    vec![crate::view::header::welcome(state, width)]
 }
 
 #[cfg(test)]
@@ -192,7 +108,8 @@ mod tests {
             resume: None,
         };
         let empty = draw(&state, 80, at, None, state.summary.updated_at);
-        assert_eq!(empty[0].to_string(), "bingo▍");
+        assert_eq!(empty.len(), 1);
+        assert!(empty[0].to_string().contains("bingo▍"));
         let filled = draw(
             &state,
             80,
@@ -204,7 +121,7 @@ mod tests {
             state.summary.updated_at,
         );
         assert_eq!(empty.len(), filled.len());
-        assert!(filled[2].to_string().contains("/resume"));
+        assert!(filled[0].to_string().contains("session"));
     }
     /// The table of §11: every reason the opening does not play.
     #[test]
@@ -293,11 +210,11 @@ mod tests {
         let mut child = state();
         child.summary = child_summary("reviewer");
         assert!(!wanted(&child), "a sub-session joins");
-        assert!(lines(&child, 60, None).is_empty());
+        assert_eq!(lines(&child, 60, None).len(), 1);
 
         let mut room = folded(vec![]);
         room.summary = log_summary("#design");
         assert!(!wanted(&room), "a room is not a session of ours");
-        assert!(lines(&room, 60, Some("0.5.0")).is_empty());
+        assert_eq!(lines(&room, 60, Some("0.5.0")).len(), 1);
     }
 }

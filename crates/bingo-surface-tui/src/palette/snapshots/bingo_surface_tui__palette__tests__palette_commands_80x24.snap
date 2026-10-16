@@ -2,7 +2,7 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-"                                                                                "
+" bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -22,7 +22,7 @@ expression: screen
 "   /clear          start a fresh session here                                   "
 "   /exit           leave bingo                                                  "
 "   type to search commands, sessions and keys together                          "
-"╭──────────────────────────────────────────────────────────────────────────────╮"
-"│ > /                                                                          │"
-"╰──────────────────────────────────────────────────────────────────────────────╯"
-"                                                                     fake/fake-1"
+"────────────────────────────────────────────────────────────────────────────────"
+" ▍ /                                                                            "
+"                                                                                "
+" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "

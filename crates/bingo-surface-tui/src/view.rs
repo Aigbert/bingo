@@ -1,19 +1,16 @@
-//! The frame: the regions of [`crate::frame`] filled in, and the layers over
-//! them. Nothing sits above the transcript, and nothing below it moves — the
-//! input box and the status line are cut from the bottom before the transcript
-//! is given what is left, so a dialog opening or a notice arriving never
-//! shifts a row a person was reading.
-//!
+//! The header, transcript, rule, prompt, hints and footer in one frame.
 //! `compose` fills an owned layout without borrowing a terminal frame.
+
+pub(crate) mod header;
 
 use crate::layout::Layout;
 use bingo_sdk::{Driver, SessionState};
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, Padding, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 use unicode_width::UnicodeWidthStr;
 
-use crate::clock::{self, Now};
+use crate::clock::Now;
 use crate::commands::{Group, Suggestion};
 use crate::composer::strip;
 use crate::frame::{self, Demand, Regions};
@@ -59,6 +56,35 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     );
     frame.seating = crate::pane::seating(ui, state, regions.transcript);
     regions.transcript = frame.seating.transcript;
+    pull_activity(state, ui, frame, regions.activity);
+    let layer_regions = regions;
+    if crate::browse::active(ui) && regions.transcript.height > 0 {
+        regions.transcript.y += 1;
+        regions.transcript.height -= 1;
+    }
+    frame.regions = regions;
+    header::render(tree.viewed(), ui, frame, regions.header, now);
+    render_transcript(tree, ui, frame, regions.transcript, now);
+    render_activity(ui, frame, regions.activity, activity);
+    crate::component::band::place(&band, frame, regions.activity, band_offset);
+    render_strip(frame, regions.strip, strip);
+    render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
+    crate::pane::draw(ui, state, frame, now);
+    render_status(tree, ui, frame, regions.status, now);
+    let hints = status::hints(tree, ui, usize::from(area.width), now, &mut frame.pulls);
+    frame.render_widget(Paragraph::new(hints), regions.hints);
+    if regions.activity.height == 0 && !ui.scroll.following() {
+        frame.render_widget(Clear, regions.hints);
+        render_activity(ui, frame, regions.hints, Vec::new());
+    }
+    if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
+        frame.cursor = None;
+    }
+    layers(tree, ui, frame, layer_regions, now);
+    frame.render_widget(Paragraph::new(toasts), toast_area);
+}
+
+fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) {
     if !ui.activity_hidden {
         for placed in bingo_sdk::slot::placed(state) {
             if let bingo_sdk::slot::Slot::Activity {
@@ -70,29 +96,11 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
                     state,
                     &request.on(bingo_sdk::render::SurfaceName::Terminal),
                     area.width,
-                    regions.activity.height,
+                    area.height,
                 ));
             }
         }
     }
-    let layer_regions = regions;
-    if crate::browse::active(ui) && regions.transcript.height > 0 {
-        regions.transcript.y += 1;
-        regions.transcript.height -= 1;
-    }
-    frame.regions = regions;
-    render_transcript(tree, ui, frame, regions.transcript, now);
-    render_activity(ui, frame, regions.activity, activity);
-    crate::component::band::place(&band, frame, regions.activity, band_offset);
-    render_strip(frame, regions.strip, strip);
-    render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
-    crate::pane::draw(ui, state, frame, now);
-    render_status(tree, ui, frame, regions.status, now);
-    if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
-        frame.cursor = None;
-    }
-    layers(tree, ui, frame, layer_regions, now);
-    frame.render_widget(Paragraph::new(toasts), toast_area);
 }
 
 fn toast_lines(ui: &Ui, state: &SessionState, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
@@ -113,7 +121,7 @@ fn demand(draft: &prompt::Layout, strip: &graphics::Band, activity: &[Line<'_>])
     Demand {
         composer: u16::try_from(draft.lines.len().clamp(1, COMPOSER_ROWS)).unwrap_or(u16::MAX),
         strip: strip.height(),
-        activity: u16::try_from(activity.len()).unwrap_or(u16::MAX).max(2),
+        activity: u16::try_from(activity.len()).unwrap_or(u16::MAX),
     }
 }
 
@@ -134,12 +142,9 @@ fn strip(
     )
 }
 
-/// The cells inside the box: two border columns, a cell of padding each
-/// side, then the prompt itself (`> `, or `#design > ` in a room).
+/// The text measure after the prompt tag.
 fn inner_width(state: &SessionState, width: usize) -> usize {
-    width
-        .saturating_sub(4 + prompt::prompt(state).width())
-        .max(1)
+    width.saturating_sub(prompt::prompt(state).width()).max(1)
 }
 
 /// The one line of furniture: the status line, or what has taken its row — a
@@ -523,14 +528,8 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     .components(&ui.placed.pulled)
     .saying(ui.welcome.update.as_deref())
     .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
-    .opening(ui.focus.intro().map(|intro| intro.seconds(now)))
     .measuring(ui.measure);
     frame.height = frame.blocks.sync(state, &tree.agents(), &rows_config);
-    if ui.scroll.top(frame.height, rows, now.instant) < frame.blocks.welcome_rows()
-        && let Some(key) = crate::component::welcome::request(&rows_config)
-    {
-        frame.pulls.push(key);
-    }
     let inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
     if let Some((_, removed, drawing)) = &inline {
         frame.height = frame.height - removed + drawing.rows.len();
@@ -567,10 +566,7 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
 fn prepare_lines(ui: &Ui, tree: &Tree, frame: &Layout, shown: &mut Vec<Line<'static>>) -> usize {
     crate::browse::mark(ui, tree, frame, shown);
     mark_row(ui, frame, shown);
-    // A short transcript hangs from the composer, not from the top of the screen.
-    let padding = frame.padding();
-    shown.splice(..0, std::iter::repeat_n(Line::default(), padding));
-    padding
+    0
 }
 
 fn mark_transcript(ui: &Ui, frame: &mut Layout, area: Rect, padding: usize, now: Now) {
@@ -682,44 +678,29 @@ fn render_composer(
     if area.height == 0 {
         return;
     }
-    let block = Block::bordered()
-        .border_set(theme::border())
-        .border_style(border(state, now))
-        .padding(Padding::horizontal(1));
-    let inner = block.inner(area);
-    frame.render_widget(block, area);
-    if let Some(come) = ui.sending(now) {
-        ignite(frame, area, come);
-    }
-    render_draft(state, ui, frame, inner, draft);
-}
-
-/// The one light the box runs along its own border when a line is sent: the
-/// most repeated gesture in the surface, and until now the only one with no
-/// answer at all. It rides over the border the box has already drawn, so what
-/// the border says — dim while nothing is happening, breathing while the
-/// model works — is what it comes back to (§6).
-fn ignite(frame: &mut Layout, area: Rect, come: f32) {
-    let width = usize::from(area.width);
-    let buffer = frame.buffer_mut();
-    for (x, y) in outline(area) {
-        let lit = clock::sweep(come, usize::from(x - area.left()), width);
-        if lit <= 0.0 {
-            continue;
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            theme::rule().repeat(usize::from(area.width)),
+            theme::rule_style(),
+        ))),
+        Rect { height: 1, ..area },
+    );
+    let inner = Rect {
+        y: area.y + 1,
+        height: area.height.saturating_sub(1),
+        ..area
+    };
+    if inner.height > 0 {
+        render_draft(state, ui, frame, inner, draft);
+        if let Some(cell) = frame.buffer_mut().cell_mut((area.x + 1, inner.y)) {
+            cell.set_style(theme::text());
+            cell.set_style(if state.busy() {
+                activity::breathing(state, now)
+            } else {
+                theme::glow()
+            });
         }
-        let under = buffer[(x, y)].style();
-        buffer[(x, y)].set_style(under.patch(theme::pulse(lit)));
     }
-}
-
-/// The cells of a box's own outline, in reading order.
-fn outline(area: Rect) -> impl Iterator<Item = (u16, u16)> {
-    (area.top()..area.bottom()).flat_map(move |y| {
-        let whole = y == area.top() || y + 1 == area.bottom();
-        (area.left()..area.right())
-            .filter(move |x| whole || *x == area.left() || *x + 1 == area.right())
-            .map(move |x| (x, y))
-    })
 }
 
 /// The thumbnails, standing on the box's top border in the rows the frame
@@ -760,6 +741,8 @@ fn render_draft(
     let start = layout.cursor.0.saturating_sub(COMPOSER_ROWS - 1);
     let placeholder = if !ui.dialog.aside && ui.dialog.current().is_some() {
         "answer above · typing here leaves it for later".to_string()
+    } else if ui.dialog.aside {
+        "your message waits until the ask is answered".to_string()
     } else {
         placeholder(state)
     };
@@ -780,15 +763,6 @@ fn render_draft(
                 .unwrap_or(u16::MAX)
                 .min(area.height.saturating_sub(1)),
     ));
-}
-
-/// The box's border: `dim` while nothing is happening, and glowing on the
-/// activity row's own breath while the model works (§4).
-fn border(state: &SessionState, now: Now) -> ratatui::style::Style {
-    match state.busy() {
-        true => activity::breathing(state, now),
-        false => theme::dim(),
-    }
 }
 
 /// What the empty composer offers. Nothing answers a `Log` session, so it is
@@ -1194,7 +1168,7 @@ mod tests {
     #[test]
     fn the_pending_area_draws_only_what_the_person_queued() {
         let mine = band(&[("tui", "also fix the docs", true)]);
-        assert!(mine.contains("> also fix the docs"), "{mine}");
+        assert!(mine.contains("› also fix the docs"), "{mine}");
 
         let steer = band(&[("room", "the build is green", true)]);
         assert_eq!(
@@ -1208,7 +1182,7 @@ mod tests {
             ("room", "the build is green", true),
             ("tui", "also fix the docs", true),
         ]);
-        assert!(both.contains("> also fix the docs"), "{both}");
+        assert!(both.contains("› also fix the docs"), "{both}");
         assert!(!both.contains("the build is green"), "{both}");
 
         assert_eq!(
@@ -1225,16 +1199,16 @@ mod tests {
     #[test]
     fn a_line_that_will_not_steer_wears_the_tag_and_the_busy_box_says_why() {
         let steers = band(&[("tui", "also fix the docs", true)]);
-        assert!(steers.contains("> also fix the docs"), "{steers}");
+        assert!(steers.contains("› also fix the docs"), "{steers}");
         assert!(!steers.contains("(waits)"), "{steers}");
 
         let waits = band(&[("tui", "and then the docs", false)]);
-        assert!(waits.contains("> and then the docs (waits)"), "{waits}");
+        assert!(waits.contains("› and then the docs (waits)"), "{waits}");
 
-        assert!(waits.contains(keys::BUSY_PLACEHOLDER), "{waits}");
+        assert!(!waits.contains(keys::PLACEHOLDER), "{waits}");
         let idle = render(&state(), &mut scene().0, scene().1);
         assert!(idle.contains(keys::PLACEHOLDER), "{idle}");
-        assert!(!idle.contains(keys::BUSY_PLACEHOLDER), "{idle}");
+        assert!(idle.contains(" ▍ ask anything"), "{idle}");
     }
 
     /// The rows the band asks for, which the screen above cannot show: a blank
@@ -1424,7 +1398,7 @@ mod tests {
         tree.show(&child_id());
         let (mut ui, now) = mid_turn();
         let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("in reviewer · fake/fake-1"), "{screen}");
+        assert!(screen.contains("reviewer · session"), "{screen}");
         assert!(screen.contains("Two nits"), "{screen}");
         insta::assert_snapshot!(screen);
     }
@@ -1491,7 +1465,7 @@ mod tests {
     fn the_composer_of_a_room_offers_to_post_to_it() {
         let (mut ui, now) = scene();
         let screen = render_tree(&room(vec![]), &mut ui, now);
-        assert!(screen.contains("#design > post to the room"), "{screen}");
+        assert!(screen.contains("#design › post to the room"), "{screen}");
         insta::assert_snapshot!(screen);
     }
 
@@ -1616,7 +1590,7 @@ mod tests {
 
         press(&mut ui, key(crossterm::event::KeyCode::Esc));
         assert!(
-            render(&state, &mut ui, there).contains("? for shortcuts"),
+            render(&state, &mut ui, there).contains("⏵⏵ default"),
             "esc gives the status line back"
         );
     }
@@ -1649,7 +1623,7 @@ mod tests {
         let marked = hit_cells(&screen);
         assert_eq!(marked.len(), 7, "seven cells of `line 59`: {marked:?}");
         assert!(
-            marked.iter().all(|(x, _)| (2..9).contains(x)),
+            marked.iter().all(|(x, _)| (3..10).contains(x)),
             "after the `❯ `: {marked:?}"
         );
     }
@@ -1661,8 +1635,8 @@ mod tests {
             .content()
             .iter()
             .enumerate()
-            .filter(|(_, cell)| {
-                cell.style() == theme::as_drawn(theme::presence().patch(theme::bold()))
+            .filter(|(i, cell)| {
+                *i >= 160 && cell.style() == theme::as_drawn(theme::presence().patch(theme::bold()))
             })
             .map(|(i, _)| ((i % 80) as u16, (i / 80) as u16))
             .collect()
@@ -1683,7 +1657,7 @@ mod tests {
         crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now);
         assert_eq!(
             hit_cells(&drawn(80, 24, &tree, &mut ui, now)),
-            (10..15).map(|x| (x, row)).collect::<Vec<_>>(),
+            (11..16).map(|x| (x, row)).collect::<Vec<_>>(),
             "the five cells of `tests` on the row it is drawn on"
         );
     }
@@ -1741,7 +1715,7 @@ mod tests {
     #[test]
     fn a_drag_over_a_short_transcript_tints_the_cells_under_the_pointer() {
         let state = folded(vec![item_frame(1, user("itm_1", "run the tests"))]);
-        let (row, marked) = dragged_over(&state, "run the tests", 2, 5);
+        let (row, marked) = dragged_over(&state, "run the tests", 3, 6);
         assert_eq!(marked, vec![(row, "run".to_string())]);
     }
 
@@ -1749,7 +1723,7 @@ mod tests {
     /// padding to get wrong: one mapping answers both.
     #[test]
     fn a_drag_over_a_long_transcript_tints_the_cells_under_the_pointer() {
-        let (row, marked) = dragged_over(&long_transcript(60), "line 59", 2, 6);
+        let (row, marked) = dragged_over(&long_transcript(60), "line 59", 3, 7);
         assert_eq!(marked, vec![(row, "line".to_string())]);
     }
 
@@ -1758,7 +1732,7 @@ mod tests {
     #[test]
     fn a_drag_over_wide_glyphs_tints_the_cells_they_are_drawn_in() {
         let state = folded(vec![item_frame(1, user("itm_1", "你好 warm"))]);
-        let (row, marked) = dragged_over(&state, "你好", 2, 6);
+        let (row, marked) = dragged_over(&state, "你好", 3, 7);
         assert_eq!(marked, vec![(row, "你好".to_string())]);
     }
 
@@ -2034,7 +2008,7 @@ mod tests {
             let rows = box_rows(&screen);
             let prompt = rows
                 .iter()
-                .position(|row| row.contains("#design >"))
+                .position(|row| row.contains("#design ›"))
                 .unwrap_or_else(|| panic!("the room's own prompt: {screen}"));
             assert_eq!(prompt, 1, "{rows:?}");
             assert_eq!(placeholder_rows(&screen), usize::from(graphics::band::ROWS));

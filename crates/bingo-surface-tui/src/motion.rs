@@ -30,6 +30,11 @@ fn style_of(tree: &Tree, ui: &mut crate::ui::Ui, now: Now, needle: &str) -> Styl
         .unwrap_or_else(|| panic!("no run carries {needle:?}"))
 }
 
+fn composer_style(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> Style {
+    let backend = drawn(80, 24, tree, ui, now);
+    backend.buffer()[(1, ui.shown.regions.composer.y + 1)].style()
+}
+
 /// A screen at one instant, as text.
 fn screen(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> String {
     draw_tree(80, 24, tree, ui, now)
@@ -79,7 +84,7 @@ fn waiting_caret_blinks_without_changing_its_glyph() {
             theme::presence()
         };
         assert_eq!(style, theme::as_drawn(expected));
-        assert!(row(&tree, &mut ui, at, "esc to interrupt").starts_with('▍'));
+        assert!(row(&tree, &mut ui, at, "esc to interrupt").starts_with(" ▍"));
     }
 }
 
@@ -168,7 +173,7 @@ fn the_input_box_glows_on_the_same_breath_and_is_dim_when_idle() {
     let (mut ui, now) = mid_turn();
     // The box is found by what it offers, and a busy box offers the two keys
     // that send (M68).
-    let working = leading_style(&turning(), &mut ui, now, keys::BUSY_PLACEHOLDER);
+    let working = composer_style(&turning(), &mut ui, now);
     assert_eq!(
         working,
         theme::as_drawn(crate::activity::breathing(turning().viewed(), now))
@@ -176,9 +181,9 @@ fn the_input_box_glows_on_the_same_breath_and_is_dim_when_idle() {
 
     let idle = solo(&state());
     assert_eq!(
-        leading_style(&idle, &mut ui, now, keys::PLACEHOLDER),
-        theme::as_drawn(theme::dim()),
-        "and it is dim while nothing is happening"
+        composer_style(&idle, &mut ui, now),
+        theme::as_drawn(theme::glow()),
+        "the idle prompt keeps its glow"
     );
 }
 
@@ -201,8 +206,8 @@ fn the_wait_breathes_at_the_pace_a_tool_holds_a_turn_and_leaves_the_box_dim() {
     });
     assert_eq!(
         leading_style(&tree, &mut ui, at, keys::PLACEHOLDER),
-        theme::as_drawn(theme::dim()),
-        "nothing is arriving here"
+        theme::as_drawn(theme::glow()),
+        "the idle prompt keeps its glow"
     );
 }
 
@@ -212,7 +217,7 @@ fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
     let screen = screen(&solo(&state()), &mut ui, now);
     assert!(!screen.contains("esc to interrupt"), "{screen}");
     assert!(
-        !screen.contains('▍') || screen.contains("█▀▀▀▀█"),
+        screen.contains("bingo▍") && screen.contains(" ▍ ask anything"),
         "{screen}"
     );
 }
@@ -249,9 +254,13 @@ fn a_sent_line_runs_one_light_along_the_boxs_border() {
     assert_eq!(ui.sending(now), Some(0.0), "the light starts on the key");
     crate::theme::with(crate::painted::truecolor(), || {
         let mut lit = |ms| border_runs(&tree, &mut ui, later(now, ms));
-        assert_ne!(lit(40), at_rest, "forty in, the near edge is lit");
+        assert_eq!(
+            lit(40),
+            at_rest,
+            "sending does not animate a removed border"
+        );
         assert_eq!(lit(40).last(), at_rest.last(), "and the far edge is not");
-        assert_ne!(lit(150), at_rest, "a hundred and fifty in, the far one is");
+        assert_eq!(lit(150), at_rest, "the prompt stays in place");
         assert_eq!(lit(150).first(), at_rest.first(), "and the near one is not");
         assert_eq!(lit(198), at_rest, "back at rest on the seventh frame");
     });
@@ -418,7 +427,7 @@ fn the_activity_row_says_a_verb_a_clock_and_what_the_turn_has_said() {
     let mut row = |ms| row(&tree, &mut ui, later(now, ms), "esc to interrupt");
     assert_eq!(
         row(4_000),
-        "▍ Burrowing… (esc to interrupt · 4s · ↓ 1.2k)",
+        " ▍ burrowing · 4s · esc to interrupt",
         "the verb is drawn from the turn's own id, so the row never changes its mind"
     );
     assert!(
@@ -437,11 +446,11 @@ fn a_turn_asked_to_stop_says_so_and_keeps_its_sparkle_and_its_clock() {
     let (mut ui, now) = scene();
     ui.stop_asked = Some(bingo_sdk::TurnId::from_raw("trn_1"));
     let mut row = |ms| row(&tree, &mut ui, later(now, ms), crate::activity::STOPPING);
-    assert_eq!(row(4_000), "▍ Stopping… (4s)");
+    assert_eq!(row(4_000), " ▍ Stopping · 4s");
     // The sparkle is at another of its four glyphs a second later, which is
     // the point: the row is still alive while it winds down.
     assert!(
-        row(5_000).ends_with(" Stopping… (5s)"),
+        row(5_000).ends_with(" Stopping · 5s"),
         "the clock ticks on: {}",
         row(5_000)
     );
@@ -488,16 +497,16 @@ fn the_next_turn_is_not_the_one_that_was_stopped() {
 #[test]
 fn every_verb_is_one_of_bingos_own() {
     let words = [
-        "Kindling",
-        "Stoking",
-        "Smouldering",
-        "Foraging",
-        "Tracking",
-        "Burrowing",
-        "Sniffing around",
-        "Pouncing",
-        "Sifting",
-        "Tinkering",
+        "kindling",
+        "stoking",
+        "smouldering",
+        "foraging",
+        "tracking",
+        "burrowing",
+        "sniffing around",
+        "pouncing",
+        "sifting",
+        "tinkering",
     ];
     let (mut ui, now) = mid_turn();
     for id in ["trn_1", "trn_2", "trn_9", "trn_ffff", "trn_01J"] {
@@ -694,20 +703,20 @@ fn context(share: u64) -> Tree {
 fn the_context_count_is_always_there_and_warms_across_the_last_fifth() {
     let (mut ui, now) = scene();
     assert!(
-        screen(&context(41), &mut ui, now).contains("41k/200k"),
+        screen(&context(41), &mut ui, now).contains("41k / 200k"),
         "the count is on the line as soon as a turn has run"
     );
     for look in [crate::painted::truecolor(), crate::painted::ascii()] {
         crate::theme::with(look, || {
-            let mut at = |share| style_of(&context(share), &mut ui, now, "/200k");
+            let mut at = |share| style_of(&context(share), &mut ui, now, "/ 200k");
             assert_eq!(at(79), theme::as_drawn(theme::dim()), "{:?}", look.colors);
             assert_eq!(at(89), theme::as_drawn(theme::dim()), "{:?}", look.colors);
             assert_eq!(
                 at(90),
-                theme::as_drawn(theme::bad()),
+                theme::as_drawn(theme::dim()),
                 "the way out joins it, and so does the colour"
             );
-            assert_eq!(at(100), theme::as_drawn(theme::bad()), "{:?}", look.colors);
+            assert_eq!(at(100), theme::as_drawn(theme::dim()), "{:?}", look.colors);
         });
     }
 }
@@ -750,7 +759,10 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
         "the sparkle rests at presence"
     );
     let drawn = row(&tree, &mut ui, still, "esc to interrupt");
-    assert!(drawn.starts_with('▍'), "and holds its first glyph: {drawn}");
+    assert!(
+        drawn.starts_with(" ▍"),
+        "and holds its first glyph: {drawn}"
+    );
 
     // A live bullet and a tail are both absent rather than frozen.
     let bash = solo(&folded(running_bash()));
@@ -817,8 +829,8 @@ fn a_finished_turn_takes_the_whole_of_the_presence_with_it() {
     assert!(!screen.contains("esc to interrupt"), "{screen}");
     assert_eq!(
         leading_style(&solo(&state), &mut ui, now, keys::PLACEHOLDER),
-        theme::as_drawn(theme::dim()),
-        "and the box's border is dim again"
+        theme::as_drawn(theme::glow()),
+        "the idle prompt keeps its glow"
     );
 }
 
