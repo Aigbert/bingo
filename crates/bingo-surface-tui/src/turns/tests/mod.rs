@@ -168,3 +168,59 @@ fn a_call_is_named_by_its_tool_in_plain_words() {
     assert_eq!(verb("WebSearch"), "web search");
     assert_eq!(verb("mcp__x"), "mcp__x");
 }
+
+/// The finished turn with the edit answered `decision`, as its fold says it.
+fn folded_with(decision: DecisionKind) -> TurnFoldProps {
+    let mut items = worked("trn_1");
+    let receipt = crate::test_support::item(
+        "trn_1_r",
+        ItemStatus::Completed,
+        ItemBody::PermissionReceipt {
+            item: Some(id("trn_1_5")),
+            interaction: bingo_sdk::InteractionId::from_raw("int_1"),
+            tool: "Edit".into(),
+            decision,
+            feedback: None,
+        },
+    );
+    items.insert(
+        6,
+        Item {
+            turn: Some(bingo_sdk::TurnId::from_raw("trn_1")),
+            ..receipt
+        },
+    );
+    let frames = items
+        .into_iter()
+        .zip(1..)
+        .map(|(item, seq)| {
+            crate::test_support::frame(seq, bingo_sdk::Event::ItemCompleted { item })
+        })
+        .collect();
+    let state = folded(frames);
+    match roles(&state, &Folds::new()).of_item(&id("trn_1_1")) {
+        Role::Fold { fold, .. } => fold.clone(),
+        other => panic!("the turn folds: {other:?}"),
+    }
+}
+
+#[test]
+fn a_plain_yes_leaves_the_fold_and_a_changed_one_stays() {
+    let answers = |fold: &TurnFoldProps| -> Vec<Option<Upshot>> {
+        fold.steps.iter().map(|step| step.answer.clone()).collect()
+    };
+    assert!(
+        answers(&folded_with(DecisionKind::Allow))
+            .iter()
+            .all(Option::is_none),
+        "a yes is how the work went on"
+    );
+    let changed = folded_with(DecisionKind::AllowChanged);
+    assert!(
+        answers(&changed)
+            .iter()
+            .flatten()
+            .any(|answer| matches!(answer, Upshot::Words { text, .. } if text.contains("changed"))),
+        "{changed:?}"
+    );
+}

@@ -419,15 +419,18 @@ fn step_state(item: &Item, state: &SessionState) -> StepState {
     }
 }
 
-/// Whether everything the person answered for the step was a yes to a
-/// permission.
+/// Whether everything the person answered for the step was a plain yes to a
+/// permission. A yes to a call the person changed first is news.
 fn granted(item: &Item, state: &SessionState) -> bool {
     let mut receipts = crate::ask::receipts::linked(state, &item.id).peekable();
     receipts.peek().is_some()
         && receipts.all(|receipt| {
             matches!(
                 receipt.body,
-                ItemBody::PermissionReceipt { decision, .. } if decision != DecisionKind::Deny
+                ItemBody::PermissionReceipt {
+                    decision: DecisionKind::Allow | DecisionKind::AllowSession,
+                    ..
+                }
             )
         })
 }
