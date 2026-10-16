@@ -190,7 +190,7 @@ mod tests {
 
     // Descriptions are prose; all structural keys and every existing alternative hold.
     fn preserves(before: &Value, after: &Value) -> bool {
-        match (before, after) {
+        match (&spelled(before), &spelled(after)) {
             (Value::Object(before), Value::Object(after)) => before.iter().all(|(key, value)| {
                 matches!(key.as_str(), "description" | "title" | "$comment")
                     || after.get(key).is_some_and(|next| preserves(value, next))
@@ -199,6 +199,24 @@ mod tests {
                 .iter()
                 .all(|value| after.iter().any(|next| preserves(value, next))),
             _ => before == after,
+        }
+    }
+
+    // One schema, two spellings: a documented unit variant is a `const`
+    // where a bare one is a one-value `enum`, and a documented `true` is `{}`.
+    fn spelled(schema: &Value) -> Value {
+        match schema {
+            Value::Bool(true) => json!({}),
+            Value::Object(object) => match object.get("enum").and_then(Value::as_array) {
+                Some(values) if values.len() == 1 && !object.contains_key("const") => {
+                    let mut object = object.clone();
+                    object.remove("enum");
+                    object.insert("const".into(), values[0].clone());
+                    Value::Object(object)
+                }
+                _ => schema.clone(),
+            },
+            _ => schema.clone(),
         }
     }
 
