@@ -109,7 +109,7 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
         return vec![Effect::View(session.clone())];
     }
     if let Some(item) = &block {
-        cycle_fold(ui, tree.viewed(), item);
+        cycle_fold(ui, tree.viewed(), item, cell.line);
     }
     ui.select.block = block;
     ui.start_selection(cell);
@@ -126,14 +126,20 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
 /// then the row alone. Only a thought is worth putting away, and putting it
 /// away is asked for rather than arrived at.
 ///
+/// A turn opens and shuts from its folded line alone: a click on what an
+/// opened turn shows under it is where a person starts selecting.
+///
 /// It writes the map `ctrl+o` writes, so a block is open in one way only.
-fn cycle_fold(ui: &mut Ui, state: &SessionState, id: &bingo_sdk::ItemId) {
-    if let Some(line) = ui.shown.blocks.roles().line_of(state, id) {
-        let next = match ui.folds.get(&line) {
-            Some(fold::Fold::Open) => fold::Fold::Peek,
-            _ => fold::Fold::Open,
-        };
-        ui.folds.insert(line, next);
+fn cycle_fold(ui: &mut Ui, state: &SessionState, id: &bingo_sdk::ItemId, at: usize) {
+    if let Some(holder) = ui.shown.blocks.roles().line_of(state, id) {
+        let on_the_line = ui.shown.blocks.span(&holder).map(|(top, _)| top) == Some(at);
+        if on_the_line {
+            let next = match ui.folds.get(&holder) {
+                Some(fold::Fold::Open) => fold::Fold::Peek,
+                _ => fold::Fold::Open,
+            };
+            ui.folds.insert(holder, next);
+        }
         return;
     }
     let Some(item) = item_of(state, id) else {

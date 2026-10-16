@@ -2840,12 +2840,12 @@ mod tests {
             let row = row_carrying(&screen, "read shot.png");
             assert!(
                 on_mouse(&mut ui, &solo(&state), click(4, row), now).is_empty(),
-                "the step's row above the cells folds its turn"
+                "the step's row above the cells is the block's"
             );
             assert_eq!(
                 ui.folds.get(&bingo_sdk::ItemId::from_raw("itm_1")),
-                Some(&fold::Fold::Peek),
-                "which is what it wrote"
+                Some(&fold::Fold::Open),
+                "and under the folded line it starts a selection, not a fold"
             );
             let cells = cells_row(&screen);
             // Ten cells from column 5, so column 60 is past the picture.

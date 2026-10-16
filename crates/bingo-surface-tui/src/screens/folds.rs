@@ -231,3 +231,29 @@ fn a_click_or_enter_on_the_folded_line_opens_it() {
     let (_, again) = line(&mut ui);
     assert!(again.contains("   ▾ 4 steps"), "{again}");
 }
+
+/// Under an opened turn a click is where a selection starts: only the line
+/// the turn folds to shuts it.
+#[test]
+fn a_click_under_an_opened_turn_leaves_it_open() {
+    let (tree, mut ui, now) = finished();
+    let screen = draw_tree(80, 24, &tree, &mut ui, now);
+    crate::pointer::on_mouse(
+        &mut ui,
+        &tree,
+        click(5, row_carrying(&screen, "4 steps")),
+        now,
+    );
+    let opened = draw_tree(80, 24, &tree, &mut ui, now);
+    for under in ["edit src/main.rs", "println!"] {
+        let row = row_carrying(&opened, under);
+        crate::pointer::on_mouse(&mut ui, &tree, click(8, row), now);
+        crate::pointer::on_mouse(&mut ui, &tree, dragged(20, row), now);
+        crate::pointer::on_mouse(&mut ui, &tree, released(20, row), now);
+        let still = draw_tree(80, 24, &tree, &mut ui, now);
+        assert!(
+            still.contains("   ▾ 4 steps"),
+            "a click on {under:?}: {still}"
+        );
+    }
+}
