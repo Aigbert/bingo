@@ -371,9 +371,13 @@ fn vouched(result: &serde_json::Value, owner: &str) -> bool {
     result["drawnBy"] == owner
 }
 
+/// Every binding problem goes in one notice: a newer notice replaces the one
+/// being said, so one per problem would leave only the last.
 pub(super) fn notices(run: &mut Run) {
-    for notice in crate::keys::commands::bindings(&run.ui, run.session.tree.viewed()).notices {
-        run.ui.notify(Level::Warn, notice, Instant::now());
+    let notices = crate::keys::commands::bindings(&run.ui, run.session.tree.viewed()).notices;
+    if !notices.is_empty() {
+        run.ui
+            .notify(Level::Warn, notices.join("; "), Instant::now());
     }
 }
 

@@ -97,10 +97,15 @@ impl Run {
                 &self.ui.shown.pulls,
             )
         });
+        let mut notices = Vec::new();
         for (intent, notice) in dropped {
             self.mine.remove(&intent);
             self.site_keys.remove(&intent);
-            self.ui.notify(Level::Warn, notice, now);
+            notices.push(notice);
+        }
+        // One notice for all of them: a newer notice replaces the one said.
+        if !notices.is_empty() {
+            self.ui.notify(Level::Warn, notices.join("; "), now);
         }
     }
 
