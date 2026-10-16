@@ -100,7 +100,7 @@ pub fn unlisted(rows: &[Row], filter: &str, current: &str) -> Option<String> {
     };
     (!provider.is_empty() && !model.is_empty()).then(|| format!("{provider}/{model}"))
 }
-fn hidden(model: &CatalogEntry) -> bool {
+pub(crate) fn hidden(model: &CatalogEntry) -> bool {
     model.meta["chat"] == false || model.meta["aliasOf"].is_string()
 }
 fn matched(id: &str, query: &str) -> bool {

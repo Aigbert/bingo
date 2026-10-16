@@ -7,9 +7,8 @@ pub async fn toggle(
     id: &str,
     models: &[CatalogEntry],
 ) -> Result<(), KernelError> {
-    let pinned = models
-        .iter()
-        .any(|m| m.id == id && m.meta["pinned"] == true);
+    let model = models.iter().find(|m| m.id == id);
+    let pinned = model.is_some_and(|m| m.meta["pinned"] == true);
     crate::bridge::run(
         &cx.host,
         &cx.session,
@@ -19,6 +18,7 @@ pub async fn toggle(
     )
     .await?;
     if pinned {
+        picker.all |= model.is_some_and(crate::rows::hidden);
         picker.props.selected = Some(Row::Model(id.into()).key());
     }
     let model = id.split_once('/').map_or(id, |(_, model)| model);

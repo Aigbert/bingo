@@ -54,3 +54,31 @@ fn a_pinned_models_hint_offers_unpin() {
     );
     assert!(view.fold().contains("* unpin"), "{}", view.fold());
 }
+
+#[tokio::test]
+async fn unpinning_a_hidden_alias_keeps_its_provider_row_visible() {
+    let (_, cx) = host();
+    let (mut models, providers) = entries();
+    models[1].meta["aliasOf"] = json!("first");
+    let mut picker = Picker {
+        props: component::ModelPickerProps {
+            selected: Some("pin:p/second".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    act(
+        &mut picker,
+        "*",
+        &Row::Pinned("p/second".into()),
+        &models,
+        &providers,
+        &cx,
+    )
+    .await
+    .unwrap();
+    models[1].meta["pinned"] = json!(false);
+    let rows = crate::rows::rows(&models, &providers, "", picker.all);
+    let at = crate::rows::cursor(&rows, picker.props.selected.as_deref()).unwrap();
+    assert_eq!(rows[at], Row::Model("p/second".into()));
+}

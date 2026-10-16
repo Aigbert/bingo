@@ -99,7 +99,8 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
 - Require a known positive context window for compaction copy. Keep the kernel's
   `compacts` decision (including output reserve and estimated input growth),
   rather than reimplementing its threshold using the card's displayed token count.
-- Unpin selects the same model under its provider and sends a three-second toast;
+- Unpin selects the same model under its provider (revealing hidden rows when
+  needed) and sends a three-second toast;
   hints derive pin/unpin from the current catalogue. ModelPicker cache identity
   includes viewport height so a smaller drawing keeps its selected row visible.
   The supplied settled filtered captures already show a cursor; the failing
