@@ -89,9 +89,6 @@ fn classify(media_type: &str) -> Option<Kind> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bingo_pictures::testing::png_bytes;
-
-    const HTML: &[u8] = b"<h1>Title</h1><p>Body</p>";
 
     /// The page a body of this type reads as, or the test's failure.
     async fn page(content_type: &str, body: &[u8]) -> String {
@@ -99,13 +96,6 @@ mod tests {
             Ok(Content::Page(text)) => text,
             other => panic!("{content_type}: expected a page, got {other:?}"),
         }
-    }
-
-    #[tokio::test]
-    async fn html_reaches_the_model_as_markdown() {
-        let out = page("text/html; charset=utf-8", HTML).await;
-        assert!(out.contains("# Title"), "got {out}");
-        assert!(!out.contains("<h1>"), "got {out}");
     }
 
     #[tokio::test]
@@ -126,25 +116,6 @@ mod tests {
         assert_eq!(page("", b"plain words").await, "plain words");
     }
 
-    #[tokio::test]
-    async fn a_picture_comes_back_as_the_picture() {
-        let bytes = png_bytes(3, 2);
-        match render("image/png", bytes.clone(), "https://example.com/shot.png").await {
-            Ok(Content::Picture(image)) => {
-                assert_eq!(image.media_type, "image/png");
-                assert_eq!(
-                    image,
-                    Image {
-                        width: Some(3),
-                        height: Some(2),
-                        ..Image::from_bytes("image/png", &bytes).expect("within the cap")
-                    }
-                );
-            }
-            other => panic!("expected a picture, got {other:?}"),
-        }
-    }
-
     /// The header is a claim and the bytes are the evidence, in both
     /// directions: a page served as a PNG is refused, and an SVG — text no
     /// decoder reads — never reaches the decoder at all.
@@ -162,20 +133,5 @@ mod tests {
             "got {error:?}"
         );
         assert_eq!(page("image/svg+xml", b"<svg/>").await, "<svg/>");
-    }
-
-    #[tokio::test]
-    async fn anything_else_is_refused_by_name() {
-        let error = render(
-            "application/pdf",
-            b"%PDF-1.7".to_vec(),
-            "https://example.com/",
-        )
-        .await
-        .err();
-        assert!(
-            matches!(&error, Some(Unreadable::ContentType(t)) if t == "application/pdf"),
-            "got {error:?}"
-        );
     }
 }

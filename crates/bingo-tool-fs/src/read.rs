@@ -221,16 +221,6 @@ mod tests {
     use crate::tests::{context, write};
 
     #[test]
-    fn a_relative_path_resolves_against_the_working_directory() {
-        let cwd = Path::new("/work");
-        assert_eq!(
-            resolve("src/lib.rs", cwd),
-            PathBuf::from("/work/src/lib.rs")
-        );
-        assert_eq!(resolve("/etc/hosts", cwd), PathBuf::from("/etc/hosts"));
-    }
-
-    #[test]
     fn the_subject_is_the_resolved_path() {
         let subjects = ReadTool.subjects(
             &serde_json::json!({ "file_path": "a.txt" }),

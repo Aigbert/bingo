@@ -167,6 +167,51 @@ fn seconds(ms: u64) -> String {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn endings_keep_the_output_and_report_their_status() {
+        for (command, text, ended, error, expected) in [
+            (
+                "echo hi",
+                "hi\n",
+                Ended::Exited(0),
+                false,
+                "$ echo hi\nhi\n[Exited with code 0]",
+            ),
+            (
+                "true",
+                "",
+                Ended::Exited(0),
+                false,
+                "$ true\n\n[Exited with code 0]",
+            ),
+            (
+                "false",
+                "",
+                Ended::Exited(1),
+                true,
+                "$ false\n\n[Exited with code 1]",
+            ),
+            (
+                "sleep 5",
+                "",
+                Ended::Timeout { after_ms: 200 },
+                true,
+                "$ sleep 5\n\n[Killed after 0.2s timeout]",
+            ),
+            (
+                "sleep 5",
+                "tick\n",
+                Ended::Interrupted,
+                true,
+                "$ sleep 5\ntick\n[Killed by the interrupt; output so far]",
+            ),
+        ] {
+            let out = shape(command, text, ended);
+            assert_eq!(out.parts[0].as_text(), Some(expected), "{command}");
+            assert_eq!(out.is_error, error, "{command}");
+        }
+    }
+
+    #[test]
     fn rough_edges_display_reports_only_output_and_an_abnormal_end() {
         for (end, expected) in [
             (Ended::Exited(0), "hi"),
@@ -259,61 +304,6 @@ mod tests {
         let tail = bounded.tail_lines(5);
         assert_eq!(tail.chars().count(), MAX_TAIL_LINE_CHARS + 1);
         assert!(tail.ends_with('…'), "{tail}");
-    }
-
-    #[test]
-    fn a_clean_exit_is_not_an_error() {
-        let out = shape("echo hi", "hi\n", Ended::Exited(0));
-        assert_eq!(
-            out.parts[0].as_text(),
-            Some("$ echo hi\nhi\n[Exited with code 0]")
-        );
-        assert!(!out.is_error);
-    }
-
-    #[test]
-    fn a_command_that_wrote_nothing_keeps_the_shape() {
-        let out = shape("true", "", Ended::Exited(0));
-        assert_eq!(
-            out.parts[0].as_text(),
-            Some("$ true\n\n[Exited with code 0]")
-        );
-    }
-
-    #[test]
-    fn a_non_zero_exit_is_an_error_and_says_the_code() {
-        let out = shape("false", "", Ended::Exited(1));
-        assert!(out.is_error);
-        assert!(
-            out.parts[0]
-                .as_text()
-                .is_some_and(|t| t.ends_with("[Exited with code 1]"))
-        );
-    }
-
-    #[test]
-    fn a_timeout_says_how_long_it_waited() {
-        let out = shape("sleep 5", "", Ended::Timeout { after_ms: 200 });
-        assert!(out.is_error);
-        assert!(
-            out.parts[0]
-                .as_text()
-                .is_some_and(|t| t.ends_with("[Killed after 0.2s timeout]")),
-            "{:?}",
-            out.parts[0]
-        );
-    }
-
-    #[test]
-    fn an_interrupt_keeps_the_output_and_says_it_was_cut_short() {
-        let out = shape("sleep 5", "tick\n", Ended::Interrupted);
-        assert!(out.is_error);
-        let text = out.parts[0].as_text().expect("text");
-        assert!(text.contains("tick"), "{text}");
-        assert!(
-            text.ends_with("[Killed by the interrupt; output so far]"),
-            "{text}"
-        );
     }
 
     #[test]

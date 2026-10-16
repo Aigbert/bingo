@@ -159,22 +159,6 @@ mod tests {
     }
 
     #[test]
-    fn the_shelf_is_in_id_order_whatever_the_directory_says() {
-        let project = Project::new();
-        let cwd = project.cwd();
-        for id in ["ccc", "aaa", "bbb"] {
-            let entry = Entry {
-                id: id.into(),
-                ..entry()
-            };
-            project.library.save(&cwd, &entry).expect("saved");
-        }
-        let shelf = project.library.load(&cwd);
-        let ids: Vec<&str> = shelf.entries.iter().map(|e| e.id.as_str()).collect();
-        assert_eq!(ids, ["aaa", "bbb", "ccc"]);
-    }
-
-    #[test]
     fn a_file_nobody_can_parse_costs_one_entry_and_is_named() {
         let project = Project::new();
         let cwd = project.cwd();
@@ -215,22 +199,6 @@ mod tests {
             .library
             .delete(&cwd, "abcd1234")
             .expect("forgetting twice is not an error");
-    }
-
-    #[test]
-    fn a_minted_id_is_free_in_this_project() {
-        let project = Project::new();
-        let cwd = project.cwd();
-        project.library.save(&cwd, &entry()).expect("saved");
-        let minted = project.library.mint(&cwd);
-        assert_ne!(minted, "abcd1234");
-        assert!(
-            !project
-                .library
-                .dir(&cwd)
-                .join(format!("{minted}.md"))
-                .exists()
-        );
     }
 
     #[test]

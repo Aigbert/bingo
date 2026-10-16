@@ -98,7 +98,7 @@ mod tests {
     use crate::room;
     use crate::seat::Opening;
     use crate::tests::{Fleet, tool_context};
-    use bingo_sdk::{SessionId, Tone, ToolTraits, TreeNode};
+    use bingo_sdk::{SessionId, Tone, TreeNode};
     use serde_json::json;
 
     /// A root holding `#design`, the reviewer that opened it, and a scout in it.
@@ -199,14 +199,6 @@ mod tests {
             !room::closed_of(&fleet.state(&fleet.titled("#design").expect("the room"))),
             "and the room still stands"
         );
-    }
-
-    #[test]
-    fn the_traits_fail_closed() {
-        let traits = CloseRoomTool.traits(&Value::Null);
-        assert_eq!(traits, ToolTraits::default());
-        assert!(!traits.read_only, "a room is ended, not read");
-        assert!(!traits.concurrency_safe);
     }
 
     #[test]

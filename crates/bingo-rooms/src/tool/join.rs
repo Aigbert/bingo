@@ -113,7 +113,7 @@ mod tests {
     use super::*;
     use crate::seat::Opening;
     use crate::tests::{Fleet, tool_context};
-    use bingo_sdk::{SessionId, ToolTraits, View};
+    use bingo_sdk::{SessionId, View};
     use serde_json::json;
 
     /// A root that holds `#design`, the reviewer that opened it, and a scout
@@ -208,14 +208,6 @@ mod tests {
             panic!("the wrong kind of refusal");
         };
         assert!(message.contains("at least one member"), "{message}");
-    }
-
-    #[test]
-    fn the_traits_fail_closed() {
-        let traits = SeatTool.traits(&Value::Null);
-        assert_eq!(traits, ToolTraits::default());
-        assert!(!traits.read_only, "a roster is written, not read");
-        assert!(!traits.concurrency_safe);
     }
 
     #[test]

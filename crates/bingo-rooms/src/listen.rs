@@ -133,7 +133,6 @@ mod tests {
     use crate::ear::Seat;
     use crate::seat;
     use crate::tests::{Fleet, tool_context};
-    use bingo_sdk::ToolTraits;
     use serde_json::json;
     use std::time::Duration;
 
@@ -274,14 +273,6 @@ mod tests {
             fleet.ears(&below).of("scout"),
             Ear::Patient(crate::chase::PATIENCE)
         );
-    }
-
-    #[test]
-    fn the_traits_fail_closed() {
-        let traits = ListenTool.traits(&Value::Null);
-        assert_eq!(traits, ToolTraits::default());
-        assert!(!traits.read_only, "an ear is retuned, not read");
-        assert!(!traits.concurrency_safe);
     }
 
     #[test]

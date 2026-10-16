@@ -148,8 +148,7 @@ mod tests {
     use crate::room::Room;
     use crate::tests::{Fleet, tool_context};
     use bingo_sdk::{
-        Command as _, CommandOutcome, Driver, ParentLink, SessionId, Tone, ToolTraits, TreeNode,
-        View,
+        Command as _, CommandOutcome, Driver, ParentLink, SessionId, Tone, TreeNode, View,
     };
     use serde_json::json;
 
@@ -493,14 +492,6 @@ mod tests {
                 .all(|spec| spec.parent.as_ref().is_some_and(|p| p.item.is_none())),
             "a room is not linked to the call that opened it (ADR-0011 §3)"
         );
-    }
-
-    #[test]
-    fn the_traits_fail_closed() {
-        let traits = OpenRoomTool.traits(&Value::Null);
-        assert_eq!(traits, ToolTraits::default());
-        assert!(!traits.read_only, "a room is opened, not read");
-        assert!(!traits.concurrency_safe);
     }
 
     /// The one thing a person sees before approving. It is also the rule an

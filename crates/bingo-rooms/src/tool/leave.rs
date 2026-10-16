@@ -101,7 +101,7 @@ mod tests {
     use crate::ear::Seat;
     use crate::seat::Opening;
     use crate::tests::{Fleet, tool_context};
-    use bingo_sdk::{Input, SessionId, ToolTraits};
+    use bingo_sdk::{Input, SessionId};
     use serde_json::json;
 
     /// A root holding `#design`, the reviewer that opened it, and the scout it
@@ -206,14 +206,6 @@ mod tests {
             fleet.members(&fleet.titled("#design").expect("the room")),
             ["reviewer", "scout"]
         );
-    }
-
-    #[test]
-    fn the_traits_fail_closed() {
-        let traits = UnseatTool.traits(&Value::Null);
-        assert_eq!(traits, ToolTraits::default());
-        assert!(!traits.read_only, "a roster is written, not read");
-        assert!(!traits.concurrency_safe);
     }
 
     #[test]

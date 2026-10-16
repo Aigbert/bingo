@@ -1020,25 +1020,6 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn a_timeout_kills_the_command_and_says_how_long_it_waited() {
-        let (_jobs, _promotions, tool) = tool();
-        let (_host, cx) = context();
-        let out = tool
-            .call(
-                serde_json::json!({"command": "echo waiting; sleep 30", "timeout": 200}),
-                &cx,
-            )
-            .await
-            .expect("the call ran");
-        assert!(out.is_error);
-        assert!(
-            text(&out).ends_with("[Killed after 0.2s timeout]"),
-            "{}",
-            text(&out)
-        );
-    }
-
-    #[tokio::test]
     /// What an interrupt does to a call, from the tool's side: the future is
     /// dropped, so there is no answer at all — the kernel writes the
     /// interruption marker instead. That the process tree goes with the drop

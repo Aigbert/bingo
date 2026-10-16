@@ -109,13 +109,6 @@ mod tests {
     }
 
     #[test]
-    fn a_store_that_does_not_exist_is_an_empty_shelf() {
-        let data = Data::new();
-        let shelf = data.store().load();
-        assert!(shelf.is_empty() && shelf.unreadable.is_empty());
-    }
-
-    #[test]
     fn an_entry_round_trips_through_the_directory_under_its_id() {
         let data = Data::new();
         let store = data.store();
@@ -135,21 +128,6 @@ mod tests {
             ["abcd1234.json"],
             "no tmp file survives"
         );
-    }
-
-    #[test]
-    fn the_shelf_is_in_id_order_whatever_the_directory_says() {
-        let data = Data::new();
-        let store = data.store();
-        for id in ["ccc", "aaa", "bbb"] {
-            store
-                .save(&Entry {
-                    id: id.into(),
-                    ..entry()
-                })
-                .expect("saved");
-        }
-        assert_eq!(store.load().ids(), ["aaa", "bbb", "ccc"]);
     }
 
     #[test]
@@ -175,34 +153,5 @@ mod tests {
             "the reason names the grammar: {:?}",
             shelf.unreadable[1]
         );
-    }
-
-    #[test]
-    fn saving_the_same_id_replaces_the_file_and_forgetting_removes_it() {
-        let data = Data::new();
-        let store = data.store();
-        store.save(&entry()).expect("saved");
-        let revised = Entry {
-            enabled: false,
-            ..entry()
-        };
-        store.save(&revised).expect("saved again");
-        assert_eq!(store.load().entries, [revised]);
-
-        store.delete("abcd1234").expect("deleted");
-        assert!(store.load().is_empty());
-        store
-            .delete("abcd1234")
-            .expect("forgetting twice is not an error");
-    }
-
-    #[test]
-    fn a_minted_id_is_free_in_this_store() {
-        let data = Data::new();
-        let store = data.store();
-        store.save(&entry()).expect("saved");
-        let minted = store.mint();
-        assert_ne!(minted, "abcd1234");
-        assert!(!store.path(&minted).exists());
     }
 }

@@ -99,6 +99,9 @@ plugin-rpc `holdsContext` stays until ADR-0076 says otherwise.
 - Snapshot discipline is advisory and recognizes literal and generated names;
   CI has no cargo-insta installation, so it adds no dependency.
 
+- Keep fixture-distinct TUI snapshots and `ScheduleShelf`, which still serves
+  the corruption-recovery test. Eleven byte-identical catalogue twins go.
+
 ## Verified — 2026-10-16
 
 Commands run in this worktree with disposable HOME/data, provider environment
@@ -133,4 +136,10 @@ check 0; clippy 0; test 0; all six ignored/manual tests removed.
 ```text
 Brick 4 (bin and the 18 changed page/manifest/codec owners):
 check 0; clippy 0; test 0 (including all 16 primary page names).
+```
+
+```text
+Brick 5 (surface-tui, rooms, schedule, experience, provider-openai,
+         provider-anthropic, http, tool-fs, tool-bash, tool-web):
+check 0; clippy 0; test 0. Five room tools and five bash endings remain rows.
 ```

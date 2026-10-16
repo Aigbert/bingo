@@ -101,3 +101,21 @@ async fn a_body_that_never_frames_is_an_error() {
         Some(Err(ProviderError::Stream { .. }))
     ));
 }
+
+#[tokio::test]
+async fn cancellation_before_or_after_an_event_yields_no_more_events() {
+    for consumed in [0, 1] {
+        let cancel = CancellationToken::new();
+        let mut events = model_stream(
+            body(b"data: first\n\ndata: last\n\n", 1),
+            Clock::new(),
+            cancel.clone(),
+            Lines,
+        );
+        for _ in 0..consumed {
+            assert!(events.next().await.is_some());
+        }
+        cancel.cancel();
+        assert_eq!(events.next().await, None, "consumed {consumed}");
+    }
+}

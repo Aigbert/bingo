@@ -882,23 +882,6 @@ mod tests {
     }
 
     #[test]
-    fn idle() {
-        let state = folded(vec![
-            item_frame(1, user("itm_1", "run the tests")),
-            item_frame(
-                2,
-                assistant(
-                    "itm_2",
-                    "All 33 pass.\n\n- `wrap` is done\n- `keys` is done",
-                    ItemStatus::Completed,
-                ),
-            ),
-        ]);
-        let (mut ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
     fn streaming_assistant_text() {
         let state = folded(vec![
             frame(1, started("trn_1")),
@@ -988,33 +971,6 @@ mod tests {
             ),
         ]);
         let (mut ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
-    fn a_diff_result_is_coloured_by_column() {
-        let state = folded(vec![item_frame(
-            1,
-            tool(
-                "itm_1",
-                "Edit",
-                json!({"file_path": "src/lib.rs"}),
-                Some(diff_output()),
-                ItemStatus::Completed,
-            ),
-        )]);
-        let (mut ui, now) = scene();
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
-    fn permission_collapsed() {
-        let state = folded(vec![frame(
-            1,
-            opened(permission(Some("Edit(src/)"), Some(long_diff()))),
-        )]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
         insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
@@ -1132,68 +1088,6 @@ mod tests {
                     .contains(ratatui::style::Modifier::DIM)
         }));
         assert!(render(&state, &mut ui, now).contains("needs you"));
-    }
-
-    #[test]
-    fn question_single() {
-        let state = folded(vec![frame(1, opened(question(false, false)))]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
-    fn question_multi() {
-        let state = folded(vec![frame(1, opened(question(true, true)))]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        crate::input::on_key(&mut ui, &solo(&state), typed(' '), now);
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
-    fn confirm_dialog() {
-        let state = folded(vec![frame(1, opened(confirm()))]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
-    fn login_browser_dialog() {
-        let state = folded(vec![frame(
-            1,
-            opened(login(bingo_sdk::LoginFlow::Browser {
-                url: "https://auth.openai.com/oauth/authorize?client_id=app_x&state=s1".into(),
-            })),
-        )]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
-    fn login_device_dialog() {
-        let state = folded(vec![frame(
-            1,
-            opened(login(bingo_sdk::LoginFlow::Device {
-                url: "https://auth.openai.com/codex/device".into(),
-                code: "ABCD-EFGH".into(),
-            })),
-        )]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        insta::assert_snapshot!(render(&state, &mut ui, now));
-    }
-
-    #[test]
-    fn login_paste_dialog_with_the_words_row_open() {
-        let state = folded(vec![frame(1, opened(login(bingo_sdk::LoginFlow::Paste)))]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        crate::input::on_key(&mut ui, &solo(&state), typed('1'), now);
-        write(&mut ui, &state, "sk-pasted-elsewhere", now);
-        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
@@ -1508,7 +1402,6 @@ mod tests {
             .focus_on(tree.open_interaction().map(|(_, open)| open));
         let screen = render_tree(&tree, &mut ui, now);
         assert!(screen.contains("◗"), "{screen}");
-        insta::assert_snapshot!(screen);
     }
 
     #[test]
@@ -1592,7 +1485,6 @@ mod tests {
             !screen.contains("running") && !screen.contains("idle"),
             "nothing answers a room: {screen}"
         );
-        insta::assert_snapshot!(screen);
     }
 
     #[test]

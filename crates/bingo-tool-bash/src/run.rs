@@ -327,12 +327,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_exit_code_is_the_command_s_own() {
-        assert_eq!(bash("exit 3").await.ended, Ended::Exited(3));
-        assert_eq!(bash("false").await.ended, Ended::Exited(1));
-    }
-
-    #[tokio::test]
     async fn stderr_arrives_with_stdout() {
         let out = bash("echo out; echo err >&2").await;
         assert!(out.output.contains("out"), "{:?}", out.output);

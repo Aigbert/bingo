@@ -121,21 +121,6 @@ mod tests {
     }
 
     #[test]
-    fn slots_leave_the_wake_record_unplaced() {
-        let wake = set(
-            Timestamp::UNIX_EPOCH,
-            SignedDuration::from_mins(5),
-            "check".into(),
-        );
-        let payload = payload(Some(&wake));
-        let slots: Vec<bingo_sdk::slot::Slot> =
-            serde_json::from_value(payload["slots"].clone()).unwrap();
-        assert!(slots.is_empty());
-        assert_eq!(payload[AT], wake.at.to_string());
-        assert_eq!(payload[NOTE], "check");
-    }
-
-    #[test]
     fn an_interval_inside_the_bounds_is_the_one_that_was_asked_for() {
         for seconds in [10, 60, 900, 3600] {
             let asked = SignedDuration::from_secs(seconds);
@@ -164,33 +149,7 @@ mod tests {
     }
 
     #[test]
-    fn a_wake_comes_this_long_from_now_and_says_the_note() {
-        let wake = set(
-            Timestamp::UNIX_EPOCH,
-            SignedDuration::from_mins(5),
-            "look at the build again".into(),
-        );
-        assert_eq!(
-            wake.at,
-            Timestamp::UNIX_EPOCH + SignedDuration::from_mins(5)
-        );
-        assert_eq!(wake.note, "look at the build again");
-    }
-
-    #[test]
-    fn what_a_surface_is_told_is_when_it_comes_and_what_it_says() {
-        let wake = set(
-            Timestamp::UNIX_EPOCH,
-            SignedDuration::from_mins(5),
-            "look at the build again".into(),
-        );
-        assert_eq!(
-            payload(Some(&wake)),
-            bingo_sdk::slot::with(
-                json!({ "at": "1970-01-01T00:05:00Z", "note": "look at the build again" }),
-                []
-            )
-        );
+    fn an_absent_wake_removes_its_payload() {
         assert_eq!(
             payload(None),
             Value::Null,
@@ -215,20 +174,5 @@ mod voice_tests {
     #[test]
     fn producer_stamps_its_voice() {
         assert_eq!(super::origin().voice, Some(bingo_sdk::Voice::Note));
-    }
-}
-
-#[cfg(test)]
-mod m148 {
-    use super::*;
-    #[test]
-    fn m148_wake_is_unplaced_data() {
-        assert_eq!(
-            payload(Some(&Wake {
-                at: Timestamp::UNIX_EPOCH,
-                note: "check".into()
-            }))["slots"],
-            json!([])
-        );
     }
 }

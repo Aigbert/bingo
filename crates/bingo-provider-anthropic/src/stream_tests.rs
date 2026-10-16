@@ -61,38 +61,3 @@ async fn a_mid_stream_error_arrives_after_everything_that_preceded_it() {
         Some(Ok(ModelEvent::TextDelta { .. }))
     ));
 }
-
-#[tokio::test]
-async fn a_cancelled_turn_stops_the_stream_before_it_finishes() {
-    let cancel = CancellationToken::new();
-    let mut events = model_stream(
-        fixture("text.sse", 64),
-        Clock::new(),
-        cancel.clone(),
-        Decoder::new(),
-    );
-    assert!(events.next().await.is_some());
-    cancel.cancel();
-    let rest: Vec<_> = events.collect().await;
-    assert!(
-        !rest
-            .iter()
-            .any(|e| matches!(e, Ok(ModelEvent::Finish { .. }))),
-        "a cancelled stream never finishes"
-    );
-}
-
-#[tokio::test]
-async fn a_token_cancelled_before_the_first_poll_yields_nothing() {
-    let cancel = CancellationToken::new();
-    cancel.cancel();
-    let events: Vec<_> = model_stream(
-        fixture("text.sse", 64),
-        Clock::new(),
-        cancel,
-        Decoder::new(),
-    )
-    .collect()
-    .await;
-    assert!(events.is_empty());
-}

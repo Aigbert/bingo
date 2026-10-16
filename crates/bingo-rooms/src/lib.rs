@@ -189,6 +189,29 @@ mod plugin_tests {
     use bingo_sdk::Env;
 
     #[test]
+    fn every_registered_tool_fails_closed() {
+        let mut registrar = Registrar::new(
+            PLUGIN,
+            serde_json::Value::Null,
+            Env::rooted("/nowhere"),
+            Default::default(),
+        );
+        RoomsPlugin::default().register(&mut registrar).unwrap();
+        let mut expected =
+            std::collections::BTreeSet::from(["OpenRoom", "Seat", "Unseat", "CloseRoom", "Listen"]);
+        for contribution in registrar.into_contributions() {
+            if let Contribution::Tool(tool) = contribution {
+                let name = tool.spec().name;
+                assert!(expected.remove(name.as_str()), "unexpected tool {name}");
+                let traits = tool.traits(&serde_json::Value::Null);
+                assert_eq!(traits, bingo_sdk::ToolTraits::default(), "{name}");
+                assert!(!traits.read_only && !traits.concurrency_safe, "{name}");
+            }
+        }
+        assert!(expected.is_empty(), "missing tools: {expected:?}");
+    }
+
+    #[test]
     fn the_manifest_says_what_it_provides_and_claims_no_settings() {
         assert_eq!(MANIFEST.id, "bingo.rooms");
         assert_eq!(
