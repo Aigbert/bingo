@@ -110,12 +110,6 @@ mod tests {
         registrar.into_contributions()
     }
 
-    #[test]
-    fn the_manifest_says_what_it_provides_and_claims_no_settings() {
-        assert_eq!(MANIFEST.id, "bingo.context");
-        assert!(MANIFEST.config.is_none(), "no switch turns memory off");
-    }
-
     /// Baselines and transcript rows retain their original contribution order.
     #[test]
     fn the_plugin_registers_a_compactor_two_contributors_the_command_and_two_hooks() {

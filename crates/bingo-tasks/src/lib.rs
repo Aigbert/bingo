@@ -175,26 +175,6 @@ mod plugin_tests {
     }
 
     #[test]
-    fn the_manifest_says_what_it_provides_and_claims_no_settings() {
-        assert_eq!(MANIFEST.id, "bingo.tasks");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "tool:TaskCreate",
-                "tool:TaskUpdate",
-                "tool:TaskGet",
-                "tool:TaskList",
-                "command:tasks",
-                "context:tasks",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
-                bingo_services::tasks_write::CAPABILITY,
-            ]
-        );
-        assert!(MANIFEST.requires.is_empty());
-        assert!(MANIFEST.config.is_none());
-    }
-
-    #[test]
     fn registering_reads_nothing_and_contributes_what_the_manifest_promises() {
         let mut registrar = Registrar::new(
             "bingo.tasks",

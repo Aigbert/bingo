@@ -70,12 +70,4 @@ mod tests {
             );
         }
     }
-
-    #[test]
-    fn the_page_is_one_line_of_description_and_a_body_worth_reading() {
-        assert_eq!(page().name, "permissions");
-        assert!(!page().description.contains('\n'));
-        assert!(page().description.chars().count() < 250);
-        assert!(page().body.lines().count() < 200);
-    }
 }

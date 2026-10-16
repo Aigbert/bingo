@@ -82,15 +82,6 @@ mod tests {
     }
 
     #[test]
-    fn the_page_is_one_line_of_description_and_a_body_worth_reading() {
-        assert_eq!(page().name, "mods");
-        assert!(!page().description.contains('\n'));
-        assert!(page().description.chars().count() < 250);
-        assert!(!page().body.is_empty());
-        assert!(page().body.lines().count() < 200);
-    }
-
-    #[test]
     fn the_keys_page_names_the_setting_the_handler_and_the_placement() {
         let [_, _, keys] = PAGES.0 else {
             panic!("the mods page, then the keys page");

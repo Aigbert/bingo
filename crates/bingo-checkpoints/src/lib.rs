@@ -140,22 +140,6 @@ mod plugin_tests {
     }
 
     #[test]
-    fn the_manifest_says_what_it_provides_and_claims_no_settings() {
-        assert_eq!(MANIFEST.id, "bingo.checkpoints");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "hook:checkpoints",
-                "command:rewind",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
-                bingo_services::checkpoints::CAPABILITY,
-            ]
-        );
-        assert!(MANIFEST.requires.is_empty());
-        assert!(MANIFEST.config.is_none());
-    }
-
-    #[test]
     fn registering_contributes_a_hook_a_command_and_a_page_and_creates_nothing() {
         let home = tempfile::tempdir().expect("a temp home");
         let contributions = registered(home.path());

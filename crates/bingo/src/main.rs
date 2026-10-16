@@ -1031,3 +1031,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod page_tests;

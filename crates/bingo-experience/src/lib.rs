@@ -186,20 +186,6 @@ mod plugin_tests {
         )
     }
 
-    #[test]
-    fn the_manifest_says_what_it_provides_and_claims_one_setting() {
-        assert_eq!(MANIFEST.id, "bingo.experience");
-        assert!(MANIFEST.requires.is_empty());
-        assert_eq!(
-            MANIFEST.config.map(|claim| claim.keys),
-            Some(&[("experience", Merge::Replace)][..])
-        );
-        assert!(
-            Experience::default().enabled,
-            "playbooks are on until turned off"
-        );
-    }
-
     /// The one setting: what a person turns off, and what a typo does.
     #[test]
     fn the_settings_slice_says_whether_this_project_keeps_playbooks() {

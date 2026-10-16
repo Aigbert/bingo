@@ -326,13 +326,6 @@ mod plugin_tests {
     }
 
     #[test]
-    fn the_manifest_says_what_it_provides_and_the_two_keys_it_claims() {
-        assert_eq!(MANIFEST.id, "bingo.surface.tui");
-        let claim = MANIFEST.config.expect("a config claim");
-        assert_eq!(claim.keys.len(), 2);
-    }
-
-    #[test]
     fn the_plugin_registers_the_surface_and_its_page() {
         let mut registrar = Registrar::new(
             MANIFEST.id,

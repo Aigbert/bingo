@@ -625,16 +625,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn the_manifest_says_what_it_provides() {
-        assert_eq!(MANIFEST.id, "bingo.store.jsonl");
-        assert_eq!(
-            MANIFEST.provides,
-            ["store:jsonl", "service:bingo.sessions.reader"]
-        );
-        assert!(MANIFEST.config.is_none(), "the store claims no settings");
-    }
-
-    #[test]
     fn the_plugin_registers_one_store_under_the_data_directory() {
         let plugin = JsonlStorePlugin::default();
         let env = bingo_sdk::Env::rooted("/home/someone");

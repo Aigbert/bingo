@@ -131,23 +131,6 @@ mod tests {
     }
 
     #[test]
-    fn the_manifest_says_what_it_provides_and_claims_one_setting() {
-        assert_eq!(MANIFEST.id, "bingo.persona");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "context:persona:judgement",
-                &format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name()),
-            ]
-        );
-        assert!(MANIFEST.requires.is_empty());
-        assert_eq!(
-            MANIFEST.config.map(|claim| claim.keys),
-            Some(&[("persona", Merge::Replace)][..])
-        );
-    }
-
-    #[test]
     fn registering_contributes_the_block_and_the_page_the_manifest_promises() {
         let mut registrar = registrar(json!({}));
         PersonaPlugin

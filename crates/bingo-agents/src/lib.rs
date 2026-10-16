@@ -238,12 +238,6 @@ mod plugin_tests {
         assert!(face.find("list").is_some());
         assert!(face.find("register").is_some());
     }
-    #[test]
-    fn the_manifest_says_what_it_provides_and_claims_no_settings() {
-        assert_eq!(MANIFEST.id, "bingo.agents");
-        assert!(MANIFEST.requires.is_empty());
-        assert!(MANIFEST.config.is_none());
-    }
 
     #[test]
     fn registering_reads_nothing_and_contributes_what_the_manifest_promises() {

@@ -95,20 +95,4 @@ mod tests {
             "the page never says the band under the floor is refused"
         );
     }
-
-    #[test]
-    fn this_plugin_claims_no_settings_for_the_page_to_name() {
-        assert!(
-            MANIFEST.config.is_none(),
-            "who sits where is a project's file, not a person's settings"
-        );
-    }
-
-    #[test]
-    fn the_page_is_one_line_of_description_and_a_body_worth_reading() {
-        assert_eq!(page().name, "rooms");
-        assert!(!page().description.contains('\n'));
-        assert!(page().description.chars().count() < 250);
-        assert!(page().body.lines().count() < 200);
-    }
 }

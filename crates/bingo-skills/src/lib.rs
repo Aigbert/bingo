@@ -151,22 +151,6 @@ mod plugin_tests {
     use bingo_sdk::Env;
 
     #[test]
-    fn the_manifest_says_what_it_provides() {
-        assert_eq!(MANIFEST.id, "bingo.skills");
-        assert_eq!(
-            MANIFEST.provides,
-            [
-                "command:skills",
-                "tool:Skill",
-                "context:skills",
-                "service:bingo.skills.pages",
-            ]
-        );
-        assert!(MANIFEST.requires.is_empty());
-        assert!(MANIFEST.config.is_none(), "skills are files, not settings");
-    }
-
-    #[test]
     fn registering_reads_nothing_and_contributes_what_the_manifest_promises() {
         let mut registrar = Registrar::new(
             "bingo.skills",

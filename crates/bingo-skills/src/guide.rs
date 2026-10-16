@@ -64,17 +64,4 @@ mod tests {
             );
         }
     }
-
-    #[test]
-    fn this_plugin_claims_no_settings_for_the_page_to_name() {
-        assert!(MANIFEST.config.is_none(), "skills are files, not settings");
-    }
-
-    #[test]
-    fn the_page_is_one_line_of_description_and_a_body_worth_reading() {
-        assert_eq!(page().name, "skills");
-        assert!(!page().description.contains('\n'));
-        assert!(page().description.chars().count() < 250);
-        assert!(page().body.lines().count() < 200);
-    }
 }

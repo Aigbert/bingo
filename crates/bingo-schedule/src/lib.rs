@@ -206,19 +206,6 @@ mod plugin_tests {
     use serde_json::json;
 
     #[test]
-    fn the_manifest_says_what_it_provides_and_claims_no_settings() {
-        assert_eq!(MANIFEST.id, "bingo.schedule");
-        let page = format!("service:{}", bingo_sdk::Pages::key(MANIFEST.id).name());
-        assert_eq!(MANIFEST.provides.last().copied(), Some(page.as_str()));
-        assert!(MANIFEST.requires.is_empty());
-        assert_eq!(
-            MANIFEST.config.map(|claim| claim.keys),
-            Some(&[("schedule", Merge::Replace)][..])
-        );
-        assert!(Schedule::default().wakes, "wakes are on until turned off");
-    }
-
-    #[test]
     fn registering_reads_nothing_and_contributes_what_the_manifest_promises() {
         let home = tempfile::tempdir().expect("a temp home");
         // The slice a plugin that claims a key and finds none is handed.

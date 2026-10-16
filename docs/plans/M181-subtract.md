@@ -129,3 +129,8 @@ Brick 2 (core, sdk, provider-acp, provider-openai, surface-rpc, update,
 Brick 3 (store-jsonl, mods, bin, surface-rpc, surface-tui, pictures):
 check 0; clippy 0; test 0; all six ignored/manual tests removed.
 ```
+
+```text
+Brick 4 (bin and the 18 changed page/manifest/codec owners):
+check 0; clippy 0; test 0 (including all 16 primary page names).
+```
