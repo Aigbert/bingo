@@ -35,7 +35,8 @@ a stop reads `■ you stopped the turn · 2 of 3 steps had run; nothing after th
 
 ## Non-goals
 
-Changing what is persisted in the journal; Browse's layout.
+Any journal change but an additive one (the optional `upshot` on a tool
+output); Browse's layout.
 
 ## Risks
 
