@@ -3,57 +3,13 @@
 //! the caller's own call — so `SendMessage { to, again: true }` lands those
 //! words, once, without the model writing them a second time.
 
-use std::path::{Path, PathBuf};
+use super::journal::{frames_at, room_dir, root_dir};
+use std::path::Path;
 use std::time::Duration;
 
 use bingo_sdk::{ContentPart, ItemBody};
 
 use super::*;
-
-/// Every session directory the run wrote.
-fn dirs(home: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(home.join(".bingo/data/sessions")) else {
-        return Vec::new();
-    };
-    entries.flatten().map(|entry| entry.path()).collect()
-}
-
-/// A session's summary as it stands on disk.
-fn summary_of(dir: &Path) -> Option<serde_json::Value> {
-    let text = std::fs::read_to_string(dir.join("summary.json")).ok()?;
-    serde_json::from_str(&text).ok()
-}
-
-/// The run's root session: the one with nothing above it, which is the session
-/// the person prompted and the one the room hangs under.
-fn root_dir(home: &Path) -> Option<PathBuf> {
-    dirs(home)
-        .into_iter()
-        .find(|dir| summary_of(dir).is_some_and(|summary| summary["parent"].is_null()))
-}
-
-/// The room the run opened, whatever the root's id turned out to be.
-fn room_dir(home: &Path) -> Option<PathBuf> {
-    dirs(home).into_iter().find(|dir| {
-        summary_of(dir).is_some_and(|summary| {
-            summary["key"]
-                .as_str()
-                .is_some_and(|key| key.starts_with("rooms/"))
-        })
-    })
-}
-
-/// One session's journal, as frames. The first line names the format, and a
-/// line the run was still writing when it ended is not a frame either.
-fn frames_at(dir: &Path) -> Vec<Frame> {
-    let Ok(text) = std::fs::read_to_string(dir.join("journal.jsonl")) else {
-        return Vec::new();
-    };
-    text.lines()
-        .skip(1)
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect()
-}
 
 /// What was said into a session: the text of each post, and who signed it.
 fn posts(frames: &[Frame]) -> Vec<(String, Option<String>)> {

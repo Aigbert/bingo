@@ -13,7 +13,7 @@ use bingo_sdk::{
 };
 use futures::StreamExt;
 
-mod support;
+use crate::support;
 
 use support::{LIMIT, Server, ack_for, create, ready, who};
 

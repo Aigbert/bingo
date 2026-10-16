@@ -28,8 +28,8 @@ mod tests {
     use std::path::Path;
     const SEND_MESSAGE: &str = "SendMessage";
     const NOT_A_ROOM: &str = "`again` repeats a bounced room post; write to an agent with `text`";
+    use super::support::{Fleet, Recorder};
     use super::tool_context;
-    use crate::support::{Fleet, Recorder};
     use bingo_sdk::ContentPart;
     use serde_json::json;
     use std::sync::Arc;

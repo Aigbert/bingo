@@ -4,30 +4,15 @@
 //! an idle agent is never stranded (ADR-0024). A post written behind a room's
 //! head is handed back with what it missed instead of landing (ADR-0025).
 
-use std::path::{Path, PathBuf};
+use super::journal::{posts as said, results, session_dir, text_of};
+use std::path::Path;
 
-use bingo_sdk::{ContentPart, ItemBody, Origin, SessionId, ToolOutput};
+use bingo_sdk::{ItemBody, SessionId};
 use serde_json::Value;
 
 use super::*;
 
 // ---- what another session's journal says -----------------------------------
-
-/// The directory of the session whose summary carries `key`.
-fn session_dir(home: &Path, key: &str) -> Option<PathBuf> {
-    std::fs::read_dir(home.join(".bingo/data/sessions"))
-        .ok()?
-        .flatten()
-        .map(|entry| entry.path())
-        .find(|dir| keyed(dir, key))
-}
-
-fn keyed(dir: &Path, key: &str) -> bool {
-    std::fs::read_to_string(dir.join("summary.json"))
-        .ok()
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .is_some_and(|summary| summary["key"] == key)
-}
 
 /// Every key the run left on disk, for a failure that says what was there.
 fn keys(home: &Path) -> Vec<String> {
@@ -53,49 +38,6 @@ fn journal(home: &Path, key: &str) -> Vec<Frame> {
     text.lines()
         .skip(1)
         .filter_map(|line| serde_json::from_str(line).ok())
-        .collect()
-}
-
-/// What was said into a session: the text, and who signed it.
-fn said(frames: &[Frame]) -> Vec<(String, Origin)> {
-    frames
-        .iter()
-        .filter_map(|frame| match &frame.event {
-            Event::ItemCompleted { item } => match &item.body {
-                ItemBody::User { parts, origin } => Some((
-                    parts.iter().filter_map(ContentPart::as_text).collect(),
-                    origin.clone(),
-                )),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
-}
-
-/// Every completed result of `tool` in these frames, in the order they landed.
-fn results(frames: &[Frame], tool: &str) -> Vec<ToolOutput> {
-    frames
-        .iter()
-        .filter_map(|frame| match &frame.event {
-            Event::ItemCompleted { item } => match &item.body {
-                ItemBody::ToolCall {
-                    name,
-                    output: Some(output),
-                    ..
-                } if name == tool => Some(output.clone()),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
-}
-
-fn text_of(output: &ToolOutput) -> String {
-    output
-        .parts
-        .iter()
-        .filter_map(ContentPart::as_text)
         .collect()
 }
 

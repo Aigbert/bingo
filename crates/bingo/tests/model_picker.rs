@@ -1,6 +1,6 @@
 //! Model-site actions use only local providers and private credential answers.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-mod support;
+use crate::support;
 use bingo_sdk::*;
 use futures::StreamExt;
 use serde_json::json;

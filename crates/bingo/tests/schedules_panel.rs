@@ -1,6 +1,6 @@
 //! The panel's person-only lines through an isolated real process.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-mod support;
+use crate::support;
 use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
 use bingo_sdk::*;
 use serde_json::{Value, json};

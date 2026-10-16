@@ -24,26 +24,6 @@ pub fn bingo() -> Command {
     command
 }
 
-#[test]
-fn provider_environment_is_removed_before_a_fixture_configures_its_endpoint() {
-    let mut command = bingo();
-    for name in PROVIDER_ENV {
-        assert!(
-            command
-                .get_envs()
-                .any(|(key, value)| key == name && value.is_none()),
-            "inherited {name}"
-        );
-    }
-    command.env("OPENAI_BASE_URL", "http://127.0.0.1:1234");
-    assert!(
-        command
-            .get_envs()
-            .any(|(key, value)| key == "OPENAI_BASE_URL"
-                && value == Some(OsStr::new("http://127.0.0.1:1234")))
-    );
-}
-
 pub fn pty() -> portable_pty::CommandBuilder {
     let mut command = portable_pty::CommandBuilder::new(env!("CARGO_BIN_EXE_bingo"));
     for name in PROVIDER_ENV {

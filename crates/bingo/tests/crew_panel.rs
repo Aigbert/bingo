@@ -1,6 +1,6 @@
 //! Crew exercises the same remote pane and command protocol as other clients.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-mod support;
+use crate::support;
 use bingo_sdk::*;
 use serde_json::{Value, json};
 use support::{LIMIT, Server, ack_for, create, ready, who};

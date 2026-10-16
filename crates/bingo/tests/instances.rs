@@ -6,7 +6,7 @@
 
 use bingo_sdk::{AuthStatus, CatalogKind, HostApi};
 
-mod support;
+use crate::support;
 
 use support::{Server, ready};
 

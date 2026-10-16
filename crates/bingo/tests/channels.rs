@@ -9,7 +9,7 @@
 // An integration test is not `cfg(test)`; the test-only lint relief is spelled out.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-mod support;
+use crate::support;
 
 use std::process::Stdio;
 use std::time::Duration;

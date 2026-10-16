@@ -1,6 +1,6 @@
 //! Ownership survives a killed channel host without manual file cleanup.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-mod support;
+use crate::support;
 
 use std::process::Stdio;
 use std::time::Duration;

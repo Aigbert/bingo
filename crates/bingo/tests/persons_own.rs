@@ -6,7 +6,7 @@ use bingo_surface_rpc::RemoteKernel;
 use futures::StreamExt;
 use serde_json::json;
 
-mod support;
+use crate::support;
 #[path = "persons_own/typed.rs"]
 mod typed;
 use support::{Server, ack_for, create, ready, until_completed, who};

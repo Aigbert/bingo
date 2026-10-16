@@ -1,4 +1,5 @@
 [package]
+autotests = false
 name = "bingo"
 version.workspace = true
 edition.workspace = true
@@ -115,3 +116,23 @@ async-trait.workspace = true
 # reader rather than the kernel's. Test targets only — the shipped tree is
 # unchanged, and `bingo-core` is the one crate that takes this normally.
 toml_edit.workspace = true
+
+[[test]]
+name = "rpc"
+path = "tests/rpc/main.rs"
+
+[[test]]
+name = "kernel"
+path = "tests/kernel/main.rs"
+
+[[test]]
+name = "plugin_kit"
+path = "tests/kit/main.rs"
+
+[[test]]
+name = "cli"
+path = "tests/cli/main.rs"
+
+[[test]]
+name = "pty"
+path = "tests/pty/main.rs"

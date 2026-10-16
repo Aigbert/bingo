@@ -3,9 +3,10 @@
 //! its own journal, never in the room — and while anything is owed the room's
 //! parent carries the card. `@all` asks the room and chases nobody.
 
-use std::path::{Path, PathBuf};
+use super::journal::{journal, posts as said, session_dir};
+use std::path::Path;
 
-use bingo_sdk::{ContentPart, ItemBody, Origin, SessionId};
+use bingo_sdk::{ContentPart, ItemBody, SessionId};
 use jiff::{SignedDuration, Timestamp};
 use serde_json::{Value, json};
 
@@ -23,49 +24,6 @@ fn with_a_room(home: &Path) {
         r#"{"rooms":[{"name":"design","members":["scout"]}]}"#,
     )
     .unwrap();
-}
-
-fn session_dir(home: &Path, key: &str) -> Option<PathBuf> {
-    std::fs::read_dir(home.join(".bingo/data/sessions"))
-        .ok()?
-        .flatten()
-        .map(|entry| entry.path())
-        .find(|dir| keyed(dir, key))
-}
-
-fn keyed(dir: &Path, key: &str) -> bool {
-    std::fs::read_to_string(dir.join("summary.json"))
-        .ok()
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .is_some_and(|summary| summary["key"] == key)
-}
-
-/// One session's journal, as frames: the first line names the format, and a
-/// line the run was still writing when it ended is not a frame either.
-fn journal(home: &Path, key: &str) -> Vec<Frame> {
-    let dir = session_dir(home, key).unwrap_or_else(|| panic!("no session is keyed {key}"));
-    let text = std::fs::read_to_string(dir.join("journal.jsonl")).expect("a journal on disk");
-    text.lines()
-        .skip(1)
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect()
-}
-
-/// What was said into a session: the text, and who signed it.
-fn said(frames: &[Frame]) -> Vec<(String, Origin)> {
-    frames
-        .iter()
-        .filter_map(|frame| match &frame.event {
-            Event::ItemCompleted { item } => match &item.body {
-                ItemBody::User { parts, origin } => Some((
-                    parts.iter().filter_map(ContentPart::as_text).collect(),
-                    origin.clone(),
-                )),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
 }
 
 /// The nudges a member was sent: what the room said with nobody's name on it.

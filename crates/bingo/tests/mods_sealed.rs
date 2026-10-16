@@ -1,6 +1,6 @@
 //! Sealed render contracts over the same stdio wire used by remote surfaces.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-mod support;
+use crate::support;
 use bingo_sdk::{render::*, *};
 use serde_json::json;
 use support::{LIMIT, Server, create, ready, who};

@@ -3,11 +3,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output};
 
-#[path = "support/home.rs"]
-mod home;
+use crate::home;
 
-#[path = "support/command.rs"]
-mod isolated;
+use crate::isolated;
 
 fn node_available() -> bool {
     let version = Command::new("node")

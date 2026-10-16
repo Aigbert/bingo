@@ -1,8 +1,8 @@
 //! The composed binary publishes only tool schemas that fit the event envelope.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+use crate::support;
 use bingo_sdk::{CatalogKind, HostApi, catalogue::reserved_tool_field};
 use serde_json::json;
-mod support;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn built_in_tool_inputs_leave_the_envelope_fields_free() {

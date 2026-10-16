@@ -1,12 +1,12 @@
 //! The same surface wire that pulls a pane sends its controls back as actions.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+use crate::support;
 use bingo_sdk::{
     render::{Component, RenderRequest, SurfaceName, Viewport},
     slot::{Shown, Slot},
     *,
 };
 use std::path::PathBuf;
-mod support;
 use support::{LIMIT, Server, ack_for, create, ready, who};
 
 #[tokio::test(flavor = "multi_thread")]

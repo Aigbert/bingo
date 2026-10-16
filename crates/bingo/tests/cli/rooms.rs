@@ -4,9 +4,12 @@
 //! either happens, and the card they answer names the room, its members and
 //! the tree it will hang in.
 
+use super::journal::{
+    dirs, frames_at, posts, room_dir, root_dir, session_dir, summary_of, text_of,
+};
 use std::path::{Path, PathBuf};
 
-use bingo_sdk::{ContentPart, InteractionKind, ItemBody, Origin, SessionId};
+use bingo_sdk::{InteractionKind, ItemBody, SessionId};
 
 use super::stream_json::Host;
 use super::*;
@@ -19,35 +22,6 @@ fn with_a_scout(home: &Path) {
     std::fs::write(bingo.join("team.json"), r#"{"roles":[{"name":"scout"}]}"#).unwrap();
 }
 
-fn sessions(home: &Path) -> PathBuf {
-    home.join(".bingo/data/sessions")
-}
-
-/// The directory of the session whose summary carries `key`, or nothing when
-/// the run opened no such session.
-fn session_dir(home: &Path, key: &str) -> Option<PathBuf> {
-    dirs(home).into_iter().find(|dir| keyed(dir, key))
-}
-
-/// Every session directory the run has written so far.
-fn dirs(home: &Path) -> Vec<PathBuf> {
-    let Ok(entries) = std::fs::read_dir(sessions(home)) else {
-        return Vec::new();
-    };
-    entries.flatten().map(|entry| entry.path()).collect()
-}
-
-/// A session's summary as it stands on disk, for a test reading a run that is
-/// still going.
-fn summary_of(dir: &Path) -> Option<serde_json::Value> {
-    let text = std::fs::read_to_string(dir.join("summary.json")).ok()?;
-    serde_json::from_str(&text).ok()
-}
-
-fn keyed(dir: &Path, key: &str) -> bool {
-    summary_of(dir).is_some_and(|summary| summary["key"] == key)
-}
-
 /// One session's journal, as frames. The first line names the format; a last
 /// line the run was still writing when it ended is not a frame either, so the
 /// lines that parse are the journal, exactly as the store's own replay reads
@@ -55,33 +29,6 @@ fn keyed(dir: &Path, key: &str) -> bool {
 fn journal(home: &Path, key: &str) -> Vec<Frame> {
     let dir = session_dir(home, key).unwrap_or_else(|| panic!("no session is keyed {key}"));
     frames_at(&dir)
-}
-
-fn frames_at(dir: &Path) -> Vec<Frame> {
-    let Ok(text) = std::fs::read_to_string(dir.join("journal.jsonl")) else {
-        return Vec::new();
-    };
-    text.lines()
-        .skip(1)
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect()
-}
-
-/// What another session said into this one: the text, and who signed it.
-fn posts(frames: &[Frame]) -> Vec<(String, Origin)> {
-    frames
-        .iter()
-        .filter_map(|frame| match &frame.event {
-            Event::ItemCompleted { item } => match &item.body {
-                ItemBody::User { parts, origin } => Some((
-                    parts.iter().filter_map(ContentPart::as_text).collect(),
-                    origin.clone(),
-                )),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
 }
 
 /// The result a completed call to `tool` returned, in this session's journal.
@@ -97,14 +44,6 @@ fn tool_result(frames: &[Frame], tool: &str) -> bingo_sdk::ToolOutput {
         })
         .next_back()
         .unwrap_or_else(|| panic!("no {tool} call completed"))
-}
-
-fn text_of(output: &bingo_sdk::ToolOutput) -> String {
-    output
-        .parts
-        .iter()
-        .filter_map(ContentPart::as_text)
-        .collect()
 }
 
 fn root_of(out: &Output) -> SessionId {
@@ -390,19 +329,6 @@ fn root_id(home: &Path) -> String {
         .as_str()
         .expect("a session id")
         .to_string()
-}
-
-/// The run's root session: the one on disk with nothing above it, which is
-/// the holder of every room this project declares.
-fn root_dir(home: &Path) -> Option<PathBuf> {
-    dirs(home)
-        .into_iter()
-        .find(|dir| summary_of(dir).is_some_and(|summary| summary["parent"].is_null()))
-}
-
-/// The room this project declares, whatever the root's id turned out to be.
-fn room_dir(home: &Path) -> Option<PathBuf> {
-    room_dirs(home).into_iter().next()
 }
 
 /// Every room session the run opened, however many that turned out to be.

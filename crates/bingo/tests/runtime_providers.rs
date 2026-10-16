@@ -1,14 +1,14 @@
 //! Runtime provider management through the real stdio RPC process, with local endpoints.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+use crate::support;
 use bingo_sdk::*;
 use futures::StreamExt;
 use serde_json::json;
+use support::{LIMIT, Server, ack_for, create, ready, until_completed, who};
 use wiremock::{
     Mock, MockServer, ResponseTemplate,
     matchers::{method, path},
 };
-mod support;
-use support::{LIMIT, Server, ack_for, create, ready, until_completed, who};
 const KEY: &str = "runtime-secret-never-journaled";
 const IDLE: &str = r#"{"responses":[{"steps":[{"text":"unused"}]}]}"#;
 

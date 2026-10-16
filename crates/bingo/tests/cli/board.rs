@@ -3,64 +3,12 @@
 //! it is, and an owner no session in the room answers to is marked at read
 //! time with nothing rewritten.
 
-use std::path::{Path, PathBuf};
+use super::journal::{journal, results, session_dir, text_of};
+use std::path::Path;
 
-use bingo_sdk::{ContentPart, ItemBody, SessionId, ToolOutput};
+use bingo_sdk::SessionId;
 
 use super::*;
-
-fn sessions(home: &Path) -> PathBuf {
-    home.join(".bingo/data/sessions")
-}
-
-/// The directory of the session whose summary carries `key`.
-fn session_dir(home: &Path, key: &str) -> Option<PathBuf> {
-    std::fs::read_dir(sessions(home))
-        .ok()?
-        .flatten()
-        .map(|entry| entry.path())
-        .find(|dir| keyed(dir, key))
-}
-
-fn keyed(dir: &Path, key: &str) -> bool {
-    std::fs::read_to_string(dir.join("summary.json"))
-        .ok()
-        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
-        .is_some_and(|summary| summary["key"] == key)
-}
-
-/// One session's journal, as frames. The first line names the format, and a
-/// line the run was still writing when it ended is not a frame either.
-fn journal(home: &Path, key: &str) -> Vec<Frame> {
-    let dir = session_dir(home, key).unwrap_or_else(|| panic!("no session is keyed {key}"));
-    let text = std::fs::read_to_string(dir.join("journal.jsonl")).expect("a journal on disk");
-    text.lines()
-        .skip(1)
-        .filter_map(|line| serde_json::from_str(line).ok())
-        .collect()
-}
-
-/// Every completed call of `tool` in these frames, in the order they ran.
-fn results(frames: &[Frame], tool: &str) -> Vec<ToolOutput> {
-    frames
-        .iter()
-        .filter_map(|frame| match &frame.event {
-            Event::ItemCompleted { item } => match &item.body {
-                ItemBody::ToolCall { name, output, .. } if name == tool => output.clone(),
-                _ => None,
-            },
-            _ => None,
-        })
-        .collect()
-}
-
-fn text_of(output: &ToolOutput) -> String {
-    output
-        .parts
-        .iter()
-        .filter_map(ContentPart::as_text)
-        .collect()
-}
 
 /// The task list the room's journal holds, as the last `bingo.tasks` payload
 /// published into it: what a board really stores, not what a listing said.

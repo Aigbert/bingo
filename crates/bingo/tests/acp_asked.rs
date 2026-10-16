@@ -20,7 +20,7 @@ use bingo_sdk::{
 use futures::StreamExt;
 use serde_json::{Value, json};
 
-mod support;
+use crate::support;
 
 use support::{LIMIT, Server, ready, until_completed, who};
 

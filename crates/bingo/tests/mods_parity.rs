@@ -3,11 +3,9 @@
 use std::path::Path;
 use std::process::Command;
 
-#[path = "support/home.rs"]
-mod home;
+use crate::home;
 
-#[path = "support/command.rs"]
-mod isolated;
+use crate::isolated;
 
 fn workspace() -> std::path::PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")

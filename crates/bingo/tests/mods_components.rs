@@ -1,6 +1,6 @@
 //! Original component examples through the same stdio wire used by surfaces.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
-mod support;
+use crate::support;
 use bingo_sdk::{
     render::{Component, RenderRequest, SurfaceName, Viewport},
     *,

@@ -4,7 +4,7 @@
 use bingo_sdk::{Event, Frame, HostApi, ItemBody, OpenOptions, Seq, SessionSelector};
 use futures::StreamExt;
 
-mod support;
+use crate::support;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn unknown_records_resume_and_replay_over_rpc() {

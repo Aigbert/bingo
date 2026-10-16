@@ -114,6 +114,10 @@ plugin-rpc `holdsContext` stays until ADR-0076 says otherwise.
   retain 80 operations; only the case count drops to 256. Empty rustdoc
   targets are identified by the baseline; SDK and the hello example stay on.
 
+- Keep journal helpers with distinct result types or read-failure behavior;
+  common projections move to CLI support. Five explicit integration targets
+  retain every mounted scenario and the CI `plugin_kit` target name.
+
 ## Verified — 2026-10-16
 
 Commands run in this worktree with disposable HOME/data, provider environment
@@ -147,4 +151,6 @@ Brick 6: bin, sdk, core, auth-oauth, http, provider-acp, provider-openai,
          — check 0; clippy 0; test 0; SDK gates repeated for fixed checksum vectors
 Brick 7: workspace (empty rustdoc targets touch most libraries)
          — check 0; clippy 0; test 0; both queued-wake consent cases pass
+Brick 8: bin — check 0; clippy 0; test 0 (506 passed)
+         inventory 531 -> 506: only 24 scrub-test copies and its one twin removed
 ```

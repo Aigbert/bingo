@@ -2,7 +2,7 @@
 
 The one thing the test suite cannot do: talk to Feishu. Everything else about
 the channel surface is proven offline against the loopback adapter and byte
-fixtures (`cargo test -p bingo-channel-feishu`, `cargo test -p bingo --test channels`);
+fixtures (`cargo test -p bingo-channel-feishu`, `cargo test -p bingo --test rpc channels::`);
 this is the half-hour that decides whether the wire notes in ADR-0016 §6 are
 still true.
 
@@ -132,7 +132,7 @@ Tick each line, and paste what you saw.
 ### Chat sites and command menu (M162)
 
 Offline coverage: `cargo test -p bingo-channel-feishu` and
-`cargo test -p bingo --test channels`. The following checks are for the person
+`cargo test -p bingo --test rpc channels::`. The following checks are for the person
 with the app, never an automated credential test. Status: **pending**.
 
 - [ ] Type `/` in the bot chat; bingo's command descriptions appear. Allow

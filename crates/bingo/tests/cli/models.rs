@@ -2,6 +2,7 @@
 //! providers with their sign-in state, models with the facts the embedded
 //! snapshot carries — and a spawn that names one of each.
 
+use super::journal::text_of;
 use super::*;
 
 /// What a completed call to `tool` handed back, as the model read it.
@@ -17,14 +18,6 @@ fn tool_result(out: &Output, tool: &str) -> bingo_sdk::ToolOutput {
         })
         .next_back()
         .unwrap_or_else(|| panic!("no {tool} call completed: {}", stdout(out)))
-}
-
-fn text_of(output: &bingo_sdk::ToolOutput) -> String {
-    output
-        .parts
-        .iter()
-        .filter_map(bingo_sdk::ContentPart::as_text)
-        .collect()
 }
 
 /// The lines indented under one provider's header: the models it serves.

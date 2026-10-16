@@ -7,6 +7,7 @@
 //! `$HOME/.bingo/data/schedules`, and a test that leaked would write into
 //! the developer's own.
 
+use super::journal::sessions;
 use std::path::{Path, PathBuf};
 
 use jiff::{SignedDuration, Timestamp};
@@ -15,10 +16,6 @@ use super::*;
 
 fn schedules(home: &Path) -> PathBuf {
     home.join(".bingo/data/schedules")
-}
-
-fn sessions(home: &Path) -> PathBuf {
-    home.join(".bingo/data/sessions")
 }
 
 /// One entry, written the way a person editing the store by hand would.

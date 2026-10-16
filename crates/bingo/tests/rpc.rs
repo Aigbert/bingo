@@ -14,7 +14,7 @@ use bingo_sdk::{
 use futures::StreamExt;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
-mod support;
+use crate::support;
 
 use support::{LIMIT, Server, ack_for, create, ready, send, until_completed, who};
 

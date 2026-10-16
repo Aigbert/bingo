@@ -850,16 +850,26 @@ fn mcp_config_must_exist_and_carry_servers() {
     );
 }
 
+mod memory;
+
+mod journal;
+
 #[test]
-fn provider_endpoints_are_not_inherited_by_cli_fixtures() {
-    let command = bingo();
-    for name in ["OPENAI_BASE_URL", "ANTHROPIC_BASE_URL"] {
+fn provider_environment_is_removed_before_a_fixture_configures_its_endpoint() {
+    let mut command = isolated::bingo();
+    for name in isolated::PROVIDER_ENV {
         assert!(
             command
                 .get_envs()
                 .any(|(key, value)| key == name && value.is_none()),
-            "fixture must remove {name} before a test sets its local endpoint"
+            "inherited {name}"
         );
     }
+    command.env("OPENAI_BASE_URL", "http://127.0.0.1:1234");
+    assert!(
+        command
+            .get_envs()
+            .any(|(key, value)| key == "OPENAI_BASE_URL"
+                && value == Some(std::ffi::OsStr::new("http://127.0.0.1:1234")))
+    );
 }
-mod memory;

@@ -1,9 +1,9 @@
 //! Status uses the same RPC commands and render contract as an outside mod.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+use crate::support;
 use bingo_sdk::render::{Component, RenderRequest, SurfaceName, Viewport};
 use bingo_sdk::*;
 use serde_json::json;
-mod support;
 use support::{LIMIT, Server, ack_for, create, ready, who};
 
 fn request(state: &SessionState) -> RenderRequest {

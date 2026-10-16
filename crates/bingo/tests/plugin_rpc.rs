@@ -206,7 +206,7 @@ fn a_host_with_no_plugins_installed_runs_as_it_always_did() {
     assert_eq!(stderr(&out), "");
 }
 
-mod support;
+use crate::support;
 
 const SIDE_PLUGIN: &str = r#"
 import json, sys

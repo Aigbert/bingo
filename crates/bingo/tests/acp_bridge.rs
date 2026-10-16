@@ -9,8 +9,7 @@
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-#[path = "support/command.rs"]
-mod isolated;
+use crate::isolated;
 
 use std::process::Stdio;
 use std::sync::Arc;
