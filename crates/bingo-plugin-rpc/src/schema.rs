@@ -136,6 +136,14 @@ mod tests {
         let fold = &schema["$defs"]["CommandFold"];
         assert_eq!(fold["properties"]["into"]["type"], "string");
         assert_eq!(fold["properties"]["names"]["items"]["type"], "string");
+        for field in ["into", "names"] {
+            assert!(
+                fold["properties"][field]["description"]
+                    .as_str()
+                    .is_some_and(|description| !description.trim().is_empty()),
+                "CommandFold.{field} must document the generated contract"
+            );
+        }
         assert_eq!(fold["required"], json!(["into", "names"]));
     }
 

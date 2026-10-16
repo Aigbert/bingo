@@ -1586,13 +1586,15 @@
       "type": "object",
       "properties": {
         "into": {
-          "type": "string"
+          "type": "string",
+          "description": "Destination command shown in the palette for the folded names."
         },
         "names": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Command names or aliases found through the destination without changing dispatch."
         }
       },
       "required": [

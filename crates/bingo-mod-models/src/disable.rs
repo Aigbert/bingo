@@ -1,4 +1,7 @@
-use bingo_sdk::*;
+use bingo_sdk::{
+    CatalogKind, CommandOutcome, HookContext, Interceptor, KernelError, LinkMatcher, Next,
+    PluginState, catalogue,
+};
 use serde_json::{Value, json};
 
 pub struct Disable(pub crate::Shared);
@@ -67,7 +70,12 @@ impl Disable {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Disable;
+    use bingo_sdk::{
+        Catalog, CatalogEntry, CatalogKind, HookContext, Interceptor, Next, SessionId, catalogue,
+        testing,
+    };
+    use serde_json::{Value, json};
 
     fn setup(state: Value) -> (testing::TestHost, HookContext, crate::Shared) {
         let host = testing::TestHost::default();

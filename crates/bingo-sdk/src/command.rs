@@ -21,7 +21,9 @@ use crate::view::View;
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandFold {
+    /// Destination command shown in the palette for the folded names.
     pub into: String,
+    /// Command names or aliases found through the destination without changing dispatch.
     pub names: Vec<String>,
 }
 
