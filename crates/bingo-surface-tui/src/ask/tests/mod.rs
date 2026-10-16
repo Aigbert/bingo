@@ -274,3 +274,26 @@ fn escape_ends_the_turn_from_aside_and_from_the_change_editor() {
         ));
     }
 }
+
+#[test]
+fn pager_close_keys_leave_the_underlying_ask_unanswered() {
+    for pressed in [key(KeyCode::Esc), typed('q'), ctrl('o')] {
+        let (tree, mut ui, now) = scene_for(
+            permission(
+                None,
+                Some(Preview::Diff {
+                    unified: "-old\n+new".into(),
+                }),
+            ),
+            false,
+        );
+        assert!(crate::input::on_key(&mut ui, &tree, ctrl('o'), now).is_empty());
+        assert!(matches!(ui.focus.open(), crate::ui::Open::Pager(_)));
+        let effects = crate::input::on_key(&mut ui, &tree, pressed, now);
+        assert!(effects.is_empty(), "pager key escaped: {effects:?}");
+        assert!(!ui.focus.showing(), "pager stayed open after {pressed:?}");
+        assert!(!ui.dialog.answered);
+        assert!(ui.stop_asked.is_none());
+        assert!(tree.open_interaction().is_some());
+    }
+}

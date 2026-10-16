@@ -56,6 +56,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if crate::palette::active(ui) {
         return crate::palette::key(ui, tree, key, now);
     }
+    if ui.focus.showing() && matches!(ui.focus.open(), Open::Pager(_)) {
+        return pager::keys(ui, tree, key, now);
+    }
     if key.code == KeyCode::Esc && tree.open_interaction().is_some() {
         return cancel(ui, tree);
     }

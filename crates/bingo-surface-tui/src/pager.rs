@@ -341,7 +341,10 @@ pub fn keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     if searching(ui) {
         return searched(ui, tree, key);
     }
-    if key.code == KeyCode::Esc {
+    if key.code == KeyCode::Esc
+        || key == KeyEvent::from(KeyCode::Char('q'))
+        || key == KeyEvent::new(KeyCode::Char('o'), crossterm::event::KeyModifiers::CONTROL)
+    {
         closed(ui, tree, now);
         return Vec::new();
     }
