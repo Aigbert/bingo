@@ -5,8 +5,8 @@ mod guide;
 mod hints;
 mod keys;
 mod lifecycle;
-mod recent;
 pub mod rows;
+mod uses;
 use bingo_sdk::*;
 use std::{
     collections::BTreeMap,
@@ -25,7 +25,7 @@ struct Cursor {
 }
 struct State {
     cursors: BTreeMap<(SessionId, String), Cursor>,
-    recent: recent::Recent,
+    uses: uses::Uses,
 }
 type Shared = Arc<Mutex<State>>;
 static MANIFEST: PluginManifest = PluginManifest {
@@ -48,9 +48,7 @@ impl Plugin for Palette {
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
         let shared = Arc::new(Mutex::new(State {
             cursors: BTreeMap::new(),
-            recent: recent::Recent::load(
-                registrar.env().data_dir.join("plugins/palette/recent.json"),
-            ),
+            uses: uses::Uses::load(uses::path(&registrar.env().data_dir)),
         }));
         registrar.add(Contribution::Hook(Arc::new(lifecycle::Lifecycle {
             path: registrar.env().data_dir.join("plugins/palette/key-hint"),

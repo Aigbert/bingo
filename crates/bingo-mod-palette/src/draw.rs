@@ -27,7 +27,7 @@ impl Interceptor for Drawing {
         let request: render::RenderRequest = serde_json::from_value(value).map_err(crate::error)?;
         let props: PaletteProps = serde_json::from_value(request.props).map_err(crate::error)?;
         let mut shared = self.0.lock().map_err(crate::error)?;
-        let (groups, initial) = groups(&props, shared.recent.names());
+        let (groups, initial) = groups(&props, &shared.uses.top());
         let cursor = shared
             .cursors
             .entry((cx.session.clone(), request.request_id.clone()))

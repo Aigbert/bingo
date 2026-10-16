@@ -16,8 +16,9 @@ permission mode without opening a list. Ctrl+G returns to a pending ask. An ask
 arriving under the palette waits aside until the palette closes. Informational
 and interrupt key rows are dim and skipped when choosing a shortcut.
 
-The last five commands chosen here appear first. Only their names are stored,
-never arguments. `/help` opens keys; `/resume` opens sessions. Bindings follow the
+The three commands chosen here most often appear first, under `recent`. The
+counts live in your own data directory, never a project's, and only the names
+are stored, never arguments. `/help` opens keys; `/resume` opens sessions. Bindings follow the
 `keys` setting and include commands contributed by other mods. On nonterminal
 surfaces `/help` and `/resume` explain that they are terminal only.
 

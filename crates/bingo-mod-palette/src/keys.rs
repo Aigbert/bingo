@@ -88,7 +88,7 @@ impl Handler {
         props: &PaletteProps,
     ) -> Result<CommandOutcome, KernelError> {
         let mut shared = self.0.lock().map_err(crate::error)?;
-        let (groups, initial) = crate::draw::groups(props, shared.recent.names());
+        let (groups, initial) = crate::draw::groups(props, &shared.uses.top());
         let rows = groups
             .iter()
             .flat_map(|group| &group.rows)
@@ -123,7 +123,7 @@ impl Handler {
             return Ok(CommandOutcome::Handled { handled: true });
         };
         if let Some(line) = operation["run"].as_str() {
-            shared.recent.remember(line).map_err(crate::error)?;
+            shared.uses.count(line).map_err(crate::error)?;
         }
         if operation.get("close").is_some()
             || operation.get("run").is_some()
@@ -328,7 +328,7 @@ pub(crate) mod review_tests {
         let home = tempfile::tempdir().unwrap();
         let props = props();
         let state = Arc::new(Mutex::new(crate::State {
-            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
         state.lock().unwrap().cursors.insert(
@@ -360,7 +360,7 @@ pub(crate) mod review_tests {
             json!({"handler":"opening","event":"press","query":"/mo"})
         );
         let state = Arc::new(Mutex::new(crate::State {
-            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
         state.lock().unwrap().cursors.insert(
@@ -394,7 +394,7 @@ pub(crate) mod review_tests {
             props.key_hints.insert(key.into(), key.into());
         }
         let state = Arc::new(Mutex::new(crate::State {
-            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
         let handler = Handler(state.clone());
@@ -427,7 +427,7 @@ pub(crate) mod review_tests {
         );
         props.query = "/plugins trust ".into();
         let state = Arc::new(Mutex::new(crate::State {
-            recent: crate::recent::Recent::load(home.path().join("recent.json")),
+            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
         let (groups, _) = crate::draw::groups(&props, &[]);
@@ -476,7 +476,7 @@ pub(crate) mod review_tests {
         props.query = "/permission ".into();
         for (at, value) in modes.iter().enumerate() {
             let handler = Handler(Arc::new(Mutex::new(crate::State {
-                recent: crate::recent::Recent::load(home.path().join("recent.json")),
+                uses: crate::uses::Uses::load(crate::uses::path(home.path())),
                 cursors: Default::default(),
             })));
             for _ in 0..at {
