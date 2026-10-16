@@ -519,7 +519,7 @@ async fn a_shell_line_and_a_permission_mode_dispatch_as_commands() {
     );
     let ack = ack_for(&mut attachment, &mode).await;
     assert!(
-        matches!(&ack, bingo_sdk::IntentOutcome::Applied { result } if result["message"] == "permission mode: acceptEdits"),
+        matches!(&ack, bingo_sdk::IntentOutcome::Applied { result } if result["message"] == "permission mode: accept edits"),
         "{ack:?}"
     );
 

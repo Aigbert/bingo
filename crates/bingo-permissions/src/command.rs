@@ -114,11 +114,11 @@ impl Command for PermissionCommand {
             ));
         }
         // Read back rather than echo: the message says what the next call will
-        // be decided against.
+        // be decided against, in the words the footer uses (ADR-0095 §5).
         Ok(CommandOutcome::Applied {
             message: Some(format!(
                 "permission mode: {}",
-                self.policy.mode_for(&cx.session)
+                self.policy.mode_for(&cx.session).label()
             )),
         })
     }
@@ -265,7 +265,7 @@ mod tests {
         assert_eq!(
             outcome,
             CommandOutcome::Applied {
-                message: Some("permission mode: acceptEdits".into())
+                message: Some("permission mode: accept edits".into())
             }
         );
 
