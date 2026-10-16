@@ -98,9 +98,9 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
         } => values
             .iter()
             .filter_map(|value| {
-                choice(
+                word_row(
                     value,
-                    labels.get(value).unwrap_or(value),
+                    labels.get(value),
                     prefix,
                     query,
                     current,
@@ -139,6 +139,23 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
         }],
         ArgSpec::Options { args, .. } => offered(args, prefix, query, offer),
     }
+}
+/// A word as a row. A word drawn by a label carries its value as the hint,
+/// so the row still shows what the line runs.
+fn word_row(
+    value: &str,
+    label: Option<&String>,
+    prefix: &str,
+    query: &str,
+    current: &str,
+    more: bool,
+) -> Option<Row> {
+    let label = label.map_or(value, String::as_str);
+    let mut row = choice(value, label, prefix, query, current, more)?;
+    if label != value {
+        row.hint = value.into();
+    }
+    Some(row)
 }
 /// A catalogue entry as a row. On a guarded level the row's label is the
 /// id the line runs; the entry's own label, which whoever filled the
@@ -413,6 +430,11 @@ mod tests {
             let chosen = &offered.rows[offered.selected];
             assert_eq!(chosen.now, "now", "{value}");
             assert_eq!(chosen.label, label, "{value}");
+            assert_eq!(
+                chosen.hint,
+                if label == value { "" } else { value },
+                "{value}"
+            );
             assert_eq!(chosen.target, Target::Run(format!("/permission {value}")));
             assert_eq!(
                 offered.rows.iter().filter(|row| row.now == "now").count(),

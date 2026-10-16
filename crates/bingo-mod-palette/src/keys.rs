@@ -391,6 +391,44 @@ mod review_tests {
         props.commands[0].meta["args"]["person"] = json!([]);
         assert_eq!(shown(Some(&forged), run.clone(), &props), run);
     }
+    /// Every person-only word drawn by a label still runs from its row: the
+    /// value it runs stands beside the label.
+    #[test]
+    fn a_labelled_person_only_word_runs_from_its_row() {
+        let home = tempfile::tempdir().unwrap();
+        let mut props = props();
+        props.open = bingo_sdk::component::PaletteOpen::Commands;
+        let modes = [
+            "default",
+            "acceptEdits",
+            "plan",
+            "bypassPermissions",
+            "dontAsk",
+        ];
+        props.commands = vec![CatalogEntry {
+            id: "permission".into(),
+            label: "permission".into(),
+            meta: json!({"name":"permission","hint":"mode","family":"session","now":"default","args":{
+                "kind":"words","values":modes,"person":modes,"alone":modes,
+                "labels":{"acceptEdits":"accept edits","bypassPermissions":"bypass","dontAsk":"don't ask"}}}),
+        }];
+        props.query = "/permission ".into();
+        for (at, value) in modes.iter().enumerate() {
+            let handler = Handler(Arc::new(Mutex::new(crate::State {
+                recent: crate::recent::Recent::load(home.path().join("recent.json")),
+                cursors: Default::default(),
+            })));
+            for _ in 0..at {
+                handler.press("opening", "down", &props).unwrap();
+            }
+            let outcome = handler.press("opening", "enter", &props).unwrap();
+            assert!(
+                matches!(&outcome, CommandOutcome::Surface { action, .. }
+                    if action.args["value"]["run"] == format!("/permission {value}")),
+                "{value}: {outcome:?}"
+            );
+        }
+    }
     /// A row that shows only the tier runs nothing: the name it trusts is
     /// part of what it runs, and so is the verb nobody typed.
     #[test]
