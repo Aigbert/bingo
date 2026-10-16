@@ -38,7 +38,8 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let band_offset = activity.len();
     let band = crate::component::band::draw(state, ui, frame);
     activity.extend(band.lines.iter().cloned());
-    let mut regions = frame::regions(area, demand(&draft, &strip, &activity));
+    let palette = palette(tree, ui, frame, now);
+    let mut regions = frame::regions(area, demand(&draft, &strip, &activity, &palette));
     frame.seating = crate::pane::seating(ui, state, regions.transcript);
     regions.transcript = frame.seating.transcript;
     pull_activity(state, ui, frame, regions.activity);
@@ -56,6 +57,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
     crate::pane::draw(ui, state, frame, now);
     render_status(tree, ui, frame, regions.status, now);
+    frame.render_widget(Paragraph::new(palette), regions.palette);
     if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
         frame.cursor = None;
     }
@@ -94,12 +96,28 @@ fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) 
 }
 
 /// What the frame must make room for before the transcript is given the rest.
-fn demand(draft: &prompt::Layout, strip: &graphics::Band, activity: &[Line<'_>]) -> Demand {
+fn demand(
+    draft: &prompt::Layout,
+    strip: &graphics::Band,
+    activity: &[Line<'_>],
+    palette: &[Line<'_>],
+) -> Demand {
     Demand {
         composer: u16::try_from(draft.lines.len().clamp(1, COMPOSER_ROWS)).unwrap_or(u16::MAX),
         strip: strip.height(),
         activity: u16::try_from(activity.len()).unwrap_or(u16::MAX),
+        palette: u16::try_from(palette.len()).unwrap_or(u16::MAX),
     }
+}
+
+/// The open palette's rows, drawn before the frame is cut since they decide
+/// how far the box moves up.
+fn palette(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
+    if !crate::palette::active(ui) {
+        return Vec::new();
+    }
+    let (width, rows) = crate::palette::room(frame.area());
+    crate::palette::draw(ui, tree, frame, width, rows, now)
 }
 
 /// The draft's thumbnails, measured and rendered once for this frame.
@@ -236,17 +254,8 @@ fn layer(
             let lines = crate::plugins::draw(ui, tree, frame, above.width, above.height);
             over(frame, above, lines);
         }
-        Open::Palette(_) => {
-            let lines = crate::palette::draw(
-                ui,
-                tree,
-                frame,
-                above.width,
-                (frame.canvas.area().height / 2).min(above.height),
-                _now,
-            );
-            over(frame, above, lines);
-        }
+        // Drawn under the box, in its own rows (ADR-0095 §1).
+        Open::Palette(_) => {}
         Open::Pager(open) => paged(tree, frame, above, open, reveal),
         // Rewind shares the space above the input box.
         Open::Rewind(card) => over(

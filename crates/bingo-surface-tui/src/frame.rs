@@ -1,7 +1,9 @@
 //! Where each region of the screen is, and nothing about what goes in them.
 //!
 //! A header and spacer sit above the transcript. The rule, prompt, hint row
-//! and footer are cut from the bottom, so typing keeps a fixed baseline.
+//! and footer are cut from the bottom, so typing keeps a fixed baseline. An
+//! open palette sits under the prompt in place of the hint row and the
+//! footer, and the transcript gives up the rest of its rows (ADR-0095 §1).
 //!
 //! It is pure geometry over a [`Demand`], so every size is a table row in a
 //! test rather than a screen someone has to look at.
@@ -24,10 +26,13 @@ pub struct Demand {
     /// Rows between the transcript and the box: the activity row and whatever
     /// is queued behind it.
     pub activity: u16,
+    /// Rows of the open palette, under the box; none while it is closed.
+    pub palette: u16,
 }
 
 /// The frame, top to bottom. Every region may be empty; the status line and
-/// the input box are the last to go.
+/// the input box are the last to go, and an open palette takes the status
+/// line's and the hint row's place.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Regions {
     pub header: Rect,
@@ -38,6 +43,8 @@ pub struct Regions {
     pub strip: Rect,
     pub composer: Rect,
     pub status: Rect,
+    /// The open palette, under the box.
+    pub palette: Rect,
 }
 
 impl Regions {
@@ -57,8 +64,11 @@ impl Regions {
 /// Cut the frame into its regions from the bottom up.
 pub fn regions(size: Rect, demand: Demand) -> Regions {
     let mut rest = size;
-    let status = take_bottom(&mut rest, 1);
-    let hint_rows = u16::from(rest.height > COMPOSER_MIN);
+    let rows = palette_rows(demand.palette, rest.height);
+    let palette = take_bottom(&mut rest, rows);
+    let open = palette.height > 0;
+    let status = take_bottom(&mut rest, u16::from(!open));
+    let hint_rows = u16::from(!open && rest.height > COMPOSER_MIN);
     let hints = take_bottom(&mut rest, hint_rows);
     let rows = composer_rows(demand.composer, rest.height);
     let composer = take_bottom(&mut rest, rows);
@@ -80,7 +90,13 @@ pub fn regions(size: Rect, demand: Demand) -> Regions {
         strip,
         composer,
         status,
+        palette,
     }
+}
+
+/// The palette leaves the box its smallest self above it.
+fn palette_rows(want: u16, room: u16) -> u16 {
+    want.min(room.saturating_sub(COMPOSER_MIN))
 }
 
 /// The box grows with the draft and stops at ten rows; it never shrinks below
@@ -124,6 +140,7 @@ mod tests {
             composer: 1,
             strip: 0,
             activity: 0,
+            palette: 0,
         }
     }
 
@@ -170,6 +187,36 @@ mod tests {
         assert_eq!(rows(4), 5);
         assert_eq!(rows(10), COMPOSER_MAX);
         assert_eq!(rows(40), COMPOSER_MAX, "it never eats the transcript");
+    }
+
+    /// The palette sits under the box where the hint row and the footer
+    /// were; the box moves up with it and the transcript pays the rest.
+    #[test]
+    fn an_open_palette_takes_the_footer_s_place_under_the_box() {
+        let closed = at(80, 24, demand());
+        let r = at(
+            80,
+            24,
+            Demand {
+                palette: 12,
+                ..demand()
+            },
+        );
+        assert_eq!(r.palette, Rect::new(0, 12, 80, 12));
+        assert_eq!(r.composer.bottom(), r.palette.y, "on the palette");
+        assert_eq!(r.composer.height, closed.composer.height);
+        assert_eq!((r.status.height, r.hints.height), (0, 0));
+        assert_eq!(r.transcript.height, closed.transcript.height + 2 - 12);
+        let tiny = at(
+            20,
+            5,
+            Demand {
+                palette: 12,
+                ..demand()
+            },
+        );
+        assert_eq!(tiny.palette.height, 3, "the box keeps its two rows");
+        assert_eq!(tiny.composer.height, COMPOSER_MIN);
     }
 
     /// A strip of thumbnails is rows of its own standing on the box: a
@@ -253,8 +300,8 @@ mod tests {
             40,
             Demand {
                 composer: 2,
-                strip: 0,
                 activity: 2,
+                ..demand()
             },
         );
         assert_eq!(r.transcript.bottom(), r.activity.y);

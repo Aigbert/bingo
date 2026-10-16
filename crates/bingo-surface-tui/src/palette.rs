@@ -237,17 +237,16 @@ pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
                 .current(render::Component::Palette, &open.id, tree.viewed())
                 .is_none_or(|(_, waiting)| waiting);
     }
-    let area = ui.shown.canvas.area();
-    let above = ui.shown.regions.above();
+    let (width, rows) = room(ui.shown.canvas.area());
     let props = Props::Palette(Box::new(props(ui, tree, open, now)));
-    crate::component::key(
-        tree.viewed(),
-        &open.id,
-        &props,
-        above.width,
-        (area.height / 2).min(above.height),
-    )
-    .is_some()
+    crate::component::key(tree.viewed(), &open.id, &props, width, rows).is_some()
+}
+
+/// The room the palette is drawn in under the box: the frame's width and
+/// half its height. Drawing and waiting read it here, so they ask for the
+/// same drawing.
+pub fn room(area: ratatui::layout::Rect) -> (u16, u16) {
+    (area.width, area.height / 2)
 }
 
 /// Query editing belongs to the composer; list actions belong to the mod.
