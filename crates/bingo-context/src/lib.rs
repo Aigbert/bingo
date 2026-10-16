@@ -7,6 +7,7 @@
 //! (ADR-0006, ADR-0044, ADR-0049).
 
 mod baseline;
+mod branch;
 mod compact;
 mod estimate;
 mod files;
@@ -89,6 +90,7 @@ impl Plugin for ContextPlugin {
         registrar.add(guide::contribution(registrar));
         registrar.add(Contribution::Hook(Arc::new(memory::row::MemoryRows)));
         registrar.add(memory::service::contribution(data_dir, config_dir));
+        registrar.add(Contribution::Hook(Arc::new(branch::Branch::default())));
         Ok(())
     }
 }
@@ -116,7 +118,7 @@ mod tests {
         let contributions = contributions(json!({}));
         // The hook is nobody's promise: it is the baseline's own, and the
         // manifest names the five things another plugin could ask for.
-        assert_eq!(contributions.len(), MANIFEST.provides.len() + 2);
+        assert_eq!(contributions.len(), MANIFEST.provides.len() + 3);
         assert!(matches!(contributions[0], Contribution::Compactor(_)));
         assert!(matches!(contributions[1], Contribution::Context(_)));
         assert!(matches!(contributions[2], Contribution::Context(_)));
