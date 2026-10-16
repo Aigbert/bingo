@@ -310,7 +310,8 @@ pub fn loose(item: Item) -> Item {
 
 /// Every finished turn opened under its line, as a click on each would.
 pub fn open_the_turns(ui: &mut Ui, state: &SessionState) {
-    let roles = crate::turns::Roles::of(state, &Default::default(), &ui.folds);
+    let answers = crate::ask::receipts::Answers::of(state);
+    let roles = crate::turns::Roles::of(state, &Default::default(), &ui.folds, &answers);
     for item in state.transcript.items() {
         if matches!(roles.of_item(&item.id), crate::turns::Role::Fold { .. }) {
             ui.folds.insert(item.id.clone(), crate::fold::Fold::Open);

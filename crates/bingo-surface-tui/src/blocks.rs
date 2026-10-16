@@ -88,7 +88,10 @@ fn revision(
 ) -> Revision {
     let request = crate::component::items::id(item);
     Revision {
-        receipts: crate::ask::receipts::linked(rows.state, &item.id)
+        receipts: rows
+            .answers
+            .to(&item.id)
+            .iter()
             .map(|receipt| receipt.id.clone())
             .collect(),
         component: (
@@ -288,7 +291,7 @@ impl Blocks {
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
-        self.roles = Roles::of(state, agents, rows.folds);
+        self.roles = Roles::of(state, agents, rows.folds, &rows.answers);
         let mut kept = 0;
         for (at, item) in state.transcript.items().iter().enumerate() {
             let role = self.roles.of_item(&item.id).clone();

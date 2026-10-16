@@ -11,6 +11,7 @@ use bingo_sdk::{
     DecisionKind, Item, ItemBody, ItemId, ItemStatus, SessionState, TurnStatus, Upshot, view::Tone,
 };
 
+use crate::ask::receipts::Answers;
 use crate::fold::{self, Fold, Folds};
 use crate::tree::Agents;
 use crate::{paths, thoughts};
@@ -43,7 +44,12 @@ pub enum Role {
 pub struct Roles(BTreeMap<ItemId, Role>);
 
 impl Roles {
-    pub fn of(state: &SessionState, agents: &Agents<'_>, folds: &Folds) -> Self {
+    pub fn of(
+        state: &SessionState,
+        agents: &Agents<'_>,
+        folds: &Folds,
+        answers: &Answers<'_>,
+    ) -> Self {
         let items: Vec<&Item> = state.transcript.items().iter().map(AsRef::as_ref).collect();
         let replaced = rowed(state);
         let mut roles = BTreeMap::new();
@@ -56,6 +62,7 @@ impl Roles {
                 state,
                 agents,
                 replaced: &replaced,
+                answers,
             };
             match state.turn.as_ref().is_some_and(|live| &live.id == id) {
                 true => turn.live(&mut roles),
@@ -167,6 +174,7 @@ struct Turn<'a> {
     state: &'a SessionState,
     agents: &'a Agents<'a>,
     replaced: &'a [ItemId],
+    answers: &'a Answers<'a>,
 }
 
 impl Turn<'_> {
@@ -176,7 +184,7 @@ impl Turn<'_> {
         for item in self.items {
             let role = match () {
                 _ if self.is_step(item) => {
-                    let step = step(item, self.state);
+                    let step = step(item, self.state, self.answers);
                     steps.push(step.clone());
                     Role::Step {
                         step,
@@ -253,7 +261,7 @@ impl Turn<'_> {
     fn opened(&self, item: &Item) -> Role {
         match self.is_step(item) {
             true => Role::Step {
-                step: step(item, self.state),
+                step: step(item, self.state, self.answers),
                 opened: true,
             },
             false => Role::Thought,
@@ -262,7 +270,7 @@ impl Turn<'_> {
 
     fn steps(&self, at: &[usize]) -> Vec<Step> {
         at.iter()
-            .map(|&at| step(self.items[at], self.state))
+            .map(|&at| step(self.items[at], self.state, self.answers))
             .collect()
     }
 
@@ -271,13 +279,15 @@ impl Turn<'_> {
     fn news(&self, at: &[usize], steps: Vec<Step>) -> Vec<Step> {
         at.iter()
             .zip(steps)
-            .map(|(&at, step)| match granted(self.items[at], self.state) {
-                true => Step {
-                    answer: None,
-                    ..step
+            .map(
+                |(&at, step)| match granted(self.answers.to(&self.items[at].id)) {
+                    true => Step {
+                        answer: None,
+                        ..step
+                    },
+                    false => step,
                 },
-                false => step,
-            })
+            )
             .collect()
     }
 
@@ -344,7 +354,7 @@ fn ran(step: &Step) -> bool {
 }
 
 /// One call, in the words its row shows.
-pub fn step(item: &Item, state: &SessionState) -> Step {
+pub fn step(item: &Item, state: &SessionState, answers: &Answers<'_>) -> Step {
     let ItemBody::ToolCall {
         call_id,
         name,
@@ -381,7 +391,7 @@ pub fn step(item: &Item, state: &SessionState) -> Step {
         target: paths::shorten_in(target, &state.summary.cwd, paths::home()),
         state: step_state(item, state),
         upshot: output.as_ref().and_then(bingo_sdk::ToolOutput::outcome),
-        answer: answer(item, state),
+        answer: answer(answers.to(&item.id)),
     }
 }
 
@@ -421,10 +431,9 @@ fn step_state(item: &Item, state: &SessionState) -> StepState {
 
 /// Whether everything the person answered for the step was a plain yes to a
 /// permission. A yes to a call the person changed first is news.
-fn granted(item: &Item, state: &SessionState) -> bool {
-    let mut receipts = crate::ask::receipts::linked(state, &item.id).peekable();
-    receipts.peek().is_some()
-        && receipts.all(|receipt| {
+fn granted(receipts: &[&Item]) -> bool {
+    !receipts.is_empty()
+        && receipts.iter().all(|receipt| {
             matches!(
                 receipt.body,
                 ItemBody::PermissionReceipt {
@@ -436,8 +445,7 @@ fn granted(item: &Item, state: &SessionState) -> bool {
 }
 
 /// What the person answered when the step asked, in the receipt's words.
-fn answer(item: &Item, state: &SessionState) -> Option<Upshot> {
-    let receipts: Vec<&Item> = crate::ask::receipts::linked(state, &item.id).collect();
+fn answer(receipts: &[&Item]) -> Option<Upshot> {
     let words: Vec<String> = receipts
         .iter()
         .filter_map(|receipt| crate::ask::receipts::label(&receipt.body))

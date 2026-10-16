@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::rc::Rc;
+
 use crate::{theme, transcript::Rows};
 use bingo_sdk::{DecisionKind, Item, ItemBody, ItemId, SessionState};
 use ratatui::text::{Line, Span};
@@ -11,14 +14,29 @@ pub fn source(item: &Item) -> Option<&ItemId> {
         _ => None,
     }
 }
-pub fn linked<'a>(state: &'a SessionState, id: &'a ItemId) -> impl Iterator<Item = &'a Item> {
-    state
-        .transcript
-        .items()
-        .iter()
-        .map(AsRef::as_ref)
-        .filter(move |item| source(item) == Some(id))
+
+/// Every answer in a transcript, by the item it answers: read once a frame,
+/// so finding a step's answers costs a lookup, not a pass over the session.
+#[derive(Clone, Debug, Default)]
+pub struct Answers<'a>(Rc<BTreeMap<&'a ItemId, Vec<&'a Item>>>);
+
+impl<'a> Answers<'a> {
+    pub fn of(state: &'a SessionState) -> Self {
+        let mut by_source: BTreeMap<&'a ItemId, Vec<&'a Item>> = BTreeMap::new();
+        for item in state.transcript.items().iter().map(AsRef::as_ref) {
+            if let Some(id) = source(item) {
+                by_source.entry(id).or_default().push(item);
+            }
+        }
+        Self(Rc::new(by_source))
+    }
+
+    /// The answers to `id`, in the order they were given.
+    pub fn to(&self, id: &ItemId) -> &[&'a Item] {
+        self.0.get(id).map_or(&[], Vec::as_slice)
+    }
 }
+
 pub fn label(body: &ItemBody) -> Option<String> {
     match body {
         ItemBody::PermissionReceipt {
@@ -43,7 +61,10 @@ pub fn append(item: &Item, lines: &mut [Line<'static>], rows: &Rows<'_>) {
     let Some(first) = lines.first_mut() else {
         return;
     };
-    let words = linked(rows.state, &item.id)
+    let words = rows
+        .answers
+        .to(&item.id)
+        .iter()
         .flat_map(|receipt| {
             let own = label(&receipt.body).unwrap_or_default();
             let Some(props) = crate::component::items::props(receipt, false) else {

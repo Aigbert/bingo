@@ -2,7 +2,7 @@ use super::*;
 use crate::test_support::{finished_turn, folded, running_turn, stopped_turn, tool, worked};
 
 fn roles(state: &SessionState, folds: &Folds) -> Roles {
-    Roles::of(state, &Agents::new(), folds)
+    Roles::of(state, &Agents::new(), folds, &Answers::of(state))
 }
 
 fn id(raw: &str) -> ItemId {

@@ -563,6 +563,7 @@ fn mark_transcript(ui: &Ui, frame: &mut Layout, area: Rect, padding: usize, now:
 }
 
 fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) {
+    let answers = crate::ask::receipts::Answers::of(state);
     for item in state.transcript.items() {
         let Some((from, to)) = frame.blocks.span(&item.id) else {
             continue;
@@ -581,7 +582,7 @@ fn component_requests(state: &SessionState, ui: &Ui, frame: &mut Layout, area: R
             frame.pulls.extend(keys);
             continue;
         }
-        for receipt in crate::ask::receipts::linked(state, &item.id) {
+        for receipt in answers.to(&item.id) {
             if let Some(props) = crate::component::items::props(receipt, false)
                 && let Some(key) = crate::component::key(
                     state,

@@ -106,6 +106,9 @@ pub struct Rows<'a> {
     pub linked: &'a Linked,
     /// Plugin placements read from this frame's folded session.
     pub slots: Vec<bingo_sdk::slot::Placed>,
+    /// The person's answers, by the item each answers, read off this frame's
+    /// session once.
+    pub answers: crate::ask::receipts::Answers<'a>,
     /// A newer release than this build, when the start-up check found one
     /// (M63). Terminal-side, like the fold and the scroll: it is a fact about
     /// this machine, not about the conversation.
@@ -144,7 +147,7 @@ impl<'a> Rows<'a> {
             pictures,
             linked,
             slots: bingo_sdk::slot::placed(state),
-
+            answers: crate::ask::receipts::Answers::of(state),
             update: None,
             measure: None,
             opening: None,
