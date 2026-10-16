@@ -1,8 +1,7 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-expression: "draw_tree(80, 24, tree, ui, now)"
+expression: rows
 ---
-" bingo▍ /var/…/T/.tmptfTSKg                                          session 1  "
 "                                                                                "
 "                                                                                "
 " › line 15                                                                      "

@@ -54,6 +54,16 @@ fn both(name: &str, tree: &Tree, ui: &mut Ui, now: Now) {
     insta::assert_snapshot!(format!("{name}_120x40"), draw_tree(120, 40, tree, ui, now));
 }
 
+// These fixtures need a real temporary directory for completion. The fixed
+// header has its own snapshots; omit its changing cwd from these site records.
+fn directory_dropdowns(name: &str, tree: &Tree, ui: &mut Ui, now: Now) {
+    for (width, height) in [(80, 24), (120, 40)] {
+        let screen = draw_tree(width, height, tree, ui, now);
+        let rows = screen.lines().skip(1).collect::<Vec<_>>().join("\n");
+        insta::assert_snapshot!(format!("{name}_{width}x{height}"), rows);
+    }
+}
+
 /// One scene in the look a terminal that can draw nothing but ASCII gets
 /// (§7). Written here rather than at each call site so every screen of that
 /// look is named alike, whichever module drew it.
@@ -729,13 +739,11 @@ fn the_at_completion_dropdown() {
         std::fs::write(dir.path().join("src").join(name), "//! it\n").expect("a source");
     }
     std::fs::write(dir.path().join("Cargo.toml"), "[package]\n").expect("a manifest");
-    // A transcript long enough that the welcome box — which would carry this
-    // run's temporary directory into the snapshot — has scrolled away.
     let mut state = long_transcript(24);
     state.summary.cwd = dir.path().to_string_lossy().into_owned();
     let (mut ui, now) = scene();
     write(&mut ui, &state, "read @src/", now);
-    both("at_dropdown", &solo(&state), &mut ui, now);
+    directory_dropdowns("at_dropdown", &solo(&state), &mut ui, now);
 }
 
 /// The same `@`, where the session has agents under it: the names it can reach
@@ -763,7 +771,7 @@ fn the_at_completion_dropdown_with_agents_to_reach() {
     assert!(screen.contains("@reviewer"), "{screen}");
     assert!(screen.contains("Files"), "{screen}");
     assert!(screen.contains("@src/reader.rs"), "{screen}");
-    both("at_dropdown_agents", &tree, &mut ui, now);
+    directory_dropdowns("at_dropdown_agents", &tree, &mut ui, now);
 }
 
 /// A long result, open whole: what `⏎` on a focused block and the second
