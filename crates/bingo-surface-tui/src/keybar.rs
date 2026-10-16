@@ -122,21 +122,9 @@ pub(super) fn own(props: &Props, width: usize) -> Vec<Line<'static>> {
             width.saturating_sub(1),
         ))];
     }
-    let mut used = 0;
-    let mut start = props.pairs.len();
-    for (index, pair) in props.pairs.iter().enumerate().rev() {
-        let size = pair.keys.width()
-            + pair.action.width()
-            + usize::from(!pair.keys.is_empty())
-            + usize::from(used > 0) * 3;
-        if used + size > width.saturating_sub(3) {
-            break;
-        }
-        used += size;
-        start = index;
-    }
+    let (pairs, used) = props.fitting(width.saturating_sub(3), UnicodeWidthStr::width);
     let mut spans = vec![Span::raw(" ".repeat(width.saturating_sub(used + 2)))];
-    for (index, pair) in props.pairs[start..].iter().enumerate() {
+    for (index, pair) in pairs.iter().enumerate() {
         if index > 0 {
             spans.push(Span::styled(" · ", theme::ash()));
         }

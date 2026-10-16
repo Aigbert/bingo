@@ -6,6 +6,27 @@ pub struct KeyBarProps {
     pub pairs: Vec<KeyPair>,
     pub toast: Option<KeyToast>,
 }
+impl KeyBarProps {
+    /// The pairs that fit in `width` cells, kept whole from the right, and the
+    /// cells they take with their ` · ` joins: a narrow row drops pairs from
+    /// the left (ADR-0095). `cells` measures a string as the surface draws it.
+    pub fn fitting(&self, width: usize, cells: impl Fn(&str) -> usize) -> (&[KeyPair], usize) {
+        let mut used = 0;
+        let mut start = self.pairs.len();
+        for (index, pair) in self.pairs.iter().enumerate().rev() {
+            let size = cells(&pair.keys)
+                + usize::from(!pair.keys.is_empty())
+                + cells(&pair.action)
+                + usize::from(used > 0) * 3;
+            if used + size > width {
+                break;
+            }
+            used += size;
+            start = index;
+        }
+        (&self.pairs[start..], used)
+    }
+}
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct ComposerProps {
     pub tag: String,
@@ -69,6 +90,29 @@ pub struct QuestionFocus {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_narrow_row_keeps_whole_pairs_from_the_right() {
+        let props = KeyBarProps {
+            pairs: vec![
+                KeyPair::new("a", "bb"),
+                KeyPair::new("", "ccc"),
+                KeyPair::new("esc", "close"),
+            ],
+            toast: None,
+        };
+        let fit = |width| {
+            let (pairs, used) = props.fitting(width, str::len);
+            (
+                pairs.iter().map(|p| p.action.as_str()).collect::<Vec<_>>(),
+                used,
+            )
+        };
+        assert_eq!(fit(9), (vec!["close"], 9));
+        assert_eq!(fit(14), (vec!["close"], 9));
+        assert_eq!(fit(15), (vec!["ccc", "close"], 15));
+        assert_eq!(fit(22), (vec!["bb", "ccc", "close"], 22));
+        assert_eq!(fit(8), (Vec::<&str>::new(), 0));
+    }
     #[test]
     fn pane_hints_are_optional_and_round_trip() {
         let wire = serde_json::json!({"pairs":[{"keys":"⏎","action":"use here","emphasis":true}],"composer":{"tag":"/model ","placeholder":"filter models"}});

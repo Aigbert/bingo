@@ -25,23 +25,11 @@ pub fn tree(props: &KeyBarProps, width: usize) -> View {
         }
         return text(children, None, false, false);
     }
-    let mut used = 0;
-    let mut start = props.pairs.len();
-    for (index, pair) in props.pairs.iter().enumerate().rev() {
-        let cells = pair.keys.width()
-            + usize::from(!pair.keys.is_empty())
-            + pair.action.width()
-            + usize::from(used > 0) * 3;
-        if used + cells > room {
-            break;
-        }
-        used += cells;
-        start = index;
-    }
+    let (pairs, used) = props.fitting(room, UnicodeWidthStr::width);
     let mut children = vec![TextChild::String(
         " ".repeat(width.saturating_sub(used + 2)),
     )];
-    for (index, pair) in props.pairs[start..].iter().enumerate() {
+    for (index, pair) in pairs.iter().enumerate() {
         if index > 0 {
             children.push(node(" · ", Some("ash"), false, false));
         }
