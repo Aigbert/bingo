@@ -177,4 +177,24 @@ mod tests {
         );
         assert!(!lines.contains("medium"));
     }
+    #[test]
+    fn unknown_windows_never_claim_that_a_switch_compacts() {
+        let chat = Chat {
+            used: 1_000_000,
+            ..Default::default()
+        };
+        for context in [json!(null), json!(0), json!(-1), json!("unknown")] {
+            let model = CatalogEntry {
+                id: "p/m".into(),
+                label: "m".into(),
+                meta: json!({"context": context, "compacts": true}),
+            };
+            assert!(
+                !card(&model, &chat, None, false)
+                    .join("\n")
+                    .contains("compacts")
+            );
+            assert!(!crate::label::compacts(&model));
+        }
+    }
 }

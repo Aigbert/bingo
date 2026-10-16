@@ -33,7 +33,8 @@ drive bugs are gone, each with a test that failed before the fix.
 7. **Catalogue cwd**: `bingo-core/src/host/catalog.rs` lists skills from the
    session's cwd, not `std::env::current_dir()`.
 8. **Model card** shows "compacts first" only when the window is known and the
-   chat exceeds it (`bingo-mod-models/card.rs`).
+   kernel reports that this chat exceeds its effective switch limit
+   (`bingo-mod-models/card.rs`).
 9. **Picker cursor**: `*` unpin keeps the cursor on the row and toasts
    `unpinned <model>`; the hint reads `* unpin` on a pinned row; a picker opened
    with a filter shows its cursor row (B12, B19).
@@ -95,3 +96,6 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
   existing request generations discard stale answers. No kernel feature noun.
 - Toast deadlines ignore `holdToasts`; the existing wire field stays compatible.
   Only the alert-once set remains, with no paused copy of a deadline.
+- Require a known positive context window for compaction copy. Keep the kernel's
+  `compacts` decision (including output reserve and estimated input growth),
+  rather than reimplementing its threshold using the card's displayed token count.
