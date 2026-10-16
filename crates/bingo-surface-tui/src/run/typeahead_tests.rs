@@ -617,3 +617,24 @@ async fn interrupts_do_not_wait_for_a_status_panes_first_drawing() {
         assert!(run.typeahead.deadline().is_none());
     }
 }
+
+#[tokio::test]
+async fn query_edits_echo_without_a_palette_answer_but_enter_waits() {
+    let now = still(scene().1);
+    let (_home, mut run, session) = palette_run(now);
+    type_burst(&mut run, "/permission");
+    assert_eq!(run.ui.composer.text(), "/permission");
+    assert!(run.typeahead.is_empty());
+    run.terminal_event(Term::Key(key(KeyCode::Left)));
+    run.terminal_event(Term::Key(key(KeyCode::Backspace)));
+    assert_eq!(run.ui.composer.text(), "/permissin");
+    let picture = draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
+    assert!(picture.contains("/permissin"));
+    run.terminal_event(Term::Key(key(KeyCode::Enter)));
+    type_burst(&mut run, "z");
+    assert_eq!(run.ui.composer.text(), "/permissin");
+    assert_eq!(run.typeahead.len(), 2);
+    assert!(session.submitted().is_empty());
+    play_palette(&mut run, &session, now);
+    assert_eq!(texts(&session), ["/permissin"]);
+}

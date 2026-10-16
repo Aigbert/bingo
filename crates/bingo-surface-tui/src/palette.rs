@@ -186,32 +186,59 @@ pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
     let Open::Palette(open) = ui.focus.open() else {
         return false;
     };
+    if let Some(key) = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.request_id == open.id)
+    {
+        return key.request.props["query"].as_str() != Some(ui.composer.text())
+            || ui
+                .placed
+                .pulled
+                .current(render::Component::Palette, &open.id, tree.viewed())
+                .is_none_or(|(_, waiting)| waiting);
+    }
     let area = ui.shown.canvas.area();
     let above = ui.shown.regions.above();
     let props = Props::Palette(Box::new(props(ui, tree, open, now)));
-    if crate::component::key(
+    crate::component::key(
         tree.viewed(),
         &open.id,
         &props,
         above.width,
         (area.height / 2).min(above.height),
     )
-    .is_none()
-    {
+    .is_some()
+}
+
+/// Query editing belongs to the composer; list actions belong to the mod.
+pub fn edits_query(ui: &Ui, key: KeyEvent) -> bool {
+    use crossterm::event::KeyModifiers as M;
+    if !active(ui) {
         return false;
     }
-    let Some(key) = ui
-        .shown
-        .pulls
-        .iter()
-        .find(|key| Some(key.request.request_id.as_str()) == request(ui))
-    else {
-        return true;
-    };
-    key.request.props["query"].as_str() != Some(ui.composer.text())
-        || ui.placed.pulled.get(key).is_none()
+    match key.modifiers - M::SHIFT {
+        M::NONE => match key.code {
+            KeyCode::Char(_)
+            | KeyCode::Left
+            | KeyCode::Right
+            | KeyCode::Home
+            | KeyCode::End
+            | KeyCode::Delete => true,
+            KeyCode::Backspace => !matches!(ui.composer.text(), "" | "/"),
+            _ => false,
+        },
+        M::CONTROL => matches!(key.code, KeyCode::Char('a' | 'e' | 'w' | 'u' | 'k')),
+        M::ALT => matches!(key.code, KeyCode::Char('b' | 'f')),
+        _ => false,
+    }
 }
+
 pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+    if edits_query(ui, key) {
+        return crate::input::palette_edit(ui, tree, key, now);
+    }
     if let Some(action) = handler(ui) {
         if let Some(chord) = crate::keys::commands::chord(key)
             && let Some(action) = action.with_value(json!({"key":chord}))

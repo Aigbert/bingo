@@ -44,30 +44,15 @@ async fn rapid_text_then_enter_waits_for_the_matching_palette_frame() {
         run.terminal_event(Term::Key(key));
     }
     assert!(session.submitted().is_empty());
-    for (index, query) in ["/", "/m", "/mo"].into_iter().enumerate() {
-        pull(&mut run, now);
-        let submissions = session.submissions();
-        assert_eq!(submissions.len(), index + 1);
-        let (intent, Input::Action { action, .. }) = &submissions[index] else {
-            panic!("key action")
-        };
-        assert_eq!(action.args["query"], query);
-        if index < 2 {
-            run.ack(
-                intent,
-                &IntentOutcome::Applied {
-                    result: json!({"handled":false}),
-                },
-            );
-            assert_eq!(
-                session.submitted().len(),
-                index + 1,
-                "wait for the new query's drawing"
-            );
-        } else {
-            assert_eq!(action.args["value"]["key"], "enter");
-        }
-    }
+    assert_eq!(run.ui.composer.text(), "/mo");
+    pull(&mut run, now);
+    let submissions = session.submissions();
+    assert_eq!(submissions.len(), 1);
+    let (_, Input::Action { action, .. }) = &submissions[0] else {
+        panic!("list action")
+    };
+    assert_eq!(action.args["query"], "/mo");
+    assert_eq!(action.args["value"]["key"], "enter");
     assert_eq!(run.ui.composer.text(), "/mo");
 }
 
@@ -120,20 +105,20 @@ async fn the_top_palette_owns_keys_when_an_ask_arrives_after_idle() {
                 pull(&mut run, now);
                 let id = crate::palette::request(&run.ui).unwrap().to_owned();
                 run.terminal_event(Term::Key(pressed));
-                let submissions = session.submissions();
-                let (intent, Input::Action { .. }) = &submissions[0] else {
-                    panic!("palette action")
-                };
-                let result = if pressed.code == KeyCode::Char('x') {
-                    json!({"handled":false})
+                if pressed.code == KeyCode::Char('x') {
+                    assert!(session.submitted().is_empty(), "editing stays local");
                 } else {
-                    json!({"surface":{"name":"surface:palette","args":{"handler":id,"value":{"close":true}}}})
-                };
-                run.ack(intent, &IntentOutcome::Applied { result });
+                    let submissions = session.submissions();
+                    let (intent, Input::Action { .. }) = &submissions[0] else {
+                        panic!("palette action")
+                    };
+                    let result = json!({"surface":{"name":"surface:palette","args":{"handler":id,"value":{"close":true}}}});
+                    run.ack(intent, &IntentOutcome::Applied { result });
+                }
                 assert!(run.session.tree.open_interaction().is_some());
                 assert_eq!(
                     session.submissions().len(),
-                    1,
+                    usize::from(pressed.code != KeyCode::Char('x')),
                     "no answer or interrupt escaped"
                 );
                 if pressed.code == KeyCode::Char('x') {

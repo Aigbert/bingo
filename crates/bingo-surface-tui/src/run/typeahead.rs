@@ -122,19 +122,20 @@ fn focus(run: &Run) -> Option<String> {
         .map(|site| site.focus)
 }
 
-fn drawing(run: &Run) -> bool {
+fn drawing(run: &Run, editing: bool) -> bool {
     (crate::focus::owner(&run.ui, &run.session.tree) == crate::focus::Owner::Pane
         && crate::pane::readiness::waiting(&run.ui, run.session.tree.viewed()))
         || crate::browse::waiting(&run.ui, &run.session.tree)
         || crate::plugins::waiting(&run.ui)
-        || crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now())
+        || (!editing && crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now()))
         || crate::sessions::waiting(&run.ui, &run.session.tree, run.detection.now())
 }
 
 /// Whether a key typed now must wait behind something: a site still drawn,
 /// a key still judged, a command line still out, or keys typed before it.
-pub(super) fn blocked(run: &Run) -> bool {
-    if drawing(run) || run.typeahead.opening(run.detection.now().instant) {
+pub(super) fn blocked(run: &Run, key: Option<KeyEvent>) -> bool {
+    let editing = key.is_some_and(|key| crate::palette::edits_query(&run.ui, key));
+    if drawing(run, editing) || run.typeahead.opening(run.detection.now().instant) {
         return true;
     }
     if focus(run).is_some_and(|focus| judging(run, &focus)) {
@@ -147,7 +148,7 @@ pub(super) fn blocked(run: &Run) -> bool {
 fn catalogue_only(run: &Run) -> bool {
     run.typeahead.inputs.iter().all(|queued| {
         matches!(&queued.input, Held::Key(key) if catalogues::waiting(run, *key))
-            && !waiting(run, queued.site.as_deref())
+            && !waiting(run, queued.site.as_deref(), &queued.input)
     })
 }
 
@@ -178,7 +179,7 @@ pub(super) fn retry(run: &mut Run, site: String, key: KeyEvent) {
 
 /// A paste waits in the same order as keys, but never enters an ask from here.
 pub(super) fn paste(run: &mut Run, text: String) {
-    if blocked(run) {
+    if blocked(run, None) {
         let site = focus(run);
         run.typeahead.inputs.push_back(Queued {
             site,
@@ -228,7 +229,7 @@ pub(super) fn drain(run: &mut Run) {
             }
             continue;
         }
-        if waiting(run, site.as_deref()) {
+        if waiting(run, site.as_deref(), &front.input) {
             break;
         }
         if let Some(queued) = run.typeahead.inputs.pop_front() {
@@ -255,8 +256,9 @@ fn dialog(run: &Run, focus: Option<&str>) -> bool {
         })
 }
 
-fn waiting(run: &Run, site: Option<&str>) -> bool {
-    if drawing(run) || run.typeahead.opening(run.detection.now().instant) {
+fn waiting(run: &Run, site: Option<&str>, input: &Held) -> bool {
+    let editing = matches!(input, Held::Key(key) if crate::palette::edits_query(&run.ui, *key));
+    if drawing(run, editing) || run.typeahead.opening(run.detection.now().instant) {
         return true;
     }
     if site.is_some_and(|site| judging(run, site)) {

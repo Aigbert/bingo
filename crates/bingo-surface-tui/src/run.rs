@@ -691,7 +691,9 @@ impl Run {
                         return;
                     }
                 }
-                if !interrupt && (catalogues::waiting(self, key) || typeahead::blocked(self)) {
+                if !interrupt
+                    && (catalogues::waiting(self, key) || typeahead::blocked(self, Some(key)))
+                {
                     typeahead::queue(self, key);
                     return;
                 }

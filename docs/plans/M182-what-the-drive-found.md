@@ -18,10 +18,10 @@ drive bugs are gone, each with a test that failed before the fix.
    `palette::waiting` stops rebuilding the full props on every check: it compares
    the query the last answer was drawn for.
 2. **No fallback flash.** While a pull is pending the palette keeps the last
-   answer's drawing (rows filtered locally by the new query), never the
+   answer's drawing (old rows retained until the new answer), never the
    names-only `palette/fallback.rs`; fallback is only for "no answer has ever
-   arrived". The palette's height changes only when the row count crosses the
-   last height, so the header row does not jump on every key.
+   arrived". The palette's height grows only when the row count exceeds the
+   last height (and shrinks to fit a smaller terminal), so the header row does not jump on every key.
 3. **Pager Esc** closes the pager and does nothing else; `q` and `ctrl+o` close
    it too (B1).
 4. **Esc on a question or form** answers "skipped, it decides" and the turn
@@ -64,3 +64,13 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
   or keep the old rows unfiltered until the answer arrives.
 - M180's guarantee (keys never lost, never into an ask) must hold: its tests
   stay green unchanged.
+
+## Implementation decisions
+
+- Keep the last palette rows unfiltered while awaiting the mod. Its matcher and
+  selection stay with its owner; local filtering would duplicate both. List
+  actions still wait for the current query and cannot activate those old rows.
+- Keep the largest accepted palette height for each opening, bounded by the
+  viewport. Padding shorter answers keeps the header steady while narrowing.
+- Root Backspace and Escape retain the palette owner's close/back semantics;
+  ordinary edits and horizontal cursor movement stay with the composer.
