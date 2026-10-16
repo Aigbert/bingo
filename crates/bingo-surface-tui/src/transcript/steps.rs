@@ -3,7 +3,7 @@
 //! where the person stopped it. What hangs under a step starts at column 5,
 //! under its words.
 
-use bingo_sdk::component::ledger::{FoldGlyphs, stop_row};
+use bingo_sdk::component::ledger::{FoldGlyphs, STEP_INDENT, plural};
 use bingo_sdk::component::row::{Ink, Piece};
 use bingo_sdk::component::{Props, Step, StepState, TurnFoldProps};
 
@@ -22,10 +22,7 @@ pub(super) fn part(item: &Item, role: &Role, rows: &Rows<'_>) -> Option<Block> {
         Role::Step { step, opened } => Some(step_block(item, step, *opened, rows)),
         Role::Fold { fold, then } => Some(fold_block(item, fold, then.as_deref(), rows)),
         Role::Thought => Some(thought(item, rows).into()),
-        Role::Stop { ran, total } => {
-            let glyph = theme::glyphs().chrome.stop;
-            Some(vec![line(stop_row(glyph, *ran, *total))].into())
-        }
+        Role::Stop { ran, total } => Some(vec![stop_line(*ran, *total)].into()),
     }
 }
 
@@ -157,6 +154,25 @@ fn thought(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
     under(Span::raw(" ".repeat(HANG)), plain(text), HANG, rows.width)
 }
 
+/// The line a stopped turn ends on: `■ you stopped the turn · 2 of 3 steps
+/// had run; nothing after them`, or the first four words when no step had
+/// begun.
+fn stop_line(ran: usize, total: usize) -> Line<'static> {
+    let mut words = String::from("you stopped the turn");
+    if total > 0 {
+        words.push_str(&format!(
+            " \u{b7} {ran} of {total} {} had run; nothing after them",
+            plural(total)
+        ));
+    }
+    let glyph = theme::glyphs().chrome.stop;
+    Line::from(vec![
+        Span::styled(STEP_INDENT, theme::text()),
+        Span::styled(format!("{glyph} "), theme::bad()),
+        Span::styled(words, theme::dim()),
+    ])
+}
+
 /// A row of pieces in the theme's inks.
 fn line(pieces: Vec<Piece>) -> Line<'static> {
     let spans = pieces
@@ -175,5 +191,31 @@ fn ink(ink: Ink) -> Style {
         Ink::Bad => theme::bad(),
         Ink::Glow => theme::glow(),
         Ink::Presence => theme::presence(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stop_line;
+
+    #[test]
+    fn the_stop_line_counts_what_ran_and_says_nothing_of_steps_never_begun() {
+        let stop = crate::theme::glyphs().chrome.stop;
+        assert_eq!(
+            stop_line(2, 3).to_string(),
+            format!(
+                "   {stop} you stopped the turn \u{b7} 2 of 3 steps had run; nothing after them"
+            )
+        );
+        assert_eq!(
+            stop_line(0, 1).to_string(),
+            format!(
+                "   {stop} you stopped the turn \u{b7} 0 of 1 step had run; nothing after them"
+            )
+        );
+        assert_eq!(
+            stop_line(0, 0).to_string(),
+            format!("   {stop} you stopped the turn")
+        );
     }
 }

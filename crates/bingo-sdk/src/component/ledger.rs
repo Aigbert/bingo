@@ -57,7 +57,7 @@ pub struct LedgerProps {
 }
 
 /// The `TurnFold` site: a finished turn as one line. The stop line under a
-/// stopped turn is the interruption's own row ([`stop_row`]).
+/// stopped turn is the interruption's own row.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TurnFoldProps {
@@ -297,24 +297,6 @@ impl TurnFoldProps {
     }
 }
 
-/// The line a stopped turn ends on: `■ you stopped the turn · 2 of 3 steps
-/// had run; nothing after them`, or the first four words when no step had
-/// begun.
-pub fn stop_row(glyph: &str, ran: usize, total: usize) -> Vec<Piece> {
-    let mut words = String::from("you stopped the turn");
-    if total > 0 {
-        words.push_str(&format!(
-            " \u{b7} {ran} of {total} {} had run; nothing after them",
-            plural(total)
-        ));
-    }
-    vec![
-        Piece::new(STEP_INDENT, Ink::Plain),
-        Piece::new(format!("{glyph} "), Ink::Bad),
-        Piece::new(words, Ink::Dim),
-    ]
-}
-
 fn count(steps: usize) -> String {
     match steps {
         0 => "thought".into(),
@@ -322,7 +304,8 @@ fn count(steps: usize) -> String {
     }
 }
 
-fn plural(steps: usize) -> &'static str {
+/// The noun `steps` of them take: `1 step`, `3 steps`.
+pub fn plural(steps: usize) -> &'static str {
     match steps {
         1 => "step",
         _ => "steps",
@@ -435,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn a_stopped_turn_says_so_and_the_stop_line_counts_what_ran() {
+    fn a_stopped_turn_says_so() {
         let steps = vec![
             step("read", "a", StepState::Done, None),
             step("grep", "b", StepState::Done, None),
@@ -451,14 +434,6 @@ mod tests {
         let line = text(&fold.row(GLYPHS, 100, cells).unwrap());
         assert!(line.contains("grep \u{b7} bash \u{b7} stopped"), "{line:?}");
         assert!(line.ends_with(" 1s"));
-        assert_eq!(
-            text(&stop_row("\u{25a0}", 2, steps.len())),
-            "   \u{25a0} you stopped the turn \u{b7} 2 of 3 steps had run; nothing after them"
-        );
-        assert_eq!(
-            text(&stop_row("\u{25a0}", 0, 0)),
-            "   \u{25a0} you stopped the turn"
-        );
         let nothing = TurnFoldProps {
             steps: vec![],
             thought: false,

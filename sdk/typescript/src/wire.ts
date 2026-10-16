@@ -1420,7 +1420,7 @@ export type TurnDurationProps = { "durationMs": number; "word": string; [key: st
 export type TurnEnd = ("done" | "stopped");
 /**
  * The `TurnFold` site: a finished turn as one line. The stop line under a
- * stopped turn is the interruption's own row ([`stop_row`]).
+ * stopped turn is the interruption's own row.
  */
 export type TurnFoldProps = {
   /** From the turn's first item to its last, in milliseconds. */

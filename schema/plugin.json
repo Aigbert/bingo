@@ -10919,7 +10919,7 @@
         "outcome",
         "elapsed"
       ],
-      "description": "The `TurnFold` site: a finished turn as one line. The stop line under a\nstopped turn is the interruption's own row ([`stop_row`])."
+      "description": "The `TurnFold` site: a finished turn as one line. The stop line under a\nstopped turn is the interruption's own row."
     },
     "TurnId": {
       "type": "string",
