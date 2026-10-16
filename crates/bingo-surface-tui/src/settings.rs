@@ -82,6 +82,20 @@ mod tests {
     }
 
     #[test]
+    fn the_update_check_is_on_until_it_is_turned_off() {
+        let check = |value: serde_json::Value| {
+            serde_json::from_value::<Settings>(value)
+                .ok()
+                .map(|settings| settings.update.check)
+        };
+        assert_eq!(check(json!({})), Some(true));
+        assert_eq!(check(json!({ "update": {} })), Some(true));
+        assert_eq!(check(json!({ "update": { "check": true } })), Some(true));
+        assert_eq!(check(json!({ "update": { "check": false } })), Some(false));
+        assert!(Settings::default().update.check);
+    }
+
+    #[test]
     fn a_slice_that_is_not_this_shape_leaves_the_transcript_where_it_was() {
         assert_eq!(measure(&json!({ "tui": { "measure": "wide" } })), None);
         assert_eq!(measure(&json!({ "tui": 3 })), None);
