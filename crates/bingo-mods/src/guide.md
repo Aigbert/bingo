@@ -65,7 +65,7 @@ act. These are the built-in events; service faces and `$` operations also expose
 - Tool: `tool.check` judges permission; `tool.call` runs it; `tool.describe` describes it.
 - Model: `model.complete` intercepts a host-requested completion.
 - Turn: `turn.start` observes the start; `turn.step` calls the turn's model; `turn.stop` decides whether to stop; `turn.complete` composes completion text.
-- Session: `session.start`, `session.end`, `session.attach`, `session.detach`, `session.measure` are observations of lifetime, clients and usage.
+- Session: `session.start`, `session.end`, `session.attach`, `session.detach`, `session.measure` are observations of lifetime, clients and usage; `session.measure` fires once per round, and the reading at any moment, including the one a session states when it opens or changes model, is `context` in `await $.session.usage()`.
 - Session dispatch: `session.send`, `session.receive`, `session.append`, `session.compact` handle delivery, records and compaction.
 - Command: `command.run` runs one; `command.describe` describes it.
 - Config: `config.set` changes a setting; `config.describe` describes the settings.
