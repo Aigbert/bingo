@@ -92,7 +92,8 @@ export type CommandSpec = {
 };
 export type Complete = { "request": ModelRequest; "session": SessionId; "turn"?: (TurnId | null); [key: string]: unknown; };
 export type Completed = { "events": Array<ModelEvent>; [key: string]: unknown; };
-export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 /** Configuration as a client sees it: the kernel's keys and each plugin's claimed slice. */
 export type ConfigView = { "kernel"?: unknown; "plugins"?: { [key: string]: unknown; }; [key: string]: unknown; };
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
@@ -587,6 +588,7 @@ export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | 
  * `/model next` is a binding on `model` and not a second catalogue entry.
  */
 export type KeyBinding = (string | { "args": string; "chord": string; [key: string]: unknown; });
+export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
 export type Level = ("info" | "warn" | "error");
 export type LoginFlow = ({ "kind": "browser"; "url": string; [key: string]: unknown; } | { "code": string; "kind": "device"; "url": string; [key: string]: unknown; } | { "kind": "paste"; [key: string]: unknown; });
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
@@ -704,6 +706,8 @@ export type Question = {
   "question": string;
   [key: string]: unknown;
 };
+/** A question owner's editing projection; sealed labels remain the host's. */
+export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
 export type QuestionOption = {
   "description"?: (string | null);
   "id": string;
@@ -809,6 +813,7 @@ export type Setting = {
   "value": unknown;
   [key: string]: unknown;
 };
+export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 export type StateGet = { "key": string; "scope": string; [key: string]: unknown; };
 export type StateSet = { "ifVersion"?: (number | null); "key": string; "scope": string; "value": unknown; [key: string]: unknown; };
 export type StateValue = { "value": unknown; "version": number; [key: string]: unknown; };
@@ -970,6 +975,8 @@ export type View = ({
   "gap"?: (number | null);
   /** The height in rows. */
   "height"?: (number | null);
+  /** The focused site declares chrome separately from its body. */
+  "hints"?: (SiteHints | null);
   /** Main-axis distribution, such as `flex-start` or `space-between`. */
   "justifyContent"?: (Justify | null);
   /** A stable identity among siblings. */
@@ -989,6 +996,11 @@ export type View = ({
   "paddingX"?: (number | null);
   /** Rows inside the box above and below. */
   "paddingY"?: (number | null);
+  /**
+   * A question owner's editing state, on the root of a drawn question;
+   * the choices' labels and the answer stay the host's.
+   */
+  "question"?: (QuestionFocus | null);
   /** The width in cells. */
   "width"?: (number | null);
   [key: string]: unknown;

@@ -85,6 +85,10 @@ impl Component {
     /// What this site draws, for authors choosing a `ui.render` match.
     pub const fn summary(self) -> &'static str {
         match self {
+            Self::KeyBar => {
+                "The row under the prompt naming what the keys do now, with a toast at its left end."
+            }
+            Self::Composer => "The prompt line's tag and placeholder around the person's draft.",
             Self::ModelPicker => "The model picker: providers and their models to choose from.",
             Self::Browse => "The transcript reader: the session turn by turn, with search.",
             Self::Plugins => "The plugin list, with each plugin's state and switch.",

@@ -32,12 +32,14 @@ pub struct TextStyle {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BoxStyle {
-    /// A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back.
+    /// A question owner's editing state, on the root of a drawn question;
+    /// the choices' labels and the answer stay the host's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub question: Option<crate::component::QuestionFocus>,
     /// The focused site declares chrome separately from its body.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hints: Option<crate::component::SiteHints>,
+    /// A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_key: Option<Action>,
     /// A stable identity among siblings.

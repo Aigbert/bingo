@@ -7052,7 +7052,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "A question owner's editing state, on the root of a drawn question;\nthe choices' labels and the answer stay the host's."
             },
             "hints": {
               "anyOf": [

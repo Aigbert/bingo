@@ -59,7 +59,7 @@ export type UiSelect = UiSelectInput.Payload;
 export namespace UiRenderInput {
 // Generated from JSON Schema. Do not edit.
 export type Anchor = ("topLeft" | "topRight" | "bottomLeft" | "bottomRight" | "center");
-export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
 /**
  * A length: a number of terminal cells, or a share of the screen written as
  * a percentage string such as `'40%'`.
@@ -112,9 +112,13 @@ export type ActionItem = {
   [key: string]: unknown;
 };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
-export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type Direction = ("row" | "column");
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
+export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
+/** A question owner's editing projection; sealed labels remain the host's. */
+export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
 export type SelectOption = {
   /** The text shown. */
   "label": string;
@@ -122,6 +126,7 @@ export type SelectOption = {
   "value": string;
   [key: string]: unknown;
 };
+export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | unknown);
 /** The one styling hook a plugin has; the surface owns the colour. */
@@ -227,6 +232,8 @@ export type Payload = ({
   "gap"?: (number | null);
   /** The height in rows. */
   "height"?: (number | null);
+  /** The focused site declares chrome separately from its body. */
+  "hints"?: (SiteHints | null);
   /** Main-axis distribution, such as `flex-start` or `space-between`. */
   "justifyContent"?: (Justify | null);
   /** A stable identity among siblings. */
@@ -246,6 +253,11 @@ export type Payload = ({
   "paddingX"?: (number | null);
   /** Rows inside the box above and below. */
   "paddingY"?: (number | null);
+  /**
+   * A question owner's editing state, on the root of a drawn question;
+   * the choices' labels and the answer stay the host's.
+   */
+  "question"?: (QuestionFocus | null);
   /** The width in cells. */
   "width"?: (number | null);
   [key: string]: unknown;
@@ -600,7 +612,8 @@ export type ActionItem = {
   [key: string]: unknown;
 };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
-export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type Direction = ("row" | "column");
 /**
@@ -626,6 +639,9 @@ export type Image = {
   [key: string]: unknown;
 };
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
+export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
+/** A question owner's editing projection; sealed labels remain the host's. */
+export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
 export type SelectOption = {
   /** The text shown. */
   "label": string;
@@ -633,6 +649,7 @@ export type SelectOption = {
   "value": string;
   [key: string]: unknown;
 };
+export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** The one styling hook a plugin has; the surface owns the colour. */
@@ -742,6 +759,8 @@ export type View = ({
   "gap"?: (number | null);
   /** The height in rows. */
   "height"?: (number | null);
+  /** The focused site declares chrome separately from its body. */
+  "hints"?: (SiteHints | null);
   /** Main-axis distribution, such as `flex-start` or `space-between`. */
   "justifyContent"?: (Justify | null);
   /** A stable identity among siblings. */
@@ -761,6 +780,11 @@ export type View = ({
   "paddingX"?: (number | null);
   /** Rows inside the box above and below. */
   "paddingY"?: (number | null);
+  /**
+   * A question owner's editing state, on the root of a drawn question;
+   * the choices' labels and the answer stay the host's.
+   */
+  "question"?: (QuestionFocus | null);
   /** The width in cells. */
   "width"?: (number | null);
   [key: string]: unknown;
@@ -1200,7 +1224,8 @@ export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
  * another process: the reason crosses the bridge as it is.
  */
 export type CompactReason = ({ "kind": "threshold"; [key: string]: unknown; } | { "kind": "overflow"; "message": string; [key: string]: unknown; } | { "instructions"?: (string | null); "kind": "manual"; [key: string]: unknown; });
-export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type ContextKind = ("system" | "tools" | "chat" | "pictures");
 export type ContextPart = { "name": ContextKind; "tokens": number; [key: string]: unknown; };
@@ -1274,6 +1299,7 @@ export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<Conte
 export type ItemId = string;
 export type ItemStatus = ("pending" | "running" | "completed" | "failed" | "interrupted");
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
+export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
 export type Level = ("info" | "warn" | "error");
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
 export type ModelRequest = {
@@ -1305,6 +1331,8 @@ export type Origin = {
   "voice"?: (Voice | null);
   [key: string]: unknown;
 };
+/** A question owner's editing projection; sealed labels remain the host's. */
+export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
 export type Role = ("user" | "assistant");
 export type SelectOption = {
   /** The text shown. */
@@ -1315,6 +1343,7 @@ export type SelectOption = {
 };
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
+export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
@@ -1441,6 +1470,8 @@ export type View = ({
   "gap"?: (number | null);
   /** The height in rows. */
   "height"?: (number | null);
+  /** The focused site declares chrome separately from its body. */
+  "hints"?: (SiteHints | null);
   /** Main-axis distribution, such as `flex-start` or `space-between`. */
   "justifyContent"?: (Justify | null);
   /** A stable identity among siblings. */
@@ -1460,6 +1491,11 @@ export type View = ({
   "paddingX"?: (number | null);
   /** Rows inside the box above and below. */
   "paddingY"?: (number | null);
+  /**
+   * A question owner's editing state, on the root of a drawn question;
+   * the choices' labels and the answer stay the host's.
+   */
+  "question"?: (QuestionFocus | null);
   /** The width in cells. */
   "width"?: (number | null);
   [key: string]: unknown;
@@ -2013,7 +2049,8 @@ export type ActionItem = {
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
 export type Answer = ({ "input": unknown; "kind": "allowChanged"; [key: string]: unknown; } | { "kind": "allowOnce"; [key: string]: unknown; } | { "kind": "allowSession"; "scope": string; [key: string]: unknown; } | { "feedback"?: (string | null); "kind": "deny"; [key: string]: unknown; } | { "ids": Array<string>; "kind": "choice"; "other"?: (string | null); [key: string]: unknown; } | { "kind": "text"; "text": string; [key: string]: unknown; } | { "kind": "confirm"; [key: string]: unknown; } | { "kind": "cancel"; [key: string]: unknown; } | { "answers": Array<Answer>; "kind": "form"; [key: string]: unknown; });
 export type CommandOutcome = ({ "kind": "acknowledged"; "result": unknown; [key: string]: unknown; } | { "action": Action; "fallback"?: (string | null); "kind": "surface"; [key: string]: unknown; } | { "answer": Answer; "kind": "answer"; [key: string]: unknown; } | { "handled": boolean; "kind": "handled"; [key: string]: unknown; } | { "kind": "applied"; "message"?: (string | null); [key: string]: unknown; } | { "kind": "view"; "view": View; [key: string]: unknown; } | { "kind": "prompt"; "text": string; [key: string]: unknown; } | { "body": ItemBody; "kind": "record"; [key: string]: unknown; });
-export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type DecisionKind = ("allowChanged" | "allowChangedSession" | "allow" | "allowSession" | "deny");
 export type Direction = ("row" | "column");
@@ -2045,6 +2082,7 @@ export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<Conte
 /** One unit in the transcript order. */
 export type ItemId = string;
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
+export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
 export type Level = ("info" | "warn" | "error");
 /** Who submitted the input, as every surface records it. */
 export type Origin = {
@@ -2056,6 +2094,8 @@ export type Origin = {
   "voice"?: (Voice | null);
   [key: string]: unknown;
 };
+/** A question owner's editing projection; sealed labels remain the host's. */
+export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
 export type SelectOption = {
   /** The text shown. */
   "label": string;
@@ -2063,6 +2103,7 @@ export type SelectOption = {
   "value": string;
   [key: string]: unknown;
 };
+export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
@@ -2175,6 +2216,8 @@ export type View = ({
   "gap"?: (number | null);
   /** The height in rows. */
   "height"?: (number | null);
+  /** The focused site declares chrome separately from its body. */
+  "hints"?: (SiteHints | null);
   /** Main-axis distribution, such as `flex-start` or `space-between`. */
   "justifyContent"?: (Justify | null);
   /** A stable identity among siblings. */
@@ -2194,6 +2237,11 @@ export type View = ({
   "paddingX"?: (number | null);
   /** Rows inside the box above and below. */
   "paddingY"?: (number | null);
+  /**
+   * A question owner's editing state, on the root of a drawn question;
+   * the choices' labels and the answer stay the host's.
+   */
+  "question"?: (QuestionFocus | null);
   /** The width in cells. */
   "width"?: (number | null);
   [key: string]: unknown;

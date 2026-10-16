@@ -265,7 +265,8 @@ export type CompactorContext = {
 export type CompactorSpec = { "id": string; [key: string]: unknown; };
 export type Complete = { "request": ModelRequest; "session": SessionId; "turn"?: (TurnId | null); [key: string]: unknown; };
 export type Completed = { "events": Array<ModelEvent>; [key: string]: unknown; };
-export type Component = ("ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome");
+export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type ConfigSet = {
   /** The setting's dotted key. */
   "key": string;
@@ -722,12 +723,15 @@ export type ItemStatus = ("pending" | "running" | "completed" | "failed" | "inte
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
 /** An error as it appears on the wire and in the journal. */
 export type KernelError = { "code": ErrorCode; "message": string; [key: string]: unknown; };
+export type KeyBarProps = { "pairs": Array<KeyPair>; "toast"?: (KeyToast | null); [key: string]: unknown; };
 /**
  * A chord a command declares for itself. A bare chord runs the command
  * alone; one with `args` submits the command with them, so a shortcut for
  * `/model next` is a binding on `model` and not a second catalogue entry.
  */
 export type KeyBinding = (string | { "args": string; "chord": string; [key: string]: unknown; });
+export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
+export type KeyToast = { "about"?: (string | null); "level": Level; "text": string; [key: string]: unknown; };
 /**
  * A length: a number of terminal cells, or a share of the screen written as
  * a percentage string such as `'40%'`.
@@ -877,7 +881,24 @@ export type OversizedItem = {
   [key: string]: unknown;
 };
 export type PaletteOpen = ("commands" | "keys" | "sessions");
-export type PaletteProps = { "action": Action; "bindings": { [key: string]: string; }; "catalogs": { [key: string]: Array<CatalogEntry>; }; "commands": Array<CatalogEntry>; "conversation": Array<PaletteSession>; "keyHints": { [key: string]: string; }; "open": PaletteOpen; "query": string; "session": SessionId; "sessions": Array<PaletteSession>; [key: string]: unknown; };
+export type PaletteProps = {
+  "action": Action;
+  "bindings": { [key: string]: string; };
+  /**
+   * Only the catalogues the query's command completes from, once the
+   * query reaches its arguments: every press carries them, and a model
+   * catalogue is the largest thing it would otherwise carry.
+   */
+  "catalogs": { [key: string]: Array<CatalogEntry>; };
+  "commands": Array<CatalogEntry>;
+  "conversation": Array<PaletteSession>;
+  "keyHints": { [key: string]: string; };
+  "open": PaletteOpen;
+  "query": string;
+  "session": SessionId;
+  "sessions": Array<PaletteSession>;
+  [key: string]: unknown;
+};
 /** A compact row, projected by the client from live or stored facts. */
 export type PaletteSession = { "attention"?: (string | null); "detail": string; "id": SessionId; "label": string; [key: string]: unknown; };
 /**
@@ -885,7 +906,7 @@ export type PaletteSession = { "attention"?: (string | null); "detail": string; 
  * `'overlay'` floating over the screen, or at a fixed `{rect}`.
  */
 export type PanePlace = (("above" | "side" | "overlay") | { "rect": Rect; });
-export type PaneProps = { "bodyColumns": number; "isFocused": boolean; "placement": string; "scroll": SiteScroll; "title": string; "view": SiteView; [key: string]: unknown; };
+export type PaneProps = { "bodyColumns": number; "hints"?: (SiteHints | null); "isFocused": boolean; "placement": string; "scroll": SiteScroll; "title": string; "view": SiteView; [key: string]: unknown; };
 /** A pane's height and width; each defaults when left out. */
 export type PaneSize = {
   /** Width in columns. */
@@ -979,7 +1000,7 @@ export type PromptView = {
   "queue": Array<QueueEntry>;
   [key: string]: unknown;
 };
-export type Props = ({ "component": "ModelPicker"; "props": ModelPickerProps; [key: string]: unknown; } | { "component": "Browse"; "props": BrowseProps; [key: string]: unknown; } | { "component": "Plugins"; "props": PluginsProps; [key: string]: unknown; } | { "component": "Palette"; "props": PaletteProps; [key: string]: unknown; } | { "component": "Sessions"; "props": SessionsProps; [key: string]: unknown; } | { "component": "Status"; "props": StatusProps; [key: string]: unknown; } | { "component": "Question"; "props": QuestionProps; [key: string]: unknown; } | { "component": "UserMessage"; "props": UserMessageProps; [key: string]: unknown; } | { "component": "AssistantMessage"; "props": AssistantMessageProps; [key: string]: unknown; } | { "component": "ToolUse"; "props": ToolUseProps; [key: string]: unknown; } | { "component": "ToolResult"; "props": ToolResultProps; [key: string]: unknown; } | { "component": "ToolGroup"; "props": ToolGroupProps; [key: string]: unknown; } | { "component": "ToolProgress"; "props": ToolProgressProps; [key: string]: unknown; } | { "component": "CommandOutput"; "props": CommandOutputProps; [key: string]: unknown; } | { "component": "Spinner"; "props": SpinnerProps; [key: string]: unknown; } | { "component": "TurnDuration"; "props": TurnDurationProps; [key: string]: unknown; } | { "component": "InfoNotice"; "props": InfoNoticeProps; [key: string]: unknown; } | { "component": "SessionMode"; "props": SessionModeProps; [key: string]: unknown; } | { "component": "PromptHint"; "props": PromptHintProps; [key: string]: unknown; } | { "component": "AbovePrompt"; "props": AbovePromptProps; [key: string]: unknown; } | { "component": "Pane"; "props": PaneProps; [key: string]: unknown; } | { "component": "Permission"; "props": PermissionProps; [key: string]: unknown; } | { "component": "SignIn"; "props": SignInProps; [key: string]: unknown; } | { "component": "Reasoning"; "props": ReasoningProps; [key: string]: unknown; } | { "component": "Compaction"; "props": CompactionProps; [key: string]: unknown; } | { "component": "Rewind"; "props": RewindProps; [key: string]: unknown; } | { "component": "Interruption"; "props": InterruptionProps; [key: string]: unknown; } | { "component": "QuestionAnswer"; "props": QuestionAnswerProps; [key: string]: unknown; } | { "component": "PermissionReceipt"; "props": PermissionReceiptProps; [key: string]: unknown; } | { "component": "Asset"; "props": AssetProps; [key: string]: unknown; } | { "component": "ShellRun"; "props": ShellRunProps; [key: string]: unknown; } | { "component": "Action"; "props": ActionProps; [key: string]: unknown; } | { "component": "TurnProgress"; "props": TurnProgressProps; [key: string]: unknown; } | { "component": "SessionStatus"; "props": SessionStatusProps; [key: string]: unknown; } | { "component": "Toast"; "props": ToastProps; [key: string]: unknown; } | { "component": "Welcome"; "props": WelcomeProps; [key: string]: unknown; });
+export type Props = ({ "component": "KeyBar"; "props": KeyBarProps; [key: string]: unknown; } | { "component": "Composer"; "props": ComposerProps; [key: string]: unknown; } | { "component": "ModelPicker"; "props": ModelPickerProps; [key: string]: unknown; } | { "component": "Browse"; "props": BrowseProps; [key: string]: unknown; } | { "component": "Plugins"; "props": PluginsProps; [key: string]: unknown; } | { "component": "Palette"; "props": PaletteProps; [key: string]: unknown; } | { "component": "Sessions"; "props": SessionsProps; [key: string]: unknown; } | { "component": "Status"; "props": StatusProps; [key: string]: unknown; } | { "component": "Question"; "props": QuestionProps; [key: string]: unknown; } | { "component": "UserMessage"; "props": UserMessageProps; [key: string]: unknown; } | { "component": "AssistantMessage"; "props": AssistantMessageProps; [key: string]: unknown; } | { "component": "ToolUse"; "props": ToolUseProps; [key: string]: unknown; } | { "component": "ToolResult"; "props": ToolResultProps; [key: string]: unknown; } | { "component": "ToolGroup"; "props": ToolGroupProps; [key: string]: unknown; } | { "component": "ToolProgress"; "props": ToolProgressProps; [key: string]: unknown; } | { "component": "CommandOutput"; "props": CommandOutputProps; [key: string]: unknown; } | { "component": "Spinner"; "props": SpinnerProps; [key: string]: unknown; } | { "component": "TurnDuration"; "props": TurnDurationProps; [key: string]: unknown; } | { "component": "InfoNotice"; "props": InfoNoticeProps; [key: string]: unknown; } | { "component": "SessionMode"; "props": SessionModeProps; [key: string]: unknown; } | { "component": "PromptHint"; "props": PromptHintProps; [key: string]: unknown; } | { "component": "AbovePrompt"; "props": AbovePromptProps; [key: string]: unknown; } | { "component": "Pane"; "props": PaneProps; [key: string]: unknown; } | { "component": "Permission"; "props": PermissionProps; [key: string]: unknown; } | { "component": "SignIn"; "props": SignInProps; [key: string]: unknown; } | { "component": "Reasoning"; "props": ReasoningProps; [key: string]: unknown; } | { "component": "Compaction"; "props": CompactionProps; [key: string]: unknown; } | { "component": "Rewind"; "props": RewindProps; [key: string]: unknown; } | { "component": "Interruption"; "props": InterruptionProps; [key: string]: unknown; } | { "component": "QuestionAnswer"; "props": QuestionAnswerProps; [key: string]: unknown; } | { "component": "PermissionReceipt"; "props": PermissionReceiptProps; [key: string]: unknown; } | { "component": "Asset"; "props": AssetProps; [key: string]: unknown; } | { "component": "ShellRun"; "props": ShellRunProps; [key: string]: unknown; } | { "component": "Action"; "props": ActionProps; [key: string]: unknown; } | { "component": "TurnProgress"; "props": TurnProgressProps; [key: string]: unknown; } | { "component": "SessionStatus"; "props": SessionStatusProps; [key: string]: unknown; } | { "component": "Toast"; "props": ToastProps; [key: string]: unknown; } | { "component": "Welcome"; "props": WelcomeProps; [key: string]: unknown; });
 /**
  * Kernel → plugin: nobody is reading this stream any more — the turn was
  * interrupted, or whoever asked let go. A process that ignores it is slow, not
@@ -1042,6 +1063,8 @@ export type Question = {
   [key: string]: unknown;
 };
 export type QuestionAnswerProps = { "answer": string; "interaction": InteractionId; "question": string; [key: string]: unknown; };
+/** A question owner's editing projection; sealed labels remain the host's. */
+export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
 export type QuestionOption = {
   "description"?: (string | null);
   "id": string;
@@ -1239,9 +1262,10 @@ export type Setting = {
 export type ShellRunProps = { "command": string; "cwd": string; "exit"?: (number | null); "output": string; "status": ItemStatus; [key: string]: unknown; };
 export type Shown = ({ "request": PullRequest; [key: string]: unknown; } | View);
 export type SignInProps = { "flow": LoginFlow; "interactionId": InteractionId; "provider": string; [key: string]: unknown; };
+export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 export type SiteScroll = { "bodyRows": number; "offset": number; [key: string]: unknown; };
 export type SiteView = { "agentId"?: (string | null); [key: string]: unknown; };
-export type Slot = ({ "branch"?: (string | null); "cwd": string; "kind": "location"; [key: string]: unknown; } | { "kind": "status"; "text": string; "tone": Tone; "until"?: (string | null); [key: string]: unknown; } | { "kind": "activity"; "verb"?: (string | null); "view": Shown; [key: string]: unknown; } | { "kind": "rail"; "title": string; "view": Shown; [key: string]: unknown; } | { "kind": "panel"; "title": string; "view": Shown; [key: string]: unknown; } | { "asked": boolean; "closeOnEscape": boolean; "focus": boolean; "holdToasts": boolean; "id": string; "kind": "pane"; "place"?: Array<PanePlace>; "size"?: PaneSize; "title": string; "view": Shown; [key: string]: unknown; } | { "alert": boolean; "kind": "toast"; "text": string; "until": string; [key: string]: unknown; } | {
+export type Slot = ({ "branch"?: (string | null); "cwd": string; "kind": "location"; [key: string]: unknown; } | { "kind": "status"; "text": string; "tone": Tone; "until"?: (string | null); [key: string]: unknown; } | { "kind": "activity"; "verb"?: (string | null); "view": Shown; [key: string]: unknown; } | { "kind": "rail"; "title": string; "view": Shown; [key: string]: unknown; } | { "kind": "panel"; "title": string; "view": Shown; [key: string]: unknown; } | { "asked": boolean; "closeOnEscape": boolean; "focus": boolean; "hints"?: (SiteHints | null); "holdToasts": boolean; "id": string; "kind": "pane"; "place"?: Array<PanePlace>; "size"?: PaneSize; "title": string; "view": Shown; [key: string]: unknown; } | { "alert": boolean; "kind": "toast"; "text": string; "until": string; [key: string]: unknown; } | {
   /** The mode's value: the argument of the item that chooses it. */
   "current": string;
   "kind": "mode";
@@ -1481,6 +1505,8 @@ export type View = ({
   "gap"?: (number | null);
   /** The height in rows. */
   "height"?: (number | null);
+  /** The focused site declares chrome separately from its body. */
+  "hints"?: (SiteHints | null);
   /** Main-axis distribution, such as `flex-start` or `space-between`. */
   "justifyContent"?: (Justify | null);
   /** A stable identity among siblings. */
@@ -1500,6 +1526,11 @@ export type View = ({
   "paddingX"?: (number | null);
   /** Rows inside the box above and below. */
   "paddingY"?: (number | null);
+  /**
+   * A question owner's editing state, on the root of a drawn question;
+   * the choices' labels and the answer stay the host's.
+   */
+  "question"?: (QuestionFocus | null);
   /** The width in cells. */
   "width"?: (number | null);
   [key: string]: unknown;
