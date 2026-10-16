@@ -461,5 +461,4 @@ fn answer(item: &Item, state: &SessionState) -> Option<Upshot> {
 }
 
 #[cfg(test)]
-#[path = "turns_tests.rs"]
 mod tests;

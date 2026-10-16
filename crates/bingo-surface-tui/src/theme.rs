@@ -1349,7 +1349,7 @@ mod tests {
                     "activity.rs",
                     "embers.rs",
                     "opening/frame.rs",
-                    "transcript.rs",
+                    "transcript/comet.rs",
                 ],
             ),
             ("landing", &["transcript.rs"]),
