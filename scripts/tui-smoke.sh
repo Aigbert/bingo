@@ -184,7 +184,8 @@ finish
 step 'login opens one pane and one escape closes it'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '/login' Enter
-await '↑↓ pick'
+# The palette's KeyBar says `↑↓ pick` too: wait for the pane itself.
+await 'own place ▾'
 keys Escape
 vanish '↑↓ pick'
 keys 'composer returned'
