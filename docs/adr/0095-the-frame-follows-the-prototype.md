@@ -22,9 +22,10 @@ every drawing that shows them (status, footer, header, receipts).
 1. **The frame.** One header row (`bingo▍ ~/cwd · branch … title · session id`),
    the transcript, a `─` rule with the ` ▍ ` prompt line (no box), one
    right-aligned `KeyBar` row, and an always-on footer: mode, crew, the context
-   bar, model `∴ effort · scope`. The footer's middle slot and the notice line go;
-   what they carried moves to toasts or the `KeyBar` (a pending other session is
-   a `KeyBar` pair, `ctrl+g` and its count).
+   bar, model `∴ effort`, then `· this session` only when the choice is
+   session-scoped; the default scope draws nothing. The footer's middle slot
+   and the notice line go; what they carried moves to toasts or the `KeyBar`
+   (a pending other session is a `KeyBar` pair, `ctrl+g` and its count).
 2. **Toasts live in the `KeyBar`'s left end**, one at a time, 2.8 s on the wall
    clock: nothing above them moves, and a toast whose moment has passed is
    dropped, never replayed.
