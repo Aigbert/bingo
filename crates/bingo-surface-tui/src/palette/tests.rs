@@ -478,3 +478,37 @@ fn a_trust_line_nobody_vouched_for_stays_unsent() {
         }
     }
 }
+
+#[tokio::test]
+async fn pending_queries_keep_the_accepted_drawing_and_its_height() {
+    let fixture = Fixture::new();
+    let (state, mut ui, now) = setup();
+    let tree = solo(&state);
+    open(&mut ui, PaletteOpen::Commands, now);
+    let first = fixture.paint(&mut ui, &state, now, 80, 24).await;
+    let header = first
+        .lines()
+        .position(|line| line.trim_matches('"').trim() == "commands")
+        .unwrap();
+    for letter in "rename".chars() {
+        crate::input::on_key(&mut ui, &tree, typed(letter), now);
+        let pending = draw_tree(80, 24, &tree, &mut ui, now);
+        assert_eq!(pending.lines().nth(header), first.lines().nth(header));
+        assert!(
+            pending.contains("choose model"),
+            "last drawing disappeared: {pending}"
+        );
+        assert!(waiting(&ui, &tree, now), "old rows must not accept actions");
+    }
+    let current = fixture.paint(&mut ui, &state, now, 80, 24).await;
+    assert_eq!(
+        current
+            .lines()
+            .position(|line| line.trim_matches('"').trim() == "commands"),
+        Some(header)
+    );
+    assert!(!waiting(&ui, &tree, now));
+    let moved = crate::input::on_key(&mut ui, &tree, key(KeyCode::Left), now);
+    assert!(moved.is_empty());
+    assert_eq!(draw_tree(80, 24, &tree, &mut ui, now), current);
+}

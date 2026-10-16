@@ -156,13 +156,24 @@ pub fn draw(
     };
     let props = Props::Palette(Box::new(props(ui, tree, open, now)));
     let key = crate::component::key(tree.viewed(), &open.id, &props, width, rows);
-    let answer = key.as_ref().and_then(|key| ui.placed.pulled.get(key));
+    let answer = key.as_ref().and_then(|key| ui.placed.pulled.display(key));
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    crate::component::draw(&props, answer, usize::from(width), |props, width| {
+    let mut lines = crate::component::draw(&props, answer, usize::from(width), |props, width| {
         fallback::draw(props, open.fallback_at, width, rows)
-    })
+    });
+    if answer.is_some() {
+        let previous = frame
+            .palette_height
+            .as_ref()
+            .filter(|(id, _)| id == &open.id)
+            .map_or(0, |(_, rows)| *rows);
+        let height = previous.max(lines.len()).min(usize::from(rows));
+        lines.resize(height, Line::default());
+        frame.palette_height = Some((open.id.clone(), height));
+    }
+    lines
 }
 fn handler(ui: &Ui) -> Option<Action> {
     let id = request(ui)?;
@@ -193,6 +204,7 @@ pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
         .find(|key| key.request.request_id == open.id)
     {
         return key.request.props["query"].as_str() != Some(ui.composer.text())
+            || ui.placed.pulled.get(key).is_none()
             || ui
                 .placed
                 .pulled
