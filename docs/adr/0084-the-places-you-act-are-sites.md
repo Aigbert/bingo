@@ -71,3 +71,7 @@ Refs: ADR-0064, ADR-0079, ADR-0082, ADR-0085, ADR-0086.
 M177 / ADR-0091 accepts `Browse` from the plan's sketch (no separate prototype).
 Its props carry session, selection, query, matches, turn rows and a minted client
 action; the built-in owns navigation and returns its projection in the drawing.
+
+ADR-0095 (2026-10-16) fixes the props of `KeyBar`, `Composer`, `Ledger` and
+`TurnFold`, and amends §5: Esc on a question or form skips it and the turn goes
+on; Esc on an ask set aside behind a draft returns to the ask.
