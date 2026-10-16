@@ -128,7 +128,7 @@ fn layout_finds_the_foot_in_the_current_transcript() {
     };
     let frame = layout(Layout::default(), &solo(&state), &ui, SIZE, now);
     let foot = frame.foot.expect("held transcript");
-    assert_eq!(foot.y, frame.regions.hints.y);
+    assert_eq!(foot.y, frame.regions.transcript.bottom() - 1);
     assert!(
         frame.canvas.buffer[(foot.x + 1, foot.y)]
             .symbol()
@@ -181,18 +181,10 @@ fn layout_notice_sleeps_through_its_hold_and_expires() {
     ui.notify(bingo_sdk::Level::Info, "hello", now.instant);
     let tree = solo(&state());
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
-    assert_eq!(first.next_frame, Some(now.instant + crate::ui::NOTICE_FADE));
+    assert_eq!(first.next_frame, Some(now.instant + crate::ui::NOTICE));
     let held = later(now, 100);
     let frame = layout(first, &tree, &ui, SIZE, held);
-    assert_eq!(
-        frame.next_frame,
-        Some(
-            now.instant
-                + crate::ui::NOTICE_FADE
-                + crate::ui::NOTICE
-                + std::time::Duration::from_nanos(1)
-        )
-    );
+    assert_eq!(frame.next_frame, Some(now.instant + crate::ui::NOTICE));
     ui.expire(later(now, 5000));
     assert_eq!(
         layout(frame, &tree, &ui, SIZE, later(now, 5000)).next_frame,

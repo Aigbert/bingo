@@ -129,7 +129,7 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
             target: Target::Run(format!("{prefix}{query}").trim_end().into()),
         }],
         ArgSpec::None => vec![Row {
-            label: format!("⏎ runs {}", format!("{prefix}{query}").trim_end()),
+            label: format!("runs {}", format!("{prefix}{query}").trim_end()),
             hint: String::new(),
             now: String::new(),
             alert: None,
@@ -229,7 +229,7 @@ fn typed_first(mut rows: Vec<Row>, prefix: &str, query: &str) -> (Vec<Row>, usiz
     rows.insert(
         0,
         Row {
-            label: format!("⏎ runs {line}"),
+            label: format!("runs {line}"),
             hint: String::new(),
             now: String::new(),
             alert: None,
@@ -243,9 +243,9 @@ fn typed_first(mut rows: Vec<Row>, prefix: &str, query: &str) -> (Vec<Row>, usiz
 
 fn preview(prefix: &str, query: &str) -> String {
     match prefix {
-        "/rename " => format!("⏎ names this session “{query}”"),
-        "/compact " => format!("⏎ compacts, keeping {query}"),
-        _ => format!("⏎ runs {prefix}{query}"),
+        "/rename " => format!("names this session “{query}”"),
+        "/compact " => format!("compacts, keeping {query}"),
+        _ => format!("runs {prefix}{query}"),
     }
 }
 

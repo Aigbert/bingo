@@ -115,7 +115,8 @@
 # M166 (ADR-0086): bingo-mod-models adds one member, no external crate.
 # M176 (ADR-0090): bingo-mod-crew adds one member, no external crate.
 # M179: bingo-mod-schedule adds one member, no external crate.
-max_dependencies = 421
+# M184: bingo-mod-keybar adds one member, no external crate.
+max_dependencies = 422
 max_core_check_seconds = 20
 max_target_gb = 5
 

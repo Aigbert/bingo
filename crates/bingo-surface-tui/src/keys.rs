@@ -156,13 +156,7 @@ pub const BINDINGS: &[Binding] = &[
     },
 ];
 
-pub const FOOTER_HINT: &str = "? for shortcuts";
 pub const PLACEHOLDER: &str = "ask anything";
-/// What the empty box offers while a turn runs: the two ways a line goes out
-/// of it (ADR-0008 §2, amended M68). One string, so the box and the help can
-/// never say different things about the same key.
-pub const BUSY_PLACEHOLDER: &str = "";
-
 // ---- the three ordered stacks (design §7) -------------------------------
 
 /// What `esc` closes, innermost first. It is a table rather than a chain of

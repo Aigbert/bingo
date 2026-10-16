@@ -203,3 +203,24 @@ mod table;
 
 pub use calls::HostCall;
 pub use host::TestHost;
+
+/// Assert the site's declared contextual hints never leak into its body.
+pub fn assert_separate_hints(view: &crate::View) {
+    let crate::View::Box { layout, .. } = view else {
+        panic!("a site has a root box");
+    };
+    let Some(hints) = layout.hints.as_ref() else {
+        panic!("the owner declares chrome");
+    };
+    assert!(!hints.pairs.is_empty());
+    let body = view.fold();
+    for pair in &hints.pairs {
+        if !pair.keys.is_empty() {
+            let hint = format!("{} {}", pair.keys, pair.action);
+            assert!(
+                !body.contains(&hint),
+                "hint {hint:?} leaked into the body: {body}"
+            );
+        }
+    }
+}

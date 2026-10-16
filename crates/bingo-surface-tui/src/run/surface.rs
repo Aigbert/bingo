@@ -19,6 +19,7 @@ pub(super) fn receipt(run: &mut Run, result: &Value) {
     if result.get("surface").is_none()
         && result.get("item").is_none()
         && let Some(message) = result.get("message").and_then(Value::as_str)
+        && (!message.starts_with("permission mode: ") || message.contains('\n'))
     {
         run.ui
             .notify(Level::Info, message.to_string(), Instant::now());
@@ -132,6 +133,22 @@ mod tests {
         test_support::*,
     };
     use std::sync::Arc;
+    #[tokio::test]
+    async fn changing_mode_does_not_leave_a_stale_notice() {
+        let now = still(scene().1);
+        let session = Arc::new(TestSession::default());
+        let mut run = super::super::tests::idle_in(state(), session, now.instant);
+        for mode in ["bypass permissions", "accept edits"] {
+            receipt(
+                &mut run,
+                &serde_json::json!({"message":format!("permission mode: {mode}")}),
+            );
+            assert!(run.ui.notice().is_none());
+        }
+        receipt(&mut run, &serde_json::json!({"message":"saved"}));
+        assert_eq!(run.ui.notice().unwrap().text, "saved");
+    }
+
     #[tokio::test]
     async fn only_own_rewind_returns_the_full_prompt_and_keeps_a_draft() {
         for (own, draft, queued) in [

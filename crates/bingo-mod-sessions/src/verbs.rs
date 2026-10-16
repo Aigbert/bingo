@@ -134,6 +134,7 @@ mod tests {
             ..Default::default()
         };
         let view = crate::draw::tree(&crate::tests::props(), &[], &cursor, "list", 20, 80);
+        bingo_sdk::testing::assert_separate_hints(&view);
         assert!(view.fold().contains("Parent · open elsewhere"));
     }
 }

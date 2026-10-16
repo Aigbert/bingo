@@ -1,0 +1,30 @@
+ bingo▍ /var/…/T/m184-_x_zauzg/cwd                                                            session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+ status   live                                                                          bingo 0.6.6 · up 0m
+ ❯ session    untitled · ses_01M51NDFHBY0T92ZEGASYFMFKB · /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/…
+   model      fake-1 · fake
+   context    not measured yet
+   spent      0 in · 0 out · cache read 0% · price unknown
+   permission default · 0 rules this session
+   plugins    37 on · 0 off
+   mcp        0 connected · 0 tools
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /status
+                                                                            ↑↓ pick · ⏎ rename · esc close
+ ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                               fake-1

@@ -771,6 +771,8 @@
     "Component": {
       "type": "string",
       "enum": [
+        "KeyBar",
+        "Composer",
         "ModelPicker",
         "Browse",
         "Plugins",
@@ -807,6 +809,21 @@
         "SessionStatus",
         "Toast",
         "Welcome"
+      ]
+    },
+    "ComposerProps": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "placeholder"
       ]
     },
     "ConfigView": {
@@ -3273,6 +3290,70 @@
       ],
       "description": "An error as it appears on the wire and in the journal."
     },
+    "KeyBarProps": {
+      "type": "object",
+      "properties": {
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KeyPair"
+          }
+        },
+        "toast": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KeyToast"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "pairs"
+      ]
+    },
+    "KeyPair": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "emphasis": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "keys",
+        "action"
+      ]
+    },
+    "KeyToast": {
+      "type": "object",
+      "properties": {
+        "about": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "text": {
+          "type": "string"
+        },
+        "level": {
+          "$ref": "#/$defs/Level"
+        }
+      },
+      "required": [
+        "text",
+        "level"
+      ]
+    },
     "LastTurn": {
       "type": "object",
       "properties": {
@@ -3924,6 +4005,16 @@
     "PaneProps": {
       "type": "object",
       "properties": {
+        "hints": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SiteHints"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "title": {
           "type": "string"
         },
@@ -4272,6 +4363,38 @@
     },
     "Props": {
       "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "KeyBar"
+            },
+            "props": {
+              "$ref": "#/$defs/KeyBarProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Composer"
+            },
+            "props": {
+              "$ref": "#/$defs/ComposerProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
         {
           "type": "object",
           "properties": {
@@ -4902,6 +5025,30 @@
         "question",
         "answer"
       ]
+    },
+    "QuestionFocus": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "checked": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "writing": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "field",
+        "checked",
+        "writing"
+      ],
+      "description": "A question owner's editing projection; sealed labels remain the host's."
     },
     "QuestionOption": {
       "type": "object",
@@ -5927,6 +6074,27 @@
       ],
       "description": "`HostApi::signal` (ADR-0013 §2): a plugin's live state onto a session's stream."
     },
+    "SiteHints": {
+      "type": "object",
+      "properties": {
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KeyPair"
+          }
+        },
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerProps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
     "SiteScroll": {
       "type": "object",
       "properties": {
@@ -6829,6 +6997,27 @@
               "items": {
                 "$ref": "#/$defs/View"
               }
+            },
+            "question": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/QuestionFocus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "hints": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SiteHints"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The focused site declares chrome separately from its body."
             },
             "onKey": {
               "anyOf": [

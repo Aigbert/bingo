@@ -5619,6 +5619,16 @@
         {
           "type": "object",
           "properties": {
+            "hints": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SiteHints"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "id": {
               "type": "string"
             },
@@ -6599,6 +6609,27 @@
                 "$ref": "#/$defs/View"
               }
             },
+            "question": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/QuestionFocus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "hints": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SiteHints"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The focused site declares chrome separately from its body."
+            },
             "onKey": {
               "anyOf": [
                 {
@@ -7241,6 +7272,8 @@
     "Component": {
       "type": "string",
       "enum": [
+        "KeyBar",
+        "Composer",
         "ModelPicker",
         "Browse",
         "Plugins",
@@ -7634,6 +7667,85 @@
         "viewport"
       ],
       "description": "A placement has no asking surface until a client pulls it."
+    },
+    "SiteHints": {
+      "type": "object",
+      "properties": {
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KeyPair"
+          }
+        },
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerProps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "ComposerProps": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "placeholder"
+      ]
+    },
+    "KeyPair": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "emphasis": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "keys",
+        "action"
+      ]
+    },
+    "QuestionFocus": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "checked": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "writing": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "field",
+        "checked",
+        "writing"
+      ],
+      "description": "A question owner's editing projection; sealed labels remain the host's."
     }
   },
   "manifest": {

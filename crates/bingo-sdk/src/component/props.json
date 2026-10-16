@@ -1,5 +1,14 @@
 [
-  {"component":"ModelPicker","props":{"filter":"opus","selected":"model:anthropic/claude-opus-5-5","scope":"session","effort":"medium","sheet":null}},
+  {
+    "component": "ModelPicker",
+    "props": {
+      "filter": "opus",
+      "selected": "model:anthropic/claude-opus-5-5",
+      "scope": "session",
+      "effort": "medium",
+      "sheet": null
+    }
+  },
   {
     "component": "Plugins",
     "props": {
@@ -88,7 +97,7 @@
     "props": {
       "word": "Kindling",
       "message": null,
-      "suffix": "\u2026",
+      "suffix": "…",
       "mode": "requesting"
     }
   },
@@ -381,6 +390,29 @@
         "plugins": {}
       },
       "context": null
+    }
+  },
+  {
+    "component": "KeyBar",
+    "props": {
+      "pairs": [
+        {
+          "keys": "esc",
+          "action": "close",
+          "emphasis": false
+        }
+      ],
+      "toast": {
+        "text": "Saved",
+        "level": "info"
+      }
+    }
+  },
+  {
+    "component": "Composer",
+    "props": {
+      "tag": "? ",
+      "placeholder": "ask anything"
     }
   }
 ]

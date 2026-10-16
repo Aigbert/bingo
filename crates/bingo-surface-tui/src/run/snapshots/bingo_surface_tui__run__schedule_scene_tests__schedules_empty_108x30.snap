@@ -3,6 +3,5 @@ source: crates/bingo-surface-tui/src/run/schedule_scene_tests.rs
 expression: text
 ---
  schedules · held by this process (pid 4120)
- ↑↓ choose  space pause/enable  r run  c confirm  d forget  → session  esc close
  no schedules yet · /schedule add every 2h -- check
 ────────────────────────────────────────────────────────────────────────────────────────────────────────────

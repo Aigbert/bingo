@@ -3,6 +3,7 @@ use bingo_sdk::slot::{Anchor, Length, PaneSize, Rect as Declaration, Span};
 
 fn pane(key: &str, place: Vec<Place>) -> Pane {
     Pane {
+        hints: None,
         key: key.into(),
         plugin: "counter".into(),
         id: key.into(),

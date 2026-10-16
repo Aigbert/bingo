@@ -31,7 +31,7 @@ pub fn agent_card(row: &AgentRow, live: Option<&SessionState>, price: Option<Pri
             "asked  {}",
             summary.history.first_ask.as_deref().unwrap_or("—")
         ),
-        format!("model  {model} · ⏎ on model: pick"),
+        format!("model  {model}"),
     ];
     if let Some(live) = live {
         if let Some(tool) = current_tool(live) {

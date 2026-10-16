@@ -7,6 +7,7 @@
 # Every wait is a bounded poll of `capture-pane`, never a fixed sleep: the
 # script is as fast as the binary and fails loudly instead of flaking.
 set -euo pipefail
+unset OPENAI_API_KEY OPENAI_BASE_URL ANTHROPIC_API_KEY ANTHROPIC_BASE_URL
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 BIN="${CARGO_TARGET_DIR:-$ROOT/target}/debug/bingo"
@@ -18,7 +19,7 @@ command -v tmux >/dev/null || { echo "tui-smoke: tmux is required"; exit 1; }
 [ -x "$BIN" ] || { echo "tui-smoke: build first (cargo build): $BIN"; exit 1; }
 
 WORK=$(mktemp -d)
-SOCKET="bingo-smoke-${WORK##*/}"
+SOCKET="${TUI_SMOKE_SOCKET_PREFIX:-bingo-smoke}-${WORK##*/}"
 cleanup() {
   tmux -L "$SOCKET" kill-server 2>/dev/null || true
   rm -rf "$WORK"
@@ -30,7 +31,15 @@ mkdir -p "$WORK/home/.bingo" "$WORK/cwd"
 printf '{ "update": { "check": false } }' >"$WORK/home/.bingo/settings.json"
 
 pane() { tmux -L "$SOCKET" capture-pane -p -t "$SESSION"; }
-keys() { tmux -L "$SOCKET" send-keys -t "$SESSION" "$@"; }
+keys() {
+  # The KeyBar changes immediately; encode Escape unambiguously so the next
+  # typed letter cannot become an alt chord during the terminal's ESC timeout.
+  if [ "$#" -eq 1 ] && [ "$1" = Escape ]; then
+    tmux -L "$SOCKET" send-keys -t "$SESSION" -l "$(printf '\033[27u')"
+  else
+    tmux -L "$SOCKET" send-keys -t "$SESSION" "$@"
+  fi
+}
 
 # Wait for `$1` to appear on the pane, or fail with what was there instead.
 await() {
@@ -93,7 +102,7 @@ picture() { printf '%s' "$SHOT" | base64 -d >"$WORK/cwd/shot.png"; }
 start() {
   printf '%s' "$1" >"$WORK/script.json"
   keys "HOME=$WORK/home XDG_DATA_HOME=$WORK/data ${2:-} BINGO_FAKE_SCRIPT=$WORK/script.json $BIN --cwd $WORK/cwd ${3:-}" Enter
-  await '? for shortcuts'
+  await '/ commands'
 }
 
 # Press `$1` until `$2` shows. A dialog ignores keys until its guard has
@@ -147,7 +156,7 @@ finish() {
   left
 }
 
-tmux -L "$SOCKET" -f /dev/null new-session -d -s "$SESSION" -x 120 -y 40 \
+HOME="$WORK/home" XDG_DATA_HOME="$WORK/data" XDG_CONFIG_HOME="$WORK/config" SHELL=/bin/sh tmux -L "$SOCKET" -f /dev/null new-session -d -s "$SESSION" -c "$WORK/cwd" -x 120 -y 40 \
   "PS1='smoke\$ ' /bin/sh -i"
 keys 'echo "shell: $((1 + 1))"' Enter
 await 'shell: 2'
@@ -185,7 +194,7 @@ finish
 step 'esc interrupts a turn that is still waiting'
 start '{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"too late"}]}]}'
 keys 'wait for it' Enter
-await 'esc to interrupt'
+await 'esc stop'
 keys Escape
 await '[Request interrupted by user]'
 finish
@@ -195,7 +204,7 @@ finish
 step 'esc interrupts a turn whose request has not answered yet'
 start '{"responses":[{"steps":[{"delayBeforeStream":{"ms":60000}},{"text":"too late"}]}]}'
 keys 'wait for the first byte' Enter
-await 'esc to interrupt'
+await 'esc stop'
 keys Escape
 await '[Request interrupted by user]'
 finish
@@ -228,9 +237,9 @@ await 'browse · turn'
 keys 'line 42'
 await 'line 42'
 keys Enter
-await '1/1 (n/N)'
+await '1/1'
 keys Escape
-vanish '1/1 (n/N)'
+vanish '1/1'
 # The shortcut hint is also visible in Browse; even an absent header can be
 # an intermediate redraw. Require a persistent composer echo before finish.
 # CSI-u keeps this Escape separate from the probe under a delayed tty read.
@@ -260,18 +269,18 @@ await ' line 80'
 mouse 0 10 5
 sleep 0.5
 keys Enter
-await 'j/k · pgup/pgdn'
+await 'j/k scroll'
 keys 'G'
 await ' line 80'
 keys '/'
 keys 'line 42'
 await '/line 42'
 keys Enter
-await 'n/N · esc'
+await 'n/N match'
 keys Escape
 keys Escape
-vanish 'j/k · pgup/pgdn'
-await '? for shortcuts'
+vanish 'j/k scroll'
+await '/ commands'
 finish
 
 step 'an @ offers the paths under the session and enter takes one'
@@ -286,10 +295,10 @@ finish
 step 'the keys palette opens on ? and closes on esc'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '?'
-await 'type to search commands, sessions and keys together'
+await '⏎ do it'
 keys Escape
-await '? for shortcuts'
-vanish 'type to search commands, sessions and keys together'
+await '/ commands'
+vanish '⏎ do it'
 finish
 
 step 'ctrl+r opens the session palette and esc closes it'
@@ -300,7 +309,7 @@ keys C-r
 await 'this one'
 keys Escape
 vanish 'this one'
-await '? for shortcuts'
+await '/ commands'
 finish
 
 step 'a permission dialog answered y runs the tool'
@@ -309,7 +318,7 @@ start '{"responses":[
   {"steps":[{"text":"Wrote it."}]}]}'
 keys 'write the note' Enter
 await 'Do you want to '
-if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 # The pending question leaves the prompt available below the rule.
 await '▍ answer above'
 press_until 'y' 'Wrote it.'
@@ -320,10 +329,10 @@ finish
 step 'a notice expires and ctrl+c twice exits the idle composer'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys C-c
-await 'press ctrl+c again to exit'
+await 'ctrl+c again to exit'
 # It holds its window and goes on its own: nothing is pressed to dismiss it.
-vanish 'press ctrl+c again to exit'
-await '? for shortcuts'
+vanish 'ctrl+c again to exit'
+await '/ commands'
 keys C-c C-c
 left
 
@@ -336,7 +345,7 @@ start '{"responses":[
 focus O
 keys 'write the note' Enter
 await 'Do you want to '
-if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 press_until 'y' 'Wrote it.'
 [ -f "$WORK/cwd/away.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
 if pane | grep -qE 'notify|777|Ptmux'; then
@@ -490,7 +499,7 @@ sealed_card() {
     {"steps":[{"text":"Sealed done."}]}]}' 'BINGO_MOTION=off' "--plugin-dir $installed"
   keys 'write sealed input' Enter
   await 'Do you want to '
-  if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+  if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
   case "$fixture" in
     sealed-frame)
       await 'SEALED FRAME'
@@ -535,13 +544,13 @@ start '{"responses":[
   {"steps":[{"text":"Changed done."}]}]}' 'BINGO_MOTION=off'
 keys 'run the command' Enter
 await 'Do you want to run this command?'
-if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 # Enter the editor only after its guard has lifted.
-press_until '4' 'enter send'
+press_until '4' '⏎ make this edit'
 keys C-u
 keys 'echo after' Enter
 await '$ echo after'
-if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 press_until 'y' 'Changed done.'
 await 'you changed it first'
 pane
@@ -553,9 +562,9 @@ start '{"responses":[
   {"steps":[{"text":"Question done."}]}]}' 'BINGO_MOTION=off'
 keys 'pick a route' Enter
 await 'Which route?'
-if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 await 'something else'
-press_until x 'ctrl+g back to it'
+press_until x 'esc back to the ask'
 pane
 keys C-g
 press_until '2' 'Question done.'
@@ -573,7 +582,7 @@ start '{"responses":[
   {"steps":[{"text":"Skipped question; continued."}]}]}' 'BINGO_MOTION=off'
 keys 'choose for me' Enter
 await 'Which route?'
-if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
+if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 await 'something else'
 keys -l "$(printf '\033[27u')"
 await 'Skipped question; continued.'

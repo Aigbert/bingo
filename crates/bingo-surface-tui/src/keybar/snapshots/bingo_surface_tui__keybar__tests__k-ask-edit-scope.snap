@@ -1,0 +1,12 @@
+---
+source: crates/bingo-surface-tui/src/keybar/tests.rs
+expression: screens
+---
+108 columns
+" edits under src/ won't ask again this session                                                              "
+
+80 columns
+" edits under src/ won't ask again this session                                  "
+
+32 columns
+" edits under src/ won't ask ag… "

@@ -26,7 +26,7 @@ impl Hook for Lifecycle {
         if !matches!(frame.event, Event::SessionUpdated { .. }) || !claim(&self.path) {
             return;
         }
-        let Ok(until) = frame.ts.checked_add(std::time::Duration::from_secs(8)) else {
+        let Ok(until) = frame.ts.checked_add(std::time::Duration::from_millis(2800)) else {
             return;
         };
         let slot = slot::Slot::Toast {

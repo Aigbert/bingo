@@ -460,7 +460,7 @@ fn preview_lines(preview: &Preview, expanded: bool) -> Vec<Line<'static>> {
         Line::from(spans)
     }));
     let tail = if hidden > 0 {
-        format!("     ╰ … +{hidden} lines (ctrl+o whole diff)")
+        format!("     ╰ … +{hidden} lines")
     } else {
         "     ╰".into()
     };

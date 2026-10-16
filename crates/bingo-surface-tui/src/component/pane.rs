@@ -7,6 +7,7 @@ pub fn props(
     offset: usize,
 ) -> Props {
     Props::Pane(PaneProps {
+        hints: pane.hints.clone(),
         title: pane.title.clone(),
         is_focused: focused,
         body_columns: seat.area.width,

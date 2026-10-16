@@ -12,7 +12,7 @@ fn a_terminal_that_answers_the_graphics_probe_is_sent_the_picture() {
     let file = bingo_pictures::testing::png_bytes(1200, 900);
     let mut terminal = Terminal::opened(&[], READS_A_PICTURE, Answers::Pictures);
     std::fs::write(terminal.home.path().join("shot.png"), &file).unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"look at it\r");
     terminal.wait_for("That is the picture.");
     // The cells are on the screen a frame before the pixels are: fitting a
@@ -61,7 +61,7 @@ fn a_picture_an_answer_named_in_markdown_is_read_in_and_sent() {
         bingo_pictures::testing::png_bytes(300, 200),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"show me the shot\r");
     terminal.wait_for("[image: the shot]");
     // The read happens between frames, so the bytes come after the chip.
@@ -121,7 +121,7 @@ fn a_terminal_that_says_ok_and_draws_no_placeholder_gets_the_chip() {
         bingo_pictures::testing::png_bytes(100, 200),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"look at it\r");
     terminal.wait_for("[image: image/png]");
     assert!(
@@ -142,7 +142,7 @@ fn a_terminal_that_answers_only_da1_gets_the_chip() {
         bingo_pictures::testing::png_bytes(100, 200),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"look at it\r");
     terminal.wait_for("[image: image/png]");
     assert!(
@@ -164,7 +164,7 @@ fn a_picture_under_tmux_travels_in_the_passthrough_envelope() {
         bingo_pictures::testing::png_bytes(1200, 900),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"look at it\r");
     terminal.wait_for("That is the picture.");
     terminal.wait_written(WRAPPED_TRANSMIT);
@@ -197,7 +197,7 @@ fn a_tmux_that_carries_nothing_through_gets_the_chip() {
         bingo_pictures::testing::png_bytes(100, 200),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"look at it\r");
     terminal.wait_for("[image: image/png]");
     let written = terminal.written();
@@ -226,7 +226,7 @@ fn an_answer_that_lands_after_the_probe_is_eaten_and_still_counted() {
         bingo_pictures::testing::png_bytes(1200, 900),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.wait_late();
     // A keystroke behind the late answer, and the screen that shows it: the
     // pty keeps its order, so a composer holding this and nothing else is a
@@ -272,7 +272,7 @@ fn a_passthrough_tmux_says_is_off_is_never_asked_through() {
         bingo_pictures::testing::png_bytes(100, 200),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"look at it\r");
     terminal.wait_for("[image: image/png]");
     let written = terminal.written();
@@ -331,7 +331,7 @@ fn ghostty_draws_a_picture_an_answer_named_under_home() {
         bingo_pictures::testing::png_bytes(300, 200),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"show me the desktop file\r");
     terminal.wait_for("That is all.");
     assert_drawn(&terminal);
@@ -355,7 +355,7 @@ fn a_herdr_pane_that_draws_pictures_is_sent_the_picture() {
         bingo_pictures::testing::png_bytes(300, 200),
     )
     .unwrap();
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"look at it\r");
     terminal.wait_for("That is the picture.");
     assert_drawn(&terminal);

@@ -65,11 +65,6 @@ fn tree(props: &BrowseProps, cursor: &Cursor, request: &str, height: u16) -> Vie
         .iter()
         .position(|t| Some(&t.id) == props.selected.as_ref());
     let query = cursor.editing.as_ref().unwrap_or(&props.query);
-    let hint = if cursor.editing.is_some() {
-        "⏎ search · esc clear"
-    } else {
-        "[ ] turn  ⏎ page  y copy  r rewind"
-    };
     let position = format!(
         "browse · turn {} of {}",
         at.map_or(0, |a| a + 1),
@@ -79,7 +74,7 @@ fn tree(props: &BrowseProps, cursor: &Cursor, request: &str, height: u16) -> Vie
         String::new()
     } else {
         format!(
-            " · {query:?} {}/{}{} (n/N)",
+            " · {query:?} {}/{}{}",
             if props.count == 0 {
                 0
             } else {
@@ -89,7 +84,7 @@ fn tree(props: &BrowseProps, cursor: &Cursor, request: &str, height: u16) -> Vie
             if props.count == 1000 { "+" } else { "" }
         )
     };
-    let mut children = vec![View::text(format!("{position}{search}  {hint}"))];
+    let mut children = vec![View::text(format!("{position}{search}"))];
     if let Some(shown) = &cursor.sheet
         && let Some(at) = at
         && !props.refresh
@@ -99,6 +94,7 @@ fn tree(props: &BrowseProps, cursor: &Cursor, request: &str, height: u16) -> Vie
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
+            hints: Some(chrome(cursor)),
             on_key: Some(Action {
                 name: "browse:ui".into(),
                 args: json!({"handler":request,"event":"press","props":props}),
@@ -129,16 +125,15 @@ fn sheet(cursor: &Cursor, shown: &crate::Preview, at: usize, height: u16) -> Vie
         View::text(summary),
     ];
     file_rows(&mut children, &sheet, shown, cursor, height);
-    children.push(View::text(format!(
-        "{}    ⏎ rewind  esc",
+    children.push(View::text(
         [
             crate::sheet::Mode::Both,
             crate::sheet::Mode::Conversation,
-            crate::sheet::Mode::Files
+            crate::sheet::Mode::Files,
         ]
         .map(|m| format!("{}{}", if m == cursor.mode { "❯ " } else { "" }, m.name()))
-        .join("    ")
-    )));
+        .join("    "),
+    ));
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
@@ -175,10 +170,50 @@ fn file_rows(
     );
     if files > room {
         children.push(View::text(format!(
-            "↑↓ files {}–{} of {files}",
+            "files {}–{} of {files}",
             cursor.sheet_top + 1,
             (cursor.sheet_top + room).min(files)
         )));
     }
     children.extend(sheet.rows.iter().skip(files).map(View::text));
+}
+
+fn chrome(cursor: &Cursor) -> component::SiteHints {
+    use component::{KeyPair as Pair, SiteHints};
+    let pairs = if cursor.sheet.is_some() {
+        vec![
+            Pair::new("↑↓", "files"),
+            Pair::new("←→", "mode"),
+            Pair::new("⏎", "rewind"),
+            Pair::new("esc", "back"),
+        ]
+    } else if cursor.editing.is_some() {
+        vec![Pair::new("⏎", "search"), Pair::new("esc", "clear")]
+    } else {
+        vec![
+            Pair::new("[ ]", "turn"),
+            Pair::new("⏎", "page"),
+            Pair::new("y", "copy"),
+            Pair::new("r", "rewind"),
+            Pair::new("n/N", "match"),
+            Pair::new("esc", "close"),
+        ]
+    };
+    SiteHints::new(pairs).composer("/browse", "")
+}
+
+#[cfg(test)]
+mod chrome_tests {
+    use super::*;
+    #[test]
+    fn browse_keeps_hints_out_of_the_body() {
+        let props = crate::keys::tests::props();
+        for editing in [None, Some("needle".into())] {
+            let cursor = Cursor {
+                editing,
+                ..Default::default()
+            };
+            bingo_sdk::testing::assert_separate_hints(&tree(&props, &cursor, "browse", 20));
+        }
+    }
 }

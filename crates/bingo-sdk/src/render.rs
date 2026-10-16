@@ -10,6 +10,8 @@ pub use matched::{Matched, matched};
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, JsonSchema,
 )]
 pub enum Component {
+    KeyBar,
+    Composer,
     ModelPicker,
     Browse,
     Plugins,
@@ -78,7 +80,9 @@ impl Component {
 
     pub const fn surfaces(self) -> &'static [SurfaceName] {
         match self {
-            Self::ModelPicker
+            Self::KeyBar
+            | Self::Composer
+            | Self::ModelPicker
             | Self::Browse
             | Self::Palette
             | Self::Plugins
@@ -123,7 +127,9 @@ impl Component {
         }
     }
 
-    pub const ALL: [Self; 36] = [
+    pub const ALL: [Self; 38] = [
+        Self::KeyBar,
+        Self::Composer,
         Self::ModelPicker,
         Self::Browse,
         Self::Plugins,
@@ -206,7 +212,9 @@ mod tests {
                 component.surfaces().contains(&SurfaceName::Text),
                 !matches!(
                     component,
-                    Component::ModelPicker
+                    Component::KeyBar
+                        | Component::Composer
+                        | Component::ModelPicker
                         | Component::Browse
                         | Component::Palette
                         | Component::Plugins

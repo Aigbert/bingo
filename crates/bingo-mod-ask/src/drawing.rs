@@ -69,6 +69,17 @@ pub fn tree(
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
+            question: Some(component::QuestionFocus {
+                field: state.cursor,
+                checked: state
+                    .fields
+                    .get(state.cursor)
+                    .map_or(0, |field| field.ticks.len()),
+                writing: state
+                    .fields
+                    .get(state.cursor)
+                    .is_some_and(|field| field.words.is_some()),
+            }),
             on_key: Some(Action {
                 name: "ask:ui".into(),
                 args: json!({"handler":props.interaction_id,"event":"press","request":request,"session":session,"props":props}),
@@ -143,4 +154,24 @@ fn form_row(question: &Question, field: &Field, focused: bool) -> String {
             .unwrap_or_default()
     };
     format!("{cursor}{label:<13} {value}")
+}
+
+#[cfg(test)]
+mod chrome_tests {
+    use super::*;
+    #[test]
+    fn questions_and_forms_leave_their_keys_to_the_sealed_host() {
+        for form in [false, true] {
+            let props = component::QuestionProps { interaction_id: Some(InteractionId::from_raw("ask")), form, tool: "ask".into(), questions: vec![serde_json::from_value(json!({"question":"Choose","options":[{"id":"a","label":"Alpha"}],"multi":true})).unwrap()], metadata_source: None };
+            let view = tree(
+                &props,
+                &State::default(),
+                "ask",
+                &SessionId::from_raw("session"),
+            );
+            for key in ["↑↓", "⏎", "esc", "tab next"] {
+                assert!(!view.fold().contains(key));
+            }
+        }
+    }
 }

@@ -102,7 +102,7 @@ fn drawing_is_a_valid_status_answer_with_an_owned_root_handler() {
     for (width, height) in [(108, 15), (80, 12)] {
         let tree = draw::tree(&rows, "context", width, height, 2520);
         assert!(view::answer_ok(render::Component::Status, &json!({}), ID, None, &tree).is_ok());
-        assert!(tree.fold().contains("live; ⏎ on a row goes there"));
+        bingo_sdk::testing::assert_separate_hints(&tree);
     }
 }
 #[tokio::test]

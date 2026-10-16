@@ -4,7 +4,7 @@
 pub(crate) mod header;
 
 use crate::layout::Layout;
-use bingo_sdk::{Driver, SessionState};
+use bingo_sdk::SessionState;
 use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Clear, Paragraph};
@@ -17,8 +17,8 @@ use crate::frame::{self, Demand, Regions};
 use crate::tree::{self, Tree};
 use crate::ui::{Card, Open, Ui};
 use crate::{
-    activity, composer as prompt, dialog, foot, graphics, keys, layers, mentions, pager, rewind,
-    search, select, status, theme, transcript, views, window, wrap,
+    activity, composer as prompt, dialog, foot, graphics, layers, mentions, pager, rewind, search,
+    select, status, theme, transcript, views, window, wrap,
 };
 
 /// How tall the composer box may grow before it scrolls internally.
@@ -38,22 +38,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let band_offset = activity.len();
     let band = crate::component::band::draw(state, ui, frame);
     activity.extend(band.lines.iter().cloned());
-    let toasts = toast_lines(ui, state, frame, now);
-    let toast_rows = (toasts.len() as u16).min(area.height / 3);
-    let reduced = Rect::new(
-        area.x,
-        area.y,
-        area.width,
-        area.height.saturating_sub(toast_rows),
-    );
-    let mut regions = frame::regions(reduced, demand(&draft, &strip, &activity));
-    regions.status.y += toast_rows;
-    let toast_area = Rect::new(
-        area.x,
-        regions.status.y.saturating_sub(toast_rows),
-        area.width,
-        toast_rows,
-    );
+    let mut regions = frame::regions(area, demand(&draft, &strip, &activity));
     frame.seating = crate::pane::seating(ui, state, regions.transcript);
     regions.transcript = frame.seating.transcript;
     pull_activity(state, ui, frame, regions.activity);
@@ -71,17 +56,22 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     render_composer(tree.viewed(), ui, frame, regions.composer, now, draft);
     crate::pane::draw(ui, state, frame, now);
     render_status(tree, ui, frame, regions.status, now);
-    let hints = status::hints(tree, ui, usize::from(area.width), now, &mut frame.pulls);
-    frame.render_widget(Paragraph::new(hints), regions.hints);
-    if regions.activity.height == 0 && !ui.scroll.following() {
-        frame.render_widget(Clear, regions.hints);
-        render_activity(ui, frame, regions.hints, Vec::new());
-    }
     if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
         frame.cursor = None;
     }
+    if regions.activity.height == 0 && !ui.scroll.following() {
+        let area = Rect::new(
+            regions.transcript.x,
+            regions.transcript.bottom().saturating_sub(1),
+            regions.transcript.width,
+            1,
+        );
+        frame.render_widget(Clear, area);
+        render_activity(ui, frame, area, Vec::new());
+    }
     layers(tree, ui, frame, layer_regions, now);
-    frame.render_widget(Paragraph::new(toasts), toast_area);
+    let hints = crate::keybar::draw(tree, ui, frame, now);
+    frame.render_widget(Paragraph::new(hints), regions.hints);
 }
 
 fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) {
@@ -101,19 +91,6 @@ fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) 
             }
         }
     }
-}
-
-fn toast_lines(ui: &Ui, state: &SessionState, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
-    let area = frame.area();
-    ui.placed.toasts.components(
-        now,
-        &mut crate::component::Site {
-            state,
-            memo: &ui.placed.pulled,
-            width: usize::from(area.width),
-            pulls: &mut frame.pulls,
-        },
-    )
 }
 
 /// What the frame must make room for before the transcript is given the rest.
@@ -147,30 +124,21 @@ fn inner_width(state: &SessionState, width: usize) -> usize {
     width.saturating_sub(prompt::prompt(state).width()).max(1)
 }
 
-/// The one line of furniture: the status line, or what has taken its row — a
-/// search's query. Both are one row, so what a person opens never moves
-/// anything above it (§3).
+/// Persistent session facts keep their row in every focus state.
 fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
     if area.height == 0 {
         return;
     }
     let area = crate::pane::status(ui, tree.viewed(), frame, area);
-    let width = area.width as usize;
-    let line = match ui.focus.search() {
-        Some(search) => search::row(search),
-        None => {
-            let (line, crew) = status::components(tree, ui, width, now, &mut frame.pulls);
-            frame.crew = crew.map(|columns| {
-                Rect::new(
-                    area.x + columns.start as u16,
-                    area.y,
-                    columns.len() as u16,
-                    1,
-                )
-            });
-            line
-        }
-    };
+    let (line, crew) = status::components(tree, ui, area.width as usize, now, &mut frame.pulls);
+    frame.crew = crew.map(|columns| {
+        Rect::new(
+            area.x + columns.start as u16,
+            area.y,
+            columns.len() as u16,
+            1,
+        )
+    });
     frame.render_widget(Paragraph::new(vec![line]), area);
 }
 
@@ -690,6 +658,10 @@ fn render_composer(
         height: area.height.saturating_sub(1),
         ..area
     };
+    if let Some(search) = ui.focus.search() {
+        frame.render_widget(Paragraph::new(search::row(search)), inner);
+        return;
+    }
     if inner.height > 0 {
         render_draft(state, ui, frame, inner, draft);
         if let Some(cell) = frame.buffer_mut().cell_mut((area.x + 1, inner.y)) {
@@ -736,16 +708,10 @@ fn render_draft(
     area: Rect,
     layout: prompt::Layout,
 ) {
-    let prompt = prompt::prompt(state);
-    // Scroll only as far as the caret needs: it must stay in the box.
+    let props = crate::keybar::composer(state, ui, frame);
+    let prompt = format!("{}{}", prompt::prompt(state), props.tag);
     let start = layout.cursor.0.saturating_sub(COMPOSER_ROWS - 1);
-    let placeholder = if !ui.dialog.aside && ui.dialog.current().is_some() {
-        "answer above · typing here leaves it for later".to_string()
-    } else if ui.dialog.aside {
-        "your message waits until the ask is answered".to_string()
-    } else {
-        placeholder(state)
-    };
+    let placeholder = props.placeholder;
     let lines = prompt::box_lines(
         &layout,
         &prompt,
@@ -763,20 +729,6 @@ fn render_draft(
                 .unwrap_or(u16::MAX)
                 .min(area.height.saturating_sub(1)),
     ));
-}
-
-/// What the empty composer offers. Nothing answers a `Log` session, so it is
-/// posted into rather than asked (ADR-0011 §1) — and the prompt already says
-/// which room, so the placeholder does not say it twice.
-///
-/// While a turn runs there are two keys that send and they do different
-/// things, so the box says which is which (M68).
-fn placeholder(state: &SessionState) -> String {
-    match (state.summary.driver, state.busy()) {
-        (Driver::Log, _) => "post to the room".to_string(),
-        (Driver::Model, true) => keys::BUSY_PLACEHOLDER.to_string(),
-        (Driver::Model, false) => keys::PLACEHOLDER.to_string(),
-    }
 }
 
 /// The `/` and `@` dropdown: what the line being typed ranks, in `rows` of
@@ -843,6 +795,7 @@ fn suggestion_line(row: &Suggestion, column: usize, focused: bool) -> Line<'stat
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keys;
     use crate::test_support::*;
     use bingo_sdk::{
         ContentPart, ContextUsage, Event, InterruptReason, ItemBody, ItemStatus, KernelError,
@@ -1205,7 +1158,7 @@ mod tests {
         let waits = band(&[("tui", "and then the docs", false)]);
         assert!(waits.contains("› and then the docs (waits)"), "{waits}");
 
-        assert!(!waits.contains(keys::PLACEHOLDER), "{waits}");
+        assert!(waits.contains("⏎ queue a message"), "{waits}");
         let idle = render(&state(), &mut scene().0, scene().1);
         assert!(idle.contains(keys::PLACEHOLDER), "{idle}");
         assert!(idle.contains(" ▍ ask anything"), "{idle}");
@@ -1580,7 +1533,7 @@ mod tests {
             ..now
         };
         let found = render(&state, &mut ui, there);
-        assert!(found.contains("1/11 · n/N · esc"), "{found}");
+        assert!(found.contains("1/11"), "{found}");
         assert!(found.contains("line 4"), "it scrolled to the hit: {found}");
         insta::assert_snapshot!(found);
 
@@ -1870,7 +1823,7 @@ mod tests {
         assert!(typing.contains("/line 7"), "{typing}");
         crate::input::on_key(&mut ui, &tree, key(KeyCode::Enter), now);
         let found = render(&state, &mut ui, settled);
-        assert!(found.contains("1/1 · n/N · esc"), "{found}");
+        assert!(found.contains("1/1"), "{found}");
         assert!(found.contains("line 7"), "{found}");
 
         crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);

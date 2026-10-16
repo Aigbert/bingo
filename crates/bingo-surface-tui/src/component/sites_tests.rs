@@ -79,7 +79,9 @@ fn site(component: Component) -> bingo_sdk::SessionState {
     use bingo_sdk::{ItemStatus, ToolOutput};
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
     match component {
-        Component::ModelPicker
+        Component::KeyBar
+        | Component::Composer
+        | Component::ModelPicker
         | Component::Browse
         | Component::Palette
         | Component::Plugins
@@ -194,7 +196,7 @@ screen_test!(spinner_backend, Spinner);
 screen_test!(duration_backend, TurnDuration);
 screen_test!(notice_backend, InfoNotice);
 screen_test!(mode_backend, SessionMode);
-screen_test!(hint_backend, PromptHint);
+screen_test!(keybar_backend, KeyBar);
 screen_test!(band_backend, AbovePrompt);
 screen_test!(pane_backend, Pane);
 screen_test!(status_backend, Status);
@@ -440,7 +442,11 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
         // Pulled sites wait for their first answer; they have no surface body.
         if matches!(
             component,
-            Component::Pane | Component::Status | Component::ModelPicker
+            Component::Pane
+                | Component::Status
+                | Component::ModelPicker
+                | Component::PromptHint
+                | Component::Composer
         ) {
             continue;
         }
@@ -530,6 +536,7 @@ fn placed_site(component: Component) -> bingo_sdk::SessionState {
         Component::Pane | Component::Status => {
             let mut state = state();
             let slot = Slot::Pane {
+                hints: None,
                 id: "one".into(),
                 title: "original".into(),
                 focus: false,

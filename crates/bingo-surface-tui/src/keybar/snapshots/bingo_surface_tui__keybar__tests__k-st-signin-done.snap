@@ -1,0 +1,12 @@
+---
+source: crates/bingo-surface-tui/src/keybar/tests.rs
+expression: screens
+---
+108 columns
+"                             ↑↓ pick · ⏎ its tools · space turn off · r reconnect · o sign out · esc close  "
+
+80 columns
+" ↑↓ pick · ⏎ its tools · space turn off · r reconnect · o sign out · esc close  "
+
+32 columns
+"        o sign out · esc close  "

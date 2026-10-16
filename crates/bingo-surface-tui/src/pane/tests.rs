@@ -5,6 +5,7 @@ use bingo_sdk::{
 };
 fn pane(asked: bool) -> Slot {
     Slot::Pane {
+        hints: None,
         id: "counter".into(),
         title: "Counter pane".into(),
         focus: true,

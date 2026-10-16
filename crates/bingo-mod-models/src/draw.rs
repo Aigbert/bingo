@@ -69,7 +69,7 @@ pub fn tree(
 ) -> View {
     let rows = crate::rows::rows(models, providers, &picker.props.filter, picker.all);
     let at = crate::rows::cursor(&rows, picker.props.selected.as_deref());
-    let mut children = if let Some(sheet) = &picker.sheet {
+    let children = if let Some(sheet) = &picker.sheet {
         crate::sheet::lines(sheet, providers)
             .into_iter()
             .map(dim)
@@ -84,17 +84,10 @@ pub fn tree(
         };
         list.draw(picker, width, height)
     };
-    if let Some(message) = &picker.message {
-        children.push(dim(format!("   {message}")));
-    }
-    children.push(dim(if picker.sheet.is_some() {
-        "   ↑↓ pick · ⏎ do it · esc back".into()
-    } else {
-        format!("   /model {}", picker.props.filter)
-    }));
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
+            hints: Some(chrome(picker, &rows, at, models, providers, chat)),
             on_key: Some(on_key(picker)),
             ..Default::default()
         }),
@@ -142,16 +135,6 @@ impl List<'_> {
                 width.saturating_sub(left_width),
             )
         }));
-        let label = match &unlisted {
-            Some(id) => format!("use {id}"),
-            None => action_label(row, self.models, self.providers, picker),
-        };
-        let pinned = row.and_then(Row::model).is_some_and(|id| {
-            self.models
-                .iter()
-                .any(|m| m.id == id && m.meta["pinned"] == true)
-        });
-        children.push(key_hint(&label, picker.keep(), pinned));
         children
     }
     /// One visible line: a keyed row on the left, a line of the card on the right.
@@ -196,13 +179,6 @@ pub fn header(rows: &[Row], filter: &str, providers: usize) -> String {
         format!("{models} {matches} for “{filter}”")
     }
 }
-fn key_hint(label: &str, keep: bool, pinned: bool) -> View {
-    dim(format!(
-        " ↑↓ pick  ←→ effort  * {}  tab {}  ⏎ {label}  esc close",
-        if pinned { "unpin" } else { "pin" },
-        if keep { "here only" } else { "keep" }
-    ))
-}
 fn row_text(
     row: &Row,
     models: &[CatalogEntry],
@@ -210,7 +186,7 @@ fn row_text(
     chat: &crate::card::Chat,
 ) -> String {
     match row {
-        Row::Heading => "pinned · alt+m cycles them".into(),
+        Row::Heading => "pinned".into(),
         Row::Provider(id) => format!(
             "{id}  {}",
             providers
@@ -274,14 +250,14 @@ fn details(
                     ),
                     crate::label::status(p),
                     String::new(),
-                    "⏎ test, sign in or manage".into(),
+                    "test, sign in or manage".into(),
                 ]
             })
             .unwrap_or_default(),
         Some(Row::Hidden(..)) => vec![
             "Hidden models".into(),
             "Snapshots and non-chat models".into(),
-            "⏎ show them".into(),
+            "hidden models".into(),
         ],
         Some(Row::Add) => vec![
             "add a provider".into(),
@@ -301,7 +277,7 @@ fn unlisted(id: &str) -> Vec<String> {
     vec![
         "No matching models".into(),
         String::new(),
-        format!("⏎ use {id}"),
+        format!("use {id}"),
         "the provider decides whether it exists".into(),
     ]
 }
@@ -374,6 +350,70 @@ fn action_label(
         _ => String::new(),
     }
 }
+
+fn chrome(
+    picker: &Picker,
+    rows: &[Row],
+    at: Option<usize>,
+    models: &[CatalogEntry],
+    providers: &[CatalogEntry],
+    chat: &crate::card::Chat,
+) -> component::SiteHints {
+    use component::{KeyPair as Pair, SiteHints};
+    if let Some(sheet) = &picker.sheet {
+        return sheet_hints(sheet);
+    }
+    let row = at.and_then(|i| rows.get(i));
+    let mut pairs = vec![Pair::new("↑↓", "pick")];
+    if let Some(id) = row.and_then(Row::model) {
+        let pinned = models
+            .iter()
+            .any(|m| m.id == id && m.meta["pinned"] == true);
+        pairs.extend([
+            Pair::new("←→", "thinking"),
+            Pair::new("*", if pinned { "unpin" } else { "pin" }),
+            Pair::new("tab", if picker.keep() { "here only" } else { "keep" }),
+        ]);
+    } else {
+        pairs.push(Pair::new("+", "add provider"));
+    }
+    pairs.extend([
+        Pair::new(
+            "⏎",
+            crate::rows::unlisted(rows, &picker.props.filter, &chat.current).map_or_else(
+                || action_label(row, models, providers, picker),
+                |id| format!("use {id}"),
+            ),
+        ),
+        Pair::new("esc", "close"),
+    ]);
+    SiteHints::new(pairs).composer(format!("/model {}", picker.props.filter), "")
+}
+
+fn sheet_hints(sheet: &crate::sheet::Sheet) -> component::SiteHints {
+    use component::{KeyPair as Pair, SiteHints};
+    let pairs = match sheet {
+        crate::sheet::Sheet::Add { selected, .. } => vec![
+            Pair::new("↑↓", "field"),
+            Pair::new(
+                "⏎",
+                if *selected == 4 {
+                    "check and add"
+                } else {
+                    "edit"
+                },
+            ),
+            Pair::new("esc", "back"),
+        ],
+        _ => vec![
+            Pair::new("↑↓", "pick"),
+            Pair::new("⏎", "do it"),
+            Pair::new("esc", "back"),
+        ],
+    };
+    SiteHints::new(pairs).composer(format!("/model › {}", sheet.title()), "")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

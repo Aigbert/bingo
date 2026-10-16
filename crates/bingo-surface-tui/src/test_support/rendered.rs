@@ -36,6 +36,7 @@ pub fn row_carrying(screen: &str, needle: &str) -> u16 {
 pub fn drawn(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> TestBackend {
     let mut terminal = Terminal::new(TestBackend::new(width, height)).expect("a test terminal");
     ui.prepare(&tree.viewed().summary.cwd);
+    ui.sync_toasts(tree.viewed(), now);
     let shown = layout::layout(
         std::mem::take(&mut ui.shown),
         tree,

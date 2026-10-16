@@ -44,6 +44,7 @@ fn put(state: &mut SessionState, view: View, height: u16) {
     size.rows.max = Length::Percent(50);
     size.columns.ideal = Length::Percent(100);
     let pane = Slot::Pane {
+        hints: None,
         id: "status".into(),
         title: String::new(),
         focus: true,
@@ -154,6 +155,7 @@ fn bingo_mod_status_slot() -> serde_json::Value {
     slot::with(
         json!({}),
         [Slot::Pane {
+            hints: None,
             id: "status".into(),
             title: String::new(),
             focus: true,

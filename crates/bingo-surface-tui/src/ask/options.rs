@@ -64,7 +64,7 @@ fn label(rung: &Rung) -> String {
         Answer::AllowSession { .. } => "Yes for this session".into(),
         Answer::Deny { .. } => "No, and tell it why".into(),
         Answer::Confirm => "Confirm".into(),
-        Answer::Cancel => "Cancel (esc)".into(),
+        Answer::Cancel => "Cancel".into(),
         _ => rung.label.clone(),
     }
 }

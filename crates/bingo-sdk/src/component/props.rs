@@ -83,6 +83,8 @@ props!(AbovePromptProps {
     view: SiteView,
 });
 props!(PaneProps {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hints: Option<SiteHints>,
     title: String,
     is_focused: bool,
     body_columns: u16,

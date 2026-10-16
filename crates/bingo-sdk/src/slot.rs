@@ -61,6 +61,8 @@ pub enum Slot {
         view: Shown,
     },
     Pane {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        hints: Option<crate::component::SiteHints>,
         id: String,
         title: String,
         focus: bool,

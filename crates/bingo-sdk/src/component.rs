@@ -4,6 +4,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod keybar;
+pub use keybar::*;
 mod model_picker;
 pub use model_picker::*;
 mod browse;
@@ -35,6 +37,7 @@ macro_rules! components {
     };
 }
 components! {
+    KeyBar(KeyBarProps), Composer(ComposerProps),
     ModelPicker(ModelPickerProps),
     Browse(Box<BrowseProps>),
     Plugins(PluginsProps),

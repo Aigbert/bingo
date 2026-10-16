@@ -50,6 +50,7 @@ fn placed(state: &mut SessionState, view: View) {
     size.rows.max = slot::Length::Percent(80);
     size.columns.ideal = slot::Length::Percent(100);
     let pane = slot::Slot::Pane {
+        hints: None,
         id: "crew".into(),
         title: "crew".into(),
         focus: false,

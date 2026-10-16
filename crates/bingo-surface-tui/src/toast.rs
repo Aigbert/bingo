@@ -1,7 +1,9 @@
-//! Toast expiry follows its published wall-clock deadline.
-use crate::{clock::Now, theme, views};
+//! Latest wins; the fixed KeyBar row never queues or replays a toast.
+use crate::{
+    clock::Now,
+    ui::{NOTICE, Ui},
+};
 use bingo_sdk::{SessionState, slot::Slot};
-use ratatui::text::{Line, Span};
 use std::{
     collections::BTreeSet,
     time::{Duration, Instant},
@@ -9,6 +11,7 @@ use std::{
 #[derive(Debug, Default)]
 pub struct State {
     seen: BTreeSet<String>,
+    active: Option<(String, Instant)>,
 }
 struct Toast {
     key: String,
@@ -20,91 +23,178 @@ fn placed(state: &SessionState) -> Vec<Toast> {
     bingo_sdk::slot::placed(state)
         .into_iter()
         .filter_map(|placed| {
-            if let Slot::Toast { text, until, alert } = placed.slot {
-                Some(Toast {
-                    key: format!(
-                        "{}/{}/{}/{until}/{text}/{alert}",
-                        state.summary.id, placed.plugin, placed.kind
-                    ),
-                    text,
-                    until,
-                    alert,
-                })
-            } else {
-                None
-            }
+            let (text, until, alert) = match placed.slot {
+                Slot::Toast { text, until, alert } => (text, until, alert),
+                _ => return None,
+            };
+            Some(Toast {
+                key: format!(
+                    "{}/{}/{}/{until}/{text}/{alert}",
+                    state.summary.id, placed.plugin, placed.kind
+                ),
+                text,
+                until,
+                alert,
+            })
         })
         .collect()
 }
 impl State {
-    /// Returns whether a newly seen alert should notify the terminal.
+    pub fn discard(&mut self) {
+        self.active = None;
+    }
+    pub fn supersedes(&mut self, said: Instant) -> bool {
+        if self.active.as_ref().is_some_and(|(_, at)| *at >= said) {
+            true
+        } else {
+            self.discard();
+            false
+        }
+    }
+
     pub fn sync(&mut self, state: &SessionState, now: Now) -> bool {
-        let toasts = placed(state);
-        self.seen
-            .retain(|key| toasts.iter().any(|toast| &toast.key == key));
+        let mut toasts = placed(state);
+        toasts.sort_by_key(|toast| toast.until);
         let mut alert = false;
         for toast in toasts {
-            let unseen = self.seen.insert(toast.key);
-            alert |= unseen && toast.alert && toast.until > now.wall;
+            if self.seen.insert(toast.key.clone()) {
+                // Preserve the publication's age: attaching late never starts a new life.
+                let remaining = remaining(toast.until, now).min(NOTICE);
+                let said = now
+                    .instant
+                    .checked_sub(NOTICE - remaining)
+                    .unwrap_or(now.instant);
+                self.active = Some((toast.key, said));
+                alert |= toast.alert && !remaining.is_zero();
+            }
+        }
+        if self
+            .active
+            .as_ref()
+            .is_some_and(|(_, said)| now.instant >= *said + NOTICE)
+        {
+            self.active = None;
         }
         alert
     }
-    fn remaining(&self, toast: &Toast, now: Now) -> Option<Duration> {
-        (toast.until > now.wall).then(|| toast.until.duration_since(now.wall).unsigned_abs())
-    }
-    pub fn components(
-        &self,
-        now: Now,
-        site: &mut crate::component::Site<'_>,
-    ) -> Vec<Line<'static>> {
-        placed(site.state)
-            .iter()
-            .filter(|toast| self.remaining(toast, now).is_some())
-            .flat_map(|toast| {
-                let props = bingo_sdk::component::Props::Toast(bingo_sdk::component::ToastProps {
-                    text: toast.text.clone(),
-                    until: toast.until,
-                    alert: toast.alert,
-                });
-                site.draw(&toast.key, &props, |props, width| {
-                    let bingo_sdk::component::Props::Toast(props) = props else {
-                        return Vec::new();
-                    };
-                    vec![Line::from(Span::styled(
-                        views::clip(&props.text, width),
-                        theme::text(),
-                    ))]
-                })
-            })
-            .collect()
-    }
-    #[cfg(test)]
-    pub fn lines(&self, state: &SessionState, now: Now, width: usize) -> Vec<Line<'static>> {
-        self.components(
-            now,
-            &mut crate::component::Site {
-                state,
-                memo: &crate::pulled::Memo::default(),
-                width,
-                pulls: &mut Vec::new(),
-            },
-        )
+    fn active(&self, state: &SessionState, now: Now) -> Option<(Toast, Instant)> {
+        let (key, said) = self.active.as_ref()?;
+        let toast = placed(state).into_iter().find(|toast| &toast.key == key)?;
+        (now.instant < *said + NOTICE && toast.until > now.wall).then_some((toast, *said))
     }
     pub fn next(&self, state: &SessionState, now: Now) -> Option<Instant> {
-        placed(state)
-            .iter()
-            .filter_map(|toast| {
-                self.remaining(toast, now)
-                    .map(|remaining| now.instant + remaining)
-            })
-            .min()
+        let (toast, said) = self.active(state, now)?;
+        Some((said + NOTICE).min(now.instant + remaining(toast.until, now)))
     }
+    #[cfg(test)]
+    pub fn lines(
+        &self,
+        state: &SessionState,
+        now: Now,
+        _: usize,
+    ) -> Vec<ratatui::text::Line<'static>> {
+        self.active(state, now)
+            .map(|(toast, _)| vec![ratatui::text::Line::from(toast.text)])
+            .unwrap_or_default()
+    }
+}
+fn remaining(until: jiff::Timestamp, now: Now) -> Duration {
+    if until > now.wall {
+        until.duration_since(now.wall).unsigned_abs()
+    } else {
+        Duration::ZERO
+    }
+}
+pub fn current(ui: &Ui, state: &SessionState, now: Now) -> Option<bingo_sdk::component::KeyToast> {
+    let notice = ui.notice().filter(|notice| !notice.gone(now.instant));
+    let placed = ui.placed.toasts.active(state, now);
+    if let Some((toast, said)) = placed
+        && notice.is_none_or(|notice| said > notice.said())
+    {
+        return Some(bingo_sdk::component::KeyToast {
+            about: None,
+            text: toast.text,
+            level: bingo_sdk::Level::Info,
+        });
+    }
+    notice.map(|notice| bingo_sdk::component::KeyToast {
+        text: notice.text.clone(),
+        level: notice.level,
+        about: notice.about.clone(),
+    })
+}
+
+pub fn components(
+    ui: &Ui,
+    state: &SessionState,
+    now: Now,
+    width: usize,
+    pulls: &mut Vec<crate::pulled::Key>,
+) -> Option<bingo_sdk::component::KeyToast> {
+    let mut toast = current(ui, state, now)?;
+    let Some((placed, _)) = ui
+        .placed
+        .toasts
+        .active(state, now)
+        .filter(|(placed, _)| placed.text == toast.text)
+    else {
+        return Some(toast);
+    };
+    let props = bingo_sdk::component::Props::Toast(bingo_sdk::component::ToastProps {
+        text: placed.text,
+        until: placed.until,
+        alert: placed.alert,
+    });
+    let key = crate::component::key(state, &placed.key, &props, width as u16, 1);
+    let answer = key.as_ref().and_then(|key| ui.placed.pulled.get(key));
+    if let Some(key) = key {
+        pulls.push(key);
+    }
+    let lines = crate::component::draw(&props, answer, width, |props, _| {
+        let bingo_sdk::component::Props::Toast(props) = props else {
+            return Vec::new();
+        };
+        vec![ratatui::text::Line::from(props.text.clone())]
+    });
+    toast.text = lines
+        .iter()
+        .map(ToString::to_string)
+        .collect::<Vec<_>>()
+        .join(" · ");
+    Some(toast)
 }
 
 #[cfg(test)]
 mod tests {
     use crate::test_support::*;
     use bingo_sdk::slot::Slot;
+    #[test]
+    fn a_new_publication_drops_the_local_toast_instead_of_replaying_it() {
+        let (mut ui, now) = scene();
+        ui.notify(bingo_sdk::Level::Info, "older", now.instant);
+        let mut state = state();
+        state.signals.entry("counter".into()).or_default().insert(
+            "toast".into(),
+            bingo_sdk::slot::with(
+                serde_json::json!({}),
+                [Slot::Toast {
+                    text: "latest".into(),
+                    until: later(now, 2900).wall,
+                    alert: false,
+                }],
+            )
+            .into(),
+        );
+        ui.sync_toasts(&state, later(now, 100));
+        assert!(ui.notice().is_none());
+        assert_eq!(
+            super::current(&ui, &state, later(now, 100)).unwrap().text,
+            "latest"
+        );
+        state.signals.clear();
+        assert!(super::current(&ui, &state, later(now, 200)).is_none());
+    }
+
     #[test]
     fn toasts_disappear_at_their_deadline() {
         let (mut ui, now) = scene();
@@ -136,6 +226,7 @@ mod tests {
                 alert: true,
             },
             Slot::Pane {
+                hints: None,
                 id: "pane".into(),
                 title: "Pane".into(),
                 focus: false,

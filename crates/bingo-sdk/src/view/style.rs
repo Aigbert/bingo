@@ -25,6 +25,11 @@ pub struct TextStyle {
 #[serde(rename_all = "camelCase")]
 pub struct BoxStyle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub question: Option<crate::component::QuestionFocus>,
+    /// The focused site declares chrome separately from its body.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hints: Option<crate::component::SiteHints>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub on_key: Option<Action>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,

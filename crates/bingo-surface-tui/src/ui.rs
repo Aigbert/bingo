@@ -36,11 +36,8 @@ impl std::ops::DerefMut for Ui {
     }
 }
 
-/// How long a transient notice holds the status line's middle slot (§3),
-/// between the frames it fades in over and the ones it fades out over.
-pub const NOTICE: Duration = Duration::from_secs(4);
-/// A notice fades into the slot over two frames, and out of it over two (§6).
-pub const NOTICE_FADE: Duration = Duration::from_millis(2 * FRAME.as_millis() as u64);
+/// A toast has one wall-clock window, whether the surface draws it or not.
+pub const NOTICE: Duration = Duration::from_millis(2800);
 /// A second ctrl+c within this window leaves.
 pub const EXIT_WINDOW: Duration = Duration::from_secs(2);
 /// A transcript that has just been stepped into crossfades through dim over
@@ -66,43 +63,19 @@ pub struct Notice {
 }
 
 impl Notice {
-    /// How strongly it is being said: 0 as it arrives, 1 while it is there to
-    /// be read, 0 again as it goes.
-    pub fn strength(&self, now: Now) -> f32 {
-        let said = self.said;
-        if !now.motion {
-            return 1.0;
-        }
-        let held = NOTICE_FADE + NOTICE;
-        match now.since(said) {
-            age if age < NOTICE_FADE => Anim::new(said, NOTICE_FADE).progress(now.instant),
-            age if age < held => 1.0,
-            _ => 1.0 - Anim::new(said + held, NOTICE_FADE).progress(now.instant),
-        }
-    }
-
     pub fn next_change(&self, now: Now) -> Option<Instant> {
-        let said = self.said;
-        let expiry = said + self.life();
-        let changes = [
-            said + NOTICE_FADE,
-            said + NOTICE_FADE + NOTICE + Duration::from_nanos(1),
-            expiry,
-        ];
-        if now.motion {
-            changes.into_iter().find(|at| *at > now.instant)
-        } else {
-            (expiry > now.instant).then_some(expiry)
-        }
+        let expiry = self.said + NOTICE;
+        (expiry > now.instant).then_some(expiry)
     }
-
-    /// Whether it has said its piece and left.
-    fn gone(&self, now: Instant) -> bool {
-        now.saturating_duration_since(self.said) >= self.life()
+    pub(crate) fn said(&self) -> Instant {
+        self.said
     }
-
-    fn life(&self) -> Duration {
-        NOTICE_FADE + NOTICE + NOTICE_FADE
+    pub(crate) fn gone(&self, now: Instant) -> bool {
+        now.saturating_duration_since(self.said) >= NOTICE
+    }
+    #[cfg(test)]
+    pub fn strength(&self, now: Now) -> f32 {
+        if self.gone(now.instant) { 0.0 } else { 1.0 }
     }
 }
 
@@ -352,6 +325,7 @@ impl Ui {
     /// One notice is read at a time, and it is the latest: a newer word
     /// replaces the one being said, and nothing is queued to be said later.
     fn say(&mut self, level: Level, text: String, about: Option<String>, now: Instant) {
+        self.placed.toasts.discard();
         self.notice = Some(Notice {
             level,
             text,
@@ -360,7 +334,17 @@ impl Ui {
         });
     }
 
-    /// The notice on the status line, while one is being said.
+    pub fn sync_toasts(&mut self, state: &bingo_sdk::SessionState, now: Now) -> bool {
+        let alert = self.placed.toasts.sync(state, now);
+        if let Some(notice) = &self.notice
+            && self.placed.toasts.supersedes(notice.said())
+        {
+            self.notice = None;
+        }
+        alert
+    }
+
+    /// The local toast, while one is being said.
     pub fn notice(&self) -> Option<&Notice> {
         self.notice.as_ref()
     }
@@ -582,7 +566,7 @@ mod tests {
     }
 
     fn life() -> i64 {
-        (NOTICE_FADE + NOTICE + NOTICE_FADE).as_millis() as i64
+        NOTICE.as_millis() as i64
     }
 
     #[test]
@@ -596,17 +580,13 @@ mod tests {
     }
 
     #[test]
-    fn a_notice_fades_in_over_two_frames_holds_and_fades_out() {
+    fn a_toast_is_whole_for_exactly_2800_milliseconds() {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "careful", now.instant);
-        let at = |ms| ui.notice().map(|notice| notice.strength(later(now, ms)));
-        assert_eq!(at(0), Some(0.0), "it starts dim");
-        assert_eq!(at(33), Some(0.5), "and arrives over two frames");
-        assert_eq!(at(66), Some(1.0));
-        assert_eq!(at(2_000), Some(1.0), "held while it is read");
-        assert_eq!(at(4_066), Some(1.0), "to the end of its window");
-        assert_eq!(at(4_099), Some(0.5), "then it leaves the same way");
-        assert_eq!(at(4_132), Some(0.0));
+        for ms in [0, 33, 66, 2000, 2799] {
+            assert_eq!(ui.notice().map(|n| n.strength(later(now, ms))), Some(1.0));
+        }
+        assert_eq!(ui.notice().map(|n| n.strength(later(now, 2800))), Some(0.0));
     }
 
     #[test]
@@ -665,7 +645,7 @@ mod tests {
         ui.expire(looked);
         assert_eq!(said(&ui), Some("said early"));
         let strength = ui.notice().map_or(1.0, |n| n.strength(looked));
-        assert!(strength < 1.0, "first drawn already leaving: {strength}");
+        assert_eq!(strength, 1.0, "still inside its original window");
         ui.expire(later(now, life()));
         assert_eq!(
             said(&ui),

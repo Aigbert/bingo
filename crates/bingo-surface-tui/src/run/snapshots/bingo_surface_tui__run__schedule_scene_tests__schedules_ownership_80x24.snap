@@ -3,9 +3,8 @@ source: crates/bingo-surface-tui/src/run/schedule_scene_tests.rs
 expression: text
 ---
  schedules · held by this process (pid 4120)
- ↑↓ choose  space pause/enable  r run  c confirm  d forget  → session  esc close
  01JA7 · every 2h · when it fires it says:
    /review dev
    then post the summary to the team
 ────────────────────────────────────────────────────────────────────────────────
- confirm 01JA7 as yours, mode acceptEdits?  ⏎ yes  esc
+ confirm 01JA7 as yours, mode acceptEdits?

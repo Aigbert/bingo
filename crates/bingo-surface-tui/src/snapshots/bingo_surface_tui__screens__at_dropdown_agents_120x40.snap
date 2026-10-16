@@ -39,5 +39,5 @@ expression: rows
 "  @src/rewind.rs                                                                                                        "
 "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
 " ▍ @re                                                                                                                  "
-"                                                                                                                        "
+"                                                                / commands · ? keys · ctrl+r sessions · shift+tab mode  "
 " ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                                           fake-1  "

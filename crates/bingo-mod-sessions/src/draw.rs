@@ -119,9 +119,9 @@ pub(crate) fn tree(
     width: u16,
 ) -> View {
     let scope = if props.scope == component::SessionsScope::Here {
-        "here (tab: all)"
+        "here"
     } else {
-        "all (tab: here)"
+        "all"
     };
     let total = props.sessions.len().min(props.limit);
     let count = rows
@@ -153,13 +153,13 @@ pub(crate) fn tree(
     };
     children.extend(lines);
     children.push(dim("─".repeat(usize::from(width))));
-    children.push(match &cursor.refusal {
-        Some(refusal) => View::text(format!(" {refusal}")),
-        None => dim(hint(cursor)),
-    });
+    if let Some(refusal) = &cursor.refusal {
+        children.push(View::text(format!(" {refusal}")));
+    }
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
+            hints: Some(component::SiteHints::new(hint(cursor)).composer("⟲ ", "filter sessions")),
             on_key: Some(Action {
                 name: "sessions:ui".into(),
                 args: json!({"handler":request,"event":"press","props":props}),
@@ -168,18 +168,38 @@ pub(crate) fn tree(
         }),
     }
 }
-fn hint(cursor: &Cursor) -> &'static str {
+fn hint(cursor: &Cursor) -> Vec<component::KeyPair> {
+    use component::KeyPair as Pair;
     match &cursor.sheet {
-        Sheet::None if cursor.searching => {
-            " type to filter · esc leave search · ↑↓ choose · ⏎ resume"
+        Sheet::None => vec![
+            Pair::new("↑↓", "pick"),
+            Pair::new("⏎", "resume"),
+            Pair::new("→", "preview"),
+            Pair::new("r", "rename"),
+            Pair::new("d", "delete"),
+            Pair::new("f", "fork"),
+            Pair::new("tab", "here/all"),
+            Pair::new(
+                "esc",
+                if cursor.searching {
+                    "leave search"
+                } else {
+                    "close"
+                },
+            ),
+        ],
+        Sheet::Delete(doomed) if crate::verbs::blocked(doomed) > 0 => {
+            vec![Pair::new("esc", "back")]
         }
-        Sheet::None => " ⏎ resume  → preview  r rename  d delete  f fork  tab here/all  esc",
-        Sheet::Delete(doomed) if crate::verbs::blocked(doomed) > 0 => " esc back",
-        Sheet::Delete(_) => " ⏎ delete permanently · esc cancel",
-        Sheet::Rename { .. } => " ⏎ save title · esc cancel",
-        _ => " esc back · ↑↓ choose",
+        Sheet::Delete(_) => vec![
+            Pair::new("⏎", "delete permanently"),
+            Pair::new("esc", "cancel"),
+        ],
+        Sheet::Rename { .. } => vec![Pair::new("⏎", "save title"), Pair::new("esc", "cancel")],
+        _ => vec![Pair::new("↑↓", "pick"), Pair::new("esc", "back")],
     }
 }
+
 fn directory(
     rows: &[Row],
     cursor: &Cursor,

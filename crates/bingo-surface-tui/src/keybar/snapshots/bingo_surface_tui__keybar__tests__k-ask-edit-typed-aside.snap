@@ -1,0 +1,12 @@
+---
+source: crates/bingo-surface-tui/src/keybar/tests.rs
+expression: screens
+---
+108 columns
+"                                                                esc back to the ask · ⏎ queue this message  "
+
+80 columns
+"                                    esc back to the ask · ⏎ queue this message  "
+
+32 columns
+"          ⏎ queue this message  "

@@ -271,10 +271,10 @@ fn operation(
 }
 
 #[cfg(test)]
-mod review_tests {
+pub(crate) mod review_tests {
     use super::*;
     use std::sync::{Arc, Mutex};
-    fn props() -> PaletteProps {
+    pub(crate) fn props() -> PaletteProps {
         serde_json::from_value(json!({"query":"", "open":"keys", "commands":[], "keyHints":{}, "bindings":{}, "session":"s", "conversation":[], "sessions":[], "action":{"name":"client", "args":{}}, "catalogs":{}})).unwrap()
     }
     #[test]

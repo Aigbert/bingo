@@ -1,0 +1,30 @@
+ bingo▍ /var/…/T/m184-_x_zauzg/cwd                                                            session 01M5
+
+
+
+
+
+
+
+
+
+
+
+   commands
+ ❯ /model          choose the model for this session                                           fake/fake-1
+   /think          set the reasoning effort                                                            off
+   /permission     show or change the permission mode                                              default
+   /rename         name this session
+   /compact        summarize the conversation
+   /resume         reopen a session
+   /login          sign in to a provider                                                      3 signed out
+   /logout         sign out of a provider
+   /status         show session details
+   /plugins        list, trust, approve, reload, enable or disable plugins
+   /mcp            [approve|login|logout|tools|reconnect|enable|disable <server>]
+   /agents         the sub-agents this session started, or stop or dismiss one
+   /memory         what is remembered, about you and about this project
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /
+                                                              ↑↓ pick · ⏎ choose · tab fill in · esc close
+ ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                               fake-1

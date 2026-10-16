@@ -6,15 +6,12 @@ use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
 use crate::clock::{self, Now};
-use crate::tree::{self, Scope, Tree, Wants};
+use crate::theme;
+use crate::tree::Tree;
 use crate::ui::Ui;
-use crate::{keys, theme};
 
 /// Cells between two slots.
 const GAP: usize = 2;
-/// What the middle says when nothing else is true and nothing is typed.
-pub const HINT: &str = keys::FOOTER_HINT;
-
 /// The status line at this width.
 pub fn components(
     tree: &Tree,
@@ -75,7 +72,7 @@ fn footer(
         }
     }
     let mut spans = vec![pad(1)];
-    spans.extend(place(mode, Vec::new(), model, room).spans);
+    spans.extend(place(mode, model, room).spans);
     spans.push(pad(2));
     (Line::from(clip(spans, width)), hit)
 }
@@ -112,24 +109,6 @@ fn context_bar(context: Option<bingo_sdk::ContextUsage>) -> Vec<Span<'static>> {
             crate::count::count(context.window)
         )),
     ]
-}
-
-/// Transitional hints keep their existing words until KeyBar owns this row.
-pub fn hints(
-    tree: &Tree,
-    ui: &Ui,
-    width: usize,
-    now: Now,
-    pulls: &mut Vec<crate::pulled::Key>,
-) -> Line<'static> {
-    let mut site = crate::component::Site {
-        state: tree.viewed(),
-        memo: &ui.placed.pulled,
-        width,
-        pulls,
-    };
-    let (spans, _) = middle(tree, ui, width, width, now, &mut site);
-    Line::from(clip(spans, width))
 }
 
 fn mode(state: &SessionState, site: &mut crate::component::Site<'_>) -> Vec<Span<'static>> {
@@ -194,76 +173,6 @@ fn left(state: &SessionState) -> Vec<Span<'static>> {
     vec![Span::styled(format!("{glyph} {label}"), style)]
 }
 
-/// Only what is true now, in the order the eye should take it.
-fn middle(
-    tree: &Tree,
-    ui: &Ui,
-    _width: usize,
-    _room: usize,
-    now: Now,
-    site: &mut crate::component::Site<'_>,
-) -> (Vec<Span<'static>>, bool) {
-    if ui.exit_armed(now.instant) {
-        return (
-            vec![Span::styled(crate::input::ARM_HINT, theme::text())],
-            false,
-        );
-    }
-    let notice = notice(ui, now);
-    if !notice.is_empty() {
-        return (join(notice), false);
-    }
-    let placed = placed_status(tree.viewed(), now);
-    if !placed.is_empty() {
-        return (join(placed), false);
-    }
-    if let Some(waiting) = repository_waiting(ui, now) {
-        return (vec![waiting], false);
-    }
-    if let Some(waiting) = tree::count(tree, Wants::Attention, Scope::Others) {
-        return (
-            vec![Span::styled(
-                format!("{waiting} needs you (ctrl+g)"),
-                theme::attention(now),
-            )],
-            false,
-        );
-    }
-    if ui.composer.is_empty() {
-        let props =
-            bingo_sdk::component::Props::PromptHint(bingo_sdk::component::PromptHintProps {
-                is_draft: false,
-                is_working: tree.viewed().busy(),
-                hint: HINT.into(),
-            });
-        let lines = site.draw("PromptHint", &props, |props, _| {
-            let bingo_sdk::component::Props::PromptHint(props) = props else {
-                return Vec::new();
-            };
-            vec![Line::from(Span::styled(props.hint.clone(), theme::dim()))]
-        });
-        return (lines.into_iter().next().unwrap_or_default().spans, false);
-    }
-    (Vec::new(), false)
-}
-
-fn repository_waiting(ui: &Ui, now: Now) -> Option<Span<'static>> {
-    let count = ui
-        .catalogs
-        .plugins
-        .iter()
-        .filter(|entry| entry.meta["state"]["kind"] == "waiting")
-        .count();
-    if count == 0 {
-        return None;
-    }
-    let verb = if count == 1 { "waits" } else { "wait" };
-    Some(Span::styled(
-        format!("{count} from this repo {verb} for you"),
-        theme::attention(now),
-    ))
-}
-
 fn model_flash(state: &SessionState, now: Now) -> Option<std::time::Instant> {
     let changed = state.transcript.items().iter().rev().find(|item| {
         matches!(&item.body, bingo_sdk::ItemBody::Notice { text, .. } if text.starts_with("⇄ "))
@@ -306,59 +215,6 @@ pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
         .chain(pulse)
         .chain(model_flash(tree.viewed(), now))
         .min()
-}
-
-/// Timed status entries use the frame clock and disappear when their time is past.
-fn placed_status(state: &SessionState, now: Now) -> Vec<Span<'static>> {
-    bingo_sdk::slot::placed(state)
-        .into_iter()
-        .filter_map(|placed| {
-            let bingo_sdk::slot::Slot::Status { text, tone, until } = placed.slot else {
-                return None;
-            };
-            let text = match until {
-                Some(at) if at > now.wall => format!(
-                    "{text} in {}",
-                    clock::span(at.duration_since(now.wall).unsigned_abs())
-                ),
-                Some(_) => return None,
-                None => text,
-            };
-            let style = match tone {
-                bingo_sdk::Tone::Neutral => theme::dim(),
-                bingo_sdk::Tone::Good => theme::good(),
-                bingo_sdk::Tone::Bad => theme::bad(),
-                bingo_sdk::Tone::Attention => theme::attention(now),
-            };
-            Some(Span::styled(text, style))
-        })
-        .collect()
-}
-
-/// What the kernel or the surface had to say, while it is being said: one at
-/// a time, arriving out of dim and leaving into it (§6).
-fn notice(ui: &Ui, now: Now) -> Vec<Span<'static>> {
-    if ui.opening {
-        return vec![Span::styled("opening a session…", theme::dim())];
-    }
-    let Some(notice) = ui.notice() else {
-        return Vec::new();
-    };
-    let strength = notice.strength(now);
-    let mut spans = vec![Span::styled(
-        notice.text.lines().collect::<Vec<_>>().join(" · "),
-        theme::fading(notice.level, strength),
-    )];
-    // What the refusal was about is the person's own line: it is said after
-    // the reason, and never more loudly than it. The slot's own separator
-    // joins the two, as it joins every other pair.
-    if let Some(about) = notice.about.as_ref() {
-        spans.push(Span::styled(
-            about.clone(),
-            theme::fading(bingo_sdk::Level::Info, strength),
-        ));
-    }
-    spans
 }
 
 /// Where you are, how much of the window is spent, and what answers you: who
@@ -421,54 +277,15 @@ fn dimmed(text: String) -> Span<'static> {
     Span::styled(text, theme::dim())
 }
 
-fn join(parts: Vec<Span<'static>>) -> Vec<Span<'static>> {
-    let mut out = Vec::new();
-    for part in parts {
-        if !out.is_empty() {
-            out.push(Span::styled(" · ", theme::dim()));
-        }
-        out.push(part);
-    }
-    out
-}
-
-/// Left at the margin, right at the far edge, the middle centred in what is
-/// between them — and against the left margin when there is no mode to sit
-/// beside, so the hint reads where Claude Code's does.
-fn place(
-    left: Vec<Span<'static>>,
-    middle: Vec<Span<'static>>,
-    right: Vec<Span<'static>>,
-    width: usize,
-) -> Line<'static> {
-    let (left, middle, right) = fit(left, middle, right, width);
-    let slack = width.saturating_sub(cells(&left) + cells(&middle) + cells(&right));
-    let before = match (left.is_empty(), middle.is_empty()) {
-        (_, true) => slack,
-        (true, false) => 0,
-        (false, false) => slack / 2,
-    };
+/// The footer has only its persistent left and right groups.
+fn place(left: Vec<Span<'static>>, right: Vec<Span<'static>>, width: usize) -> Line<'static> {
+    let right = clip(right, width);
+    let left = clip(left, width.saturating_sub(cells(&right) + GAP));
+    let slack = width.saturating_sub(cells(&left) + cells(&right));
     let mut spans = left;
-    spans.push(pad(before));
-    spans.extend(middle);
-    spans.push(pad(slack - before));
+    spans.push(pad(slack));
     spans.extend(right);
     Line::from(spans)
-}
-
-/// The middle gives way first, then the mode; the place a person is in is the
-/// last thing to go.
-fn fit(
-    left: Vec<Span<'static>>,
-    middle: Vec<Span<'static>>,
-    right: Vec<Span<'static>>,
-    width: usize,
-) -> (Vec<Span<'static>>, Vec<Span<'static>>, Vec<Span<'static>>) {
-    let right = clip(right, width);
-    let left = clip(left, width.saturating_sub(cells(&right)));
-    let gaps = GAP * (!left.is_empty() as usize + !right.is_empty() as usize);
-    let room = width.saturating_sub(cells(&left) + cells(&right) + gaps);
-    (left, clip(middle, room), right)
 }
 
 fn cells(spans: &[Span<'static>]) -> usize {
@@ -562,11 +379,11 @@ mod tests {
         );
         assert!(drawn.ends_with("fake-1  "), "{drawn}");
         assert!(!drawn.contains("fake/"));
-        assert!(!drawn.contains(HINT));
+        assert!(!drawn.contains("/ commands"));
         assert!(
-            hints(&solo(&state()), &ui, 108, now, &mut Vec::new())
+            crate::keybar::hints(&solo(&state()), &ui, 108, now, &mut Vec::new())
                 .to_string()
-                .contains(HINT)
+                .contains("/ commands")
         );
     }
 
@@ -610,13 +427,13 @@ mod tests {
         let at = (now.wall + jiff::SignedDuration::from_secs(60)).to_string();
         let mut state = folded(vec![frame(1, pending_wake(&at))]);
         assert!(
-            hints(&solo(&state), &ui, 108, now, &mut Vec::new())
+            crate::keybar::hints(&solo(&state), &ui, 108, now, &mut Vec::new())
                 .to_string()
                 .contains("wake in")
         );
         state.apply(&frame(2, wake_taken_back()));
         assert!(
-            !hints(&solo(&state), &ui, 108, now, &mut Vec::new())
+            !crate::keybar::hints(&solo(&state), &ui, 108, now, &mut Vec::new())
                 .to_string()
                 .contains("wake in")
         );
@@ -725,9 +542,9 @@ mod tests {
             meta: serde_json::json!({"state":{"kind":"waiting"}}),
         });
         assert!(
-            hints(&tree, &ui, 108, now, &mut Vec::new())
+            crate::keybar::hints(&tree, &ui, 108, now, &mut Vec::new())
                 .to_string()
-                .contains("1 from this repo waits for you")
+                .contains("1 from this repo waiting")
         );
         ui.notify(
             bingo_sdk::Level::Info,
@@ -735,27 +552,11 @@ mod tests {
             now.instant,
         );
         assert!(
-            hints(&tree, &ui, 108, now, &mut Vec::new())
+            crate::keybar::hints(&tree, &ui, 108, now, &mut Vec::new())
                 .to_string()
                 .contains("conversation was kept · put back a.txt")
         );
         assert_eq!(footer, line(&tree, &ui, 108, now));
-    }
-
-    /// The lines the run opens with name a setting, and a setting cut short
-    /// is no remedy: each fits whole at 80 columns.
-    #[test]
-    fn the_opening_lines_fit_whole_at_eighty_columns() {
-        for line in [
-            crate::graphics::PASSTHROUGH_OFF,
-            crate::graphics::PASSTHROUGH_UNHEARD,
-            crate::graphics::unseen::HERDR_OFF,
-        ] {
-            let (mut ui, now) = scene();
-            ui.notify(bingo_sdk::Level::Info, line, now.instant);
-            let drawn = hints(&solo(&state()), &ui, 80, now, &mut Vec::new()).to_string();
-            assert!(drawn.contains(line), "{drawn}");
-        }
     }
 
     #[test]

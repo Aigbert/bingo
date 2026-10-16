@@ -1,0 +1,12 @@
+---
+source: crates/bingo-surface-tui/src/keybar/tests.rs
+expression: screens
+---
+108 columns
+" my-picker off                                                                                              "
+
+80 columns
+" my-picker off                                                                  "
+
+32 columns
+" my-picker off                  "

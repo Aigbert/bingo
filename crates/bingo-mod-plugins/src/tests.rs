@@ -336,7 +336,7 @@ fn approving_a_server_shows_what_it_runs_and_moving_forgets_it() {
     );
     assert!(
         card.iter()
-            .any(|fact| fact.error && fact.text.contains("⏎ again"))
+            .any(|fact| fact.error && fact.text.contains("approve github for this checkout"))
     );
     assert_eq!(press("down"), json!({}));
     assert_eq!(press("up"), json!({}));
@@ -490,7 +490,9 @@ fn drawn_at(
         selected: row.into(),
         ..Default::default()
     };
-    lines(&draw::tree(props, servers, &mut cursor, "a", width, height))
+    let view = draw::tree(props, servers, &mut cursor, "a", width, height);
+    bingo_sdk::testing::assert_separate_hints(&view);
+    lines(&view)
 }
 
 #[test]
@@ -600,9 +602,9 @@ fn the_built_ins_card_counts_the_ones_that_stay_on() {
         .map(|fact| fact.text.as_str())
         .collect::<Vec<_>>();
     assert!(text.contains(&" 1 are needed and stay on"), "{text:?}");
-    assert!(text.contains(&" ⏎ show all 3"), "{text:?}");
+    assert!(text.contains(&" show all 3"), "{text:?}");
     let folded = cards::builtins_card(&plugins, true);
-    assert!(folded.iter().any(|fact| fact.text == " ⏎ fold them"));
+    assert!(folded.iter().any(|fact| fact.text == " fold them"));
 }
 
 #[test]

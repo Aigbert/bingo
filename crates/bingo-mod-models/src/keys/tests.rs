@@ -52,7 +52,22 @@ fn a_pinned_models_hint_offers_unpin() {
         108,
         18,
     );
-    assert!(view.fold().contains("* unpin"), "{}", view.fold());
+    assert!(
+        !view.fold().contains("* unpin"),
+        "hints stay out of the body"
+    );
+    bingo_sdk::testing::assert_separate_hints(&view);
+    let View::Box { layout, .. } = view else {
+        panic!("site");
+    };
+    assert!(
+        layout
+            .hints
+            .unwrap()
+            .pairs
+            .iter()
+            .any(|p| p.keys == "*" && p.action == "unpin")
+    );
 }
 
 #[tokio::test]

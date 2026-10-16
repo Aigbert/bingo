@@ -78,7 +78,7 @@ async fn follow(panel: &mut Panel, rows: &Rows, cx: &HookContext) -> Result<(), 
 }
 pub fn tree(panel: &Panel, rows: &Rows, models: &[CatalogEntry], height: u16) -> View {
     let header = header(panel, rows);
-    let mut lines = vec![format!("crew · {header}   ] switches")];
+    let mut lines = vec![format!("crew · {header}")];
     let cards = cards(panel, rows, models);
     if cards.is_empty() {
         lines.push(empty(panel.tab).into());
@@ -107,11 +107,9 @@ pub fn tree(panel: &Panel, rows: &Rows, models: &[CatalogEntry], height: u16) ->
             }
         }
     }
-    lines.push(if let Some(room) = &panel.confirm {
-        room.prompt()
-    } else {
-        hint(panel.tab).into()
-    });
+    if let Some(room) = &panel.confirm {
+        lines.push(room.prompt());
+    }
     View::Box {
         children: lines
             .into_iter()
@@ -124,6 +122,17 @@ pub fn tree(panel: &Panel, rows: &Rows, models: &[CatalogEntry], height: u16) ->
             })
             .collect(),
         layout: Box::new(view::BoxStyle {
+            hints: Some(
+                component::SiteHints::new(if panel.confirm.is_some() {
+                    vec![
+                        component::KeyPair::new("⏎", "confirm"),
+                        component::KeyPair::new("esc", "cancel"),
+                    ]
+                } else {
+                    hint(panel.tab)
+                })
+                .composer("/crew", ""),
+            ),
             on_key: Some(Action {
                 name: CommandSpec::ui_name(crate::ID),
                 args: json!({"handler":crate::REQUEST,"event":"press","row":rows.identity(panel.tab,panel.selected),"tab":panel.tab.label()}),
@@ -197,10 +206,44 @@ fn cards(panel: &Panel, rows: &Rows, models: &[CatalogEntry]) -> Vec<Card> {
             .collect(),
     }
 }
-fn hint(tab: Tab) -> &'static str {
-    match tab {
-        Tab::Agents => "⏎ step in · s stop · x dismiss · m message · ←→ model · esc",
-        Tab::Rooms => "p purpose · a seat · u unseat · c close · esc",
-        Tab::Tasks => "+ add · space done/open · o owner · esc",
+fn hint(tab: Tab) -> Vec<component::KeyPair> {
+    use component::KeyPair as Pair;
+    let mut pairs = vec![Pair::new("]", "switch"), Pair::new("↑↓", "pick")];
+    pairs.extend(match tab {
+        Tab::Agents => vec![
+            Pair::new("⏎", "step in"),
+            Pair::new("s", "stop"),
+            Pair::new("x", "dismiss"),
+            Pair::new("m", "message"),
+            Pair::new("←→", "model"),
+        ],
+        Tab::Rooms => vec![
+            Pair::new("p", "purpose"),
+            Pair::new("a", "seat"),
+            Pair::new("u", "unseat"),
+            Pair::new("c", "close"),
+        ],
+        Tab::Tasks => vec![
+            Pair::new("+", "add"),
+            Pair::new("space", "done/open"),
+            Pair::new("o", "owner"),
+        ],
+    });
+    pairs.push(Pair::new("esc", "close"));
+    pairs
+}
+
+#[cfg(test)]
+mod chrome_tests {
+    use super::*;
+    #[test]
+    fn all_tabs_keep_hints_out_of_the_body() {
+        for tab in [Tab::Agents, Tab::Rooms, Tab::Tasks] {
+            let panel = Panel {
+                tab,
+                ..Default::default()
+            };
+            bingo_sdk::testing::assert_separate_hints(&tree(&panel, &Rows::default(), &[], 20));
+        }
     }
 }

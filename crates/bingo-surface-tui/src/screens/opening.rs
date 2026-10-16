@@ -52,11 +52,11 @@ fn the_piece_moves_nothing_but_the_boxs_own_cells() {
     let rows = |t: f32| {
         in_look(truecolor(), || playing(80, 24, t))
             .lines()
-            .map(|row| row.contains("? for shortcuts") || row.contains(" ▍ "))
+            .map(|row| row.contains("/ commands") || row.contains(" ▍ "))
             .collect::<Vec<bool>>()
     };
     assert_eq!(rows(0.0), rows(2.4), "the furniture never moved");
     let landed = in_look(truecolor(), || playing(80, 24, 2.4));
     assert!(landed.contains("bingo▍"), "{landed}");
-    assert!(landed.contains("? for shortcuts"), "{landed}");
+    assert!(landed.contains("/ commands"), "{landed}");
 }

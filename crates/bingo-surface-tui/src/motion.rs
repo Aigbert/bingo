@@ -43,9 +43,13 @@ fn screen(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> String {
 /// The style of the first run of the row carrying `needle` — the sparkle on
 /// the activity row, the border on the input box's own row.
 fn leading_style(tree: &Tree, ui: &mut crate::ui::Ui, now: Now, needle: &str) -> Style {
-    crate::painted::painted(80, 24, tree, ui, now)
-        .row(needle)
-        .first()
+    let painted = crate::painted::painted(80, 24, tree, ui, now);
+    let runs = if needle == "burrowing" {
+        painted.at(ui.shown.regions.activity.bottom().saturating_sub(1))
+    } else {
+        painted.row(needle)
+    };
+    runs.first()
         .map(|(_, style)| *style)
         .unwrap_or_else(|| panic!("no row carries {needle:?}"))
 }
@@ -77,14 +81,14 @@ fn waiting_caret_blinks_without_changing_its_glyph() {
     let (mut ui, now) = scene();
     for ms in [530, 1060, 1590] {
         let at = later(now, ms);
-        let style = leading_style(&tree, &mut ui, at, "esc to interrupt");
+        let style = leading_style(&tree, &mut ui, at, "burrowing");
         let expected = if ms / 530 % 2 == 1 {
             theme::dim()
         } else {
             theme::presence()
         };
         assert_eq!(style, theme::as_drawn(expected));
-        assert!(row(&tree, &mut ui, at, "esc to interrupt").starts_with(" ▍"));
+        assert!(row(&tree, &mut ui, at, "burrowing").starts_with(" ▍"));
     }
 }
 
@@ -95,7 +99,7 @@ fn the_blocked_caret_breathes_on_the_tool_period() {
         for ms in [0, 550, 1100, 1650, 2200] {
             let at = later(now, ms);
             assert_eq!(
-                leading_style(&solo(&calling()), &mut ui, at, "esc to interrupt"),
+                leading_style(&solo(&calling()), &mut ui, at, "burrowing"),
                 theme::as_drawn(theme::breath(crate::clock::breath(
                     at,
                     Duration::from_millis(2200)
@@ -149,9 +153,8 @@ fn arriving_words_hold_the_caret_steady_while_tools_breathe() {
     let (mut ui, now) = mid_turn();
     let at = later(now, 250);
     crate::theme::with(crate::painted::truecolor(), || {
-        let mut drawn = |state: &bingo_sdk::SessionState| {
-            leading_style(&solo(state), &mut ui, at, "esc to interrupt")
-        };
+        let mut drawn =
+            |state: &bingo_sdk::SessionState| leading_style(&solo(state), &mut ui, at, "burrowing");
         let on = |period| {
             theme::as_drawn(theme::breath(crate::clock::breath(
                 at,
@@ -215,7 +218,7 @@ fn the_wait_breathes_at_the_pace_a_tool_holds_a_turn_and_leaves_the_box_dim() {
 fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
     let (mut ui, now) = mid_turn();
     let screen = screen(&solo(&state()), &mut ui, now);
-    assert!(!screen.contains("esc to interrupt"), "{screen}");
+    assert!(!screen.contains("burrowing"), "{screen}");
     assert!(
         screen.contains("bingo▍") && screen.contains(" ▍ ask anything"),
         "{screen}"
@@ -400,10 +403,10 @@ fn a_turn_that_answers_at_once_never_flashes_a_row() {
     let (mut ui, now) = scene();
     for ms in [0i64, 100, 200, 299] {
         let screen = screen(&tree, &mut ui, later(now, ms));
-        assert!(!screen.contains("esc to interrupt"), "at {ms} ms: {screen}");
+        assert!(!screen.contains("burrowing"), "at {ms} ms: {screen}");
     }
     assert!(
-        screen(&tree, &mut ui, later(now, 300)).contains("esc to interrupt"),
+        screen(&tree, &mut ui, later(now, 300)).contains("burrowing"),
         "and it appears at 300 ms"
     );
 }
@@ -424,16 +427,13 @@ fn the_activity_row_says_a_verb_a_clock_and_what_the_turn_has_said() {
     ));
     let (mut ui, now) = scene();
     let tree = solo(&state);
-    let mut row = |ms| row(&tree, &mut ui, later(now, ms), "esc to interrupt");
+    let mut row = |ms| row(&tree, &mut ui, later(now, ms), "burrowing");
     assert_eq!(
         row(4_000),
-        " ▍ burrowing · 4s · esc to interrupt",
+        " ▍ burrowing · 4s",
         "the verb is drawn from the turn's own id, so the row never changes its mind"
     );
-    assert!(
-        row(5_000).contains("· 5s ·"),
-        "the clock ticks once a second"
-    );
+    assert!(row(5_000).contains("· 5s"), "the clock ticks once a second");
 }
 
 /// The answer to the key, on the key's own frame. The row keeps everything
@@ -472,7 +472,7 @@ fn stopping_outruns_the_activity_row_s_own_delay() {
     let tree = solo(&state);
     let (mut ui, now) = scene();
     assert!(
-        !screen(&tree, &mut ui, later(now, 40)).contains("esc to interrupt"),
+        !screen(&tree, &mut ui, later(now, 40)).contains("burrowing"),
         "a turn this young says nothing on its own"
     );
     ui.stop_asked = Some(bingo_sdk::TurnId::from_raw("trn_1"));
@@ -490,7 +490,7 @@ fn the_next_turn_is_not_the_one_that_was_stopped() {
     let (mut ui, now) = scene();
     ui.stop_asked = Some(bingo_sdk::TurnId::from_raw("trn_1"));
     let drawn = screen(&solo(&state), &mut ui, later(now, 4_000));
-    assert!(drawn.contains("esc to interrupt"), "{drawn}");
+    assert!(drawn.contains("sniffing around · 4s"), "{drawn}");
     assert!(!drawn.contains(crate::activity::STOPPING), "{drawn}");
 }
 
@@ -513,7 +513,7 @@ fn every_verb_is_one_of_bingos_own() {
         let state = folded(vec![frame(1, started(id))]);
         let row = screen(&solo(&state), &mut ui, now)
             .lines()
-            .find(|line| line.contains("esc to interrupt"))
+            .find(|line| words.iter().any(|word| line.contains(word)))
             .expect("the activity row")
             .to_string();
         assert!(words.iter().any(|word| row.contains(word)), "{id}: {row}");
@@ -591,28 +591,17 @@ fn esc_runs_a_sheet_back_down_the_way_it_came() {
 // ---- notices ------------------------------------------------------------
 
 #[test]
-fn a_notice_arrives_out_of_dim_and_leaves_into_it() {
+fn a_toast_keeps_its_colour_until_expiry() {
     let tree = solo(&state());
     let (mut ui, now) = scene();
     ui.notify(bingo_sdk::Level::Error, "unknown command: /x", now.instant);
-    let mut at = |ms| style_of(&tree, &mut ui, later(now, ms), "unknown command");
-    assert_eq!(
-        at(0),
-        theme::as_drawn(theme::fading(bingo_sdk::Level::Error, 0.0))
-    );
-    assert_eq!(
-        at(33),
-        theme::as_drawn(theme::fading(bingo_sdk::Level::Error, 0.5))
-    );
-    assert_eq!(
-        at(66),
-        theme::as_drawn(theme::bad()),
-        "and it is there to read"
-    );
-    assert_eq!(
-        at(4_099),
-        theme::as_drawn(theme::fading(bingo_sdk::Level::Error, 0.5))
-    );
+    for ms in [0, 33, 66, 2799] {
+        assert_eq!(
+            style_of(&tree, &mut ui, later(now, ms), "unknown command"),
+            theme::as_drawn(theme::bad())
+        );
+    }
+    assert!(!screen(&tree, &mut ui, later(now, 2800)).contains("unknown command"));
 }
 
 #[test]
@@ -754,11 +743,11 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
     let (mut ui, now) = mid_turn();
     let still = still(later(now, 450));
     assert_eq!(
-        leading_style(&tree, &mut ui, still, "esc to interrupt"),
+        leading_style(&tree, &mut ui, still, "burrowing"),
         theme::as_drawn(theme::presence()),
         "the sparkle rests at presence"
     );
-    let drawn = row(&tree, &mut ui, still, "esc to interrupt");
+    let drawn = row(&tree, &mut ui, still, "burrowing");
     assert!(
         drawn.starts_with(" ▍"),
         "and holds its first glyph: {drawn}"
@@ -826,7 +815,7 @@ fn a_finished_turn_takes_the_whole_of_the_presence_with_it() {
     ]);
     let (mut ui, now) = mid_turn();
     let screen = screen(&solo(&state), &mut ui, now);
-    assert!(!screen.contains("esc to interrupt"), "{screen}");
+    assert!(!screen.contains("burrowing"), "{screen}");
     assert_eq!(
         leading_style(&solo(&state), &mut ui, now, keys::PLACEHOLDER),
         theme::as_drawn(theme::glow()),
@@ -859,7 +848,7 @@ fn the_rhythms_are_the_ones_the_design_names() {
     assert_eq!(FRAME, Duration::from_millis(33));
     assert_eq!(crate::transcript::COMET, Duration::from_millis(180));
     assert_eq!(theme::PULSE, Duration::from_secs(1));
-    assert_eq!(crate::ui::NOTICE, Duration::from_secs(4));
-    assert_eq!(crate::ui::NOTICE_FADE, FRAME * 2);
+    assert_eq!(crate::ui::NOTICE, Duration::from_millis(2800));
+    assert_eq!(crate::ui::NOTICE, std::time::Duration::from_millis(2800));
     assert_eq!(crate::ui::SWITCH, FRAME * 2);
 }

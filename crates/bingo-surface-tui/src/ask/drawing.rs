@@ -5,7 +5,7 @@ use crate::{
     tree::{self, Tree},
     ui::{Card, Ui},
 };
-use bingo_sdk::{Interaction, InteractionKind};
+use bingo_sdk::InteractionKind;
 use ratatui::{
     layout::Rect,
     text::{Line, Span},
@@ -118,7 +118,7 @@ pub fn activity(tree: &Tree, ui: &Ui) -> Option<Line<'static>> {
         _ => "a question".into(),
     };
     let waiting = if ui.dialog.aside {
-        format!("{name} is waiting for you · ctrl+g back to it")
+        format!("{name} is waiting for you")
     } else {
         "waiting for you".into()
     };
@@ -142,25 +142,6 @@ pub fn activity(tree: &Tree, ui: &Ui) -> Option<Line<'static>> {
         format!(" ▍ {waiting}{queue}"),
         theme::presence(),
     )))
-}
-
-pub fn keys(open: &Interaction, ui: &Ui) -> Option<&'static str> {
-    if ui.dialog.aside {
-        return Some("ctrl+g back to it · enter queue draft · esc stop");
-    }
-    if ui.dialog.words.is_some() {
-        return Some("enter send · ctrl+g back · esc stop");
-    }
-    Some(match &open.kind {
-        InteractionKind::Permission { .. } => {
-            "↑↓ pick · enter answer · ctrl+o whole diff · esc no, stop the turn"
-        }
-        InteractionKind::Form { title, questions } if title.is_some() || questions.len() > 1 => {
-            "tab next · ←→ choose · space toggle · enter send · esc decline"
-        }
-        InteractionKind::Question(q) if q.multi => "↑↓ pick · space tick · enter answer · esc skip",
-        _ => "↑↓ pick · enter answer · esc skip",
-    })
 }
 
 fn fit(

@@ -161,17 +161,11 @@ pub fn tree(
     let start = at
         .saturating_sub(room / 2)
         .min(lines.len().saturating_sub(room));
-    let mut children = lines.into_iter().skip(start).take(room).collect::<Vec<_>>();
-    children.push(dim(
-        if props.query.contains(' ') && props.query.starts_with('/') {
-            "   ↑↓ choose · enter run · esc back"
-        } else {
-            "   type to search commands, sessions and keys together"
-        },
-    ));
+    let children = lines.into_iter().skip(start).take(room).collect::<Vec<_>>();
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
+            hints: Some(chrome(props, groups)),
             on_key: Some(Action {
                 name: "palette:ui".into(),
                 args: json!({"handler":request,"event":"press","query":props.query}),
@@ -271,5 +265,68 @@ fn marked(text: &str, marks: &[usize], dim: bool) -> View {
             dim_color: Some(dim),
             ..Default::default()
         },
+    }
+}
+
+fn chrome(props: &PaletteProps, groups: &[Group]) -> component::SiteHints {
+    use component::{KeyPair as Pair, PaletteOpen, SiteHints};
+    let arguments = props.query.starts_with('/') && props.query.contains(' ');
+    let empty = groups.iter().all(|group| group.rows.is_empty());
+    if arguments
+        && let Some(name) = props
+            .query
+            .strip_prefix('/')
+            .and_then(|q| q.split_once(' '))
+            .map(|(name, _)| name)
+    {
+        let free = props
+            .commands
+            .iter()
+            .find(|entry| entry.id == name)
+            .and_then(|entry| serde_json::from_value::<CommandSpec>(entry.meta.clone()).ok())
+            .is_some_and(|spec| matches!(spec.args, ArgSpec::Free { .. }));
+        if free {
+            return SiteHints::new([Pair::new("⏎", name), Pair::new("esc", "cancel")])
+                .composer("", "");
+        }
+    }
+
+    let mut pairs = vec![Pair::new("↑↓", "pick")];
+    pairs.push(Pair::new(
+        "⏎",
+        if empty {
+            "nothing"
+        } else if arguments {
+            "choose"
+        } else {
+            match props.open {
+                PaletteOpen::Commands => "choose",
+                PaletteOpen::Keys => "do it",
+                PaletteOpen::Sessions => "resume",
+            }
+        },
+    ));
+    if !arguments && !empty && props.open == PaletteOpen::Commands {
+        pairs.push(Pair::new("tab", "fill in"));
+    }
+    pairs.push(Pair::new("esc", if arguments { "back" } else { "close" }));
+    SiteHints::new(pairs).composer(
+        match props.open {
+            PaletteOpen::Commands => "",
+            PaletteOpen::Keys => "? ",
+            PaletteOpen::Sessions => "⟲ ",
+        },
+        "",
+    )
+}
+
+#[cfg(test)]
+mod chrome_tests {
+    use super::*;
+    #[test]
+    fn palette_keeps_contextual_hints_out_of_the_body() {
+        let props = crate::keys::review_tests::props();
+        let (groups, selected) = groups(&props, &[]);
+        bingo_sdk::testing::assert_separate_hints(&tree(&props, &groups, selected, "palette", 20));
     }
 }

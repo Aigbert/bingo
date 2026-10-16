@@ -55,6 +55,7 @@ fn slot() -> Value {
     slot::with(
         json!({}),
         [slot::Slot::Pane {
+            hints: None,
             id: REQUEST.into(),
             title: String::new(),
             focus: true,

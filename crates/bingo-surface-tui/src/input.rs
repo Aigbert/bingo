@@ -30,7 +30,6 @@ mod mode;
 pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
 /// What the first ctrl+c on an empty composer says.
-pub const ARM_HINT: &str = "press ctrl+c again to exit";
 /// What shift+tab says when no policy published a mode it can walk.
 pub const UNKNOWN_MODE: &str = "permission mode unknown — /permission <mode>";
 /// What ctrl+b says when no shell command is running to background.
@@ -463,9 +462,11 @@ fn interrupt_or_exit(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect>
             ui.edited();
         }
         keys::Interrupt::Exit => return vec![Effect::Exit],
-        // The hint is derived from `armed` on the status line, never queued
-        // behind a notice: the answer to a key outruns everything else.
-        keys::Interrupt::Arm => ui.armed = Some(now.instant),
+        keys::Interrupt::Arm => {
+            ui.armed = Some(now.instant);
+            ui.notice = None;
+            ui.placed.toasts.discard();
+        }
     }
     Vec::new()
 }
@@ -1467,8 +1468,8 @@ mod tests {
         assert!(ui.composer.is_empty(), "text goes first");
 
         assert!(press(&mut ui, &state(), ctrl('c'), now).is_empty());
-        let line = crate::status::hints(&solo(&state()), &ui, 80, now, &mut Vec::new()).to_string();
-        assert!(line.contains(ARM_HINT), "{line}");
+        let line = crate::keybar::hints(&solo(&state()), &ui, 80, now, &mut Vec::new()).to_string();
+        assert!(line.contains("ctrl+c again to exit"), "{line}");
         let late = Now {
             instant: now.instant + crate::ui::EXIT_WINDOW,
             ..now

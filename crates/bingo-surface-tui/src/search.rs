@@ -1,6 +1,6 @@
 //! Looking through the transcript.
 //!
-//! `ctrl+f` takes the status line's row for a query; committing it finds every
+//! `ctrl+f` takes the composer's row for a query; committing it finds every
 //! place the words occur in the rendered transcript and `n`/`N` walk them,
 //! scrolling the transcript to each. The hits are cells — a line and a run of
 //! columns — because that is what a highlight is drawn over, and because a
@@ -94,7 +94,7 @@ impl Search {
         }
         match self.hits.len() {
             0 => NONE.to_string(),
-            found => format!("{}/{found} · n/N · esc", self.at + 1),
+            found => format!("{}/{found}", self.at + 1),
         }
     }
 }
@@ -126,7 +126,7 @@ fn in_line(line: usize, text: &str, needle: &str) -> Vec<Hit> {
     out
 }
 
-/// The one row a search takes, in the status line's place.
+/// The query and its count, without action hints.
 pub fn row(search: &Search) -> Line<'static> {
     let caret = if search.typing { theme::caret() } else { "" };
     Line::from(vec![
@@ -209,7 +209,7 @@ mod tests {
             ]
         );
         assert!(!search.typing, "committing stops the typing");
-        assert_eq!(search.tally(), "1/3 · n/N · esc");
+        assert_eq!(search.tally(), "1/3");
     }
 
     #[test]
@@ -217,7 +217,7 @@ mod tests {
         let mut search = found("cache");
         search.step(1);
         assert_eq!(search.current().map(|h| h.line), Some(1));
-        assert_eq!(search.tally(), "2/3 · n/N · esc");
+        assert_eq!(search.tally(), "2/3");
         search.step(1);
         search.step(1);
         assert_eq!(search.current().map(|h| h.line), Some(0), "it wrapped");

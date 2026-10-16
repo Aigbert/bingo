@@ -676,6 +676,7 @@ pub fn attention(now: crate::clock::Now) -> Style {
 /// life, its own level's colour while it is there to be read. `dim` is a
 /// weight and not a hue since M73, so there is nothing left to mix through —
 /// the notice is dim until it has arrived, as it has always been on the eight.
+#[cfg(test)]
 pub fn fading(level: bingo_sdk::Level, t: f32) -> Style {
     match t >= 1.0 {
         true => self::level(level),
@@ -1193,7 +1194,6 @@ mod tests {
                     "rewind.rs",
                     "search.rs",
                     "status.rs",
-                    "toast.rs",
                     "transcript.rs",
                     "transcript/ran.rs",
                     "transcript/said.rs",
@@ -1223,9 +1223,10 @@ mod tests {
                     "foot.rs",
                     "form.rs",
                     "graphics/band.rs",
+                    "keybar.rs",
+                    "keybar/tests.rs",
                     "layers.rs",
                     "markdown.rs",
-                    "pager.rs",
                     "pane/draw.rs",
                     "preview.rs",
                     "rewind.rs",
@@ -1289,9 +1290,12 @@ mod tests {
                 &[
                     "activity.rs",
                     "composer.rs",
+                    "keybar.rs",
+                    "keybar/tests.rs",
                     "opening/frame.rs",
                     "status.rs",
                     "view.rs",
+                    "views/text.rs",
                 ],
             ),
             (
@@ -1328,7 +1332,7 @@ mod tests {
             ),
             ("landing", &["transcript.rs"]),
             ("cooling", &["transcript.rs"]),
-            ("fading", &["status.rs"]),
+            ("fading", &[]),
             ("warming", &[]),
             ("ink", &["highlight.rs"]),
             ("crew", &["face.rs", "status.rs"]),

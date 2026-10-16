@@ -25,10 +25,6 @@ use crate::{markdown, search, theme, thoughts, transcript, wrap};
 /// The rows the sheet spends on itself: what it is, and the air under it.
 pub const HEAD: usize = 2;
 
-/// What the title row says on its right while nothing is being searched for.
-/// The hint lives in the thing it acts on (design §4).
-const HINT: &str = "j/k · pgup/pgdn · g/G · / to search · esc";
-
 /// The block a person opened, and where they are in it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Pager {
@@ -274,15 +270,14 @@ pub fn sheet(
     out
 }
 
-/// The title, and on its right either the keys or the query being typed.
+/// The title and the query being typed; keys belong to the KeyBar.
 fn head(title: &str, searching: Option<&Search>) -> Line<'static> {
     let mut spans = vec![
         Span::styled(title.to_string(), theme::text().patch(theme::bold())),
         Span::raw("  "),
     ];
-    match searching {
-        Some(open) => spans.extend(search::row(open).spans),
-        None => spans.push(Span::styled(HINT.to_string(), theme::dim())),
+    if let Some(open) = searching {
+        spans.extend(search::row(open).spans);
     }
     Line::from(spans)
 }
@@ -666,17 +661,14 @@ mod tests {
     }
 
     #[test]
-    fn the_title_row_carries_the_keys_until_a_query_takes_it() {
+    fn the_title_row_keeps_content_without_key_hints() {
         let mut pager = pager();
         let head = sheet("Read(src/lib.rs)", &[], &pager, window(0))[0].to_string();
         assert!(head.starts_with("Read(src/lib.rs)"), "{head}");
-        assert!(head.contains(HINT), "{head}");
+        assert!(!head.contains("pgup"), "{head}");
         pager.search = Some(Search::open());
         let head = sheet("Read(src/lib.rs)", &[], &pager, window(0))[0].to_string();
         assert!(head.contains('/'), "{head}");
-        assert!(
-            !head.contains(HINT),
-            "the keys give way to the query: {head}"
-        );
+        assert!(!head.contains("pgup"), "keys stay outside the body: {head}");
     }
 }

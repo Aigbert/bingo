@@ -142,6 +142,7 @@ mod tests {
             24,
             jiff::Timestamp::UNIX_EPOCH,
         );
+        bingo_sdk::testing::assert_separate_hints(&tree);
         let View::Box { layout, .. } = tree else {
             panic!("the pane is a box");
         };

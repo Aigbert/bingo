@@ -763,7 +763,7 @@ fn schedule_plugin() -> SchedulePlugin {
     }
 }
 
-fn builtin_mods() -> [Box<dyn Plugin>; 10] {
+fn builtin_mods() -> [Box<dyn Plugin>; 11] {
     [
         Box::new(bingo_mod_ask::Ask),
         Box::new(bingo_mod_palette::Palette),
@@ -773,6 +773,7 @@ fn builtin_mods() -> [Box<dyn Plugin>; 10] {
         Box::new(bingo_mod_plugins::Plugins),
         Box::new(bingo_mod_status::Status::default()),
         Box::new(bingo_mod_models::Models),
+        Box::new(bingo_mod_keybar::KeyBar),
         Box::new(bingo_mod_crew::Crew::default()),
         Box::new(bingo_mod_schedule::SchedulePanel::default()),
     ]

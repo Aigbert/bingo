@@ -26,11 +26,11 @@ pub enum Confirmation {
 impl Confirmation {
     pub fn prompt(&self) -> String {
         match self {
-            Self::Stop(name) => format!("Stop {name}? ⏎ confirm · esc cancel"),
+            Self::Stop(name) => format!("Stop {name}?"),
             Self::Dismiss(name) => {
-                format!("Dismiss {name} and delete its journal? ⏎ confirm · esc cancel")
+                format!("Dismiss {name} and delete its journal?")
             }
-            Self::CloseRoom(name) => format!("Close {name}? ⏎ confirm · esc cancel"),
+            Self::CloseRoom(name) => format!("Close {name}?"),
         }
     }
 }

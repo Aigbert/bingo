@@ -232,6 +232,7 @@ mod tests {
                 .contains(&format!("command:{name}").as_str())
         );
         let drawn = crate::draw::tree(&[], 0, None, 10, 40);
+        bingo_sdk::testing::assert_separate_hints(&drawn);
         let drawer = crate::draw::Drawing(Shared::default());
         view::answer_ok(
             render::Component::Pane,

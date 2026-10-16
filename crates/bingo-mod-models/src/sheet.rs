@@ -97,7 +97,7 @@ fn append_sign_in(lines: &mut Vec<String>, selected: usize, pending: Option<&str
 }
 fn append_add(lines: &mut Vec<String>, guess: &crate::guess::Guess, selected: usize) {
     let address = if guess.address.is_empty() {
-        "none · ⏎ paste whose key this is"
+        "none · paste whose key this is"
     } else {
         guess.address.as_str()
     };
@@ -118,7 +118,6 @@ fn append_add(lines: &mut Vec<String>, guess: &crate::guess::Guess, selected: us
     {
         lines.push(format!("{}{label:10} {value}", mark(i == selected)));
     }
-    lines.push("   ⏎ edit / add · esc back".into());
 }
 fn mark(selected: bool) -> &'static str {
     if selected { " ❯ " } else { "   " }
@@ -158,9 +157,7 @@ fn append_manage(
             ));
         }
         if confirm {
-            lines.push(format!(
-                "Remove {provider} and its key? ⏎ confirm · esc cancel"
-            ));
+            lines.push(format!("Remove {provider} and its key?"));
         }
     }
 }

@@ -1,0 +1,1857 @@
+{
+  "k-model-open-down1": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "←→",
+        "action": "thinking",
+        "emphasis": false
+      },
+      {
+        "keys": "*",
+        "action": "unpin",
+        "emphasis": false
+      },
+      {
+        "keys": "tab",
+        "action": "keep",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "use here",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-open-right": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "←→",
+        "action": "thinking",
+        "emphasis": false
+      },
+      {
+        "keys": "*",
+        "action": "unpin",
+        "emphasis": false
+      },
+      {
+        "keys": "tab",
+        "action": "keep",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "use here",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-open-tab-keep": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "←→",
+        "action": "thinking",
+        "emphasis": false
+      },
+      {
+        "keys": "*",
+        "action": "unpin",
+        "emphasis": false
+      },
+      {
+        "keys": "tab",
+        "action": "here only",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "use and keep",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-open-star": {
+    "pairs": [],
+    "toast": {
+      "text": "unpinned gpt-6",
+      "level": "info"
+    }
+  },
+  "k-model-open-provider-row": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "←→",
+        "action": "thinking",
+        "emphasis": false
+      },
+      {
+        "keys": "*",
+        "action": "unpin",
+        "emphasis": false
+      },
+      {
+        "keys": "tab",
+        "action": "keep",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "use here",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-open-bottom-add": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "+",
+        "action": "add provider",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "add",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-open-enter-same": {
+    "pairs": [],
+    "toast": {
+      "text": "still on claude-sonnet-5-5",
+      "level": "info"
+    }
+  },
+  "k-model-open-enter-switch": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-open-enter-switch.after": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-direct-enter": {
+    "pairs": [],
+    "toast": {
+      "text": "press ⏎: the top match is used directly",
+      "level": "info"
+    }
+  },
+  "k-model-quick-altm": {
+    "pairs": [],
+    "toast": {
+      "text": "press alt+m, then alt+t",
+      "level": "info"
+    }
+  },
+  "k-model-quick-altt": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-quick-after": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-down-enter": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "do it",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-paste-enter": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "field",
+        "emphasis": false
+      },
+      {
+        "keys": "type",
+        "action": "edit",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "check and add",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-paste-form-down": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "field",
+        "emphasis": false
+      },
+      {
+        "keys": "type",
+        "action": "edit",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "check and add",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-paste-added": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "pick a model",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back to the list",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-codex-device": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "cancel",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-model-codex-esc": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "+",
+        "action": "add provider",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "sign in",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-slash-down": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "tab",
+        "action": "fill in",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-slash-th": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "tab",
+        "action": "fill in",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-slash-th-enter": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-slash-th-tab": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-help-model": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "do it",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-help-enter-altm": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-sessions-resume": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-think-enter": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-rename-typed": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "rename",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "cancel",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-rename-enter": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-mode-shifttab": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-mode-after": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-idle": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-permission-args": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-compact-args": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "compact",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "cancel",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-compact-typed": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "compact",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "cancel",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-resume-args": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-login-args": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-typing-idle": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-nomatch": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "nothing",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-pal-ctrlr-m": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "resume",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-down": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "answer",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+o",
+        "action": "whole diff",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "no, stop the turn",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-3-reason": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "send the reason",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back to the question",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-reason-typed": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "send the reason",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back to the question",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-reason-sent": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "stop",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "queue a message",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-reason-done": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-4-change": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "make this edit",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back to the question",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-ctrlo": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "answer",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+o",
+        "action": "less",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "no, stop the turn",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-yes": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "stop",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "queue a message",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-yes-done": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-scope": {
+    "pairs": [],
+    "toast": {
+      "text": "edits under src/ won't ask again this session",
+      "level": "info"
+    }
+  },
+  "k-ask-edit-scope-done": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-esc": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-typed-aside": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "back to the ask",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "queue this message",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-aside-esc": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "answer",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+o",
+        "action": "whole diff",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "no, stop the turn",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-edit-aside-queue": {
+    "pairs": [],
+    "toast": {
+      "text": "queued: it goes after this turn",
+      "level": "info"
+    }
+  },
+  "k-ask-question-other": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "answer",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-question-2": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "stop",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "queue a message",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-question-2-done": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-question-esc": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "stop",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "queue a message",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-question-esc-done": {
+    "pairs": [
+      {
+        "keys": "/",
+        "action": "commands",
+        "emphasis": false
+      },
+      {
+        "keys": "?",
+        "action": "keys",
+        "emphasis": false
+      },
+      {
+        "keys": "ctrl+r",
+        "action": "sessions",
+        "emphasis": false
+      },
+      {
+        "keys": "shift+tab",
+        "action": "mode",
+        "emphasis": false
+      },
+      {
+        "keys": "alt+m",
+        "action": "next model",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-multi-tick": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "tick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "answer with 2",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "skip, it decides",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-multi-enter": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "stop",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "queue a message",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-form-tab": {
+    "pairs": [
+      {
+        "keys": "tab",
+        "action": "next",
+        "emphasis": false
+      },
+      {
+        "keys": "←→",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "send",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "decline",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-form-right": {
+    "pairs": [
+      {
+        "keys": "tab",
+        "action": "next",
+        "emphasis": false
+      },
+      {
+        "keys": "←→",
+        "action": "choose",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "send",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "decline",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-form-bool": {
+    "pairs": [
+      {
+        "keys": "tab",
+        "action": "next",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "toggle",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "send",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "decline",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-form-send": {
+    "pairs": [
+      {
+        "keys": "esc",
+        "action": "stop",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "queue a message",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-crew-after1": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "answer",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "no, stop the turn",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-ask-danger-enter": {
+    "pairs": [
+      {
+        "keys": "⏎",
+        "action": "send the reason",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "back to the question",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-status-down": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "change",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-status-rule": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "revoke",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-status-revoke": {
+    "pairs": [],
+    "toast": {
+      "text": "revoked: edit src/** asks again",
+      "level": "info"
+    }
+  },
+  "k-st-status-plugins": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "/mcp",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-status-plugins-enter": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "its tools",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "turn off",
+        "emphasis": false
+      },
+      {
+        "keys": "r",
+        "action": "reconnect",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-plugins-space": {
+    "pairs": [],
+    "toast": {
+      "text": "my-picker off",
+      "level": "info"
+    }
+  },
+  "k-st-plugins-trust": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "tier",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "grant",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "cancel",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-plugins-trust-full1": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "tier",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "grant full",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "cancel",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-failed-reload": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "turn off",
+        "emphasis": false
+      },
+      {
+        "keys": "r",
+        "action": "reload",
+        "emphasis": false
+      },
+      {
+        "keys": "t",
+        "action": "trust",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-project-grant": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "turn off",
+        "emphasis": false
+      },
+      {
+        "keys": "r",
+        "action": "reload",
+        "emphasis": false
+      },
+      {
+        "keys": "t",
+        "action": "trust",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-builtin-off": {
+    "pairs": [],
+    "toast": {
+      "text": "bingo-mod-models off · /model takes a name; no list",
+      "level": "info"
+    }
+  },
+  "k-st-builtin-needed": {
+    "pairs": [],
+    "toast": {
+      "text": "bingo-tool-fs stays on: the kernel reads and edits files with it",
+      "level": "info"
+    }
+  },
+  "k-st-plugins-bottom": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "turn on",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-mcp-tools": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "facts",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "turn off",
+        "emphasis": false
+      },
+      {
+        "keys": "r",
+        "action": "reconnect",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-signin-enter": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "wait",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "turn off",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-signin-done": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "its tools",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "turn off",
+        "emphasis": false
+      },
+      {
+        "keys": "r",
+        "action": "reconnect",
+        "emphasis": false
+      },
+      {
+        "keys": "o",
+        "action": "sign out",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  },
+  "k-st-mcp-postgres": {
+    "pairs": [
+      {
+        "keys": "↑↓",
+        "action": "pick",
+        "emphasis": false
+      },
+      {
+        "keys": "⏎",
+        "action": "try again",
+        "emphasis": false
+      },
+      {
+        "keys": "space",
+        "action": "turn off",
+        "emphasis": false
+      },
+      {
+        "keys": "r",
+        "action": "reconnect",
+        "emphasis": false
+      },
+      {
+        "keys": "esc",
+        "action": "close",
+        "emphasis": false
+      }
+    ],
+    "toast": null
+  }
+}

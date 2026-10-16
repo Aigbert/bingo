@@ -62,14 +62,10 @@ pub fn tree(
     height: u16,
     now: jiff::Timestamp,
 ) -> View {
-    let mut children = vec![
-        line(format!(" schedules · {}", holder(&listing.holder)), false),
-        line(
-            " ↑↓ choose  space pause/enable  r run  c confirm  d forget  → session  esc close"
-                .into(),
-            true,
-        ),
-    ];
+    let mut children = vec![line(
+        format!(" schedules · {}", holder(&listing.holder)),
+        false,
+    )];
     let (body, armed) = match confirming {
         Some(Confirmation::Confirm(row)) => crate::whole::body(row, width, height),
         _ => (entries(listing, selected, height, now), true),
@@ -91,6 +87,25 @@ pub fn tree(
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
+            hints: Some(
+                if confirming.is_some() {
+                    component::SiteHints::new([
+                        component::KeyPair::new("⏎", "yes"),
+                        component::KeyPair::new("esc", "cancel"),
+                    ])
+                } else {
+                    component::SiteHints::new([
+                        component::KeyPair::new("↑↓", "pick"),
+                        component::KeyPair::new("space", "pause/enable"),
+                        component::KeyPair::new("r", "run"),
+                        component::KeyPair::new("c", "confirm"),
+                        component::KeyPair::new("d", "forget"),
+                        component::KeyPair::new("→", "session"),
+                        component::KeyPair::new("esc", "close"),
+                    ])
+                }
+                .composer("/schedule", ""),
+            ),
             on_key: Some(Action {
                 name: format!("{ID}:ui"),
                 args: json!({"handler":REQUEST,"event":"press","row":listing.entries.get(selected),"confirming":confirming}),
@@ -154,7 +169,7 @@ fn footer(selected: Option<&Row>, confirming: Option<&Confirmation>, armed: bool
             return confirm_footer(row, armed);
         }
         return format!(
-            " forget {} \"{} {}\"{}? its session stays.  ⏎ yes  esc",
+            " forget {} \"{} {}\"{}? its session stays.",
             row.id,
             row.spec,
             bingo_services::schedule::visible(&row.text)
@@ -180,12 +195,12 @@ fn footer(selected: Option<&Row>, confirming: Option<&Confirmation>, armed: bool
 fn confirm_footer(row: &Row, armed: bool) -> String {
     match armed {
         true => format!(
-            " confirm {} as yours, mode {}?  ⏎ yes  esc",
+            " confirm {} as yours, mode {}?",
             row.id,
             row.mode.as_deref().unwrap_or("the session's")
         ),
         false => format!(
-            " cannot confirm here: `/schedule confirm {}` answers with all of it  esc",
+            " cannot confirm here: `/schedule confirm {}` answers with all of it",
             row.id
         ),
     }

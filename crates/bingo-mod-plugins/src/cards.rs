@@ -253,7 +253,7 @@ fn trust_card(p: &CatalogEntry, choice: &crate::trust::Choice) -> Vec<Fact> {
     }
     rows.push(if choice.confirm {
         error(&format!(
-            "⏎ again: {} could run tools unasked",
+            "{} could run tools unasked",
             crate::groups::name(p)
         ))
     } else {
@@ -343,7 +343,7 @@ fn review(s: &ServerRow) -> Vec<Fact> {
         ("run", "env")
     };
     let mut rows = vec![
-        error(&format!("⏎ again: approve {} for this checkout", s.name)),
+        error(&format!("approve {} for this checkout", s.name)),
         line(format!(" approving lets bingo {what}:")),
         line(format!("   {}", s.transport.line())),
     ];
@@ -384,9 +384,9 @@ pub fn builtins_card(plugins: &[CatalogEntry], expanded: bool) -> Vec<Fact> {
         .filter(|p| p.meta["needed"].is_string())
         .count();
     let fold = if expanded {
-        " ⏎ fold them".to_string()
+        " fold them".to_string()
     } else {
-        format!(" ⏎ show all {}", builtins.len())
+        format!(" show all {}", builtins.len())
     };
     [
         " built in",

@@ -284,9 +284,7 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
             .get("run")
             .is_none()
     );
-    assert!(
-        backend(panel(&host, &attachment).await).contains("again: demo could run tools unasked")
-    );
+    assert!(backend(panel(&host, &attachment).await).contains("demo could run tools unasked"));
     assert_eq!(
         key(&host, &mut attachment, "enter").await["run"],
         "/plugins approve plugins:demo full"
@@ -312,7 +310,7 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
                 let reviewed = key(&host, &mut attachment, key_name).await;
                 assert!(reviewed.get("run").is_none(), "{key_name}: {reviewed}");
             }
-            assert!(backend(panel(&host, &attachment).await).contains("⏎ again: approve local"));
+            assert!(backend(panel(&host, &attachment).await).contains("approve local"));
         }
         assert_eq!(
             key(&host, &mut attachment, "enter").await["run"],
@@ -749,10 +747,10 @@ async fn a_press_a_link_respelled_changes_nothing() {
     let respelled = key(&host, &mut attachment, "space").await;
     assert!(respelled.get("run").is_none(), "{respelled}");
     assert!(
-        !backend(panel(&host, &attachment).await).contains("again: approve local"),
+        !backend(panel(&host, &attachment).await).contains("approve local"),
         "a respelled press opened the review"
     );
     key(&host, &mut attachment, "enter").await;
-    assert!(backend(panel(&host, &attachment).await).contains("again: approve local"));
+    assert!(backend(panel(&host, &attachment).await).contains("approve local"));
     host.shutdown().await;
 }

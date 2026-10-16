@@ -39,5 +39,5 @@ expression: rows
 "  @src/theme.rs                                                                                                         "
 "────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
 " ▍ read @src/                                                                                                           "
-"                                                                                                                        "
+"                                                                / commands · ? keys · ctrl+r sessions · shift+tab mode  "
 " ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                                           fake-1  "

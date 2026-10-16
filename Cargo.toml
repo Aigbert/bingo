@@ -11,6 +11,7 @@ repository = "https://github.com/yexrob/bingo"
 publish = false
 
 [workspace.dependencies]
+bingo-mod-keybar = { path = "crates/bingo-mod-keybar" }
 bingo-mod-sessions = { path = "crates/bingo-mod-sessions" }
 bingo-mod-memory = { path = "crates/bingo-mod-memory" }
 bingo-mod-plugins = { path = "crates/bingo-mod-plugins" }

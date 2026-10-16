@@ -136,7 +136,7 @@ async fn pasted_key_is_masked_in_frames_and_absent_from_the_journal() {
     // An `sk-` key names no vendor: the sheet waits on its address and adds nothing without one.
     assert!(
         view.fold()
-            .contains("❯ address    none · ⏎ paste whose key this is"),
+            .contains("❯ address    none · paste whose key this is"),
         "{}",
         view.fold()
     );
@@ -146,8 +146,15 @@ async fn pasted_key_is_masked_in_frames_and_absent_from_the_journal() {
     let req = request(&kernel, &mut session).await;
     let refused = kernel.render(&session.session, req).await.unwrap().fold();
     assert!(
-        refused.contains("Paste the provider's address first"),
+        !refused.contains("Paste the provider's address first"),
         "{refused}"
+    );
+    assert!(
+        slot::placed(&session.snapshot).iter().any(|placed| {
+            matches!(&placed.slot, slot::Slot::Toast { text, .. }
+            if text.contains("Paste the provider's address first"))
+        }),
+        "the refusal belongs to the KeyBar toast"
     );
     assert!(endpoint.received_requests().await.unwrap().is_empty());
     command(&mut session, "bingo.mod.models:ui", press(&id, "up")).await;
@@ -413,7 +420,7 @@ async fn unlisted_models_switch_by_path_and_by_the_typed_filter() {
     }
     let req = request(&kernel, &mut session).await;
     let view = kernel.render(&session.session, req).await.unwrap().fold();
-    assert!(view.contains("⏎ use fake/unlisted"), "{view}");
+    assert!(view.contains("use fake/unlisted"), "{view}");
     command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
     session = reopen(&kernel, &session).await;
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("unlisted"));
@@ -423,7 +430,7 @@ async fn unlisted_models_switch_by_path_and_by_the_typed_filter() {
     let req = request(&kernel, &mut session).await;
     let id = req.request_id.clone();
     let view = kernel.render(&session.session, req).await.unwrap().fold();
-    assert!(view.contains("⏎ use fake/zeta"), "{view}");
+    assert!(view.contains("use fake/zeta"), "{view}");
     command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
     session = reopen(&kernel, &session).await;
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("zeta"));

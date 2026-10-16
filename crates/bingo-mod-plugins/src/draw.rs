@@ -72,16 +72,19 @@ pub fn tree(
         .clamp(1, 16);
     let body = body(&groups, cursor, card, width, room);
     View::Box {
-        children: vec![
-            header_view(header(props, servers.len()), width),
-            body,
-            text(
-                hints(selected.map(|r| &r.kind), props, servers, cursor),
-                None,
-                true,
-            ),
-        ],
+        children: vec![header_view(header(props, servers.len()), width), body],
         layout: Box::new(view::BoxStyle {
+            hints: Some(
+                component::SiteHints::new(hints(selected.map(|r| &r.kind), props, servers, cursor))
+                    .composer(
+                        if props.open == component::PluginsOpen::Mcp {
+                            "/mcp › plugins and MCP servers"
+                        } else {
+                            "/plugins › plugins and MCP servers"
+                        },
+                        "",
+                    ),
+            ),
             on_key: Some(Action {
                 name: "plugins:ui".into(),
                 args: json!({"handler":request,"event":"press","row":cursor.selected,"props":{"open":props.open,"session":props.session,"plugins":[],"action":props.action}}),
@@ -159,41 +162,54 @@ fn hints(
     props: &PluginsProps,
     servers: &[ServerRow],
     cursor: &Cursor,
-) -> String {
+) -> Vec<component::KeyPair> {
     if let Some(choice) = &cursor.trust {
-        return format!(
-            " ↑↓ tier · ⏎ {} · esc cancel",
-            if choice.confirm {
-                "grant full"
-            } else {
-                "grant"
-            }
-        );
+        return vec![
+            component::KeyPair::new("↑↓", "tier"),
+            component::KeyPair::new(
+                "⏎",
+                if choice.confirm {
+                    "grant full"
+                } else {
+                    "grant"
+                },
+            ),
+            component::KeyPair::new("esc", "cancel"),
+        ];
     }
     let bindings = match kind {
         Some(Kind::Builtins) => crate::verbs::builtins(cursor.expanded),
         Some(Kind::Plugin(i)) => crate::verbs::plugin_keys(&props.plugins[*i]),
         Some(Kind::Server(i)) => crate::verbs::server_keys(&servers[*i], cursor.reviewing),
-        None => return " esc close".into(),
+        None => return vec![component::KeyPair::new("esc", "close")],
     };
-    footer(&bindings, if cursor.reviewing { "cancel" } else { "close" })
+    key_pairs(&bindings, if cursor.reviewing { "cancel" } else { "close" })
 }
-/// The footer says what the table binds, in its order, and nothing else.
+fn key_pairs(bindings: &[crate::verbs::Binding], esc: &str) -> Vec<component::KeyPair> {
+    std::iter::once(component::KeyPair::new("↑↓", "pick"))
+        .chain(bindings.iter().filter_map(|binding| {
+            Some(component::KeyPair::new(
+                if binding.key == "enter" {
+                    "⏎"
+                } else {
+                    binding.key
+                },
+                binding.hint.as_ref()?,
+            ))
+        }))
+        .chain(std::iter::once(component::KeyPair::new("esc", esc)))
+        .collect()
+}
+#[cfg(test)]
 pub fn footer(bindings: &[crate::verbs::Binding], esc: &str) -> String {
-    let keys = bindings.iter().filter_map(|binding| {
-        let hint = binding.hint.as_ref()?;
-        let key = if binding.key == "enter" {
-            "⏎"
-        } else {
-            binding.key
-        };
-        Some(format!("{key} {hint}"))
-    });
-    let parts = std::iter::once("↑↓ pick".to_string())
-        .chain(keys)
-        .chain(std::iter::once(format!("esc {esc}")))
-        .collect::<Vec<_>>();
-    format!(" {}", parts.join(" · "))
+    format!(
+        " {}",
+        key_pairs(bindings, esc)
+            .iter()
+            .map(|p| format!("{} {}", p.keys, p.action))
+            .collect::<Vec<_>>()
+            .join(" · ")
+    )
 }
 /// A line no wider than the card, its end replaced by `…` when it was.
 pub fn cut(line: &str, width: usize) -> String {

@@ -145,6 +145,6 @@ async fn save_provider(
         pending: None,
         confirm: false,
     });
-    picker.message = Some("Provider added. Esc returns to the list; pick one.".into());
+    crate::pins::announce(cx, "Provider added".into()).await?;
     Ok(())
 }

@@ -43,6 +43,7 @@ pub fn slot() -> Value {
     slot::with(
         json!({}),
         [slot::Slot::Pane {
+            hints: None,
             id: crate::REQUEST.into(),
             title: "crew".into(),
             focus: false,

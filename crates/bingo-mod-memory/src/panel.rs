@@ -81,6 +81,7 @@ async fn open(cx: &HookContext) -> Result<(), KernelError> {
     let mut size = slot::PaneSize::from_rows(20);
     size.columns.ideal = slot::Length::Percent(100);
     let slot = slot::Slot::Pane {
+        hints: None,
         id: REQUEST.into(),
         title: "memory".into(),
         focus: true,

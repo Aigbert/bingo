@@ -133,7 +133,7 @@ fn append_controls(
         .into(),
     );
     if crate::label::compacts(model) {
-        lines.push("▲ ⏎ compacts the chat first, then switches".into());
+        lines.push("▲ compacts the chat first, then switches".into());
     }
     if chat.pictures && meta["images"] == false {
         lines.push("▲ pictures stay in the log; this model won't see them".into());

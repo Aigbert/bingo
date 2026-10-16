@@ -1,0 +1,12 @@
+---
+source: crates/bingo-surface-tui/src/keybar/tests.rs
+expression: screens
+---
+108 columns
+" press ⏎: the top match is used directly                                                                    "
+
+80 columns
+" press ⏎: the top match is used directly                                        "
+
+32 columns
+" press ⏎: the top match is use… "

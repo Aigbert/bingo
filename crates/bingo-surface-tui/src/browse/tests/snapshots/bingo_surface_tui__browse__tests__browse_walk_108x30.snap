@@ -4,7 +4,7 @@ expression: screen
 ---
 " bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
-"browse · turn 1 of 2  [ ] turn  ⏎ page  y copy  r rewind                                                    "
+"browse · turn 1 of 2                                                                                        "
 " › inspect the fork                                                                                         "
 "   keep this second line                                                                                    "
 "                                                                                                            "
@@ -29,6 +29,6 @@ expression: screen
 "                                                                                                            "
 "                                                                                                            "
 "────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ ask anything                                                                                             "
-"? for shortcuts                                                                                             "
+" ▍ /browse                                                                                                  "
+"                                             [ ] turn · ⏎ page · y copy · r rewind · n/N match · esc close  "
 " ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                               fake-1  "

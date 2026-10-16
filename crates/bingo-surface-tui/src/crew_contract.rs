@@ -147,7 +147,8 @@ fn strip_names_the_work_and_yields_to_notices() {
         "{narrow}"
     );
     ui.notify(Level::Info, "saved", now.instant);
-    let notice = status::hints(&tree, &ui, 120, later(now, 1000), &mut Vec::new()).to_string();
+    let notice =
+        crate::keybar::hints(&tree, &ui, 120, later(now, 1000), &mut Vec::new()).to_string();
     assert!(
         notice.contains("saved") && !notice.contains("reviewer"),
         "{notice}"
@@ -354,7 +355,7 @@ fn a_placed_status_outranks_crew_until_it_expires() {
             ),
         ),
     ));
-    let placed = status::hints(&tree, &ui, 120, now, &mut Vec::new()).to_string();
+    let placed = crate::keybar::hints(&tree, &ui, 120, now, &mut Vec::new()).to_string();
     assert!(placed.contains("scheduled") && !placed.contains("reviewer"));
     draw_tree(120, 40, &tree, &mut ui, now);
     assert!(ui.shown.crew.is_some(), "the footer retains the crew");

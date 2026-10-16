@@ -37,7 +37,7 @@ impl Command for Handler {
         let close = match result {
             Ok(close) => close,
             Err(error) => {
-                picker.message = Some(error.message);
+                crate::pins::announce(cx, error.message).await?;
                 false
             }
         };
@@ -58,7 +58,6 @@ fn handled() -> CommandOutcome {
     CommandOutcome::Handled { handled: true }
 }
 async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bool, KernelError> {
-    picker.message = None;
     if key == "esc" {
         return Ok(back(picker));
     }
@@ -216,7 +215,7 @@ async fn activate(
                 return Ok(false);
             };
             if model.meta["chat"] == false {
-                picker.message = Some("This model can't hold a chat.".into());
+                crate::pins::announce(cx, "This model can't hold a chat.".into()).await?;
                 return Ok(false);
             }
             let Some(provider) = providers.iter().find(|p| model.meta["provider"] == p.id) else {
@@ -384,7 +383,7 @@ async fn manage_key(
         return Ok(false);
     };
     if !enabled {
-        picker.message = Some("Unset the environment credential in your shell.".into());
+        crate::pins::announce(cx, "Unset the environment credential in your shell.".into()).await?;
         return Ok(false);
     }
     match op {

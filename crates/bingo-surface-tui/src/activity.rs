@@ -124,11 +124,6 @@ fn band(
     if out.is_empty() {
         out.extend(waiting(tree, now));
     }
-    if let Some((_, open)) = tree.open_interaction()
-        && let Some(keys) = crate::ask::drawing::keys(open, ui)
-    {
-        out.push(Line::from(Span::styled(format!("   {keys}"), theme::dim())));
-    }
     let running = !out.is_empty();
     if !ui.activity_hidden {
         for placed in slots {
@@ -415,21 +410,8 @@ fn progress(props: &bingo_sdk::component::Props, _: usize) -> Vec<Line<'static>>
     let bingo_sdk::component::Props::TurnProgress(props) = props else {
         return Vec::new();
     };
-    let hint = if props.interruptible && !props.stopping {
-        "esc to interrupt · "
-    } else {
-        ""
-    };
     vec![Line::from(Span::styled(
-        format!(
-            " · {}s{}",
-            props.elapsed_ms / 1000,
-            if hint.is_empty() {
-                ""
-            } else {
-                " · esc to interrupt"
-            }
-        ),
+        format!(" · {}s", props.elapsed_ms / 1000),
         theme::dim(),
     ))]
 }
@@ -645,7 +627,7 @@ mod tests {
         let at = later(now, 1_600);
         assert_eq!(row(&woken, at), "");
         let drawn = draw_tree(80, 24, &woken, &mut ui, at);
-        assert!(drawn.contains("esc to interrupt"), "{drawn}");
+        assert!(!drawn.contains("esc to interrupt"), "{drawn}");
     }
 
     /// The working word carries one light across itself while the turn runs:

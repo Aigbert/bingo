@@ -59,6 +59,12 @@ pub fn color(style: Style, color: Option<&str>) -> Style {
     if theme::current().colors == theme::Colors::Plain {
         return style;
     }
+    if color == Some("glow") {
+        return style.patch(theme::glow());
+    }
+    if color == Some("ash") {
+        return style.patch(theme::ash());
+    }
     if color == Some("attention") {
         return style.patch(super::badge::style(bingo_sdk::Tone::Attention));
     }

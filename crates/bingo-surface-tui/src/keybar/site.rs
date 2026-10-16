@@ -1,0 +1,79 @@
+use crate::{focus::Focus, layout::Layout, ui::Ui};
+use bingo_sdk::{
+    SessionState, View,
+    component::{KeyPair, SiteHints},
+};
+
+pub fn hints(state: &SessionState, ui: &Ui, frame: &Layout) -> Option<SiteHints> {
+    if let Some(search) = ui.focus.search() {
+        return Some(search_hints(search));
+    }
+    if let crate::ui::Open::Pager(pager) = ui.focus.open()
+        && ui.focus.showing()
+    {
+        return Some(pager.search.as_ref().map_or_else(
+            || {
+                SiteHints::new([
+                    KeyPair::new("j/k", "scroll"),
+                    KeyPair::new("pgup/pgdn", "page"),
+                    KeyPair::new("g/G", "ends"),
+                    KeyPair::new("/", "search"),
+                    KeyPair::new("esc", "back"),
+                ])
+            },
+            search_hints,
+        ));
+    }
+    if let Focus::Pane(focused) = &ui.focus {
+        let pane = crate::pane::placed(state)
+            .into_iter()
+            .find(|pane| &pane.key == focused)?;
+        let seated = frame
+            .seating
+            .panes
+            .iter()
+            .find(|seat| &seat.key == focused)?;
+        return crate::pane::view(ui, state, &pane, seated)
+            .and_then(from_view)
+            .cloned()
+            .or(pane.hints);
+    }
+    let id = crate::palette::request(ui)
+        .filter(|_| crate::palette::active(ui))
+        .or_else(|| crate::plugins::request(ui).filter(|_| crate::plugins::active(ui)))
+        .or_else(|| crate::sessions::request(ui).filter(|_| crate::sessions::active(ui)))
+        .or_else(|| crate::browse::request(ui).filter(|_| crate::browse::active(ui)))?;
+    frame
+        .pulls
+        .iter()
+        .find(|key| key.request.request_id == id)
+        .and_then(|key| ui.placed.pulled.display(key))
+        .and_then(from_view)
+        .cloned()
+        .or_else(|| {
+            ui.placed
+                .pulled
+                .drawings(&state.summary.id)
+                .find(|(key, _)| key.request.request_id == id)
+                .and_then(|(_, view)| from_view(view))
+                .cloned()
+        })
+}
+fn from_view(view: &View) -> Option<&SiteHints> {
+    match view {
+        View::Box { layout, .. } => layout.hints.as_ref(),
+        _ => None,
+    }
+}
+
+fn search_hints(search: &crate::search::Search) -> SiteHints {
+    SiteHints::new([
+        if search.typing {
+            KeyPair::new("⏎", "find")
+        } else {
+            KeyPair::new("n/N", "match")
+        },
+        KeyPair::new("esc", "back"),
+    ])
+    .composer("/", "search transcript")
+}

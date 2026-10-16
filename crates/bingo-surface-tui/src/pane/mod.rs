@@ -30,6 +30,7 @@ pub struct State {
 }
 #[derive(Clone)]
 pub struct Pane {
+    pub hints: Option<bingo_sdk::component::SiteHints>,
     pub key: String,
     pub plugin: String,
     pub id: String,
@@ -64,6 +65,7 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
         .into_iter()
         .filter_map(|placed| {
             if let Slot::Pane {
+                hints,
                 id,
                 title,
                 focus,
@@ -76,6 +78,7 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
             } = placed.slot
             {
                 Some(Pane {
+                    hints,
                     key: format!("{}/{}/{}", state.summary.id, placed.plugin, id),
                     plugin: placed.plugin,
                     id,
@@ -158,7 +161,7 @@ pub fn waiting(ui: &Ui, state: &SessionState) -> Vec<Pane> {
         .filter(|pane| !ui.placed.panes.visible(pane))
         .collect()
 }
-fn view<'a>(
+pub(crate) fn view<'a>(
     ui: &'a Ui,
     state: &SessionState,
     pane: &'a Pane,

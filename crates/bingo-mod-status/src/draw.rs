@@ -106,6 +106,14 @@ pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64
     View::Box {
         children,
         layout: Box::new(BoxStyle {
+            hints: Some(
+                component::SiteHints::new([
+                    component::KeyPair::new("↑↓", "pick"),
+                    component::KeyPair::new("⏎", rows.get(selected).map_or("change", hint)),
+                    component::KeyPair::new("esc", "close"),
+                ])
+                .composer("/status", ""),
+            ),
             on_key: Some(Action {
                 name: format!("{ID}:ui"),
                 args: json!({"handler":REQUEST,"event":"press","selected":rows.get(selected).map(|row| &row.label)}),
@@ -116,10 +124,7 @@ pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64
 }
 fn heading(columns: u16, uptime: u64) -> View {
     pair(
-        vec![
-            text(" status", Tone::Ok),
-            text("   live; ⏎ on a row goes there", Tone::Dim),
-        ],
+        vec![text(" status", Tone::Ok), text("   live", Tone::Dim)],
         &format!("bingo {} · up {}m ", env!("CARGO_PKG_VERSION"), uptime / 60),
         columns,
     )
@@ -152,17 +157,13 @@ fn start(rows: &[Row], selected: usize, budget: usize) -> usize {
     }
     start
 }
-fn draw_row(row: &Row, selected: bool, columns: u16) -> View {
+fn draw_row(row: &Row, selected: bool, _columns: u16) -> View {
     let rule = row.label.starts_with("allow ");
     let label = if rule { "  allow" } else { &row.label };
     let prefix = format!(" {} {:11}", if selected { "❯" } else { " " }, label);
     let mut spans = vec![text(&prefix, if selected { Tone::Ok } else { Tone::Dim })];
     spans.extend(row.value.iter().map(|span| text(&span.text, span.tone)));
-    if selected {
-        pair(spans, &format!("  ⏎ {} ", hint(row)), columns)
-    } else {
-        line(spans)
-    }
+    line(spans)
 }
 fn pair(left: Vec<View>, right: &str, columns: u16) -> View {
     // Let the surface measure and truncate Unicode cells inside the left column.

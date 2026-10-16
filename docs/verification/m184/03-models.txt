@@ -1,0 +1,30 @@
+ bingo▍ /var/…/T/m184-_x_zauzg/cwd                                                            session 01M5
+
+
+
+
+
+
+
+model                                                                                            own place ▾
+   60 models · 4 providers    ★ pinned · ∴ thinks · ▣ sees images
+   fake  ● no key needed  0 ms                          │ fake-1
+ ❯   ● fake-1 —                                         │
+   anthropic  ○ not signed in                           │ context   unknown until it answers
+       claude-fable-5 1.0M ∴▣                           │ output    unknown
+       claude-fable-5-1 1.0M ∴▣                         │ price     unknown · not in the catalogue
+       claude-haiku-4-5 200k ∴▣                         │ images    unknown
+       claude-haiku-5-5 1.0M ∴▣                         │ source    the server
+       claude-opus-4-5 200k ∴▣                          │
+       claude-opus-4-6 1.0M ∴▣                          │ thinking  no effort dial
+       claude-opus-4-7 1.0M ∴▣                          │ applies   ● here   ○ here and new sessions
+       claude-opus-4-8 1.0M ∴▣                          │
+       claude-opus-5 1.0M ∴▣                            │
+   ↓ 55 more                                            │
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /model
+                                         ↑↓ pick · ←→ thinking · * pin · tab keep · ⏎ use here · esc close
+ ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                               fake-1

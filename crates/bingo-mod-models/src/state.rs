@@ -6,7 +6,6 @@ pub struct Picker {
     pub props: ModelPickerProps,
     pub all: bool,
     pub sheet: Option<crate::sheet::Sheet>,
-    pub message: Option<String>,
 }
 impl Picker {
     pub fn keep(&self) -> bool {
@@ -37,6 +36,7 @@ pub async fn publish(
     let mut size = slot::PaneSize::from_rows(18);
     size.columns.ideal = slot::Length::Percent(100);
     let pane = slot::Slot::Pane {
+        hints: None,
         id: picker.id.clone(),
         title: "model".into(),
         focus: true,

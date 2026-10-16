@@ -3,7 +3,7 @@ use super::*;
 pub(super) fn sync(run: &mut Run, screen: &mut dyn Screen, now: Now) -> Result<(), KernelError> {
     let state = run.session.tree.viewed();
     run.ui.sync_panes(state);
-    if run.ui.placed.toasts.sync(state, now) && !run.ui.focused {
+    if run.ui.sync_toasts(state, now) && !run.ui.focused {
         screen.bell().map_err(stdio)?;
     }
     Ok(())

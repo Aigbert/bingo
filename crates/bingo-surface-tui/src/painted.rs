@@ -80,8 +80,12 @@ impl Painted {
         let row = (0..area.height)
             .find(|y| self.text(*y).contains(needle))
             .unwrap_or_else(|| panic!("no row carries {needle:?}:\n{}", self.screen()));
+        self.at(row)
+    }
+
+    pub fn at(&self, row: u16) -> Vec<(String, Style)> {
         let mut runs: Vec<(String, Style)> = Vec::new();
-        for x in 0..area.width {
+        for x in 0..self.0.area().width {
             let cell = &self.0[(x, row)];
             match runs.last_mut() {
                 Some((text, style)) if *style == cell.style() => text.push_str(cell.symbol()),

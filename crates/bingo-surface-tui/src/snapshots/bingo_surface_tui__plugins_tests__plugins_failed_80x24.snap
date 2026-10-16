@@ -4,6 +4,7 @@ expression: output
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
+"                                                                                "
 " plugins   7 plugins · 4 MCP servers · one list                                 "
 " ● on   ○ off   ✗ failed   ◌ waiting                                            "
 "   plugins · yours  ~/.bingo/plugins                                            "
@@ -21,8 +22,7 @@ expression: output
 " trust    tighten · deny, ask, change your prompt                               "
 "                                                                                "
 " register.ts:14:9  TypeError: cannot read                                       "
-" ↑↓ pick · space turn on · r reload · t trust · esc close                       "
 "────────────────────────────────────────────────────────────────────────────────"
-" ▍ ask anything                                                                 "
-"1 from this repo waits for you                                                  "
+" ▍ /plugins › plugins and MCP servers                                           "
+"            r reload · t trust · esc close · /plugins 1 from this repo waiting  "
 " ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "

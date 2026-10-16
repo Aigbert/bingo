@@ -196,6 +196,7 @@ async fn open(
         },
     };
     let slot = Slot::Pane {
+        hints: None,
         id: input.id.clone(),
         title: input.title,
         focus: input.focus,

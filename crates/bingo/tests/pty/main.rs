@@ -507,7 +507,7 @@ impl Terminal {
 /// One turn, then `ctrl+d` on an empty composer.
 fn one_turn_then_leave(extra: &[&str]) -> String {
     let mut terminal = Terminal::open(extra);
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"say hello\r");
     terminal.wait_for("Hello from the pty.");
     terminal.send(&[0x04]);
@@ -526,7 +526,7 @@ fn leaving_prints_the_last_screenful_into_the_shells_own_screen() {
         "and so does what was asked:\n{shell}"
     );
     assert!(
-        !shell.contains("? for shortcuts"),
+        !shell.contains("/ commands"),
         "the furniture does not:\n{shell}"
     );
     assert!(
@@ -541,7 +541,7 @@ fn leaving_prints_the_last_screenful_into_the_shells_own_screen() {
 #[test]
 fn a_bang_line_runs_the_shell_and_leaves_its_output_in_the_transcript() {
     let mut terminal = Terminal::open(&[]);
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"!echo landed\r");
     terminal.wait_for("$ echo landed");
     // The line, and under it what it wrote.
@@ -577,7 +577,7 @@ fn every_frame_is_written_inside_a_synchronized_update() {
     const BEGIN: &[u8] = b"\x1b[?2026h";
     const END: &[u8] = b"\x1b[?2026l";
     let mut terminal = Terminal::open(&[]);
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"say hello\r");
     terminal.wait_for("Hello from the pty.");
     let written = terminal.written();
@@ -604,7 +604,7 @@ fn every_frame_is_written_inside_a_synchronized_update() {
     // passing it on, and only tmux ≥ 3.7 acts on it at all — 3.7 and 3.7a
     // wrongly. So under one the frame goes out bare.
     let mut through = Terminal::opened(&[], SCRIPT, Answers::ThroughTmux);
-    through.wait_for("? for shortcuts");
+    through.wait_for("/ commands");
     through.send(b"say hello\r");
     through.wait_for("Hello from the pty.");
     let under_tmux = through.written();
@@ -625,7 +625,7 @@ fn esc_twice_confirms_then_rewinds_the_turn_and_file() {
         WRITES_A_NOTE,
         Answers::Da1Only,
     );
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"write me a note\r");
     terminal.wait_for("Wrote the note.");
     let note = terminal.home().join("note.md");

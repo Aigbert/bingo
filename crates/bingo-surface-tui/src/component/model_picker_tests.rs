@@ -98,6 +98,7 @@ fn mounted(view: View) -> SessionState {
             payload: slot::with(
                 json!({}),
                 [slot::Slot::Pane {
+                    hints: None,
                     id: "picker".into(),
                     title: "model".into(),
                     focus: true,

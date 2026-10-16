@@ -489,6 +489,27 @@
                 "$ref": "#/$defs/View"
               }
             },
+            "question": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/QuestionFocus"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "hints": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/SiteHints"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The focused site declares chrome separately from its body."
+            },
             "onKey": {
               "anyOf": [
                 {
@@ -1096,6 +1117,85 @@
         "label"
       ]
     },
+    "QuestionFocus": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "checked": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "writing": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "field",
+        "checked",
+        "writing"
+      ],
+      "description": "A question owner's editing projection; sealed labels remain the host's."
+    },
+    "SiteHints": {
+      "type": "object",
+      "properties": {
+        "pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/KeyPair"
+          }
+        },
+        "composer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComposerProps"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "KeyPair": {
+      "type": "object",
+      "properties": {
+        "keys": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string"
+        },
+        "emphasis": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "keys",
+        "action"
+      ]
+    },
+    "ComposerProps": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "placeholder": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "tag",
+        "placeholder"
+      ]
+    },
     "Action": {
       "type": "object",
       "properties": {
@@ -1188,6 +1288,8 @@
     "Component": {
       "type": "string",
       "enum": [
+        "KeyBar",
+        "Composer",
         "ModelPicker",
         "Browse",
         "Plugins",

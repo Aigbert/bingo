@@ -162,9 +162,9 @@ fn the_status_line_spends_no_colour_but_the_mode() {
     let (mut ui, now) = scene();
     let painted = painted(80, 24, &solo(&state), &mut ui, now);
     assert_eq!(
-        painted.coloured("? for shortcuts"),
-        Vec::<String>::new(),
-        "hints keep the terminal dim; mode and crew belong to the footer"
+        painted.coloured("/ commands"),
+        ["/", "·", "?", "·", "ctrl+r", "·", "shift+tab"],
+        "keys glow and separators use ash; actions stay dim"
     );
 }
 

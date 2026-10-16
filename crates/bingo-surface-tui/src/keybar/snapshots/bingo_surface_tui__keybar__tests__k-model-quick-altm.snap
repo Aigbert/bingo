@@ -1,0 +1,12 @@
+---
+source: crates/bingo-surface-tui/src/keybar/tests.rs
+expression: screens
+---
+108 columns
+" press alt+m, then alt+t                                                                                    "
+
+80 columns
+" press alt+m, then alt+t                                                        "
+
+32 columns
+" press alt+m, then alt+t        "

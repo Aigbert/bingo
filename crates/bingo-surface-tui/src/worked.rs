@@ -205,7 +205,7 @@ mod tests {
         again.fold.apply(&frame(3, started("trn_2")));
         let at = later(now, 1_600);
         assert_eq!(after(&again, at, "Worked for"), "");
-        assert!(draw_tree(80, 24, &again, &mut ui, at).contains("esc to interrupt"));
+        assert!(draw_tree(80, 24, &again, &mut ui, at).contains("esc stop"));
 
         let mut waited = waited_on(1);
         waited.fold.apply(&frame(8, started("trn_1")));

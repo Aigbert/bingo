@@ -60,7 +60,7 @@ pub fn tree(
             " memory · {} tokens carried",
             crate::rows::about(crate::rows::total(groups))
         ),
-        "⏎ read  d forget".into(),
+        String::new(),
     )];
     children.extend(lines.into_iter().skip(start).take(room));
     children.push(dim(format!(
@@ -69,10 +69,10 @@ pub fn tree(
     )));
     children.push(dim(match confirming {
         Some(Target::Memory { name, .. }) => {
-            format!(" forget \"{name}\"? the file and its index line go.  ⏎ yes  esc")
+            format!(" forget \"{name}\"? the file and its index line go.")
         }
-        Some(target) => format!(" forget \"{}\"? the entry goes.  ⏎ yes  esc", target.name()),
-        None => " ↑↓ choose · ⏎ read · d forget · esc close".into(),
+        Some(target) => format!(" forget \"{}\"? the entry goes.", target.name()),
+        None => String::new(),
     }));
     let target = groups
         .iter()
@@ -82,6 +82,22 @@ pub fn tree(
     View::Box {
         children,
         layout: Box::new(view::BoxStyle {
+            hints: Some(
+                if confirming.is_some() {
+                    component::SiteHints::new([
+                        component::KeyPair::new("⏎", "yes"),
+                        component::KeyPair::new("esc", "cancel"),
+                    ])
+                } else {
+                    component::SiteHints::new([
+                        component::KeyPair::new("↑↓", "pick"),
+                        component::KeyPair::new("⏎", "read"),
+                        component::KeyPair::new("d", "forget"),
+                        component::KeyPair::new("esc", "close"),
+                    ])
+                }
+                .composer("/memory", ""),
+            ),
             on_key: Some(Action {
                 name: CommandSpec::ui_name(crate::ID),
                 args: json!({"handler":crate::REQUEST,"event":"press","target":target,"confirming":confirming}),

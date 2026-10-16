@@ -121,7 +121,7 @@ const FOCUS_GAINED: &[u8] = b"\x1b[I";
 #[test]
 fn a_terminal_whose_ground_turns_light_is_followed_within_one_focus() {
     let mut terminal = Terminal::under(&[], SCRIPT, Answers::Da1Only, Ground::Answered);
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"say hello\r");
     terminal.wait_for("Hello from the pty.");
     terminal.wait_band(false);
@@ -155,7 +155,7 @@ fn a_terminal_whose_ground_turns_light_is_followed_within_one_focus() {
 #[test]
 fn a_named_look_is_never_asked_what_ground_the_terminal_has() {
     let mut terminal = Terminal::under(&[], SCRIPT, Answers::Da1Only, Ground::Named);
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(FOCUS_GAINED);
     terminal.send(b"say hello\r");
     terminal.wait_for("Hello from the pty.");
@@ -182,7 +182,7 @@ fn a_named_look_is_never_asked_what_ground_the_terminal_has() {
 #[test]
 fn a_theme_report_holds_crossterms_parser_and_swallows_what_follows() {
     let mut terminal = Terminal::open(&[]);
-    terminal.wait_for("? for shortcuts");
+    terminal.wait_for("/ commands");
     terminal.send(b"\x1b[?997;1n");
     std::thread::sleep(BETWEEN_KEYS);
     terminal.send(b"held");

@@ -179,6 +179,8 @@
           "Component": {
             "type": "string",
             "enum": [
+              "KeyBar",
+              "Composer",
               "ModelPicker",
               "Browse",
               "Plugins",
@@ -614,6 +616,27 @@
                 "items": {
                   "$ref": "#"
                 }
+              },
+              "question": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/QuestionFocus"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "hints": {
+                "description": "The focused site declares chrome separately from its body.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/SiteHints"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               },
               "onKey": {
                 "anyOf": [
@@ -1222,6 +1245,85 @@
               "label"
             ]
           },
+          "QuestionFocus": {
+            "description": "A question owner's editing projection; sealed labels remain the host's.",
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "checked": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "writing": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "field",
+              "checked",
+              "writing"
+            ]
+          },
+          "SiteHints": {
+            "type": "object",
+            "properties": {
+              "pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/KeyPair"
+                }
+              },
+              "composer": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ComposerProps"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "KeyPair": {
+            "type": "object",
+            "properties": {
+              "keys": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "emphasis": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "keys",
+              "action"
+            ]
+          },
+          "ComposerProps": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "placeholder": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tag",
+              "placeholder"
+            ]
+          },
           "Action": {
             "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
             "type": "object",
@@ -1314,6 +1416,8 @@
           "Component": {
             "type": "string",
             "enum": [
+              "KeyBar",
+              "Composer",
               "ModelPicker",
               "Browse",
               "Plugins",
@@ -2776,6 +2880,27 @@
                       "$ref": "#/$defs/View"
                     }
                   },
+                  "question": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/QuestionFocus"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "hints": {
+                    "description": "The focused site declares chrome separately from its body.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/SiteHints"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "onKey": {
                     "anyOf": [
                       {
@@ -3383,6 +3508,85 @@
               "label"
             ]
           },
+          "QuestionFocus": {
+            "description": "A question owner's editing projection; sealed labels remain the host's.",
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "checked": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "writing": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "field",
+              "checked",
+              "writing"
+            ]
+          },
+          "SiteHints": {
+            "type": "object",
+            "properties": {
+              "pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/KeyPair"
+                }
+              },
+              "composer": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ComposerProps"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "KeyPair": {
+            "type": "object",
+            "properties": {
+              "keys": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "emphasis": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "keys",
+              "action"
+            ]
+          },
+          "ComposerProps": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "placeholder": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tag",
+              "placeholder"
+            ]
+          },
           "Action": {
             "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
             "type": "object",
@@ -3475,6 +3679,8 @@
           "Component": {
             "type": "string",
             "enum": [
+              "KeyBar",
+              "Composer",
               "ModelPicker",
               "Browse",
               "Plugins",
@@ -6770,6 +6976,27 @@
                       "$ref": "#/$defs/View"
                     }
                   },
+                  "question": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/QuestionFocus"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "hints": {
+                    "description": "The focused site declares chrome separately from its body.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/SiteHints"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "onKey": {
                     "anyOf": [
                       {
@@ -7377,6 +7604,85 @@
               "label"
             ]
           },
+          "QuestionFocus": {
+            "description": "A question owner's editing projection; sealed labels remain the host's.",
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "checked": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "writing": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "field",
+              "checked",
+              "writing"
+            ]
+          },
+          "SiteHints": {
+            "type": "object",
+            "properties": {
+              "pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/KeyPair"
+                }
+              },
+              "composer": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ComposerProps"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "KeyPair": {
+            "type": "object",
+            "properties": {
+              "keys": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "emphasis": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "keys",
+              "action"
+            ]
+          },
+          "ComposerProps": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "placeholder": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tag",
+              "placeholder"
+            ]
+          },
           "Action": {
             "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
             "type": "object",
@@ -7469,6 +7775,8 @@
           "Component": {
             "type": "string",
             "enum": [
+              "KeyBar",
+              "Composer",
               "ModelPicker",
               "Browse",
               "Plugins",
@@ -9844,6 +10152,27 @@
                       "$ref": "#/$defs/View"
                     }
                   },
+                  "question": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/QuestionFocus"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "hints": {
+                    "description": "The focused site declares chrome separately from its body.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/SiteHints"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "onKey": {
                     "anyOf": [
                       {
@@ -10451,6 +10780,85 @@
               "label"
             ]
           },
+          "QuestionFocus": {
+            "description": "A question owner's editing projection; sealed labels remain the host's.",
+            "type": "object",
+            "properties": {
+              "field": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "checked": {
+                "type": "integer",
+                "format": "uint",
+                "minimum": 0
+              },
+              "writing": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "field",
+              "checked",
+              "writing"
+            ]
+          },
+          "SiteHints": {
+            "type": "object",
+            "properties": {
+              "pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/KeyPair"
+                }
+              },
+              "composer": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/ComposerProps"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            }
+          },
+          "KeyPair": {
+            "type": "object",
+            "properties": {
+              "keys": {
+                "type": "string"
+              },
+              "action": {
+                "type": "string"
+              },
+              "emphasis": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "keys",
+              "action"
+            ]
+          },
+          "ComposerProps": {
+            "type": "object",
+            "properties": {
+              "tag": {
+                "type": "string"
+              },
+              "placeholder": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tag",
+              "placeholder"
+            ]
+          },
           "Direction": {
             "type": "string",
             "enum": [
@@ -10528,6 +10936,8 @@
           "Component": {
             "type": "string",
             "enum": [
+              "KeyBar",
+              "Composer",
               "ModelPicker",
               "Browse",
               "Plugins",
