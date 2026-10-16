@@ -626,6 +626,26 @@ mod tests {
         });
     }
 
+    /// A terminal's late answer can turn pictures on under a running surface.
+    /// A block drawn before it was a chip, and a block kept between frames
+    /// would stay one unless the mode it was drawn in is part of what it is a
+    /// rendering of.
+    #[test]
+    fn a_block_drawn_as_a_chip_draws_its_picture_once_the_terminal_does() {
+        let state = folded(vec![said(read(&png(100, 200)))]);
+        let pictures = Decoded::default();
+        let folds = crate::fold::Folds::new();
+        let linked = Linked::default();
+        let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
+        let mut blocks = Blocks::default();
+        graphics::with(Graphics::Off, || blocks.sync(&state, &Agents::new(), &rows));
+        assert!(blocks.pictures().is_empty(), "drawn as the chip first");
+        graphics::with(graphics::drawing(), || {
+            blocks.sync(&state, &Agents::new(), &rows);
+        });
+        assert_eq!(blocks.pictures().len(), 1, "and as the picture after");
+    }
+
     // ---- the picture in the words (M51) ---------------------------------
 
     /// `![shot](docs/x.png)` in an answer draws where the words put it: the

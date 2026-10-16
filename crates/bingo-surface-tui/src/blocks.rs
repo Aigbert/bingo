@@ -2,14 +2,14 @@
 //! frames.
 //!
 //! The reducer is still the only history — a block is a *memo* of
-//! [`crate::transcript`]'s rendering of one item at one width in one look,
-//! thrown away the moment any of the three changes, never a second copy of
-//! what the item says. An item
-//! that has finished is drawn once and then only cloned; the one that is still
-//! arriving is the only one that is drawn again, because it is the only one
-//! that can differ. A call that spawned a session is drawn again whenever the
-//! child's state moves, since its row is read from that state; a call that
-//! sent a shell to the background, when the shell ends, for the same reason.
+//! [`crate::transcript`]'s rendering of one item at one width in one look and
+//! one graphics mode, thrown away the moment any of them changes, never a
+//! second copy of what the item says. An item that has finished is drawn once
+//! and then only cloned; the one that is still arriving is the only one that
+//! is drawn again, because it is the only one that can differ. A call that
+//! spawned a session is drawn again whenever the child's state moves, since
+//! its row is read from that state; a call that sent a shell to the
+//! background, when the shell ends, for the same reason.
 //!
 //! Scrolling asks for a window of lines, which is why the blocks are kept
 //! rather than the flat transcript: a window is walked in blocks and cut to
@@ -69,6 +69,10 @@ struct Revision {
     /// what a block *says* about itself and not what it is — the entry, and the
     /// landing it is in the middle of, are kept and only drawn again.
     look: crate::theme::Theme,
+    /// Whether, and at what cell, the terminal draws pictures. A late answer
+    /// can turn them on under a running surface, and a block drawn before it
+    /// holds the chip where the picture now goes.
+    graphics: crate::graphics::Graphics,
 }
 
 fn revision(
@@ -117,6 +121,7 @@ fn revision(
         linked: rows.linked.answers(),
         slots: rows.placed_on(&item.id).cloned().collect(),
         look: crate::theme::current(),
+        graphics: crate::graphics::chosen(),
     }
 }
 
