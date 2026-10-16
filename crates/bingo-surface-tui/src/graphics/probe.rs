@@ -221,24 +221,27 @@ fn next_name(bytes: &[u8]) -> Option<(Option<Named>, &[u8])> {
     Some((text.and_then(named), &bytes[end + 2..]))
 }
 
-/// What a terminal called itself. A reply with no version at all is no
-/// answer: a name alone cannot be held to a floor, and every list here is a
-/// list of floors.
+/// What a terminal called itself. A reply with no version is still a name —
+/// herdr answers `libghostty` and nothing more — and an empty version is
+/// what it keeps: a list of floors holds it to none
+/// ([`super::draws_placeholders`]). A reply with no name is no answer.
 fn named(text: &str) -> Option<Named> {
-    let (name, version) = split(text.trim())?;
-    (!name.is_empty() && !version.is_empty()).then(|| Named {
+    let (name, version) = split(text.trim());
+    (!name.is_empty()).then(|| Named {
         name: name.to_string(),
         version: version.to_string(),
     })
 }
 
-/// The two shapes a reply comes in: `name(version)` and `name version`.
-fn split(text: &str) -> Option<(&str, &str)> {
-    match text.strip_suffix(')') {
+/// The three shapes a reply comes in: `name(version)`, `name version`, and a
+/// bare `name`.
+fn split(text: &str) -> (&str, &str) {
+    let parts = match text.strip_suffix(')') {
         Some(inside) => inside.split_once('('),
         None => text.split_once(' '),
-    }
-    .map(|(name, version)| (name.trim(), version.trim()))
+    };
+    let (name, version) = parts.unwrap_or((text, ""));
+    (name.trim(), version.trim())
 }
 
 fn find(haystack: &[u8], needle: &[u8]) -> Option<usize> {
@@ -338,10 +341,11 @@ mod tests {
         assert_eq!(parse(KONSOLE).terminals, one("Konsole", "26.08.0"));
     }
 
-    /// The two shapes of the reply, and the ones that say nothing usable: a
-    /// name with no version cannot be held to a floor, so it is no answer.
+    /// The shapes of the reply, and the ones that say nothing usable. A name
+    /// with no version is still read — herdr's pane answers `libghostty` and
+    /// nothing more — and it is the list of floors that holds it to one.
     #[test]
-    fn the_name_is_read_from_either_shape_and_from_nothing_else() {
+    fn the_name_is_read_from_any_shape_and_from_nothing_else() {
         let read = |reply: &str| {
             let bytes = format!("\x1bP>|{reply}\x1b\\\x1b[?62;c");
             parse(bytes.as_bytes()).terminals
@@ -349,9 +353,11 @@ mod tests {
         assert_eq!(read("iTerm2 3.6.11"), one("iTerm2", "3.6.11"));
         assert_eq!(read("Rio 0.5.27"), one("Rio", "0.5.27"));
         assert_eq!(read(" kitty(0.28.0) "), one("kitty", "0.28.0"));
-        assert!(read("kitty").is_empty(), "a name with no version");
-        assert!(read("kitty()").is_empty(), "and an empty one");
-        assert!(read("").is_empty());
+        assert_eq!(read("kitty"), one("kitty", ""), "a name with no version");
+        assert_eq!(read("kitty()"), one("kitty", ""), "and an empty one");
+        assert_eq!(read("libghostty"), one("libghostty", ""), "herdr's pane");
+        assert!(read("").is_empty(), "no name is no answer");
+        assert!(read("(1.0)").is_empty(), "nor is a version alone");
         assert!(
             parse(b"\x1bP>|kitty(0.46.2)\x1b[?62;c")
                 .terminals
@@ -475,6 +481,22 @@ mod tests {
         assert!(!probe.kitty);
         assert_eq!(probe.cell, None);
         assert!(!answered(TMUX_ALONE), "and nothing ended the read");
+    }
+
+    /// herdr 0.7.5's pane, with `[experimental] kitty_graphics` on or off —
+    /// captured 2026-10-16 in an isolated herdr in front of a Ghostty: `OK`,
+    /// a name with no version, and no cell reply at all.
+    #[test]
+    fn herdrs_pane_says_ok_and_a_bare_name_and_no_cell() {
+        let herdr = b"\x1b_Gi=31;OK\x1b\\\x1bP>|libghostty\x1b\\\x1b[?62;22c";
+        assert_eq!(
+            parse(herdr),
+            Probe {
+                kitty: true,
+                cell: None,
+                terminals: one("libghostty", ""),
+            }
+        );
     }
 
     /// Two numbers, and a suffix on the third: read as far as it reads.

@@ -316,6 +316,21 @@ mod tests {
         }
     }
 
+    /// herdr's pane: a bare `libghostty` draws pictures once there is a cell
+    /// to draw them into, and the chip while there is none.
+    #[test]
+    fn a_herdr_pane_draws_pictures_only_with_a_cell() {
+        let herdr = ("libghostty", "");
+        assert_eq!(
+            bare(true, Some(CELL), &[herdr]),
+            Graphics::Kitty {
+                cell: CELL,
+                transport: Transport::Bare
+            }
+        );
+        assert_eq!(bare(true, None, &[herdr]), Graphics::Off);
+    }
+
     /// A terminal that says `OK` and will not say what it is says nothing
     /// about placeholders either, and the chip is what silence gets.
     #[test]
