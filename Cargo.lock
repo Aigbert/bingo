@@ -268,6 +268,7 @@ dependencies = [
  "bingo-mod-crew",
  "bingo-mod-hello",
  "bingo-mod-keybar",
+ "bingo-mod-ledger",
  "bingo-mod-memory",
  "bingo-mod-models",
  "bingo-mod-palette",
@@ -672,6 +673,17 @@ dependencies = [
 
 [[package]]
 name = "bingo-mod-keybar"
+version = "0.6.6"
+dependencies = [
+ "async-trait",
+ "bingo-sdk",
+ "serde_json",
+ "tokio",
+ "unicode-width",
+]
+
+[[package]]
+name = "bingo-mod-ledger"
 version = "0.6.6"
 dependencies = [
  "async-trait",

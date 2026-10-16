@@ -54,6 +54,7 @@ bingo-mod-status.workspace = true
 bingo-mod-crew.workspace = true
 bingo-mod-models.workspace = true
 bingo-mod-keybar.workspace = true
+bingo-mod-ledger.workspace = true
 bingo-mod-schedule.workspace = true
 bingo-agents.workspace = true
 bingo-rooms.workspace = true
