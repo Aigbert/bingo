@@ -36,7 +36,6 @@ pub struct Pane {
     pub title: String,
     pub focus: bool,
     pub close: bool,
-    pub hold: bool,
     pub asked: bool,
     pub place: Vec<bingo_sdk::slot::Place>,
     pub size: bingo_sdk::slot::PaneSize,
@@ -69,7 +68,7 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
                 title,
                 focus,
                 close_on_escape,
-                hold_toasts,
+                hold_toasts: _,
                 asked,
                 place,
                 size,
@@ -83,7 +82,6 @@ pub fn placed(state: &SessionState) -> Vec<Pane> {
                     title,
                     focus,
                     close: close_on_escape,
-                    hold: hold_toasts,
                     asked,
                     place,
                     size,
@@ -135,11 +133,6 @@ impl State {
                 *focus = Focus::Pane(pane.key);
             }
         }
-    }
-    pub fn holding(&self, state: &SessionState) -> bool {
-        placed(state)
-            .iter()
-            .any(|pane| pane.hold && self.visible(pane))
     }
 }
 pub fn wanted(ui: &Ui, state: &SessionState) -> Vec<Pane> {

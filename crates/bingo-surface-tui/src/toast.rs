@@ -1,19 +1,14 @@
-//! Toast deadlines measured in visible time.
+//! Toast expiry follows its published wall-clock deadline.
 use crate::{clock::Now, theme, views};
 use bingo_sdk::{SessionState, slot::Slot};
 use ratatui::text::{Line, Span};
 use std::{
-    collections::BTreeMap,
+    collections::BTreeSet,
     time::{Duration, Instant},
 };
 #[derive(Debug, Default)]
 pub struct State {
-    clocks: BTreeMap<String, Clock>,
-}
-#[derive(Debug)]
-struct Clock {
-    paused: Duration,
-    held: Option<Instant>,
+    seen: BTreeSet<String>,
 }
 struct Toast {
     key: String,
@@ -43,42 +38,19 @@ fn placed(state: &SessionState) -> Vec<Toast> {
 }
 impl State {
     /// Returns whether a newly seen alert should notify the terminal.
-    pub fn sync(&mut self, state: &SessionState, holding: bool, now: Now) -> bool {
+    pub fn sync(&mut self, state: &SessionState, now: Now) -> bool {
         let toasts = placed(state);
-        self.clocks
-            .retain(|key, _| toasts.iter().any(|toast| &toast.key == key));
+        self.seen
+            .retain(|key| toasts.iter().any(|toast| &toast.key == key));
         let mut alert = false;
         for toast in toasts {
-            let unseen = !self.clocks.contains_key(&toast.key);
+            let unseen = self.seen.insert(toast.key);
             alert |= unseen && toast.alert && toast.until > now.wall;
-            let clock = self.clocks.entry(toast.key).or_insert(Clock {
-                paused: Duration::ZERO,
-                held: None,
-            });
-            match (clock.held, holding) {
-                (Some(start), false) => {
-                    clock.paused += now.since(start);
-                    clock.held = None;
-                }
-                (None, true)
-                    if toast
-                        .until
-                        .checked_add(clock.paused)
-                        .is_ok_and(|until| until > now.wall) =>
-                {
-                    clock.held = Some(now.instant)
-                }
-                _ => {}
-            }
         }
         alert
     }
     fn remaining(&self, toast: &Toast, now: Now) -> Option<Duration> {
-        let paused = self.clocks.get(&toast.key).map_or(Duration::ZERO, |clock| {
-            clock.paused + clock.held.map_or(Duration::ZERO, |start| now.since(start))
-        });
-        let until = toast.until.checked_add(paused).ok()?;
-        (until > now.wall).then(|| until.duration_since(now.wall).unsigned_abs())
+        (toast.until > now.wall).then(|| toast.until.duration_since(now.wall).unsigned_abs())
     }
     pub fn components(
         &self,
@@ -121,11 +93,6 @@ impl State {
     pub fn next(&self, state: &SessionState, now: Now) -> Option<Instant> {
         placed(state)
             .iter()
-            .filter(|toast| {
-                self.clocks
-                    .get(&toast.key)
-                    .is_none_or(|clock| clock.held.is_none())
-            })
             .filter_map(|toast| {
                 self.remaining(toast, now)
                     .map(|remaining| now.instant + remaining)
@@ -159,7 +126,7 @@ mod tests {
         assert!(!draw_tree(80, 24, &tree, &mut ui, later(now, 4000)).contains("Saved counter"));
     }
     #[test]
-    fn a_holding_pane_pauses_visible_time_and_alerts_only_once() {
+    fn a_holding_pane_never_replays_expired_toasts_and_alerts_only_once() {
         let (mut ui, now) = scene();
         let mut state = state();
         let mut slots = [
@@ -185,17 +152,13 @@ mod tests {
             "held".into(),
             bingo_sdk::slot::with(serde_json::json!({}), slots).into(),
         );
-        assert!(ui.placed.panes.holding(&state));
-        assert!(
-            ui.placed
-                .toasts
-                .sync(&state, ui.placed.panes.holding(&state), now)
-        );
-        assert!(!ui.placed.toasts.sync(&state, true, later(now, 6000)));
+        assert!(!crate::pane::placed(&state).is_empty());
+        assert!(ui.placed.toasts.sync(&state, now));
+        assert!(!ui.placed.toasts.sync(&state, later(now, 6000)));
         assert!(ui.placed.toasts.next(&state, later(now, 6000)).is_none());
         assert_eq!(
             ui.placed.toasts.lines(&state, later(now, 6000), 80).len(),
-            1
+            0
         );
         state
             .signals
@@ -206,14 +169,9 @@ mod tests {
             .as_array_mut()
             .unwrap()
             .retain(|slot| slot["kind"] != "pane");
-        assert!(!ui.placed.panes.holding(&state));
-        ui.placed
-            .toasts
-            .sync(&state, ui.placed.panes.holding(&state), later(now, 6000));
-        assert_eq!(
-            ui.placed.toasts.next(&state, later(now, 6000)),
-            Some(now.instant + std::time::Duration::from_secs(10))
-        );
+        assert!(crate::pane::placed(&state).is_empty());
+        ui.placed.toasts.sync(&state, later(now, 6000));
+        assert_eq!(ui.placed.toasts.next(&state, later(now, 6000)), None);
         assert!(
             ui.placed
                 .toasts

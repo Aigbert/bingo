@@ -9,7 +9,6 @@ fn pane(key: &str, place: Vec<Place>) -> Pane {
         title: key.into(),
         focus: true,
         close: true,
-        hold: false,
         asked: true,
         place,
         size: PaneSize {
