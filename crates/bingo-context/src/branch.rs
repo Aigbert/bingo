@@ -5,7 +5,7 @@ use std::process::Stdio;
 use std::sync::Mutex;
 
 use async_trait::async_trait;
-use bingo_sdk::{Event, Frame, Hook, HookContext, HookMatcher, HookPoint, Phase, SessionId};
+use bingo_sdk::{Event, Frame, Hook, HookContext, HookMatcher, HookPoint, SessionId};
 
 #[derive(Default)]
 pub(crate) struct Branch {
@@ -69,15 +69,10 @@ impl Hook for Branch {
     }
 
     fn matcher(&self) -> HookMatcher {
+        // The opening summary also arrives here, without blocking start hooks.
         HookMatcher {
-            points: vec![HookPoint::Session, HookPoint::Event],
+            points: vec![HookPoint::Event],
             tool: None,
-        }
-    }
-
-    async fn on_session(&self, phase: Phase, cx: &HookContext) {
-        if phase == Phase::Start {
-            self.publish(&cx.cwd, cx).await;
         }
     }
 
