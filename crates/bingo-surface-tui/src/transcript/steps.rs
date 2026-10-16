@@ -21,8 +21,8 @@ pub(super) fn part(item: &Item, role: &Role, rows: &Rows<'_>) -> Option<Block> {
         Role::Hidden => Some(Block::default()),
         Role::Step { step, opened } => Some(step_block(item, step, *opened, rows)),
         Role::Fold { fold, then } => Some(fold_block(item, fold, then.as_deref(), rows)),
-        Role::Thought => Some(thought(item, rows).into()),
-        Role::Stop { ran, total } => Some(vec![stop_line(*ran, *total)].into()),
+        Role::Thought => Some(thought_block(item, rows).into()),
+        Role::Stop { ran, total } => Some(stop_block(item, *ran, *total, rows).into()),
     }
 }
 
@@ -46,7 +46,7 @@ fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block 
     if !opened {
         return out.into();
     }
-    out.extend(hung(item, rows));
+    out.extend(result(item, rows));
     let mut block = Block::from(out);
     pictured::under_the_step(&mut block, item, HANG, rows);
     block
@@ -113,16 +113,36 @@ fn folded_line(props: &Props, width: usize) -> Vec<Line<'static>> {
         .collect()
 }
 
-/// What came back from a step, under its words, nothing of it folded: the
-/// turn was opened to be read.
-fn hung(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let ItemBody::ToolCall {
-        output: Some(output),
-        ..
-    } = &item.body
-    else {
+/// What came back from a step, through the site that owns it.
+fn result(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    let Some((id, props)) = crate::turns::result(item) else {
         return Vec::new();
     };
+    crate::component::resolve(
+        rows.state,
+        rows.pulled,
+        &id,
+        &props,
+        rows.width,
+        |changed, width| {
+            let Props::ToolResult(result) = changed else {
+                return Vec::new();
+            };
+            let output = crate::component::items::output_of(&result.output);
+            hung(
+                &output,
+                &Rows {
+                    width,
+                    ..rows.clone()
+                },
+            )
+        },
+    )
+}
+
+/// What came back from a step, under its words, nothing of it folded: the
+/// turn was opened to be read.
+fn hung(output: &ToolOutput, rows: &Rows<'_>) -> Vec<Line<'static>> {
     let inner = rows.width.saturating_sub(HANG).max(1);
     let body = folded(output, Fold::Open, inner)
         .into_iter()
@@ -141,12 +161,41 @@ fn shortened(line: Line<'static>, rows: &Rows<'_>) -> Line<'static> {
     Line::from(spans).style(line.style)
 }
 
-/// A thought of an opened turn: its words, dim, under the steps' words.
-fn thought(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let ItemBody::Reasoning { text, .. } = &item.body else {
+/// A thought of an opened turn, through the site that owns it.
+fn thought_block(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    let Some((id, props)) = crate::turns::fact(item) else {
         return Vec::new();
     };
-    under(Span::raw(" ".repeat(HANG)), plain(text), HANG, rows.width)
+    crate::component::resolve(
+        rows.state,
+        rows.pulled,
+        &id,
+        &props,
+        rows.width,
+        |changed, width| {
+            let Props::Reasoning(reasoning) = changed else {
+                return Vec::new();
+            };
+            thought(&reasoning.text, width)
+        },
+    )
+}
+
+/// A thought's words, dim, under the steps' words.
+fn thought(text: &str, width: usize) -> Vec<Line<'static>> {
+    under(Span::raw(" ".repeat(HANG)), plain(text), HANG, width)
+}
+
+/// Where the person stopped the turn, through the site that owns the stop.
+/// The stop line counts the turn's steps, which the site's props do not
+/// carry, so the surface's own drawing is that line whatever they say.
+fn stop_block(item: &Item, ran: usize, total: usize, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    let Some((id, props)) = crate::turns::fact(item) else {
+        return vec![stop_line(ran, total)];
+    };
+    crate::component::resolve(rows.state, rows.pulled, &id, &props, rows.width, |_, _| {
+        vec![stop_line(ran, total)]
+    })
 }
 
 /// The line a stopped turn ends on: `■ you stopped the turn · 2 of 3 steps

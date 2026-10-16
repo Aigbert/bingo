@@ -987,7 +987,8 @@ mod tests {
     use super::*;
     use crate::test_support::{
         agent_call, assistant, completed, delivered, extended, folded, frame, item, loose, post,
-        receipt_item, running_tool, scene, started, started_tool, tool, ts, user as person, voiced,
+        receipt_item, running_tool, scene, started, started_tool, tool, ts, turns_opened,
+        user as person, voiced,
     };
     use bingo_sdk::{Event, ItemId};
 
@@ -1013,13 +1014,23 @@ mod tests {
             .iter()
             .map(|c| c.symbol())
             .collect();
-        assert!(text.contains(" ▍ Read note.md"), "{text}");
+        assert!(text.contains("✓ read Read note.md"), "{text}");
         assert!(text.contains("hello"), "{text}");
     }
 
     /// A member's own transcript: a session a model answers.
     fn drawn(items: Vec<Item>) -> Vec<String> {
-        rendered(&stated(items))
+        let state = stated(items);
+        rendered_with(&state, &turns_opened(&state, &Folds::new()), &[])
+    }
+
+    /// Items no turn holds draw their own rows: `▏ Thought for 2s` over a
+    /// thought's newest rows, `▍ Name(args)` over a folded result. Inside a
+    /// turn the same items fold under its line and are read there opened
+    /// (ADR-0095 §6, `turns_tests`), so these rows are reached only by an item
+    /// outside every turn.
+    fn turnless(items: Vec<Item>) -> Vec<String> {
+        drawn(items.into_iter().map(loose).collect())
     }
 
     /// The same items in the room's own transcript: a session nothing answers,
@@ -1052,7 +1063,6 @@ mod tests {
         crate::test_support::with_skill_tool_rows(folded(
             items
                 .into_iter()
-                .map(loose)
                 .enumerate()
                 .map(|(i, item)| frame(i as u64 + 1, Event::ItemCompleted { item }))
                 .collect(),
@@ -1180,9 +1190,12 @@ mod tests {
         ]);
         assert!(!quiet.iter().any(|l| l.contains("TaskCreate")), "{quiet:?}");
         assert_eq!(
-            quiet.iter().filter(|l| l.is_empty()).count(),
-            1,
-            "one gap: {quiet:?}"
+            quiet,
+            drawn(vec![
+                person("itm_1", "note the plan"),
+                assistant("itm_3", "Noted.", ItemStatus::Completed),
+            ]),
+            "no gap and no step where the call was"
         );
 
         let board = drawn(vec![tool(
@@ -1192,7 +1205,12 @@ mod tests {
             ok,
             ItemStatus::Completed,
         )]);
-        assert!(board.iter().any(|l| l.contains("TaskCreate(")), "{board:?}");
+        assert!(
+            board
+                .iter()
+                .any(|l| l.contains("✓ task create write the plan")),
+            "{board:?}"
+        );
 
         let failed = drawn(vec![tool(
             "itm_2",
@@ -1550,16 +1568,14 @@ mod tests {
     /// invents a name for the screen.
     #[test]
     fn a_skill_call_that_names_nothing_is_drawn_as_a_tool_row() {
-        assert_eq!(
-            drawn(vec![tool(
-                "itm_1",
-                "Skill",
-                serde_json::json!({"arguments": "the wire format"}),
-                None,
-                ItemStatus::Running,
-            )]),
-            vec![" ▍ Skill(the wire format)".to_string()],
-        );
+        let lines = drawn(vec![tool(
+            "itm_1",
+            "Skill",
+            serde_json::json!({"arguments": "the wire format"}),
+            None,
+            ItemStatus::Completed,
+        )]);
+        assert_eq!(lines[1..], ["   ✓ skill the wire format"], "{lines:?}");
     }
 
     /// A message from another session says who sent it, as a room's post does.
@@ -1611,26 +1627,42 @@ mod tests {
     #[test]
     fn a_tool_row_names_the_call_and_hangs_its_result_under_it() {
         let output = ToolOutput::text("Read 3 lines");
+        let lines = drawn(vec![tool(
+            "itm_1",
+            "Read",
+            serde_json::json!({"file_path": "/tmp/project/Cargo.toml"}),
+            Some(output),
+            ItemStatus::Completed,
+        )]);
+        assert!(lines[0].starts_with("   ▾ 1 step · read"), "{lines:?}");
         assert_eq!(
-            drawn(vec![tool(
-                "itm_1",
-                "Read",
-                serde_json::json!({"file_path": "/tmp/project/Cargo.toml"}),
-                Some(output),
-                ItemStatus::Completed,
-            )]),
-            vec![
-                " ▍ Read(Cargo.toml)".to_string(),
-                "  ⎿  Read 3 lines".to_string(),
-            ],
+            lines[1..],
+            ["   ✓ read Cargo.toml", "     Read 3 lines"],
             "the path is named from the session's own directory"
         );
+    }
+
+    /// A turn opened to be read hangs what a step brought back whole: the
+    /// fold that cuts a long result is a row's, and the turn's line is the
+    /// fold here.
+    #[test]
+    fn an_opened_turn_hangs_a_long_result_whole() {
+        let output = ToolOutput::text((1..=9).map(|i| format!("line {i}\n")).collect::<String>());
+        let lines = drawn(vec![tool(
+            "itm_1",
+            "Read",
+            serde_json::json!({"file_path": "src/lib.rs"}),
+            Some(output),
+            ItemStatus::Completed,
+        )]);
+        assert_eq!(lines.len(), 2 + 9, "{lines:?}");
+        assert_eq!(lines.last().map(String::as_str), Some("     line 9"));
     }
 
     #[test]
     fn a_long_result_says_how_much_it_folded_away_and_what_opens_it() {
         let output = ToolOutput::text((1..=9).map(|i| format!("line {i}\n")).collect::<String>());
-        let drawn = drawn(vec![tool(
+        let drawn = turnless(vec![tool(
             "itm_1",
             "Read",
             serde_json::json!({"file_path": "src/lib.rs"}),
@@ -1705,7 +1737,7 @@ mod tests {
     #[test]
     fn a_run_of_thoughts_draws_as_one_thought() {
         assert_eq!(
-            drawn(vec![
+            turnless(vec![
                 thought_at("itm_1", "The manifest first.", 2),
                 thought_at("itm_2", "Then the crate map.", 3),
             ]),
@@ -1724,7 +1756,7 @@ mod tests {
     #[test]
     fn a_run_whose_last_thought_is_still_being_had_is_thinking() {
         assert_eq!(
-            drawn(vec![
+            turnless(vec![
                 thought_at("itm_1", "The manifest first.", 2),
                 thought_at("itm_2", "Then the crate map.", 3),
                 thinking_at("itm_3", "The plan after that."),
@@ -1741,28 +1773,26 @@ mod tests {
     /// them apart, because what it did is what a person read between them.
     #[test]
     fn a_call_between_two_thoughts_keeps_them_two_blocks() {
+        let lines = drawn(vec![
+            thought_at("itm_1", "The manifest first.", 2),
+            tool(
+                "itm_2",
+                "Read",
+                serde_json::json!({"file_path": "Cargo.toml"}),
+                Some(ToolOutput::text("Read 3 lines")),
+                ItemStatus::Completed,
+            ),
+            thought_at("itm_3", "Then the crate map.", 3),
+        ]);
         assert_eq!(
-            drawn(vec![
-                thought_at("itm_1", "The manifest first.", 2),
-                tool(
-                    "itm_2",
-                    "Read",
-                    serde_json::json!({"file_path": "Cargo.toml"}),
-                    Some(ToolOutput::text("Read 3 lines")),
-                    ItemStatus::Completed,
-                ),
-                thought_at("itm_3", "Then the crate map.", 3),
-            ]),
-            vec![
-                " ▏ Thought for 2s".to_string(),
-                "  ⎿  The manifest first.".to_string(),
-                String::new(),
-                " ▍ Read(Cargo.toml)".to_string(),
-                "  ⎿  Read 3 lines".to_string(),
-                String::new(),
-                " ▏ Thought for 3s".to_string(),
-                "  ⎿  Then the crate map.".to_string(),
+            lines[1..],
+            [
+                "     The manifest first.",
+                "   ✓ read Cargo.toml",
+                "     Read 3 lines",
+                "     Then the crate map.",
             ],
+            "{lines:?}"
         );
     }
 
@@ -1771,7 +1801,7 @@ mod tests {
     /// seconds nobody divides in their head.
     #[test]
     fn a_run_of_minutes_reads_as_minutes_and_seconds() {
-        let drawn = drawn(vec![
+        let drawn = turnless(vec![
             thought_at("itm_1", "The manifest first.", 70),
             thought_at("itm_2", "Then the crate map.", 131),
         ]);
@@ -1785,12 +1815,12 @@ mod tests {
     #[test]
     fn thinking_streams_and_then_holds_the_rows_it_streamed() {
         assert_eq!(
-            drawn(vec![thinking_item("the manifest")]),
+            turnless(vec![thinking_item("the manifest")]),
             vec![" ▏ Thinking…".to_string(), "  ⎿  the manifest".to_string()],
             "a thought being had is read as it is thought"
         );
         assert_eq!(
-            drawn(vec![thought_item("The manifest first.", 2)]),
+            turnless(vec![thought_item("The manifest first.", 2)]),
             vec![
                 " ▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
@@ -1813,8 +1843,8 @@ mod tests {
                       the layering is written down.\n\nThe plan after that: it says \
                       which of the two is allowed to move.";
         for text in ["the manifest", paragraph, broken] {
-            let streaming = drawn(vec![thinking_item(text)]);
-            let over = drawn(vec![thought_item(text, 2)]);
+            let streaming = turnless(vec![thinking_item(text)]);
+            let over = turnless(vec![thought_item(text, 2)]);
             assert_eq!(
                 streaming.len(),
                 over.len(),
@@ -1834,7 +1864,7 @@ mod tests {
     #[test]
     fn a_thought_being_had_streams_two_rows_of_its_newest_text() {
         assert_eq!(
-            drawn(vec![thinking_item("first\nsecond\nthird\nfourth")]),
+            turnless(vec![thinking_item("first\nsecond\nthird\nfourth")]),
             vec![
                 " ▏ Thinking…".to_string(),
                 "  ⎿  third".to_string(),
@@ -1852,7 +1882,7 @@ mod tests {
                          manifest already asked for, and then the crate map, which is \
                          the one place the whole of the layering is written down, and \
                          only after both of them the plan that says which may move.";
-        let drawn = drawn(vec![thinking_item(paragraph)]);
+        let drawn = turnless(vec![thinking_item(paragraph)]);
         assert_eq!(drawn.len(), 1 + THOUGHT_ROWS, "{drawn:?}");
         assert!(
             drawn
@@ -1894,7 +1924,7 @@ mod tests {
         let mut tallest = 0;
         for stop in word_ends(text) {
             let so_far = &text[..stop];
-            let height = drawn(vec![thinking_item(so_far)]).len();
+            let height = turnless(vec![thinking_item(so_far)]).len();
             assert!(height <= 1 + THOUGHT_ROWS, "{height} rows after {so_far:?}");
             assert!(height >= tallest, "{height} rows after {so_far:?}");
             tallest = height;
@@ -1952,7 +1982,7 @@ mod tests {
     #[test]
     fn a_thought_with_nothing_in_it_yet_is_the_row_alone() {
         assert_eq!(
-            drawn(vec![thinking_item("")]),
+            turnless(vec![thinking_item("")]),
             vec![" ▏ Thinking…".to_string()],
         );
     }
@@ -1964,28 +1994,27 @@ mod tests {
     /// row replaces rather than repeats.
     #[test]
     fn an_agents_own_call_draws_as_a_tool_row_and_not_as_a_thought() {
+        let lines = drawn(vec![agent_call(
+            "itm_1",
+            "read Read src/lib.rs (1 - 50)done\npub mod wire;",
+            serde_json::json!({
+                "external": true,
+                "toolCallId": "toolu_01Read",
+                "title": "Read src/lib.rs (1 - 50)",
+                "kind": "read",
+                "status": "completed",
+                "content": [
+                    { "type": "content",
+                      "content": { "type": "text", "text": "pub mod wire;" } }
+                ],
+                "rawInput": { "file_path": "/tmp/project/src/lib.rs" },
+                "rawOutput": { "lines": 1 }
+            }),
+        )]);
         assert_eq!(
-            drawn(vec![agent_call(
-                "itm_1",
-                "read Read src/lib.rs (1 - 50)done\npub mod wire;",
-                serde_json::json!({
-                    "external": true,
-                    "toolCallId": "toolu_01Read",
-                    "title": "Read src/lib.rs (1 - 50)",
-                    "kind": "read",
-                    "status": "completed",
-                    "content": [
-                        { "type": "content",
-                          "content": { "type": "text", "text": "pub mod wire;" } }
-                    ],
-                    "rawInput": { "file_path": "/tmp/project/src/lib.rs" },
-                    "rawOutput": { "lines": 1 }
-                }),
-            )]),
-            vec![
-                " ▍ Read src/lib.rs (1 - 50)".to_string(),
-                "  ⎿  pub mod wire;".to_string(),
-            ],
+            lines[1..],
+            ["   ✓ read Read src/lib.rs (1 - 50)", "     pub mod wire;"],
+            "{lines:?}"
         );
     }
 
@@ -1995,7 +2024,7 @@ mod tests {
     #[test]
     fn an_agents_call_still_running_reads_as_the_text_it_is() {
         assert_eq!(
-            drawn(vec![thinking_item("read Read src/lib.rs (1 - 50)")]),
+            turnless(vec![thinking_item("read Read src/lib.rs (1 - 50)")]),
             vec![
                 " ▏ Thinking…".to_string(),
                 "  ⎿  read Read src/lib.rs (1 - 50)".to_string(),
@@ -2008,14 +2037,14 @@ mod tests {
     #[test]
     fn a_thought_without_the_mark_is_untouched() {
         assert_eq!(
-            drawn(vec![thought_item("The manifest first.", 2)]),
+            turnless(vec![thought_item("The manifest first.", 2)]),
             vec![
                 " ▏ Thought for 2s".to_string(),
                 "  ⎿  The manifest first.".to_string(),
             ],
         );
         assert_eq!(
-            drawn(vec![agent_call(
+            turnless(vec![agent_call(
                 "itm_1",
                 "The manifest first.",
                 serde_json::json!({ "title": "not a call" }),
@@ -2032,14 +2061,12 @@ mod tests {
     /// build wrote still draws a row — the name it can state, and nothing else.
     #[test]
     fn a_thin_mark_from_an_older_build_still_draws_a_row() {
-        assert_eq!(
-            drawn(vec![agent_call(
-                "itm_1",
-                "tool something",
-                serde_json::json!({ "external": true }),
-            )]),
-            vec![" ▍ Tool".to_string()],
-        );
+        let lines = drawn(vec![agent_call(
+            "itm_1",
+            "tool something",
+            serde_json::json!({ "external": true }),
+        )]);
+        assert_eq!(lines[1..], ["   ✓ other Tool"], "{lines:?}");
     }
 
     /// A call that failed says so where every other row says it: the bullet.
@@ -2060,12 +2087,14 @@ mod tests {
                 ]
             }),
         )]);
+        let lines = rendered_with(&state, &turns_opened(&state, &Folds::new()), &[]);
         assert_eq!(
-            rendered(&state),
-            vec![
-                " ▍ toolu_04Bash".to_string(),
-                "  ⎿  no such file".to_string(),
+            lines[1..],
+            [
+                "   ✗ other toolu_04Bash                             failed",
+                "     no such file",
             ],
+            "{lines:?}"
         );
         let item = state.transcript.items().first().expect("the call");
         assert_eq!(fold::fold_of(&Folds::new(), item), Fold::Peek);
@@ -2078,7 +2107,7 @@ mod tests {
     fn a_long_thought_holds_the_two_rows_it_ended_on() {
         let text: String = (1..=99).map(|i| format!("step {i}\n")).collect();
         assert_eq!(
-            drawn(vec![thought_item(&text, 3)]),
+            turnless(vec![thought_item(&text, 3)]),
             vec![
                 " ▏ Thought for 3s".to_string(),
                 "  ⎿  step 98".to_string(),
@@ -2092,7 +2121,7 @@ mod tests {
     #[test]
     fn an_empty_thought_is_the_row_and_nothing_else() {
         assert_eq!(
-            drawn(vec![thought_item("", 1)]),
+            turnless(vec![thought_item("", 1)]),
             vec![" ▏ Thought for 1s".to_string()],
         );
         assert_eq!(thought(&thought_item("   \n", 1)), None);
@@ -2102,7 +2131,7 @@ mod tests {
     #[test]
     fn a_receipt_joins_the_row_that_asked_for_it() {
         assert_eq!(
-            drawn(vec![
+            turnless(vec![
                 tool(
                     "itm_1",
                     "Edit",

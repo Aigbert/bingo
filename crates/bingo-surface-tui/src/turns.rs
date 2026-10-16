@@ -114,19 +114,39 @@ impl Roles {
 }
 
 /// What an item asks its sites to draw for the part it plays: a step its
-/// row, a folded line itself and, opened, the step under it. The ids are the
+/// row and, opened, what it brought back; a folded line itself and, opened,
+/// the part under it; a thought or a stop its own kind's site. The ids are the
 /// ones the drawing resolves with, so a request and its row meet.
 pub fn requests(item: &Item, role: &Role) -> Vec<(String, Props)> {
     match role {
-        Role::Step { step, .. } => vec![ledger(item, step)],
+        Role::Step { step, opened } => std::iter::once(ledger(item, step))
+            .chain(opened.then(|| result(item)).flatten())
+            .collect(),
         Role::Fold { fold, then } => {
             let under = then.as_deref().map(|then| requests(item, then));
             std::iter::once(folded(item, fold))
                 .chain(under.into_iter().flatten())
                 .collect()
         }
-        Role::Own | Role::Hidden | Role::Thought | Role::Stop { .. } => Vec::new(),
+        Role::Thought | Role::Stop { .. } => fact(item).into_iter().collect(),
+        Role::Own | Role::Hidden => Vec::new(),
     }
+}
+
+/// What a step brought back, as the `ToolResult` site is asked for it under
+/// an opened turn; nothing for a step that brought nothing back.
+pub fn result(item: &Item) -> Option<(String, Props)> {
+    match crate::component::items::tail(item)? {
+        props @ Props::ToolResult(_) => Some((crate::component::items::id(item), props)),
+        _ => None,
+    }
+}
+
+/// A thought or a stop as its own kind's site is asked for it: `Reasoning`
+/// for the words under an opened turn, `Interruption` for the stop line.
+pub fn fact(item: &Item) -> Option<(String, Props)> {
+    crate::component::items::props(item, false)
+        .map(|props| (crate::component::items::id(item), props))
 }
 
 /// A step's row as its site is asked for it.

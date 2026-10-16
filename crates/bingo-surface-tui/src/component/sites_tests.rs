@@ -3,8 +3,11 @@ use bingo_sdk::{Event, TurnStatus, render::Component};
 use serde_json::json;
 
 fn requests(state: &bingo_sdk::SessionState) -> Vec<Component> {
-    let (mut ui, now) = scene();
-    draw_tree(80, 24, &solo(state), &mut ui, later(now, 2000));
+    requests_in(&solo(state))
+}
+fn requests_in(tree: &crate::tree::Tree) -> Vec<Component> {
+    let (mut ui, now) = reading(tree);
+    draw_tree(80, 24, tree, &mut ui, later(now, 2000));
     ui.shown
         .pulls
         .iter()
@@ -23,7 +26,9 @@ fn matched(state: &mut bingo_sdk::SessionState) {
 #[test]
 fn unmatched_frame_has_no_component_requests() {
     for component in Component::ALL {
-        assert!(requests(&site(component)).is_empty(), "{component:?}");
+        let state = site(component);
+        let asked = requests_in(&seen(component, &state));
+        assert!(asked.is_empty(), "{component:?}");
     }
 }
 #[test]
@@ -75,15 +80,17 @@ fn working_frame_requests_spinner() {
     assert!(requests(&state).contains(&Component::Spinner));
 }
 
+/// Where each site is drawn in a session a model answers: every item in a
+/// turn. A step asks `Ledger` for its row and, its turn opened, `ToolResult`
+/// for what it brought back; a call that spawned an agent is its own row and
+/// asks `ToolUse` and `ToolGroup`; a running call a producer drew a row for
+/// asks `ToolProgress`.
 fn site(component: Component) -> bingo_sdk::SessionState {
     use bingo_sdk::{ItemStatus, ToolOutput};
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
-    // A turn's steps and thoughts are its rows and its line; the item's own
-    // site draws one outside any turn.
-    let own = |item| completed_item(loose(item));
-    let sample = || {
+    let sample = |id: &str| {
         tool(
-            "itm_one",
+            id,
             "sample",
             json!({"text":"original"}),
             Some(ToolOutput::text("original")),
@@ -109,13 +116,22 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         Component::AssistantMessage => {
             completed_item(assistant("itm_one", "original", ItemStatus::Completed))
         }
-        Component::ToolUse | Component::ToolResult | Component::ToolGroup => own(sample()),
-        Component::ToolProgress => own(running_tool("itm_one", "sample", "original")),
+        Component::ToolUse | Component::ToolGroup => completed_item(sample(SPAWNING)),
+        Component::ToolResult => completed_item(sample("itm_one")),
+        Component::ToolProgress => with_skill_row(
+            folded(vec![
+                frame(1, started("trn_1")),
+                started_tool(2, running_tool("itm_one", "sample", "original")),
+            ]),
+            "itm_one",
+            "sample",
+            "",
+        ),
         Component::Ledger => folded(vec![
             frame(1, started("trn_1")),
             started_tool(2, running_tool("itm_one", "sample", "original")),
         ]),
-        Component::TurnFold => completed_item(sample()),
+        Component::TurnFold => completed_item(sample("itm_one")),
         Component::CommandOutput => completed_item(item(
             "itm_one",
             ItemStatus::Completed,
@@ -157,6 +173,27 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         | Component::Action => fact_site(component),
     }
 }
+/// The call [`child_summary`]'s agent was spawned by.
+const SPAWNING: &str = "itm_1";
+
+/// The tree a site's session is seen in: for a call that spawned an agent,
+/// with that agent under it.
+fn seen(component: Component, state: &bingo_sdk::SessionState) -> crate::tree::Tree {
+    let mut tree = solo(state);
+    if matches!(component, Component::ToolUse | Component::ToolGroup) {
+        tree.fold.apply(&child_frame(1, announced("helper")));
+    }
+    tree
+}
+
+/// A fresh screen with every finished turn opened, as a person reading what
+/// the turns did has it.
+fn reading(tree: &crate::tree::Tree) -> (crate::ui::Ui, crate::clock::Now) {
+    let (mut ui, now) = scene();
+    open_the_turns(&mut ui, tree.viewed());
+    (ui, now)
+}
+
 fn replaces_drawn_site(component: Component) {
     let mut state = site(component);
     state.config.kernel["render"] = serde_json::to_value(std::collections::BTreeMap::from([(
@@ -164,8 +201,8 @@ fn replaces_drawn_site(component: Component) {
         vec![json!({})],
     )]))
     .unwrap();
-    let tree = solo(&state);
-    let (mut ui, now) = scene();
+    let tree = seen(component, &state);
+    let (mut ui, now) = reading(&tree);
     let now = later(now, 2000);
     draw_tree(80, 30, &tree, &mut ui, now);
     let key = ui
@@ -242,8 +279,8 @@ async fn counting_host_receives_no_unmatched_render_requests() {
 fn a_replacement_group_hides_its_child_requests() {
     let mut state = site(Component::ToolGroup);
     matched(&mut state);
-    let (mut ui, now) = scene();
-    let tree = solo(&state);
+    let tree = seen(Component::ToolGroup, &state);
+    let (mut ui, now) = reading(&tree);
     draw_tree(80, 30, &tree, &mut ui, now);
     let key = ui
         .shown
@@ -338,15 +375,15 @@ fn fact_site(component: Component) -> bingo_sdk::SessionState {
             .unwrap(),
     )
     .unwrap();
-    // Outside any turn: a turn folds its thoughts and its stop away.
-    let mut record = loose(item(
+    // In a turn, opened: a thought is read there, a stop drawn there.
+    let mut record = item(
         "itm_one",
         bingo_sdk::ItemStatus::Completed,
         bingo_sdk::ItemBody::Reasoning {
             text: String::new(),
             provider_metadata: Default::default(),
         },
-    ));
+    );
     super::facts::change(&mut record, &props);
     folded(vec![frame(1, Event::ItemCompleted { item: record })])
 }
@@ -466,9 +503,9 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
         }
         let mut state = site(component);
         matched(&mut state);
-        let (mut ui, now) = scene();
+        let tree = seen(component, &state);
+        let (mut ui, now) = reading(&tree);
         let now = later(now, 2000);
-        let tree = solo(&state);
         if component == Component::Browse {
             crate::browse::open(&mut ui, &tree, None, false, now);
         }

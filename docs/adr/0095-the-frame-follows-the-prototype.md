@@ -55,7 +55,13 @@ every drawing that shows them (status, footer, header, receipts).
    `KeyBar { pairs: [{ keys, action, emphasis }], toast }`, `Composer { tag,
    placeholder }` over the surface's editing core, `Ledger { steps }` with each
    step's outcome, `TurnFold { steps, outcome, elapsed }`. A pane declares its
-   key pairs as props; no mod draws hints inside its body.
+   key pairs as props; no mod draws hints inside its body. Inside a turn a
+   step's row is asked of `Ledger`, not `ToolUse`/`ToolGroup`; once opened,
+   what it brought back is asked of `ToolResult`, a thought of `Reasoning`,
+   the stop line of `Interruption`; a receipt naming its step rides in that
+   row and a running step draws no progress. Outside the steps (an agent's
+   call, a producer's row, an unlinked receipt) `ToolUse`, `ToolGroup`,
+   `ToolProgress` and `PermissionReceipt` still answer, so none retires.
 9. **New facts, no feature nouns:** the session's git branch (a context fact,
    read once per cwd change); a model choice's scope (`session | default`) and
    effort in the session summary; a permission ask's scope phrase and a
