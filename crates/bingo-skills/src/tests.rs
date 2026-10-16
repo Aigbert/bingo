@@ -182,8 +182,11 @@ pub(crate) struct Asked {
 pub(crate) fn asked(cwd: &Path) -> Asked {
     Asked {
         session: SessionSummary {
-            effort: None,
-            model_scope: None,
+            choice: bingo_sdk::SessionModel {
+                model: None,
+                model_scope: None,
+                effort: None,
+            },
             history: bingo_sdk::SessionHistory {
                 first_ask: None,
                 forked_from: None,
@@ -197,7 +200,6 @@ pub(crate) fn asked(cwd: &Path) -> Asked {
             title: None,
             cwd: cwd.display().to_string(),
             parent: None,
-            model: None,
             provider: None,
             created_at: Timestamp::UNIX_EPOCH,
             updated_at: Timestamp::UNIX_EPOCH,

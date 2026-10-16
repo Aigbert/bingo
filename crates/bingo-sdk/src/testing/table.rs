@@ -87,8 +87,11 @@ impl Table {
         }
         let id = self.next_id();
         let summary = SessionSummary {
-            effort: None,
-            model_scope: None,
+            choice: crate::SessionModel {
+                model: spec.model,
+                model_scope: None,
+                effort: None,
+            },
             history: crate::SessionHistory {
                 first_ask: None,
                 forked_from: None,
@@ -100,7 +103,6 @@ impl Table {
             cwd: spec.cwd.to_string_lossy().into_owned(),
             parent: spec.parent,
             driver: spec.driver,
-            model: spec.model,
             provider: spec.provider,
             system_extra: spec.system_extra,
             tools: spec.tools,

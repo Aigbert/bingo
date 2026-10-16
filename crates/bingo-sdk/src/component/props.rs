@@ -161,8 +161,6 @@ impl From<&crate::SessionState> for StatusFacts {
     fn from(state: &crate::SessionState) -> Self {
         Self {
             summary: crate::SessionSummary {
-                effort: None,
-                model_scope: None,
                 history: crate::SessionHistory::default(),
                 ..state.summary.clone()
             },

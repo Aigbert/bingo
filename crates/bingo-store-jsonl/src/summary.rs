@@ -58,8 +58,6 @@ fn rebuild(dir: &Path) -> Result<Option<SessionSummary>, KernelError> {
         })
         .next_back()
         .map(|summary| SessionSummary {
-            effort: None,
-            model_scope: None,
             history: bingo_sdk::SessionHistory {
                 first_ask,
                 messages: Some(messages as u64),
@@ -83,8 +81,6 @@ pub fn count_message(dir: &Path, first_ask: Option<String>) -> Result<(), Kernel
         Some((messages, summary)) => write(
             dir,
             &SessionSummary {
-                effort: None,
-                model_scope: None,
                 history: bingo_sdk::SessionHistory {
                     first_ask: summary.history.first_ask.or(first_ask),
                     messages: Some(messages + 1),
@@ -212,10 +208,18 @@ mod tests {
     #[test]
     fn the_count_in_the_file_moves_with_a_message_and_the_journal_grows_none() {
         let dir = planted();
-        write(dir.path(), &summary()).expect("write");
+        let mut chosen = summary();
+        chosen.model_scope = Some(bingo_sdk::ChoiceScope::Default);
+        chosen.effort = Some(bingo_sdk::Effort::Medium);
+        write(dir.path(), &chosen).expect("write");
         journal::append(
             dir.path(),
-            &frame(1, Event::SessionUpdated { summary: summary() }),
+            &frame(
+                1,
+                Event::SessionUpdated {
+                    summary: chosen.clone(),
+                },
+            ),
         )
         .expect("append");
         for message in [said(2, "itm_1"), answered(3, "itm_2"), called(4, "itm_3")] {
@@ -225,6 +229,7 @@ mod tests {
             }
         }
         assert_eq!(counted(dir.path()), Some(2), "an ask and an answer");
+        assert_eq!(of(dir.path()).unwrap().unwrap().choice, chosen.choice);
         let frames = journal::replay(dir.path(), Seq::ZERO).expect("replay");
         assert_eq!(
             frames
@@ -262,8 +267,6 @@ mod tests {
     fn a_file_that_never_counted_is_rebuilt_rather_than_guessed() {
         let dir = planted();
         let old = SessionSummary {
-            effort: None,
-            model_scope: None,
             history: bingo_sdk::SessionHistory {
                 messages: None,
                 ..summary().history
@@ -292,6 +295,8 @@ mod tests {
         let dir = planted();
         let mut latest = summary();
         latest.title = Some("the second name".into());
+        latest.model_scope = Some(bingo_sdk::ChoiceScope::Session);
+        latest.effort = Some(bingo_sdk::Effort::High);
         journal::append(
             dir.path(),
             &frame(1, Event::SessionUpdated { summary: summary() }),

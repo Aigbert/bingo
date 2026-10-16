@@ -334,7 +334,7 @@ impl Runtime {
             item: None,
             cwd: state.summary.cwd.into(),
             provider: None,
-            model: state.summary.model,
+            model: state.summary.choice.model,
             host: caller.host.clone(),
         };
         let requested = std::time::Duration::from_millis(input.ms);

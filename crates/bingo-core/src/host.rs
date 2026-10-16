@@ -35,6 +35,8 @@ mod tool_host;
 mod tree;
 mod unavailable;
 
+use crate::spec::apply;
+
 use std::any::Any;
 use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex, Weak};
@@ -101,26 +103,6 @@ pub struct Host {
     pinned: Mutex<Vec<String>>,
     /// The unreadable trust file the person was last told about, told once.
     trust_unread: Mutex<Option<String>>,
-}
-
-/// A knob moved, written into the spec that holds it.
-fn apply(change: SessionChange, spec: &mut SessionSpec) {
-    match change {
-        SessionChange::Key(key) => spec.key = key,
-        SessionChange::Model {
-            provider,
-            model,
-            scope,
-        } => {
-            if provider.is_some() {
-                spec.provider = provider;
-            }
-            spec.model = Some(model);
-            spec.model_scope = Some(scope);
-        }
-        SessionChange::Thinking(level) => spec.thinking = Some(level),
-        SessionChange::Title(title) => spec.title = crate::spec::titled(&title),
-    }
 }
 
 impl std::fmt::Debug for Host {

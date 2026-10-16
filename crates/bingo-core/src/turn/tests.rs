@@ -92,13 +92,12 @@ impl TurnHost for RecordingHost {
 fn summary() -> SessionSummary {
     let ts = Timestamp::from_second(0).unwrap();
     SessionSummary {
-        effort: None,
-        model_scope: None,
-        history: bingo_sdk::SessionHistory {
-            first_ask: None,
-            forked_from: None,
-            messages: None,
+        choice: bingo_sdk::SessionModel {
+            model: Some("m".into()),
+            model_scope: None,
+            effort: None,
         },
+        history: Default::default(),
         tools: None,
         system_extra: None,
         driver: Default::default(),
@@ -107,7 +106,6 @@ fn summary() -> SessionSummary {
         title: None,
         cwd: "/tmp".into(),
         parent: None,
-        model: Some("m".into()),
         provider: Some("scripted".into()),
         created_at: ts,
         updated_at: ts,

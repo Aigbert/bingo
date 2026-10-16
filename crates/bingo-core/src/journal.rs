@@ -149,8 +149,11 @@ mod tests {
     fn summary(id: &str, cwd: &str, second: i64) -> SessionSummary {
         let ts = Timestamp::from_second(second).unwrap();
         SessionSummary {
-            effort: None,
-            model_scope: None,
+            choice: bingo_sdk::SessionModel {
+                model: None,
+                model_scope: None,
+                effort: None,
+            },
             history: bingo_sdk::SessionHistory {
                 first_ask: None,
                 forked_from: None,
@@ -164,7 +167,6 @@ mod tests {
             title: None,
             cwd: cwd.into(),
             parent: None,
-            model: None,
             provider: None,
             created_at: ts,
             updated_at: ts,

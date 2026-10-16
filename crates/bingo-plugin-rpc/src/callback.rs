@@ -61,7 +61,7 @@ pub(crate) async fn restart(
             session: session.id,
             turn: None,
             cwd: session.cwd.into(),
-            model: session.model,
+            model: session.choice.model,
         };
         tokio::time::timeout(
             bingo_sdk::HOOK_DEADLINE,

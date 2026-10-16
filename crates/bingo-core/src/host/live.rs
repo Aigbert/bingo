@@ -40,8 +40,11 @@ impl Live {
 pub(super) fn summarize() -> SessionSummary {
     let now = Timestamp::now();
     SessionSummary {
-        effort: None,
-        model_scope: None,
+        choice: bingo_sdk::SessionModel {
+            model: None,
+            model_scope: None,
+            effort: None,
+        },
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,
@@ -53,7 +56,6 @@ pub(super) fn summarize() -> SessionSummary {
         title: None,
         cwd: String::new(),
         parent: None,
-        model: None,
         provider: None,
         system_extra: None,
         tools: None,

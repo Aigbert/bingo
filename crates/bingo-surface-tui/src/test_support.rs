@@ -36,8 +36,11 @@ pub fn ts() -> Timestamp {
 
 pub fn summary() -> SessionSummary {
     SessionSummary {
-        effort: None,
-        model_scope: None,
+        choice: bingo_sdk::SessionModel {
+            model: Some("fake-1".into()),
+            model_scope: None,
+            effort: None,
+        },
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,
@@ -51,7 +54,6 @@ pub fn summary() -> SessionSummary {
         title: None,
         cwd: "/tmp/project".into(),
         parent: None,
-        model: Some("fake-1".into()),
         provider: Some("fake".into()),
         created_at: ts(),
         updated_at: ts(),
@@ -82,8 +84,6 @@ pub fn child_id() -> SessionId {
 
 pub fn child_summary(title: &str) -> SessionSummary {
     SessionSummary {
-        effort: None,
-        model_scope: None,
         id: child_id(),
         title: Some(title.into()),
         parent: Some(ParentLink {
@@ -116,8 +116,6 @@ pub fn agent_id(n: u64) -> SessionId {
 
 pub fn agent_summary(n: u64, title: &str) -> SessionSummary {
     SessionSummary {
-        effort: None,
-        model_scope: None,
         id: agent_id(n),
         title: Some(title.into()),
         ..child_summary(title)
@@ -216,8 +214,6 @@ pub fn owed_table_payload(rows: &[(&str, &str, &str)]) -> Value {
 /// `sessions` read hands the switcher for its stored rows.
 pub fn stored_summary(id: &str, title: &str) -> SessionSummary {
     SessionSummary {
-        effort: None,
-        model_scope: None,
         id: SessionId::from_raw(id),
         title: Some(title.into()),
         parent: Some(ParentLink {
@@ -237,12 +233,14 @@ pub fn log_id() -> SessionId {
 
 pub fn log_summary(title: &str) -> SessionSummary {
     SessionSummary {
-        effort: None,
-        model_scope: None,
+        choice: bingo_sdk::SessionModel {
+            model: None,
+            model_scope: None,
+            effort: None,
+        },
         id: log_id(),
         title: Some(title.into()),
         driver: bingo_sdk::Driver::Log,
-        model: None,
         provider: None,
         parent: Some(ParentLink {
             session: SessionId::from_raw("ses_1"),

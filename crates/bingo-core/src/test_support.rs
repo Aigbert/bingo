@@ -369,8 +369,11 @@ pub fn seeing() -> ModelCapabilities {
 pub fn summary(id: &str) -> SessionSummary {
     let ts = jiff::Timestamp::from_second(0).unwrap();
     SessionSummary {
-        effort: None,
-        model_scope: None,
+        choice: bingo_sdk::SessionModel {
+            model: Some("m".into()),
+            model_scope: None,
+            effort: None,
+        },
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,
@@ -384,7 +387,6 @@ pub fn summary(id: &str) -> SessionSummary {
         title: None,
         cwd: "/tmp".into(),
         parent: None,
-        model: Some("m".into()),
         provider: Some("scripted".into()),
         created_at: ts,
         updated_at: ts,

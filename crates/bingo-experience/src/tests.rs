@@ -137,8 +137,11 @@ pub(crate) fn said(text: &str, surface: &str) -> Item {
 
 fn summary(cwd: &Path) -> SessionSummary {
     SessionSummary {
-        effort: None,
-        model_scope: None,
+        choice: bingo_sdk::SessionModel {
+            model: None,
+            model_scope: None,
+            effort: None,
+        },
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,
@@ -152,7 +155,6 @@ fn summary(cwd: &Path) -> SessionSummary {
         cwd: cwd.to_string_lossy().into_owned(),
         parent: None,
         driver: Default::default(),
-        model: None,
         provider: None,
         created_at: Timestamp::UNIX_EPOCH,
         updated_at: Timestamp::UNIX_EPOCH,

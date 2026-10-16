@@ -31,8 +31,11 @@ pub fn session_id() -> SessionId {
 
 pub fn summary() -> SessionSummary {
     SessionSummary {
-        effort: None,
-        model_scope: None,
+        choice: bingo_sdk::SessionModel {
+            model: Some("fake-1".into()),
+            model_scope: None,
+            effort: None,
+        },
         history: bingo_sdk::SessionHistory {
             first_ask: None,
             forked_from: None,
@@ -46,7 +49,6 @@ pub fn summary() -> SessionSummary {
         title: None,
         cwd: "/tmp".into(),
         parent: None,
-        model: Some("fake-1".into()),
         provider: Some("fake".into()),
         created_at: ts(),
         updated_at: ts(),

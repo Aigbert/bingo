@@ -289,8 +289,11 @@ pub(crate) mod tests {
 
     pub(crate) fn summary() -> SessionSummary {
         SessionSummary {
-            effort: None,
-            model_scope: None,
+            choice: bingo_sdk::SessionModel {
+                model: Some("claude-fable-5".into()),
+                model_scope: None,
+                effort: None,
+            },
             history: bingo_sdk::SessionHistory {
                 first_ask: None,
                 forked_from: None,
@@ -304,7 +307,6 @@ pub(crate) mod tests {
             title: Some("the first name".into()),
             cwd: "/work".into(),
             parent: None,
-            model: Some("claude-fable-5".into()),
             provider: Some("anthropic".into()),
             created_at: stamp(),
             updated_at: stamp(),

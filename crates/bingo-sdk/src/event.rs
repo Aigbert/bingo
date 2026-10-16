@@ -699,12 +699,8 @@ pub struct SessionSummary {
     pub parent: Option<ParentLink>,
     #[serde(default)]
     pub driver: Driver,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub model_scope: Option<ChoiceScope>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub effort: Option<crate::Effort>,
+    #[serde(flatten)]
+    pub choice: SessionModel,
     /// What the session was opened with and a resume must give it back:
     /// the prompt appended to the kernel's own, and the tool set it is held to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -730,6 +726,30 @@ pub struct SessionSummary {
     pub asking: bool,
     #[serde(flatten)]
     pub history: SessionHistory,
+}
+
+// Group the choice in Rust while keeping its fields flat on the wire.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionModel {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_scope: Option<ChoiceScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<crate::Effort>,
+}
+
+impl std::ops::Deref for SessionSummary {
+    type Target = SessionModel;
+    fn deref(&self) -> &Self::Target {
+        &self.choice
+    }
+}
+impl std::ops::DerefMut for SessionSummary {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.choice
+    }
 }
 
 /// Whether the chosen model applies only here or is the default for new sessions.
