@@ -6,6 +6,7 @@ mod hints;
 mod keys;
 mod lifecycle;
 mod line;
+mod resume;
 pub mod rows;
 mod skills;
 mod uses;

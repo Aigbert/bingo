@@ -255,7 +255,7 @@ fn binding(key: &str, line: &str, commands: &[CatalogEntry]) -> Option<Row> {
         target: Target::Key(line.into()),
     })
 }
-fn session(summary: &PaletteSession, current: &str) -> Row {
+pub(crate) fn session(summary: &PaletteSession, current: &str) -> Row {
     Row {
         label: summary.label.clone(),
         hint: String::new(),

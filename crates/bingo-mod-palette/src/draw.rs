@@ -41,7 +41,9 @@ pub(crate) fn groups(
     recent: &[String],
     expanded: &std::collections::BTreeSet<String>,
 ) -> (Vec<Group>, usize) {
-    if let Some(args) = crate::args::arguments(&props.query, &props.commands, &props.catalogs) {
+    if let Some(args) = crate::resume::arguments(props)
+        .or_else(|| crate::args::arguments(&props.query, &props.commands, &props.catalogs))
+    {
         return (
             vec![Group {
                 name: args.title,
@@ -130,7 +132,9 @@ pub fn tree(
     }
     if lines.is_empty() {
         let query = props.query.trim_start_matches('/');
-        lines.push(crate::line::note(&format!("nothing matches “{query}”")));
+        lines.push(crate::line::note(&format!(
+            "nothing matches “{query}” in commands, skills, sessions or keys"
+        )));
     }
     let footer = footer(props);
     let room = usize::from(viewport.rows)

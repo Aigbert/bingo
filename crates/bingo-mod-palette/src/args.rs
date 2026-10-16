@@ -1,5 +1,5 @@
 use crate::rows::{Row, Target, matched};
-use bingo_sdk::{ArgSpec, CatalogEntry, CommandSpec};
+use bingo_sdk::{ArgSpec, AuthStatus, CatalogEntry, CommandSpec};
 use std::collections::BTreeMap;
 
 pub struct Arguments {
@@ -60,7 +60,7 @@ pub fn arguments(
     let rows = option_rows(&spec.args, text, &format!("/{name} "), &offer)
         .unwrap_or_else(|| offered(args, &prefix, query, &offer));
     let (rows, selected) = if spec.opens {
-        typed_first(rows, &prefix, query)
+        choices_first(rows, &prefix, query)
     } else {
         let selected = rows.iter().position(|row| row.now == "now").unwrap_or(0);
         (rows, selected)
@@ -126,10 +126,14 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
             label: if query.is_empty() {
                 hint.clone()
             } else {
-                preview(prefix, query)
+                format!("⏎ {}", preview(prefix, query))
             },
             hint: String::new(),
-            now: current.into(),
+            now: if current.is_empty() {
+                String::new()
+            } else {
+                format!("now {current}")
+            },
             alert: None,
             marks: vec![],
             hint_marks: vec![],
@@ -168,14 +172,31 @@ fn word_row(
 /// id the line runs; the entry's own label, which whoever filled the
 /// catalogue chose, is only the hint beside it.
 fn entry_row(entry: &CatalogEntry, prefix: &str, query: &str, offer: &Offer) -> Option<Row> {
-    if !offer.guarded {
-        return choice(&entry.id, &entry.label, prefix, query, offer.current, false);
-    }
-    let mut row = choice(&entry.id, &entry.id, prefix, query, offer.current, false)?;
-    if entry.label != entry.id {
-        row.hint = entry.label.clone();
+    let mut row = if offer.guarded {
+        let mut row = choice(&entry.id, &entry.id, prefix, query, offer.current, false)?;
+        if entry.label != entry.id {
+            row.hint = entry.label.clone();
+        }
+        row
+    } else {
+        choice(&entry.id, &entry.label, prefix, query, offer.current, false)?
+    };
+    if row.now.is_empty()
+        && let Some(signed) = signed(entry)
+    {
+        row.now = signed.into();
     }
     Some(row)
+}
+/// Whether a provider holds a key, from the `auth` its catalogue entry
+/// carries; nothing for an entry that is not a provider or needs none.
+fn signed(entry: &CatalogEntry) -> Option<&'static str> {
+    match serde_json::from_value(entry.meta["auth"].clone()).ok()? {
+        AuthStatus::Ready { .. } => Some("● signed in"),
+        AuthStatus::Missing { .. } => Some("○ signed out"),
+        AuthStatus::Expired { .. } => Some("○ expired"),
+        AuthStatus::NotApplicable => None,
+    }
 }
 fn choice(
     value: &str,
@@ -225,26 +246,28 @@ fn option_rows(args: &ArgSpec, text: &str, prefix: &str, offer: &Offer) -> Optio
     )
 }
 
-/// A command that opens its own chooser runs the line as typed, so a filter
-/// reaches that chooser; its hints stay listed one arrow away.
-fn typed_first(mut rows: Vec<Row>, prefix: &str, query: &str) -> (Vec<Row>, usize) {
+/// A command that opens its own chooser lists its choices with the one in
+/// use selected; a filter selects the best match, and the line as typed —
+/// which opens the chooser on that filter — waits one row past them.
+fn choices_first(mut rows: Vec<Row>, prefix: &str, query: &str) -> (Vec<Row>, usize) {
     let line = format!("{prefix}{query}").trim_end().to_string();
     let target = Target::Run(line.clone());
     if let Some(at) = rows.iter().position(|row| row.target == target) {
         return (rows, at);
     }
-    rows.insert(
-        0,
-        Row {
-            label: format!("runs {line}"),
-            hint: String::new(),
-            now: String::new(),
-            alert: None,
-            marks: vec![],
-            hint_marks: vec![],
-            target,
-        },
-    );
+    if query.is_empty() {
+        let at = rows.iter().position(|row| row.now == "now").unwrap_or(0);
+        return (rows, at);
+    }
+    rows.push(Row {
+        label: format!("runs {line}"),
+        hint: String::new(),
+        now: String::new(),
+        alert: None,
+        marks: vec![],
+        hint_marks: vec![],
+        target,
+    });
     (rows, 0)
 }
 
@@ -271,6 +294,7 @@ pub fn parent(line: &str, commands: &[CatalogEntry]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     fn offer<'a>(catalogs: &'a BTreeMap<String, Vec<CatalogEntry>>, current: &'a str) -> Offer<'a> {
         Offer {
             catalogs,
@@ -278,6 +302,55 @@ mod tests {
             guarded: false,
             only: None,
         }
+    }
+    #[test]
+    fn a_provider_row_says_whether_it_holds_a_key() {
+        let catalogs = BTreeMap::from([(
+            "providers".into(),
+            [
+                ("anthropic", json!({"kind": "ready"})),
+                ("codex", json!({"kind": "missing", "hint": "sign in"})),
+                ("agent", json!({"kind": "notApplicable"})),
+            ]
+            .map(|(id, auth)| CatalogEntry {
+                id: id.into(),
+                label: id.into(),
+                meta: json!({ "auth": auth }),
+            })
+            .to_vec(),
+        )]);
+        let commands = vec![CatalogEntry {
+            id: "login".into(),
+            label: "login".into(),
+            meta: json!({"name":"login","hint":"sign in to a provider","family":"session","opens":true,"args":{"kind":"catalog","source":"providers"}}),
+        }];
+        let login = arguments("/login ", &commands, &catalogs).unwrap();
+        let rows = login
+            .rows
+            .iter()
+            .map(|row| (row.label.as_str(), row.now.as_str()))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            rows,
+            [
+                ("anthropic", "● signed in"),
+                ("codex", "○ signed out"),
+                ("agent", "")
+            ]
+        );
+    }
+    #[test]
+    fn a_free_argument_shows_its_hint_then_what_enter_does() {
+        let commands = vec![CatalogEntry {
+            id: "rename".into(),
+            label: "rename".into(),
+            meta: json!({"name":"rename","hint":"name this session","family":"session","now":"label the total","args":{"kind":"free","hint":"a name for this session"}}),
+        }];
+        let bare = arguments("/rename ", &commands, &BTreeMap::new()).unwrap();
+        assert_eq!(bare.rows[0].label, "a name for this session");
+        assert_eq!(bare.rows[0].now, "now label the total");
+        let typed = arguments("/rename totals", &commands, &BTreeMap::new()).unwrap();
+        assert_eq!(typed.rows[0].label, "⏎ names this session “totals”");
     }
     #[test]
     fn a_session_offering_fewer_words_lists_only_those() {
@@ -397,7 +470,7 @@ mod tests {
         assert_eq!(parent("/", &commands), None);
     }
     #[test]
-    fn a_command_that_opens_runs_a_typed_filter_and_keeps_its_hints() {
+    fn a_command_that_opens_takes_the_best_match_and_keeps_the_filter() {
         let catalogs = BTreeMap::from([(
             "models".into(),
             vec![CatalogEntry {
@@ -411,15 +484,18 @@ mod tests {
             label: "model".into(),
             meta: serde_json::json!({"name":"model","hint":"choose","family":"session","opens":true,"now":"work/large","args":{"kind":"catalog","source":"models"}}),
         }];
-        // `work/` names no model: run as typed, it opens the picker on that provider.
+        // Enter takes the best match; the filter as typed, which opens the
+        // picker on that provider, waits one row past it.
         let filter = arguments("/model work/", &commands, &catalogs).unwrap();
         assert_eq!(
             filter.rows[filter.selected].target,
-            Target::Run("/model work/".into())
-        );
-        assert_eq!(
-            filter.rows[1].target,
             Target::Run("/model work/large".into())
+        );
+        assert_eq!(filter.rows[1].target, Target::Run("/model work/".into()));
+        let unmatched = arguments("/model zz", &commands, &catalogs).unwrap();
+        assert_eq!(
+            unmatched.rows[unmatched.selected].target,
+            Target::Run("/model zz".into())
         );
         let exact = arguments("/model work/large", &commands, &catalogs).unwrap();
         assert_eq!(exact.rows.len(), 1);
@@ -428,10 +504,8 @@ mod tests {
             Target::Run("/model work/large".into())
         );
         let bare = arguments("/model ", &commands, &catalogs).unwrap();
-        assert_eq!(
-            bare.rows[bare.selected].target,
-            Target::Run("/model".into())
-        );
+        assert_eq!(bare.rows.len(), 1, "no row stands for the picker");
+        assert_eq!(bare.rows[bare.selected].now, "now");
     }
     /// A word's label is what the row says; the value is what it runs and
     /// what the command's `now` names, so every mode is found, not only the
