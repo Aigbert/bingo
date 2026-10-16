@@ -1413,8 +1413,8 @@ export type TurnDurationProps = { "durationMs": number; "word": string; [key: st
 /** How a turn ended, for its folded line. */
 export type TurnEnd = ("done" | "stopped" | "failed");
 /**
- * The `TurnFold` site: a finished turn as one line, and the stop line when
- * the person stopped it.
+ * The `TurnFold` site: a finished turn as one line. The stop line under a
+ * stopped turn is the interruption's own row ([`stop_row`]).
  */
 export type TurnFoldProps = {
   /** From the turn's first item to its last, in milliseconds. */

@@ -13,7 +13,6 @@ use unicode_width::UnicodeWidthStr;
 const FOLD: FoldGlyphs = FoldGlyphs {
     folded: "▸",
     open: "▾",
-    stop: "■",
 };
 
 /// A step's row. A running step is left to the surface, whose spinner turns
@@ -37,9 +36,9 @@ pub fn ledger(props: &LedgerProps, width: usize) -> View {
     View::column(rows.collect())
 }
 
-/// The folded line, and the stop line under it when the turn was stopped.
+/// The folded line; a turn with nothing to fold draws nothing.
 pub fn fold(props: &TurnFoldProps, width: usize) -> View {
-    let rows = props.rows(FOLD, width, UnicodeWidthStr::width);
+    let rows = props.row(FOLD, width, UnicodeWidthStr::width);
     View::column(rows.into_iter().map(row).collect())
 }
 
@@ -121,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn a_stopped_turn_draws_two_rows() {
+    fn a_stopped_turn_folds_to_one_row() {
         let props = TurnFoldProps {
             steps: vec![
                 step("read", StepState::Done, None),
@@ -134,12 +133,8 @@ mod tests {
         };
         let drawn = fold(&props, 80).fold();
         let rows: Vec<&str> = drawn.lines().collect();
-        assert_eq!(rows.len(), 2, "{drawn:?}");
+        assert_eq!(rows.len(), 1, "{drawn:?}");
         assert!(rows[0].starts_with("   ▸ 2 steps · read · bash · stopped"));
         assert!(rows[0].ends_with("3s"));
-        assert_eq!(
-            rows[1],
-            "   ■ you stopped the turn · 1 of 2 steps had run; nothing after them"
-        );
     }
 }

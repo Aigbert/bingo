@@ -52,8 +52,8 @@ pub struct LedgerProps {
     pub steps: Vec<Step>,
 }
 
-/// The `TurnFold` site: a finished turn as one line, and the stop line when
-/// the person stopped it.
+/// The `TurnFold` site: a finished turn as one line. The stop line under a
+/// stopped turn is the interruption's own row ([`stop_row`]).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TurnFoldProps {
@@ -216,7 +216,6 @@ impl Run {
 pub struct FoldGlyphs<'a> {
     pub folded: &'a str,
     pub open: &'a str,
-    pub stop: &'a str,
 }
 
 impl TurnFoldProps {
@@ -228,34 +227,17 @@ impl TurnFoldProps {
             .collect()
     }
 
-    /// The steps that finished before the turn ended, run or failed.
-    pub fn had_run(&self) -> usize {
-        let finished = |s: &&Step| matches!(s.state, StepState::Done | StepState::Failed);
-        self.steps.iter().filter(finished).count()
-    }
-
-    /// The fold's rows: the folded line when there is anything to fold, and
-    /// the stop line when the person stopped the turn.
-    pub fn rows(
+    /// The folded line, `▸ 5 steps · read · edit +1 −1 … 7s`; nothing for a
+    /// turn that neither stepped nor thought.
+    pub fn row(
         &self,
         glyphs: FoldGlyphs,
         width: usize,
         cells: impl Fn(&str) -> usize,
-    ) -> Vec<Vec<Piece>> {
-        let mut rows = Vec::new();
-        if let Some(left) = self.fold_words(&glyphs) {
-            let right = vec![Piece::new(elapsed(self.elapsed), Ink::Dim)];
-            rows.push(laid(left, right, width, &cells));
-        }
-        if self.outcome == TurnEnd::Stopped {
-            rows.push(laid(
-                self.stop_words(glyphs.stop),
-                Vec::new(),
-                width,
-                &cells,
-            ));
-        }
-        rows
+    ) -> Option<Vec<Piece>> {
+        let left = self.fold_words(&glyphs)?;
+        let right = vec![Piece::new(elapsed(self.elapsed), Ink::Dim)];
+        Some(laid(left, right, width, cells))
     }
 
     /// `▸ 5 steps · read · grep · edit +1 −1`, or `▸ thought` for a turn
@@ -285,23 +267,24 @@ impl TurnFoldProps {
         out.extend(ended.map(|words| Piece::new(words, Ink::Bad)));
         Some(out)
     }
+}
 
-    /// `■ you stopped the turn · 2 of 3 steps had run; nothing after them`.
-    fn stop_words(&self, glyph: &str) -> Vec<Piece> {
-        let mut words = String::from("you stopped the turn");
-        if !self.steps.is_empty() {
-            let (ran, total) = (self.had_run(), self.steps.len());
-            words.push_str(&format!(
-                " \u{b7} {ran} of {total} {} had run; nothing after them",
-                plural(total)
-            ));
-        }
-        vec![
-            Piece::new(STEP_INDENT, Ink::Plain),
-            Piece::new(format!("{glyph} "), Ink::Bad),
-            Piece::new(words, Ink::Dim),
-        ]
+/// The line a stopped turn ends on: `■ you stopped the turn · 2 of 3 steps
+/// had run; nothing after them`, or the first four words when no step had
+/// begun.
+pub fn stop_row(glyph: &str, ran: usize, total: usize) -> Vec<Piece> {
+    let mut words = String::from("you stopped the turn");
+    if total > 0 {
+        words.push_str(&format!(
+            " \u{b7} {ran} of {total} {} had run; nothing after them",
+            plural(total)
+        ));
     }
+    vec![
+        Piece::new(STEP_INDENT, Ink::Plain),
+        Piece::new(format!("{glyph} "), Ink::Bad),
+        Piece::new(words, Ink::Dim),
+    ]
 }
 
 fn count(steps: usize) -> String {
@@ -350,7 +333,6 @@ mod tests {
     const GLYPHS: FoldGlyphs = FoldGlyphs {
         folded: "\u{25b8}",
         open: "\u{25be}",
-        stop: "\u{25a0}",
     };
     fn prototype_turn() -> TurnFoldProps {
         let done = StepState::Done;
@@ -379,16 +361,15 @@ mod tests {
 
     #[test]
     fn a_finished_turn_folds_to_the_prototype_line() {
-        let rows = prototype_turn().rows(GLYPHS, 80, cells);
-        assert_eq!(rows.len(), 1);
-        let line = text(&rows[0]);
+        let row = prototype_turn().row(GLYPHS, 80, cells).unwrap();
+        let line = text(&row);
         assert!(
             line.starts_with("   \u{25b8} 5 steps \u{b7} read \u{b7} grep \u{b7} edit +1 \u{2212}1 \u{b7} test 3 passed \u{b7} run "),
             "{line:?}"
         );
         assert!(line.ends_with(" 7s"), "{line:?}");
         assert_eq!(cells(&line), 78);
-        let inks: Vec<(String, Ink)> = rows[0].iter().map(|p| (p.text.clone(), p.ink)).collect();
+        let inks: Vec<(String, Ink)> = row.iter().map(|p| (p.text.clone(), p.ink)).collect();
         assert!(inks.contains(&("+1".into(), Ink::Good)));
         assert!(inks.contains(&("\u{2212}1".into(), Ink::Bad)));
         assert!(inks.contains(&("3 passed".into(), Ink::Good)));
@@ -414,7 +395,7 @@ mod tests {
             thought: false,
             is_expanded: true,
         };
-        let line = text(&fold.rows(GLYPHS, 80, cells)[0]);
+        let line = text(&fold.row(GLYPHS, 80, cells).unwrap());
         assert!(
             line.starts_with(
                 "   \u{25be} 20 steps \u{b7} read \u{d7}18 \u{b7} edit \u{d7}2 +212 \u{2212}88"
@@ -425,41 +406,40 @@ mod tests {
     }
 
     #[test]
-    fn a_stopped_turn_adds_the_stop_line() {
+    fn a_stopped_turn_says_so_and_the_stop_line_counts_what_ran() {
+        let steps = vec![
+            step("read", "a", StepState::Done, None),
+            step("grep", "b", StepState::Done, None),
+            step("bash", "cargo test", StepState::Stopped, None),
+        ];
         let fold = TurnFoldProps {
-            steps: vec![
-                step("read", "a", StepState::Done, None),
-                step("grep", "b", StepState::Done, None),
-                step("bash", "cargo test", StepState::Stopped, None),
-            ],
+            steps: steps.clone(),
             outcome: TurnEnd::Stopped,
             elapsed: 900,
             thought: true,
             is_expanded: false,
         };
-        let rows = fold.rows(GLYPHS, 100, cells);
-        assert!(
-            text(&rows[0]).contains("grep \u{b7} bash \u{b7} stopped"),
-            "{:?}",
-            text(&rows[0])
-        );
-        assert!(text(&rows[0]).ends_with(" 1s"));
+        let line = text(&fold.row(GLYPHS, 100, cells).unwrap());
+        assert!(line.contains("grep \u{b7} bash \u{b7} stopped"), "{line:?}");
+        assert!(line.ends_with(" 1s"));
         assert_eq!(
-            text(&rows[1]),
+            text(&stop_row("\u{25a0}", 2, steps.len())),
             "   \u{25a0} you stopped the turn \u{b7} 2 of 3 steps had run; nothing after them"
+        );
+        assert_eq!(
+            text(&stop_row("\u{25a0}", 0, 0)),
+            "   \u{25a0} you stopped the turn"
         );
         let nothing = TurnFoldProps {
             steps: vec![],
             thought: false,
             ..fold
         };
-        let rows = nothing.rows(GLYPHS, 100, cells);
         assert_eq!(
-            rows.len(),
-            1,
+            nothing.row(GLYPHS, 100, cells),
+            None,
             "no fold line for a turn with nothing to fold"
         );
-        assert_eq!(text(&rows[0]), "   \u{25a0} you stopped the turn");
     }
 
     #[test]

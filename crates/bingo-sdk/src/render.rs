@@ -141,7 +141,7 @@ impl Component {
                 "A running turn's step: its glyph, verb, target and right-aligned outcome."
             }
             Self::TurnFold => {
-                "A finished turn folded to one line of its steps, and the stop line if stopped."
+                "A finished turn folded to one line of its steps and its elapsed time."
             }
         }
     }
