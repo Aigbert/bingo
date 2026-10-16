@@ -62,6 +62,7 @@ mod tests {
             },
             transport,
             passthrough: Passthrough::Unknown,
+            measured: false,
         })
     }
 

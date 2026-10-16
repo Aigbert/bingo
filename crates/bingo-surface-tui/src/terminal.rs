@@ -428,12 +428,12 @@ fn graphics_probe() -> Option<crate::graphics::Heard> {
         std::env::var_os("TMUX").is_some(),
     )?;
     let passthrough = tmux::reach_hidden(tmux::passthrough(transport));
-    let heard = crate::graphics::probe::parse(&probe::exchange(transport, passthrough));
-    Some(crate::graphics::Heard {
-        probe: probe::measured(heard, transport),
+    Some(probe::measured(crate::graphics::Heard {
+        probe: crate::graphics::probe::parse(&probe::exchange(transport, passthrough)),
         transport,
         passthrough,
-    })
+        measured: false,
+    }))
 }
 
 #[cfg(test)]

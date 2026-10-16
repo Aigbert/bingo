@@ -164,14 +164,24 @@ pub(crate) struct Heard {
     pub probe: Probe,
     pub transport: Transport,
     pub passthrough: Passthrough,
+    /// Whether the probe's cell is the window's measure rather than the
+    /// terminal's own word: a terminal that said nothing in time has its cell
+    /// read off the pty's pixels, and its own `CSI 16 t`, arriving late, is
+    /// the better answer.
+    pub measured: bool,
 }
 
 impl Heard {
     /// A reply that arrived after the read ended, joined to what was heard in
     /// time. Monotone ([`Probe::and`]), which is what makes one late settle
     /// happen and no second one: a reply that says nothing new settles
-    /// nothing.
+    /// nothing. The one thing a late reply replaces is a measured cell: the
+    /// terminal's own cell wins over the window's.
     pub fn and(&mut self, later: Probe) {
+        if self.measured && later.cell.is_some() {
+            self.probe.cell = None;
+            self.measured = false;
+        }
         self.probe = std::mem::take(&mut self.probe).and(later);
     }
 }
@@ -274,6 +284,7 @@ mod tests {
             probe,
             transport,
             passthrough,
+            measured: false,
         }
     }
 
@@ -530,6 +541,37 @@ mod tests {
         let settled = Settled::of(&waiting);
         assert_eq!(settled.notice, None);
         assert_eq!(settled.graphics, Graphics::Off, "no cell is no picture");
+    }
+
+    /// A cell read off the window gives way to the terminal's own, arriving
+    /// late; a cell the terminal said in time is not replaced by a later one.
+    #[test]
+    fn a_late_cell_wins_over_a_measured_one_and_not_over_a_said_one() {
+        let late = Cell {
+            width: 17,
+            height: 34,
+        };
+        let mut measured = Heard {
+            measured: true,
+            ..heard(
+                answered(true, Some(CELL), &[GHOSTTY]),
+                Transport::Bare,
+                Passthrough::Unknown,
+            )
+        };
+        measured.and(answered(false, Some(late), &[]));
+        assert_eq!(measured.probe.cell, Some(late), "the terminal's word wins");
+        assert!(!measured.measured, "and is no longer the window's");
+        measured.and(answered(false, Some(CELL), &[]));
+        assert_eq!(measured.probe.cell, Some(late), "and stays");
+
+        let mut said = heard(
+            answered(true, Some(CELL), &[GHOSTTY]),
+            Transport::Bare,
+            Passthrough::Unknown,
+        );
+        said.and(answered(false, Some(late), &[]));
+        assert_eq!(said.probe.cell, Some(CELL), "the first word stands");
     }
 
     /// herdr with pictures off: the chip, and the one line that says which

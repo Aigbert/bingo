@@ -94,6 +94,7 @@ impl From<Render> for Detection {
                     },
                     transport,
                     passthrough: Passthrough::All,
+                    measured: false,
                 }),
             },
             motion: render.motion,
@@ -183,6 +184,7 @@ mod tests {
                 probe: Probe::default(),
                 transport: Transport::Bare,
                 passthrough: Passthrough::Unknown,
+                measured: false,
             }),
             ..Default::default()
         };

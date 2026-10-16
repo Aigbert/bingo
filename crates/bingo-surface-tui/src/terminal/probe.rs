@@ -1,6 +1,6 @@
 //! Terminal probe I/O, before the alternate screen is taken.
 
-use crate::graphics::{Cell, Passthrough, Probe, Transport, probe};
+use crate::graphics::{Cell, Heard, Passthrough, Transport, probe};
 
 /// Put the three queries on the terminal and read until DA1 comes back.
 ///
@@ -39,9 +39,10 @@ pub(super) fn exchange(transport: Transport, passthrough: Passthrough) -> Vec<u8
 /// The answer, with a cell read off the window when the terminal said none.
 /// Only bare: under tmux the pane's window is tmux's own guess at the pixels,
 /// and the terminal behind it is the one whose cells a picture is drawn in.
-pub(super) fn measured(mut heard: Probe, transport: Transport) -> Probe {
-    if transport == Transport::Bare && heard.cell.is_none() {
-        heard.cell = window_cell();
+pub(super) fn measured(mut heard: Heard) -> Heard {
+    if heard.transport == Transport::Bare && heard.probe.cell.is_none() {
+        heard.probe.cell = window_cell();
+        heard.measured = heard.probe.cell.is_some();
     }
     heard
 }
