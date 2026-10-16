@@ -25,11 +25,11 @@ Spread across the workspace; the audit notes name each. No production behaviour 
 
 ## Exit criteria
 
-- [ ] Bricks 1–10 each land as their own commit (or a few), each passing the gates.
-- [ ] Test count and summed test time before/after recorded in Verified.
-- [ ] `git grep` shows no executable/dependency reference to a removed item; historical records and legacy wire strings are documented exceptions; discipline and budget pass.
-- [ ] tui-smoke passes on bingo-mod-hello instead of the demo.
-- [ ] Windows all-target check for each touched crate (known C-toolchain deferral recorded).
+- [x] Bricks 1–10 each land as their own commit (or a few), each passing the gates.
+- [x] Test count and summed test time before/after recorded in Verified.
+- [x] `git grep` shows no executable/dependency reference to a removed item; historical records and legacy wire strings are documented exceptions; discipline and budget pass.
+- [x] tui-smoke passes on bingo-mod-hello instead of the demo.
+- [ ] Windows all-target check for each touched crate: all 58 attempted; the additional tree-sitter header blocker in permissions prevents full verification (details below).
 
 ## Non-goals
 
@@ -72,9 +72,11 @@ Commands run in this worktree with disposable HOME/data, provider environment re
 ```text
 Before: RUSTC_BOOTSTRAP=1 cargo test --workspace --locked -- -Z unstable-options --format json --report-time
 exit 0; 6,230 passed, 6 ignored; summed per-test time 525.154 s
+After: same command and test-thread count
+exit 0; 6,108 passed, 0 ignored; summed per-test time 540.002 s
 ```
 
-The supplied audit measured 6,226 runs / 1,122.2 s under different load; the fresh baseline above is the comparison for this worktree.
+The supplied audit measured 6,226 runs / 1,122.2 s under different load; the fresh baseline above is the comparison for this worktree. There are 122 fewer passing tests (128 fewer cases including ignored tests). Summed time increased 14.848 s (2.8%); this run does not establish an overall speedup.
 
 Brick gates select every touched crate with `-p`: `cargo check --all-targets --locked`, `cargo clippy --all-targets --locked -- -D warnings`, and `cargo test --locked`, in that order. Pasted result summaries (exit status):
 
@@ -106,3 +108,33 @@ BINGO_UPDATE_SCHEMA=1 cargo test -p <sdk/plugin-rpc/mods> --locked
 Brick 8 follow-up: restore standalone session_inspection; workspace fmt,
          check, clippy and test pass; all four inspection cases pass
 ```
+
+Final gates ran one at a time, in the requested order. The timing run above is the full `cargo test --workspace --locked` gate with libtest JSON/report-time enabled. Smoke used an isolated `tmux -L` socket, `-f /dev/null`, disposable HOME/data, and `/bin/sh` without shell startup overrides (the first targeted smoke hit a local mise prompt before bingo launched).
+
+```text
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings: exit 0
+cargo test --workspace --locked: exit 0; 6108 passed; 0 failed; 0 ignored
+bash scripts/check_discipline.sh: exit 0; discipline ok (advisory warnings remain)
+bash scripts/budget.sh: exit 0; dependencies 421/421; warm core 1s/20s
+  relink isolation: 0 crates; target/debug 56 GB exceeds the 5 GB soft limit
+cargo deny check: exit 0; advisories ok, bans ok, licenses ok, sources ok
+bash scripts/tui-smoke.sh: exit 0; tui-smoke ok
+```
+
+Targeted timings: cached full draw 15.632 → 0.014 s; cached layout 7.962 → 0.007 s; tree oracle 10.262 → 2.992 s; scheduled wake 10.529 → 1.524 s. These improvements do not override the total timing result above.
+
+```text
+cargo check -p <each touched crate> --all-targets --target x86_64-pc-windows-msvc
+58 attempted: 40 exit 0; 17 exit 101 at aws-lc-sys; 1 exit 101 at tree-sitter
+No Rust compiler errors surfaced; C-blocked crates were not fully checked.
+```
+
+Passed: bingo-agents, bingo-alarm, bingo-checkpoints, bingo-claim, bingo-collab, bingo-context, bingo-core, bingo-digest, bingo-experience, bingo-hooks-shell, bingo-jsonrpc, bingo-loopback, bingo-mod-ask, bingo-mod-browse, bingo-mod-crew, bingo-mod-hello, bingo-mod-memory, bingo-mod-models, bingo-mod-palette, bingo-mod-plugins, bingo-mod-schedule, bingo-mod-sessions, bingo-mod-status, bingo-persona, bingo-plugin-host, bingo-process, bingo-provider-acp, bingo-provider-fake, bingo-rooms, bingo-schedule, bingo-schema-ts, bingo-sdk, bingo-services, bingo-shelf, bingo-skills, bingo-store-jsonl, bingo-surface-rpc, bingo-tasks, bingo-tool-bash, bingo-update.
+
+Known AWS C-toolchain deferral: bingo, bingo-auth-oauth, bingo-channel-adapter, bingo-channel-feishu, bingo-channels, bingo-gateway, bingo-http, bingo-mcp, bingo-mods, bingo-pictures, bingo-plugin-rpc, bingo-provider-anthropic, bingo-provider-openai, bingo-surface-print, bingo-surface-tui, bingo-tool-fs, bingo-tool-web.
+
+Additional blocker: `bingo-permissions` fails in `tree-sitter 0.26.13` and `tree-sitter-bash 0.25.1` because the cross-compile cannot find the MSVC C header `stdlib.h`. No clang-cl/xwin/zig executable is available on PATH. This is beyond the explicitly accepted AWS/QuickJS deferrals, so the Windows criterion remains unticked.
+
+Final reference audit: removed API names have no code matches; removed demo crate has no manifest/lock/workflow dependency; all 68 remaining `#[path]` mounts were included. External lockfile additions: none. Ember allowlists and schema/TypeScript outputs are unchanged. No logs are committed.
