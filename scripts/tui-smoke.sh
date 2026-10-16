@@ -197,7 +197,7 @@ start '{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"too late"}]}]}'
 keys 'wait for it' Enter
 await 'esc stop'
 keys Escape
-await '[Request interrupted by user]'
+await 'you stopped the turn'
 finish
 
 # The same keypress before a single byte has come back: the request is still
@@ -207,7 +207,7 @@ start '{"responses":[{"steps":[{"delayBeforeStream":{"ms":60000}},{"text":"too l
 keys 'wait for the first byte' Enter
 await 'esc stop'
 keys Escape
-await '[Request interrupted by user]'
+await 'you stopped the turn'
 finish
 
 step 'a page up releases the tail, and the foot takes it back'
@@ -370,6 +370,9 @@ start '{"responses":[
   {"steps":[{"toolCall":{"name":"Read","input":{"file_path":"shot.png"}}}]},
   {"steps":[{"text":"That is the picture."}]}]}'
 keys 'look at it' Enter
+# A finished turn folds to one line; its picture shows with it opened.
+await '▸ 1 step'
+keys C-o
 await '[image: image/png]'
 await 'That is the picture.'
 if pane | grep -qE '_Ga=|10eeee'; then
@@ -385,6 +388,9 @@ start '{"responses":[
   {"steps":[{"toolCall":{"name":"Read","input":{"file_path":"shot.png"}}}]},
   {"steps":[{"text":"That is the picture."}]}]}' 'BINGO_GRAPHICS=off'
 keys 'look at it' Enter
+# A finished turn folds to one line; its picture shows with it opened.
+await '▸ 1 step'
+keys C-o
 await '[image: image/png]'
 finish
 
@@ -589,7 +595,7 @@ await 'something else'
 keys -l "$(printf '\033[27u')"
 await 'Skipped question; continued.'
 await 'skipped · it decides'
-if pane | grep -qF '[Request interrupted by user]'; then
+if pane | grep -qF 'you stopped the turn'; then
   echo 'tui-smoke: skipping the question interrupted its turn' >&2
   exit 1
 fi
