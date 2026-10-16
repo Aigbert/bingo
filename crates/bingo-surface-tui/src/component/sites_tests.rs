@@ -81,22 +81,10 @@ fn working_frame_requests_spinner() {
 }
 
 /// Where each site is drawn in a session a model answers: every item in a
-/// turn. A step asks `Ledger` for its row and, its turn opened, `ToolResult`
-/// for what it brought back; a call that spawned an agent is its own row and
-/// asks `ToolUse` and `ToolGroup`; a running call a producer drew a row for
-/// asks `ToolProgress`.
+/// turn.
 fn site(component: Component) -> bingo_sdk::SessionState {
-    use bingo_sdk::{ItemStatus, ToolOutput};
+    use bingo_sdk::ItemStatus;
     let completed_item = |item| folded(vec![frame(1, Event::ItemCompleted { item })]);
-    let sample = |id: &str| {
-        tool(
-            id,
-            "sample",
-            json!({"text":"original"}),
-            Some(ToolOutput::text("original")),
-            ItemStatus::Completed,
-        )
-    };
     match component {
         Component::KeyBar
         | Component::Composer
@@ -116,22 +104,12 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         Component::AssistantMessage => {
             completed_item(assistant("itm_one", "original", ItemStatus::Completed))
         }
-        Component::ToolUse | Component::ToolGroup => completed_item(sample(SPAWNING)),
-        Component::ToolResult => completed_item(sample("itm_one")),
-        Component::ToolProgress => with_skill_row(
-            folded(vec![
-                frame(1, started("trn_1")),
-                started_tool(2, running_tool("itm_one", "sample", "original")),
-            ]),
-            "itm_one",
-            "sample",
-            "",
-        ),
-        Component::Ledger => folded(vec![
-            frame(1, started("trn_1")),
-            started_tool(2, running_tool("itm_one", "sample", "original")),
-        ]),
-        Component::TurnFold => completed_item(sample("itm_one")),
+        Component::ToolUse
+        | Component::ToolGroup
+        | Component::ToolResult
+        | Component::ToolProgress
+        | Component::Ledger
+        | Component::TurnFold => call_site(component),
         Component::CommandOutput => completed_item(item(
             "itm_one",
             ItemStatus::Completed,
@@ -173,6 +151,35 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         | Component::Action => fact_site(component),
     }
 }
+/// Where a call's sites are drawn. A step asks `Ledger` for its row and, its
+/// turn opened, `ToolResult` for what it brought back; a call that spawned an
+/// agent is its own row and asks `ToolUse` and `ToolGroup`; a running call a
+/// producer drew a row for asks `ToolProgress`.
+fn call_site(component: Component) -> bingo_sdk::SessionState {
+    let completed = |id: &str| {
+        let item = tool(
+            id,
+            "sample",
+            json!({"text":"original"}),
+            Some(bingo_sdk::ToolOutput::text("original")),
+            bingo_sdk::ItemStatus::Completed,
+        );
+        folded(vec![frame(1, Event::ItemCompleted { item })])
+    };
+    let running = || {
+        folded(vec![
+            frame(1, started("trn_1")),
+            started_tool(2, running_tool("itm_one", "sample", "original")),
+        ])
+    };
+    match component {
+        Component::ToolUse | Component::ToolGroup => completed(SPAWNING),
+        Component::ToolProgress => with_skill_row(running(), "itm_one", "sample", ""),
+        Component::Ledger => running(),
+        _ => completed("itm_one"),
+    }
+}
+
 /// The call [`child_summary`]'s agent was spawned by.
 const SPAWNING: &str = "itm_1";
 
