@@ -22,9 +22,7 @@ pub mod offer;
 pub mod serve;
 pub mod shape;
 pub mod socket;
-pub mod token;
-
-use std::sync::atomic::{AtomicU64, Ordering};
+pub use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
 use bingo_sdk::Env;
@@ -33,9 +31,9 @@ use tokio::task::JoinHandle;
 
 use crate::error::AcpError;
 
+pub use bingo_loopback::Token;
 pub use doors::{Doors, Refused};
 pub use socket::Address;
-pub use token::Token;
 
 /// Where the proxy dials. Read by `acp-mcp-proxy`, written into the server
 /// row's `env` — never its argv, which is world-readable (ADR-0036 §3).
@@ -90,7 +88,8 @@ impl Bridge {
     /// Open a conversation for one ACP session: the token that names it and
     /// the doors its calls go through. The token is what rides the row's env.
     pub fn admit(&self, doors: Arc<dyn Doors>) -> Result<Token, AcpError> {
-        let token = Token::mint()?;
+        let token = Token::mint()
+            .map_err(|_| AcpError::Spawn("the system random source refused".into()))?;
         self.conversations.add(token.clone(), doors);
         Ok(token)
     }

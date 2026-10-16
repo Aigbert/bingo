@@ -1,4 +1,7 @@
 //! Bind resolved endpoints while migrating only unambiguous user declarations.
+mod instances;
+pub use instances::{InstanceConfig, blank};
+
 use bingo_sdk::Registrar;
 use serde_json::Value;
 

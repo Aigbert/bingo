@@ -50,13 +50,7 @@ impl PermissionCommand {
 #[async_trait]
 impl Command for PermissionCommand {
     fn now(&self, view: &bingo_sdk::command::SessionView<'_>) -> Option<String> {
-        let state = view.state;
-        bingo_sdk::slot::placed(state)
-            .iter()
-            .find_map(|placed| match &placed.slot {
-                bingo_sdk::slot::Slot::Mode { current, .. } => Some(current.clone()),
-                _ => None,
-            })
+        bingo_sdk::slot::modes(view.state).next()
     }
 
     fn spec(&self) -> CommandSpec {

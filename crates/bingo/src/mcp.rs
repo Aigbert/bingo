@@ -12,6 +12,7 @@
 //! environment value are where a person keeps their secrets, so `get` prints
 //! the names they were given under and never what is in them.
 
+use crate::error::{internal, invalid};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -19,7 +20,7 @@ use std::sync::Arc;
 use bingo_auth_oauth::CredentialStore;
 use bingo_core::settings::{self, Claim, Layer};
 use bingo_mcp::{McpPlugin, Server, Settings};
-use bingo_sdk::{Env, ErrorCode, KernelError, LoginMethod, Plugin};
+use bingo_sdk::{Env, KernelError, LoginMethod, Plugin};
 use clap::{Subcommand, ValueEnum};
 use serde_json::{Map, Value, json};
 
@@ -437,17 +438,10 @@ fn configured(
     Ok(settings)
 }
 
-fn invalid(message: impl Into<String>) -> KernelError {
-    KernelError::new(ErrorCode::InvalidInput, message)
-}
-
-fn internal(message: impl Into<String>) -> KernelError {
-    KernelError::new(ErrorCode::Internal, message)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bingo_sdk::ErrorCode;
 
     fn stdio(command: &str, args: &[&str]) -> Server {
         Server::Stdio {

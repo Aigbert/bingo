@@ -157,17 +157,6 @@ mod tests {
             )))
         }
     }
-    fn cx() -> HookContext {
-        HookContext {
-            session: SessionId::from_raw("s"),
-            turn: None,
-            item: None,
-            cwd: "/".into(),
-            provider: None,
-            model: None,
-            host: testing::NoHost::handle(),
-        }
-    }
     #[tokio::test]
     async fn completion_wraps_the_text_from_beneath() {
         let links = [Link {
@@ -186,7 +175,7 @@ mod tests {
         let result: Option<String> = dispatch(
             catalogue::TURN_COMPLETE,
             &links,
-            &cx(),
+            &crate::test_support::hook_context("/"),
             input,
             Next::new(|_| Box::pin(async { Ok(Some("inner".to_string())) })),
             Report::default(),
@@ -224,17 +213,6 @@ mod contracts {
             next.run(input).await
         }
     }
-    fn cx() -> HookContext {
-        HookContext {
-            session: SessionId::from_raw("s"),
-            turn: None,
-            item: None,
-            cwd: "/".into(),
-            provider: None,
-            model: None,
-            host: testing::NoHost::handle(),
-        }
-    }
     fn link(key: &'static str, value: Value, tier: Tier) -> Vec<Link> {
         vec![Link {
             plugin: "fixture".into(),
@@ -250,15 +228,25 @@ mod contracts {
         let spec: ToolSpec =
             serde_json::from_value(json!({"name":"Read", "description":"old", "inputSchema":{}}))
                 .unwrap();
-        let described = crate::chain::describe::tools(vec![spec], &links, &cx(), Report::default())
-            .await
-            .unwrap();
+        let described = crate::chain::describe::tools(
+            vec![spec],
+            &links,
+            &crate::test_support::hook_context("/"),
+            Report::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(described[0].description, "new");
         let links = link("text", json!("new"), Tier::Rewrite);
         let input = bingo_sdk::Input::text("old", Origin::surface("test"));
-        let received = crate::chain::deliver::receive(input, &links, &cx(), Report::default())
-            .await
-            .unwrap();
+        let received = crate::chain::deliver::receive(
+            input,
+            &links,
+            &crate::test_support::hook_context("/"),
+            Report::default(),
+        )
+        .await
+        .unwrap();
         assert!(matches!(received, bingo_sdk::Input::Text { text, .. } if text == "new"));
     }
     /// A link may describe `/plugins` differently, but not as a command whose
@@ -276,7 +264,7 @@ mod contracts {
         let described: Option<CommandSpec> = dispatch(
             catalogue::COMMAND_DESCRIBE,
             &links,
-            &cx(),
+            &crate::test_support::hook_context("/"),
             spec,
             Next::new(|spec| Box::pin(async { Ok(Some(spec)) })),
             Report::default(),
@@ -292,9 +280,14 @@ mod contracts {
             serde_json::from_value(json!({"name":"Read", "description":"old", "inputSchema":{}}))
                 .unwrap();
         let report = Report::default();
-        let described = crate::chain::describe::tools(vec![spec], &links, &cx(), report.clone())
-            .await
-            .unwrap();
+        let described = crate::chain::describe::tools(
+            vec![spec],
+            &links,
+            &crate::test_support::hook_context("/"),
+            report.clone(),
+        )
+        .await
+        .unwrap();
         assert_eq!(described[0].name, "Read");
         let notices = report.take();
         assert_eq!(notices.len(), 1);
@@ -313,7 +306,7 @@ mod contracts {
         let answer: CommandOutcome = dispatch(
             catalogue::COMMAND_RUN,
             &links,
-            &cx(),
+            &crate::test_support::hook_context("/"),
             catalogue::CommandRun {
                 surface: None,
                 name: "test".into(),

@@ -4,6 +4,7 @@ mod test;
 mod types;
 mod validate;
 
+use crate::error::invalid;
 use bingo_sdk::KernelError;
 pub use switch::{Action, run};
 
@@ -21,10 +22,6 @@ pub async fn author(action: &Action) -> Option<Result<i32, KernelError>> {
             Ok(1)
         }
     })
-}
-
-fn invalid(why: impl std::fmt::Display) -> KernelError {
-    KernelError::new(bingo_sdk::ErrorCode::InvalidInput, why.to_string())
 }
 
 /// Only this binary knows which session commands have a headless twin.

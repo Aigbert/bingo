@@ -6,12 +6,13 @@
 //! if one is given, to `auth.json` (0600) and never to a file a project
 //! layer commits (ADR-0017 §4).
 
+use crate::error::{internal, invalid};
 use std::collections::BTreeSet;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 use bingo_auth_oauth::{CredentialStore, Entry};
-use bingo_sdk::{Env, ErrorCode, KernelError};
+use bingo_sdk::{Env, KernelError};
 use serde_json::{Map, Value};
 
 use crate::login::line;
@@ -240,14 +241,6 @@ fn receipt(name: &str, protocol: Protocol, settings: &Path, auth: Option<&Path>)
     }
     lines.push(format!("bingo --provider {name}"));
     lines.join("\n")
-}
-
-fn invalid(message: impl Into<String>) -> KernelError {
-    KernelError::new(ErrorCode::InvalidInput, message)
-}
-
-fn internal(message: impl Into<String>) -> KernelError {
-    KernelError::new(ErrorCode::Internal, message)
 }
 
 #[cfg(test)]

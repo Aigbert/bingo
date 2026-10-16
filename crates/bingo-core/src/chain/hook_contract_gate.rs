@@ -29,17 +29,6 @@ impl PermissionPolicy for Deny {
         }
     }
 }
-fn cx() -> HookContext {
-    HookContext {
-        item: None,
-        session: SessionId::from_raw("s"),
-        turn: None,
-        cwd: "/tmp".into(),
-        provider: None,
-        model: None,
-        host: bingo_sdk::testing::NoHost::handle(),
-    }
-}
 async fn before(outcome: HookOutcome, policy: &dyn PermissionPolicy) -> (Gated, Vec<String>) {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let hooks: Vec<Arc<dyn Hook>> = vec![
@@ -52,7 +41,7 @@ async fn before(outcome: HookOutcome, policy: &dyn PermissionPolicy) -> (Gated, 
             "second",
         )),
     ];
-    let cx = cx();
+    let cx = crate::test_support::hook_context("/tmp");
     let item = ItemId::from_raw("i");
     let result = gate_call(
         GateInput {

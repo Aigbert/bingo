@@ -12,7 +12,8 @@ use tokio::task::JoinHandle;
 
 use crate::codec::{Message, Notification};
 use crate::methods::{EventParams, EventRefParams, GatewaySessionHeadParams, name};
-use crate::server::bounded::{Kind, Pins, fnv1a64};
+use crate::server::bounded::{Kind, Pins};
+use bingo_sdk::host::fnv1a64;
 
 /// A task draining one stream into one notification method.
 #[derive(Debug)]

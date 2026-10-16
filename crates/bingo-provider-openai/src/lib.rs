@@ -283,7 +283,7 @@ impl OpenAiProvider {
         if response.status().is_success() {
             return Ok((response, clock));
         }
-        Err(refusal(response).await)
+        Err(bingo_http::response::refusal(response, error::classify).await)
     }
 
     async fn json(&self, builder: reqwest::RequestBuilder) -> Result<Value, ProviderError> {
@@ -525,22 +525,6 @@ fn codex_issuer(base: Option<String>) -> Issuer {
             ("originator".into(), ORIGINATOR.into()),
         ],
     }
-}
-
-fn header(response: &reqwest::Response, name: &str) -> Option<String> {
-    response
-        .headers()
-        .get(name)
-        .and_then(|value| value.to_str().ok())
-        .map(str::to_string)
-}
-
-/// A refused response as the error the turn loop's ladder reads.
-async fn refusal(response: reqwest::Response) -> ProviderError {
-    let status = response.status().as_u16();
-    let retry_after = header(&response, "retry-after");
-    let body = response.text().await.unwrap_or_default();
-    error::classify(status, &body, retry_after.as_deref())
 }
 
 fn settings_schema() -> schemars::Schema {

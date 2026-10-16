@@ -140,12 +140,7 @@ fn facts(state: &SessionState, width: usize) -> String {
     {
         parts.push(level.name().into());
     }
-    parts.extend(bingo_sdk::slot::placed(state).into_iter().filter_map(
-        |placed| match placed.slot {
-            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
-            _ => None,
-        },
-    ));
+    parts.extend(bingo_sdk::slot::modes(state));
     let prefix = parts.join(" · ");
     let room = width.saturating_sub(
         unicode_width::UnicodeWidthStr::width(prefix.as_str())

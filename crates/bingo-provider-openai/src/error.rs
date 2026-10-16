@@ -6,6 +6,7 @@
 //! decides is *what kind of failure this was*. Pure — no I/O, no client.
 
 use bingo_sdk::ProviderError;
+use bingo_sdk::provider::error::{message_of, retry_after_ms};
 use serde_json::Value;
 
 /// The code a 400 carries when the conversation outgrew the window. The loop
@@ -38,7 +39,7 @@ pub fn classify(status: u16, body: &str, retry_after: Option<&str>) -> ProviderE
         408 => ProviderError::Timeout,
         429 => ProviderError::RateLimited {
             retry_after_ms: retry_after
-                .and_then(header_delay_ms)
+                .and_then(|value| retry_after_ms(value, jiff::Timestamp::now()))
                 .or_else(|| body_delay_ms(&value)),
         },
         500..600 => ProviderError::Server { status, message },
@@ -82,22 +83,6 @@ fn says_overflow(code: Option<&str>, message: &str) -> bool {
     code == Some(OVERFLOW_CODE) || OVERFLOW_PHRASES.iter().any(|p| message.contains(p))
 }
 
-/// The sentence inside `{"error":{"message":…}}`, or the body as it came.
-/// Printing the envelope is printing punctuation.
-pub fn message_of(body: &str) -> String {
-    let Ok(value) = serde_json::from_str::<Value>(body) else {
-        return body.trim().to_string();
-    };
-    value
-        .pointer("/error/message")
-        .or_else(|| value.pointer("/message"))
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|m| !m.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| body.trim().to_string())
-}
-
 /// `code` names the condition; `type` is the coarse family an error object
 /// without a code still carries.
 pub fn code_in(error: &Value) -> Option<&str> {
@@ -111,18 +96,6 @@ pub fn code_in(error: &Value) -> Option<&str> {
 /// the error itself.
 pub fn code_of(body: &Value) -> Option<&str> {
     code_in(body.get("error").unwrap_or(body))
-}
-
-/// `retry-after` is delay-seconds or an HTTP date (RFC 9110 §10.2.3). A date
-/// already past means "now".
-pub fn header_delay_ms(value: &str) -> Option<u64> {
-    let value = value.trim();
-    if let Ok(seconds) = value.parse::<u64>() {
-        return Some(seconds.saturating_mul(1_000));
-    }
-    let until = jiff::fmt::rfc2822::parse(value).ok()?.timestamp();
-    let millis = until.duration_since(jiff::Timestamp::now()).as_millis();
-    Some(u64::try_from(millis).unwrap_or(0))
 }
 
 /// The delay some endpoints put in the body instead of the header:
@@ -220,20 +193,6 @@ mod tests {
     }
 
     #[test]
-    fn an_http_date_retry_after_becomes_a_delay_and_a_past_date_becomes_zero() {
-        let future = jiff::Timestamp::now() + jiff::SignedDuration::from_secs(120);
-        let header = jiff::fmt::rfc2822::to_string(&future.to_zoned(jiff::tz::TimeZone::UTC))
-            .expect("format an http date");
-        let ms = header_delay_ms(&header).expect("a date parses");
-        assert!(
-            (110_000..=120_000).contains(&ms),
-            "{header} gave {ms}ms, expected about two minutes"
-        );
-        assert_eq!(header_delay_ms("Sun, 06 Nov 1994 08:49:37 GMT"), Some(0));
-        assert_eq!(header_delay_ms("not a date"), None);
-    }
-
-    #[test]
     fn a_400_naming_the_context_length_is_an_overflow_kept_verbatim() {
         let sentence = "This model's maximum context length is 400000 tokens. However, your messages resulted in 431201 tokens.";
         for payload in [
@@ -324,14 +283,6 @@ mod tests {
             },
             "no code prefix: the window is read out of this string"
         );
-    }
-
-    #[test]
-    fn an_error_envelope_is_unwrapped_and_a_bare_body_is_kept() {
-        assert_eq!(message_of(&body("invalid_value", "boom")), "boom");
-        assert_eq!(message_of(r#"{"message":"plain"}"#), "plain");
-        assert_eq!(message_of("  Bad Gateway  "), "Bad Gateway");
-        assert_eq!(message_of("{}"), "{}");
     }
 
     #[test]

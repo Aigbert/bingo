@@ -10,6 +10,7 @@
 // Stdout carries the answer and nothing else; a directory that would not read
 // is a diagnostic on stderr, as every diagnostic is.
 
+use crate::error::invalid;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
@@ -98,9 +99,7 @@ pub fn run(
         | Action::Validate { .. }
         | Action::Test { .. }
         | Action::Types { .. } => {
-            return Err(invalid(
-                "author kit action reached the switch command".into(),
-            ));
+            return Err(invalid("author kit action reached the switch command"));
         }
         Action::List => list_with_uses(&listed, &composed, &settings.kernel.plugin_trust),
         Action::Enable { name } => switched(env, &composed, &listed, name, true)?,
@@ -351,10 +350,6 @@ fn refuse(
         Some(why) => Err(invalid(ignored(name, why))),
         None => Ok(()),
     }
-}
-
-fn invalid(message: String) -> KernelError {
-    KernelError::new(ErrorCode::InvalidInput, message)
 }
 
 #[cfg(test)]

@@ -167,6 +167,16 @@ pub fn placed(state: &SessionState) -> Vec<Placed> {
         .collect()
 }
 
+/// Published mode labels, in the same order as their slots.
+pub fn modes(state: &SessionState) -> impl Iterator<Item = String> {
+    placed(state)
+        .into_iter()
+        .filter_map(|placed| match placed.slot {
+            Slot::Mode { current, .. } => Some(current),
+            _ => None,
+        })
+}
+
 /// The slots the session's policy placed in its own description
 /// (ADR-0009 §5), and nothing a signal or an extension placed: what only
 /// the policy may say, such as the mode a person cycles, is read here.

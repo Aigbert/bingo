@@ -6,13 +6,7 @@ pub fn props(rows: &Rows<'_>) -> Props {
     Props::Welcome(Box::new(WelcomeProps {
         session: rows.state.summary.clone(),
         effort: crate::status::session_facts(rows.state).effort,
-        modes: bingo_sdk::slot::placed(rows.state)
-            .into_iter()
-            .filter_map(|placed| match placed.slot {
-                bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
-                _ => None,
-            })
-            .collect(),
+        modes: bingo_sdk::slot::modes(rows.state).collect(),
         update: rows.update.map(str::to_owned),
         resume: rows.entrance.resume.cloned(),
     }))

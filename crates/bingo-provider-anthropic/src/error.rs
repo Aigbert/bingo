@@ -6,7 +6,7 @@
 //! decides is *what kind of failure this was*. Pure — no I/O, no client.
 
 use bingo_sdk::ProviderError;
-use serde_json::Value;
+use bingo_sdk::provider::error::{message_of, retry_after_ms};
 
 /// A 400 or 413 whose body says one of these is the context window, not a
 /// malformed request: the loop compacts and re-runs the turn instead of
@@ -60,7 +60,8 @@ pub fn classify(status: u16, body: &str, retry_after: Option<&str>) -> ProviderE
         401 | 403 => ProviderError::Auth { message },
         408 => ProviderError::Timeout,
         429 => ProviderError::RateLimited {
-            retry_after_ms: retry_after.and_then(retry_after_ms),
+            retry_after_ms: retry_after
+                .and_then(|value| retry_after_ms(value, jiff::Timestamp::now())),
         },
         500..600 => ProviderError::Server { status, message },
         _ => ProviderError::Request { message },
@@ -148,34 +149,6 @@ fn names_5xx(text: &str) -> bool {
     false
 }
 
-/// The sentence inside `{"error":{"message":…}}`, or the body as it came.
-/// Printing the envelope is printing punctuation.
-pub fn message_of(body: &str) -> String {
-    let Ok(value) = serde_json::from_str::<Value>(body) else {
-        return body.trim().to_string();
-    };
-    value
-        .pointer("/error/message")
-        .or_else(|| value.pointer("/message"))
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|m| !m.is_empty())
-        .map(str::to_string)
-        .unwrap_or_else(|| body.trim().to_string())
-}
-
-/// `retry-after` is delay-seconds or an HTTP date (RFC 9110 §10.2.3). A date
-/// already past means "now".
-pub fn retry_after_ms(value: &str) -> Option<u64> {
-    let value = value.trim();
-    if let Ok(seconds) = value.parse::<u64>() {
-        return Some(seconds.saturating_mul(1_000));
-    }
-    let until = jiff::fmt::rfc2822::parse(value).ok()?.timestamp();
-    let millis = until.duration_since(jiff::Timestamp::now()).as_millis();
-    Some(u64::try_from(millis).unwrap_or(0))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -218,24 +191,6 @@ mod tests {
                 retry_after_ms: None
             }
         );
-    }
-
-    #[test]
-    fn an_http_date_retry_after_becomes_a_delay_and_a_past_date_becomes_zero() {
-        let future = jiff::Timestamp::now() + jiff::SignedDuration::from_secs(120);
-        let header = jiff::fmt::rfc2822::to_string(&future.to_zoned(jiff::tz::TimeZone::UTC))
-            .expect("format an http date");
-        let ms = retry_after_ms(&header).expect("a date parses");
-        assert!(
-            (110_000..=120_000).contains(&ms),
-            "{header} gave {ms}ms, expected about two minutes"
-        );
-        assert_eq!(
-            retry_after_ms("Sun, 06 Nov 1994 08:49:37 GMT"),
-            Some(0),
-            "a date already past means now"
-        );
-        assert_eq!(retry_after_ms("not a date"), None);
     }
 
     #[test]
@@ -334,13 +289,5 @@ mod tests {
             stream_error("weird_error", "name exceeds the maximum of 512 characters"),
             ProviderError::Request { .. }
         ));
-    }
-
-    #[test]
-    fn an_error_envelope_is_unwrapped_and_a_bare_body_is_kept() {
-        assert_eq!(message_of(&body("api_error", "boom")), "boom");
-        assert_eq!(message_of(r#"{"message":"plain"}"#), "plain");
-        assert_eq!(message_of("  gateway timeout  "), "gateway timeout");
-        assert_eq!(message_of("{}"), "{}");
     }
 }

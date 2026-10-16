@@ -22,6 +22,7 @@ mod spawn;
 mod storage;
 mod subscribers;
 
+use bingo_sdk::host::fnv1a64;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -955,16 +956,6 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
         .map(|s| (*s).to_string())
         .or_else(|| payload.downcast_ref::<String>().cloned())
         .unwrap_or_else(|| "unknown panic".into())
-}
-
-/// Stable, non-security integrity check on the exact serialized UTF-8 bytes.
-fn fnv1a64(bytes: &[u8]) -> String {
-    let mut hash = 0xcbf2_9ce4_8422_2325u64;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    format!("{hash:016x}")
 }
 
 #[cfg(test)]

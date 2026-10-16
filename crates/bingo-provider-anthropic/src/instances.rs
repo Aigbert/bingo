@@ -15,11 +15,19 @@ use bingo_sdk::{PluginError, Provider, Registrar};
 
 use crate::settings::{AnthropicEndpoint, Settings};
 use crate::{API_KEY_ENV, AnthropicProvider, BASE_URL_ENV, DEFAULT_BASE_URL, PROVIDER_ID};
-use bingo_auth_oauth::key::{ApiKey, Configured, Places};
+use bingo_auth_oauth::key::{ApiKey, Places};
 
 /// Local reservations are checked before construction; the host skips any
 /// remaining collision across plugins without preventing unrelated providers.
 const BUILT_IN: [&str; 4] = ["anthropic", "codex", "fake", "openai"];
+
+const CONFIG: bingo_auth_oauth::boot::InstanceConfig = bingo_auth_oauth::boot::InstanceConfig {
+    reserved: &BUILT_IN,
+    environment: BASE_URL_ENV,
+    base_url: DEFAULT_BASE_URL,
+};
+#[cfg(test)]
+use bingo_auth_oauth::boot::blank;
 
 /// Every provider the `anthropic` key names, the default first.
 pub fn providers(
@@ -44,7 +52,7 @@ pub fn providers(
     )];
     for (name, endpoint) in settings.anthropic.instances {
         let store = bound(registrar, &store, "anthropic", &name);
-        if !allowed(&mut named, &name, "anthropic", &store, registrar) {
+        if !CONFIG.allowed(&mut named, &name, "anthropic", &store, registrar) {
             continue;
         }
         providers.push(registered(
@@ -97,7 +105,7 @@ fn default_anthropic(
         PROVIDER_ID,
         places.clone(),
         store.clone(),
-        configured(&places, endpoint.api_key, sources, &base_url),
+        CONFIG.configured(&places, endpoint.api_key, sources, &base_url),
     )
     .at_origin("anthropic", &base_url, &file.display().to_string());
     AnthropicProvider::keyed(http, PROVIDER_ID, key, base_url, endpoint.images)
@@ -124,51 +132,10 @@ pub(crate) fn keyed(
         name.clone(),
         places.clone(),
         Arc::new(store.owned_by("anthropic")),
-        configured(&places, endpoint.api_key, sources, &base_url),
+        CONFIG.configured(&places, endpoint.api_key, sources, &base_url),
     )
     .at_origin("anthropic", &base_url, &file.display().to_string());
     AnthropicProvider::keyed(http, name, key, base_url, endpoint.images)
-}
-
-/// The key one endpoint holds before any paste, and the place that held it.
-/// The variable wins over the setting, so one shell can point a run at
-/// another key without editing a file.
-fn configured(
-    places: &Places,
-    from_settings: Option<String>,
-    sources: Option<&ConfigSources>,
-    resolved: &str,
-) -> Option<Configured> {
-    let environment = places
-        .variable
-        .and_then(|_| std::env::var(BASE_URL_ENV).ok());
-    let permitted = |from_environment| {
-        address::configured(
-            sources,
-            &places.setting,
-            if sources.is_some() {
-                DEFAULT_BASE_URL
-            } else {
-                resolved
-            },
-            environment.as_deref(),
-            from_environment,
-        )
-    };
-    if let Some(variable) = places.variable
-        && let Some(key) = blank(std::env::var(variable).ok())
-    {
-        return Some(Configured {
-            key,
-            place: variable.to_string(),
-            address: Some(permitted(true)),
-        });
-    }
-    blank(from_settings).map(|key| Configured {
-        key,
-        place: places.setting.clone(),
-        address: Some(permitted(false)),
-    })
 }
 
 fn bound(
@@ -188,80 +155,12 @@ fn bound(
     Arc::new(endpoint.store(registrar, store))
 }
 
-fn allowed(
-    named: &mut BTreeSet<String>,
-    name: &str,
-    owner: &str,
-    store: &CredentialStore,
-    registrar: &mut Registrar,
-) -> bool {
-    let file = registrar
-        .sources()
-        .source(&[owner, "instances", name])
-        .unwrap_or("settings")
-        .to_string();
-    if let Err(error) = claim(named, name) {
-        let name = bingo_auth_oauth::lifetime::origin(name).unwrap_or_else(|| name.to_string());
-        registrar.notice(
-            "provider.instance",
-            format!("Skipped instance `{name}` in {file}: {error}; rename or delete it there."),
-        );
-        return false;
-    }
-    if store.metadata(name).is_err() {
-        registrar.notice(
-            "provider.credentials",
-            format!(
-                "{} is unreadable; stored keys are unavailable.",
-                store.path().display()
-            ),
-        );
-        return true;
-    }
-    if let Some(entry) = store.metadata(name).ok().flatten()
-        && entry.owner.as_deref() != Some(owner)
-    {
-        let held = entry.owner.as_deref().unwrap_or("an unknown family");
-        registrar.notice("provider.instance", format!(
-            "Skipped instance `{name}` in family `{owner}`: its credential belongs to `{held}`; rename or delete the `{owner}` declaration in {file}."
-        ));
-        return false;
-    }
-    true
-}
-
-/// A name may be claimed once, and never one the build already answers to.
-fn claim(named: &mut BTreeSet<String>, name: &str) -> Result<(), PluginError> {
-    if !bingo_sdk::valid_provider_name(name) {
-        return Err(PluginError::Config(
-            "a provider name uses only ASCII letters, digits, `_` and `-`".into(),
-        ));
-    }
-    if BUILT_IN.contains(&name) {
-        return Err(PluginError::Config(format!(
-            "provider instance `{name}` collides with the built-in provider of that name"
-        )));
-    }
-    if !named.insert(name.to_string()) {
-        return Err(PluginError::Config(format!(
-            "provider instance `{name}` is named twice"
-        )));
-    }
-    Ok(())
-}
-
 /// The first value set to something other than blanks. A blank counts as
 /// unset wherever it is written, so an exported empty variable does not
 /// shadow a configured one.
 #[cfg(test)]
 fn first<const N: usize>(values: [Option<String>; N]) -> Option<String> {
     values.into_iter().find_map(blank)
-}
-
-fn blank(value: Option<String>) -> Option<String> {
-    value
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
 }
 
 #[cfg(test)]
@@ -306,7 +205,9 @@ mod tests {
 
     fn names(taken: &[&str]) -> Result<(), PluginError> {
         let mut named = BTreeSet::new();
-        taken.iter().try_for_each(|name| claim(&mut named, name))
+        taken
+            .iter()
+            .try_for_each(|name| CONFIG.claim(&mut named, name))
     }
 
     fn refusal(taken: &[&str]) -> String {
@@ -355,15 +256,20 @@ mod tests {
             setting: "anthropic.instances.proxy1.apiKey".into(),
             file: None,
         };
-        let held = configured(
-            &places,
-            Some("sk-ant-instance".into()),
-            None,
-            DEFAULT_BASE_URL,
-        )
-        .expect("the setting");
+        let held = CONFIG
+            .configured(
+                &places,
+                Some("sk-ant-instance".into()),
+                None,
+                DEFAULT_BASE_URL,
+            )
+            .expect("the setting");
         assert_eq!(held.key, "sk-ant-instance");
         assert_eq!(held.place, "anthropic.instances.proxy1.apiKey");
-        assert!(configured(&places, Some("   ".into()), None, DEFAULT_BASE_URL).is_none());
+        assert!(
+            CONFIG
+                .configured(&places, Some("   ".into()), None, DEFAULT_BASE_URL)
+                .is_none()
+        );
     }
 }

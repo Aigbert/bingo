@@ -2,6 +2,7 @@
 
 pub mod metered;
 mod redirects;
+pub mod response;
 pub mod sse;
 pub mod stream;
 mod transport;

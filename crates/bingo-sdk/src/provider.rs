@@ -1,5 +1,7 @@
 //! A model provider: one wire protocol, streaming, in the neutral vocabulary.
 
+pub mod error;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;

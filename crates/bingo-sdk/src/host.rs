@@ -827,9 +827,30 @@ impl std::ops::Deref for HostHandle {
     }
 }
 
+/// Checksum of serialized bytes used by bounded history and RPC references.
+pub fn fnv1a64(bytes: &[u8]) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bounded_history_checksums_match_pinned_fnv_vectors() {
+        for (bytes, expected) in [
+            ("", "cbf29ce484222325"),
+            ("a", "af63dc4c8601ec8c"),
+            ("foobar", "85944171f73967e8"),
+        ] {
+            assert_eq!(fnv1a64(bytes.as_bytes()), expected);
+        }
+    }
 
     #[test]
     fn a_value_keeps_object_arguments_and_gives_none_an_object() {

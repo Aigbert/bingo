@@ -10,6 +10,7 @@
 //! layer commits. The typing of a secret is not echoed and the value is never
 //! printed back, here or by `doctor`.
 
+use crate::error::invalid;
 use bingo_channel_adapter::{Platform, Platforms, secret::Requirement};
 use bingo_sdk::{Env, ErrorCode, KernelError};
 use serde_json::Value;
@@ -154,10 +155,6 @@ fn receipt(adapter: &str, variable: &str, path: &std::path::Path) -> String {
         ),
     ]
     .join("\n")
-}
-
-fn invalid(message: impl Into<String>) -> KernelError {
-    KernelError::new(ErrorCode::InvalidInput, message)
 }
 
 #[cfg(test)]

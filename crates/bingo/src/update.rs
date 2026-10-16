@@ -6,6 +6,7 @@
 //! Nothing is ever run with elevated rights: a directory this process may not
 //! write is a failure with `cargo install` in it, not a password prompt.
 
+use crate::error::{internal, invalid};
 use bingo_sdk::{Env, ErrorCode, KernelError};
 use bingo_update::{Release, api, asset, checksums, install};
 
@@ -159,13 +160,5 @@ fn failed(e: &install::InstallError, version: &str) -> KernelError {
         message.push_str("\n  build it there instead: ");
         message.push_str(&api::from_source(version));
     }
-    KernelError::new(ErrorCode::Internal, message)
-}
-
-fn invalid(message: String) -> KernelError {
-    KernelError::new(ErrorCode::InvalidInput, message)
-}
-
-fn internal(message: String) -> KernelError {
     KernelError::new(ErrorCode::Internal, message)
 }

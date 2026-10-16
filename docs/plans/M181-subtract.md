@@ -102,6 +102,13 @@ plugin-rpc `holdsContext` stays until ADR-0076 says otherwise.
 - Keep fixture-distinct TUI snapshots and `ScheduleShelf`, which still serves
   the corruption-recovery test. Eleven byte-identical catalogue twins go.
 
+- Mode labels stay an iterator: multiple placed modes are valid, and placements
+  own their strings. First-mode callers retain their existing default.
+- Pure error parsing lives in SDK (existing JSON/jiff dependencies); HTTP owns
+  response I/O. Provider classification and credential-boundary tests stay.
+- ACP uses the existing loopback token edge and identical comparison/redaction
+  cases; its random-source failure retains the original ACP error message.
+
 ## Verified — 2026-10-16
 
 Commands run in this worktree with disposable HOME/data, provider environment
@@ -115,31 +122,22 @@ exit 0; 6,230 passed, 6 ignored; summed per-test time 525.154 s
 The supplied audit measured 6,226 runs / 1,122.2 s under different load;
 the fresh baseline above is the comparison for this worktree.
 
-Brick gates use `cargo check -p <crates> --all-targets --locked`, then
-`cargo clippy -p <crates> --all-targets --locked -- -D warnings`, then
-`cargo test -p <crates> --locked`, with every touched crate selected.
+Brick gates select every touched crate with `-p`: `cargo check --all-targets
+--locked`, `cargo clippy --all-targets --locked -- -D warnings`, and
+`cargo test --locked`, in that order. Pasted result summaries (exit status):
 
 ```text
-Brick 1 (context, surface-tui): check 0; clippy 0; test 0 (1,422 passed, 2 ignored).
-```
-
-```text
-Brick 2 (core, sdk, provider-acp, provider-openai, surface-rpc, update,
-         mods, plugin-host): check 0; clippy 0; test 0.
-```
-
-```text
-Brick 3 (store-jsonl, mods, bin, surface-rpc, surface-tui, pictures):
-check 0; clippy 0; test 0; all six ignored/manual tests removed.
-```
-
-```text
-Brick 4 (bin and the 18 changed page/manifest/codec owners):
-check 0; clippy 0; test 0 (including all 16 primary page names).
-```
-
-```text
-Brick 5 (surface-tui, rooms, schedule, experience, provider-openai,
-         provider-anthropic, http, tool-fs, tool-bash, tool-web):
-check 0; clippy 0; test 0. Five room tools and five bash endings remain rows.
+Brick 1: context, surface-tui — check 0; clippy 0; test 0 (1422 passed, 2 ignored)
+Brick 2: core, sdk, provider-acp, provider-openai, surface-rpc, update,
+         mods, plugin-host — check 0; clippy 0; test 0
+Brick 3: store-jsonl, mods, bin, surface-rpc, surface-tui, pictures
+         — check 0; clippy 0; test 0; all six ignored/manual tests removed
+Brick 4: bin and all 18 changed page/manifest/codec owners
+         — check 0; clippy 0; test 0; all 16 primary page names retained
+Brick 5: surface-tui, rooms, schedule, experience, provider-openai,
+         provider-anthropic, http, tool-fs, tool-bash, tool-web
+         — check 0; clippy 0; test 0; five room tools and five bash endings retained
+Brick 6: bin, sdk, core, auth-oauth, http, provider-acp, provider-openai,
+         provider-anthropic, permissions, surface-print, surface-rpc, surface-tui
+         — check 0; clippy 0; test 0; SDK gates repeated for fixed checksum vectors
 ```

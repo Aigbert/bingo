@@ -40,7 +40,8 @@ use crate::methods::{
     WireOversizedItem, name,
 };
 use crate::session::{Forwarder, Pump};
-use bounded::{Kind, Pins, fnv1a64};
+use bingo_sdk::host::fnv1a64;
+use bounded::{Kind, Pins};
 
 /// Enough to absorb a burst of frames without letting a slow reader grow it
 /// without bound; a full channel is backpressure on the session's forwarder.

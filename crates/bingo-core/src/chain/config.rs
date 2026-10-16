@@ -77,17 +77,6 @@ mod tests {
             *slot = value;
         }
     }
-    fn cx() -> HookContext {
-        HookContext {
-            session: SessionId::from_raw("s"),
-            turn: None,
-            item: None,
-            cwd: "/".into(),
-            provider: None,
-            model: None,
-            host: testing::NoHost::handle(),
-        }
-    }
     fn mode(label: &str) -> Value {
         json!({"slots":[{"kind":"mode","current":label,
             "modes":[{"label":label,"action":{"name":"permission","args":label}}]}]})
@@ -123,7 +112,13 @@ mod tests {
                     tier: Tier::Rewrite,
                 }];
                 let report = Report::default();
-                let described = describe(given(), &links, &cx(), report.clone()).await;
+                let described = describe(
+                    given(),
+                    &links,
+                    &crate::test_support::hook_context("/"),
+                    report.clone(),
+                )
+                .await;
                 let described = described.unwrap_or_default();
                 assert_eq!(
                     described.policy(),
@@ -148,9 +143,14 @@ mod tests {
             }),
             tier: Tier::Rewrite,
         }];
-        let described = describe(given(), &links, &cx(), Report::default())
-            .await
-            .unwrap();
+        let described = describe(
+            given(),
+            &links,
+            &crate::test_support::hook_context("/"),
+            Report::default(),
+        )
+        .await
+        .unwrap();
         assert_eq!(described.plugins["aaa"], json!({"note": "mine"}));
     }
 }

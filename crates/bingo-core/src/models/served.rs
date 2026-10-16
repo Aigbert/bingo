@@ -9,8 +9,9 @@
 //! One file and not one per provider: a provider id is a name out of the
 //! settings, and a path built from one is a path a settings file can steer.
 
+use super::persist::write_atomically;
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use bingo_sdk::ModelInfo;
@@ -162,15 +163,6 @@ impl ServedModels {
             tracing::warn!(path = %path.display(), error = %e, "served models not saved");
         }
     }
-}
-
-fn write_atomically(path: &Path, lists: &BTreeMap<String, Served>) -> std::io::Result<()> {
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_vec_pretty(lists)?)?;
-    std::fs::rename(tmp, path)
 }
 
 #[cfg(test)]

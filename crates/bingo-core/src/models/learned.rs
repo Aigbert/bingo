@@ -5,8 +5,9 @@
 //! declared tier: the user's word outranks the server, the server outranks
 //! the catalogue.
 
+use super::persist::write_atomically;
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Mutex;
 
 use super::declared::key;
@@ -106,15 +107,6 @@ pub fn window_from_overflow(message: &str) -> Option<u64> {
             .max()
             .and_then(|rejected| sane(rejected.saturating_mul(85) / 100))
     })
-}
-
-fn write_atomically(path: &Path, map: &HashMap<String, u64>) -> std::io::Result<()> {
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
-    }
-    let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, serde_json::to_vec_pretty(map)?)?;
-    std::fs::rename(tmp, path)
 }
 
 fn leading_number(text: &str) -> Option<u64> {

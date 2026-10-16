@@ -23,17 +23,6 @@ impl Hook for Submit {
         self.outcome.clone()
     }
 }
-fn cx() -> HookContext {
-    HookContext {
-        item: None,
-        session: SessionId::from_raw("s"),
-        turn: None,
-        cwd: "/tmp".into(),
-        provider: None,
-        model: None,
-        host: bingo_sdk::testing::NoHost::handle(),
-    }
-}
 async fn submit(outcome: HookOutcome) -> (Verdict, Vec<String>) {
     let seen = Arc::new(Mutex::new(Vec::new()));
     let hooks = HookSet::fixed(vec![
@@ -51,7 +40,7 @@ async fn submit(outcome: HookOutcome) -> (Verdict, Vec<String>) {
     let result = submit_hooks(
         Input::text("x", Origin::surface("test")),
         hooks,
-        cx(),
+        crate::test_support::hook_context("/tmp"),
         crate::chain::Report::default(),
     )
     .await;

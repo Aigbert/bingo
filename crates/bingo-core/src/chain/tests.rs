@@ -52,17 +52,6 @@ impl Interceptor for Wrap {
         Ok(result)
     }
 }
-fn cx() -> HookContext {
-    HookContext {
-        item: None,
-        session: SessionId::from_raw("s"),
-        turn: None,
-        cwd: "/tmp".into(),
-        provider: None,
-        model: None,
-        host: bingo_sdk::testing::NoHost::handle(),
-    }
-}
 fn call() -> ToolCall {
     ToolCall {
         name: "Echo".into(),
@@ -93,7 +82,7 @@ async fn a_failed_or_expired_link_never_runs_its_continuation_twice() {
         let result = run::<tool::Call>(
             &[link(name, Tier::Full)],
             kernel,
-            &cx(),
+            &crate::test_support::hook_context("/tmp"),
             call(),
             report.clone(),
         )
@@ -111,7 +100,7 @@ async fn a_full_link_answers_without_the_kernel_and_receipts_its_name() {
     let result = run::<tool::Call>(
         &[link("answer", Tier::Full)],
         kernel,
-        &cx(),
+        &crate::test_support::hook_context("/tmp"),
         call(),
         report.clone(),
     )
@@ -129,7 +118,7 @@ async fn a_tighten_link_cannot_answer_tool_call() {
     let result = run::<tool::Call>(
         &[link("answer", Tier::Tighten)],
         kernel,
-        &cx(),
+        &crate::test_support::hook_context("/tmp"),
         call(),
         report.clone(),
     )
@@ -155,7 +144,7 @@ async fn a_rewrite_allow_over_nexts_ask_is_skipped() {
     let result = run::<tool::Check>(
         &[link("loosen", Tier::Rewrite)],
         kernel,
-        &cx(),
+        &crate::test_support::hook_context("/tmp"),
         call(),
         report.clone(),
     )
@@ -222,7 +211,7 @@ async fn an_external_links_deadline_excludes_its_continuation() {
     let result = run::<tool::Call>(
         &[link("observer", Tier::Tighten)],
         kernel,
-        &cx(),
+        &crate::test_support::hook_context("/tmp"),
         call(),
         report.clone(),
     )
@@ -242,7 +231,7 @@ async fn draining_a_continuation_is_not_plugin_phase_time() {
     let result = run::<tool::Call>(
         &[link("drain", Tier::Tighten)],
         kernel,
-        &cx(),
+        &crate::test_support::hook_context("/tmp"),
         call(),
         report.clone(),
     )
@@ -290,7 +279,7 @@ async fn a_json_deny_only_answer_never_runs_the_tool() {
                 tier,
             }],
             kernel,
-            &cx(),
+            &crate::test_support::hook_context("/tmp"),
             call(),
             Report::default(),
         )
@@ -314,7 +303,7 @@ async fn a_forwarded_terminal_error_does_not_blame_the_link() {
     let result = run::<tool::Call>(
         &[link("forward", Tier::Full)],
         kernel,
-        &cx(),
+        &crate::test_support::hook_context("/tmp"),
         call(),
         report.clone(),
     )

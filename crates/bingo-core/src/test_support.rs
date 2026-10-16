@@ -774,3 +774,15 @@ impl Agent for ScriptedProvider {
         Ok(Box::pin(stream.map(|event| event.map(AgentEvent::Said))))
     }
 }
+
+pub(crate) fn hook_context(cwd: &str) -> HookContext {
+    HookContext {
+        session: SessionId::from_raw("s"),
+        turn: None,
+        item: None,
+        cwd: cwd.into(),
+        provider: None,
+        model: None,
+        host: bingo_sdk::testing::NoHost::handle(),
+    }
+}

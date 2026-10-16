@@ -67,12 +67,8 @@ fn rows(state: &SessionState) -> Vec<(String, String)> {
 }
 
 fn mode(state: &SessionState) -> String {
-    bingo_sdk::slot::placed(state)
-        .into_iter()
-        .find_map(|placed| match placed.slot {
-            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
-            _ => None,
-        })
+    bingo_sdk::slot::modes(state)
+        .next()
         .unwrap_or_else(|| "default".into())
 }
 

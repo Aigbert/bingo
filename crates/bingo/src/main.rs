@@ -5,6 +5,7 @@ mod acp_proxy;
 mod channels;
 mod composition;
 mod env;
+mod error;
 mod login;
 mod mcp;
 mod plugins;

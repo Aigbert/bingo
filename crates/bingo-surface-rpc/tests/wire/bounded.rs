@@ -14,8 +14,9 @@ use bingo_surface_rpc::methods::{
 };
 use serde_json::{Value, json};
 
-use super::host::{TestHost, fnv1a64, frame, session_id, ts};
+use super::host::{TestHost, frame, session_id, ts};
 use super::{RemoteKernel, Wire};
+use bingo_sdk::host::fnv1a64;
 
 const LINE_LIMIT: usize = 16 * 1024 * 1024;
 
