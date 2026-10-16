@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.I3GrMnq8j7/cwd                                                                       session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /
+   /!              run a shell command
+   /bash.promote   background the running shell command
+   /team           the roles this project seats
+   /room           the rooms under this session, or open one
+   /tasks          the tasks of this session, or of a room's board
+   /experience     what this project has taught the agent
+   /schedule       what fires later, and whether anything will fire it
+   /wake           the wake the model set, and `off` to end it
+   /rewind         go back to a turn: its files and the conversation
+   /models         every model, hidden ones too
+   /provider       manage named providers
+   /clear          start a fresh session here
+   /exit           leave bingo
+   skills
+ ❯ /standup   summarise yesterday's commits for the standup                                                      yours
+   /deploy    deploy the current branch to staging and say what changed                                        project
+   /review    review the current branch to staging and say what changed                                        project
+   /guide     The map of bingo itself: what it is, running it, sessions, the commands the kernel and the…     built in
+   ▸ 29 guides
+   type to search commands, skills, sessions and keys together

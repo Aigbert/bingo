@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.cYKe30LJmP/cwd                                                                       session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /de
+   skills
+ ❯ /deploy       deploy the current branch to staging and say what changed                                     project
+   /guide        The map of bingo itself: what it is, running it, sessions, the commands the kernel and the…  built in
+   guide › ask   Answer questions and forms in place, or replace their built-in mod.
+   guide › acp   Another coding agent driving as a model: the `acp.adapters` rows that spawn one, the `agent` model…
+   · 27 more skills
+   commands
+   /model      model, thinking and providers                                                               fake/fake-1
+   /schedule   what fires later, and whether anything will fire it
+   /models     every model, hidden ones too
+   /modules    plugins on and off, and their trust
+   /provider   manage named providers
+   /compact    summarise older turns
+   /login      sign in to a provider                                                                      3 signed out
+   /logout     forget a provider's key
+   /room       the rooms under this session, or open one
+   /wake       the wake the model set, and `off` to end it
+   keys
+   shift+tab    cycle permission mode                                                                          default
+   alt+m        model, thinking and providers                                                              fake/fake-1

@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ ?
+   keys
+ ❯ shift+tab     cycle permission mode                                 default
+   alt+m         model, thinking and providers                     fake/fake-1
+   alt+t         how hard it thinks                                        off
+   /             commands, in this list
+   ?             keys, in this list
+   ctrl+r        reopen a session
+   esc           sheet → card → dropdown → interrupt
+   ctrl+o        expand result · then all
+   ctrl+t        tasks band on and off
+   ctrl+c        stop · clear · twice exits
+   ctrl+f        read and search conversation turns

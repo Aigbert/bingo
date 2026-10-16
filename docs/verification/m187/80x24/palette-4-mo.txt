@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /mo
+   commands
+ ❯ /model          model, thinking and providers                   fake/fake-1
+   /models         every model, hidden ones too
+   /modules        plugins on and off, and their trust
+   /permission     what it may do without asking                       default
+   /memory         what is remembered, about you and about this project
+   /bash.promote   background the running shell command
+   /wake           the wake the model set, and `off` to end it
+   skills
+   guide › memory     What the agent knows before anybody types and keeps…
+   guide › memory-…   Read and forget memories, instructions and experience.
+   guide › models     Choose models and manage providers in place.

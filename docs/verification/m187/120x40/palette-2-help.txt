@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.cYKe30LJmP/cwd                                                                       session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ ?
+   keys
+ ❯ shift+tab     cycle permission mode                                                                         default
+   alt+m         model, thinking and providers                                                             fake/fake-1
+   alt+t         how hard it thinks                                                                                off
+   /             commands, in this list
+   ?             keys, in this list
+   ctrl+r        reopen a session
+   esc           sheet → card → dropdown → interrupt
+   ctrl+o        expand result · then all
+   ctrl+t        tasks band on and off
+   ctrl+c        stop · clear · twice exits
+   ctrl+f        read and search conversation turns
+   ctrl+n        agents, rooms and tasks in one panel
+   1-9 · y/a/n   answer the open dialog
+   alt+b/f       move one word
+   alt+p         cycle pane place
+   click         a picture · open it
+   ctrl+a/e      line start/end (home · end)
+   ctrl+b        background running command
+   ctrl+d        exit on an empty input

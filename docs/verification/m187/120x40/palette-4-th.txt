@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.cYKe30LJmP/cwd                                                                       session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /th
+   commands
+ ❯ /think          how hard it thinks                                                                              off
+   /model          model, thinking and providers                                                           fake/fake-1
+   /permission     what it may do without asking                                                               default
+   /rename         name this session
+   /plugins        plugins on and off, and their trust
+   /mcp            MCP servers and their tools
+   /agents         sub-agents of this session
+   /memory         what is remembered, about you and about this project
+   /help           keys, in this list
+   /bash.promote   background the running shell command
+   /team           the roles this project seats
+   /room           the rooms under this session, or open one
+   /tasks          the tasks of this session, or of a room's board
+   /experience     what this project has taught the agent
+   /schedule       what fires later, and whether anything will fire it
+   /wake           the wake the model set, and `off` to end it
+   /rewind         go back to a turn: its files and the conversation
+   skills
+   guide › mods-sw…   List, enable and disable plugins; immediate switches, next-start reasons, and repository…

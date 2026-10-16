@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /rename
+   /rename  name this session
+ ❯ a name for this session
+
+
+
+
+
+
+
+
+
+

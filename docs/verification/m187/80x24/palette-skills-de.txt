@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /de
+   skills
+ ❯ /deploy       deploy the current branch to staging and say what…    project
+   /guide        The map of bingo itself: what it is, running it,…    built in
+   guide › ask   Answer questions and forms in place, or replace their…
+   guide › acp   Another coding agent driving as a model: the `acp.adapters`…
+   · 27 more skills
+   commands
+   /model      model, thinking and providers                       fake/fake-1
+   /schedule   what fires later, and whether anything will fire it
+   /models     every model, hidden ones too
+   /modules    plugins on and off, and their trust
+   /provider   manage named providers

@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /permission
+   /permission  what it may do without asking
+ ❯ default                                                                 now
+   accept edits  acceptEdits
+   plan
+   bypass  bypassPermissions
+   don't ask  dontAsk
+   forget
+
+
+
+
+

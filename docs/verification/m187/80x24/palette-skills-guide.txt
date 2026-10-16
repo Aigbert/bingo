@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /guide
+   skills
+ ❯ /guide           The map of bingo itself: what it is, running it,… built in
+   guide › ask      Answer questions and forms in place, or replace their…
+   guide › acp      Another coding agent driving as a model: the…
+   guide › agents   Sub-agents as child sessions: how `SpawnAgent` staffs…
+   · 26 more skills
+
+
+
+
+
+

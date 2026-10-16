@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /model
+   /model  model, thinking and providers
+ ❯ fake-1                                                                  now
+   claude-fable-5
+   claude-fable-5-1
+   claude-haiku-4-5
+   claude-haiku-4-5-20251001
+   claude-haiku-5-5
+   claude-opus-4-5
+   claude-opus-4-5-20251101
+   claude-opus-4-6
+   claude-opus-4-7
+   claude-opus-4-8

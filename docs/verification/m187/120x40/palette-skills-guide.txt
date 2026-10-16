@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.cYKe30LJmP/cwd                                                                       session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /guide
+   skills
+ ❯ /guide           The map of bingo itself: what it is, running it, sessions, the commands the kernel and…   built in
+   guide › ask      Answer questions and forms in place, or replace their built-in mod.
+   guide › acp      Another coding agent driving as a model: the `acp.adapters` rows that spawn one, the `agent`…
+   guide › agents   Sub-agents as child sessions: how `SpawnAgent` staffs one and what becomes of its answer, how…
+   · 26 more skills
+
+
+
+
+
+
+
+
+
+
+
+
+
+

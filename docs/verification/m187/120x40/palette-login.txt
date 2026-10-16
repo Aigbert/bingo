@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.cYKe30LJmP/cwd                                                                       session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /login
+   /login  sign in to a provider
+ ❯ fake
+   anthropic                                                                                              ○ signed out
+   openai                                                                                                 ○ signed out
+   codex                                                                                                  ○ signed out
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

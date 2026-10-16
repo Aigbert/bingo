@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /th
+   commands
+ ❯ /think          how hard it thinks                                      off
+   /model          model, thinking and providers                   fake/fake-1
+   /permission     what it may do without asking                       default
+   /rename         name this session
+   /plugins        plugins on and off, and their trust
+   /mcp            MCP servers and their tools
+   /agents         sub-agents of this session
+   /memory         what is remembered, about you and about this project
+   /help           keys, in this list
+   /bash.promote   background the running shell command
+   /team           the roles this project seats

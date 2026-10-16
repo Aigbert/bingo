@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.I3GrMnq8j7/cwd                                                                       session 01M5
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ /
+   /help           keys, in this list
+   /sessions       find every session
+   /browse         read and search conversation turns
+   /crew           agents, rooms and tasks in one panel
+   /!              run a shell command
+   /bash.promote   background the running shell command
+   /team           the roles this project seats
+   /room           the rooms under this session, or open one
+   /tasks          the tasks of this session, or of a room's board
+   /experience     what this project has taught the agent
+   /schedule       what fires later, and whether anything will fire it
+   /wake           the wake the model set, and `off` to end it
+   /rewind         go back to a turn: its files and the conversation
+   /models         every model, hidden ones too
+   /provider       manage named providers
+   /clear          start a fresh session here
+   /exit           leave bingo
+   skills
+ ❯ ▸ 4 skills · 29 guides
+   type to search commands, skills, sessions and keys together

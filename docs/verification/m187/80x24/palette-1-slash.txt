@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /
+   commands
+ ❯ /model          model, thinking and providers                   fake/fake-1
+   /think          how hard it thinks                                      off
+   /permission     what it may do without asking                       default
+   /rename         name this session
+   /compact        summarise older turns
+   /resume         reopen a session
+   /login          sign in to a provider                          3 signed out
+   /logout         forget a provider's key
+   /status         session, context and cost
+   /plugins        plugins on and off, and their trust
+   type to search commands, skills, sessions and keys together

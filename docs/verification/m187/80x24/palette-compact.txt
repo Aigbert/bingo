@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.IxNzl8FrZ0/cwd                               session 01M5
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ /compact
+   /compact  summarise older turns
+ ❯ optional: what the summary must keep
+
+
+
+
+
+
+
+
+
+
