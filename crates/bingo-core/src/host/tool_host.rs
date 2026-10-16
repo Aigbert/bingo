@@ -23,6 +23,15 @@ impl Prompter for SessionToolHost {
 
 #[async_trait]
 impl ToolHost for SessionToolHost {
+    async fn ask_for(
+        &self,
+        item: &ItemId,
+        kind: InteractionKind,
+        answers: Vec<AnswerSpec>,
+    ) -> Result<Answer, KernelError> {
+        self.mailbox.ask(Some(item.clone()), kind, answers).await
+    }
+
     fn progress(&self, item: &ItemId, tail: String) {
         self.mailbox.progress(item.clone(), tail);
     }

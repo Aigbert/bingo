@@ -22,6 +22,7 @@ mod models;
 mod plugin_approval;
 mod policy;
 mod providers;
+mod question_receipt;
 mod queue;
 mod reserved;
 mod resume;

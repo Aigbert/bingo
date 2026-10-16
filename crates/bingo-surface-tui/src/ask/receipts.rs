@@ -77,6 +77,7 @@ pub fn folded(state: &SessionState) -> Option<String> {
         .transcript
         .items()
         .iter()
+        .map(AsRef::as_ref)
         .filter(|item| item.turn.as_ref() == Some(&turn.id))
         .collect();
     let receipts: Vec<_> = items.iter().filter_map(|item| label(&item.body)).collect();
@@ -88,7 +89,27 @@ pub fn folded(state: &SessionState) -> Option<String> {
         .iter()
         .filter(|item| matches!(item.body, ItemBody::ToolCall { .. }))
         .collect();
-    let ran = steps
+    let ran = ran(state, &steps);
+    let noun = if steps.len() == 1 { "step" } else { "steps" };
+    let ending = if stopped {
+        format!(" · stopped · {ran} of {} {noun} had run", steps.len())
+    } else {
+        String::new()
+    };
+    let answers = if receipts.is_empty() {
+        String::new()
+    } else {
+        format!(" · {}", receipts.join(" · "))
+    };
+    Some(format!(
+        "{} {} {noun}{ending}{answers}",
+        theme::glyphs().point,
+        steps.len()
+    ))
+}
+
+fn ran(state: &SessionState, steps: &[&&Item]) -> usize {
+    steps
         .iter()
         .filter(|item| {
             !linked(state, &item.id).any(|receipt| {
@@ -104,20 +125,5 @@ pub fn folded(state: &SessionState) -> Option<String> {
                 bingo_sdk::ItemStatus::Completed | bingo_sdk::ItemStatus::Failed
             )
         })
-        .count();
-    let ending = if stopped {
-        format!(" · stopped · {ran} of {} steps had run", steps.len())
-    } else {
-        String::new()
-    };
-    let answers = if receipts.is_empty() {
-        String::new()
-    } else {
-        format!(" · {}", receipts.join(" · "))
-    };
-    Some(format!(
-        "{} {} steps{ending}{answers}",
-        theme::glyphs().point,
-        steps.len()
-    ))
+        .count()
 }

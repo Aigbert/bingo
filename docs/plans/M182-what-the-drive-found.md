@@ -45,6 +45,7 @@ drive bugs are gone, each with a test that failed before the fix.
 - `crates/bingo-mod-palette`, `crates/bingo-mod-models/{card.rs,keys.rs,rows.rs,commands.rs}`, `crates/bingo-mod-ask`.
 - `crates/bingo-core/src/host/catalog.rs`, interaction receipts, `bingo-tool-fs/src/ask.rs`,
   the TUI crate guide, and isolated question smoke coverage.
+- `bingo-sdk/src/tool.rs`, core executor call binding and `host/tool_host.rs`.
 
 ## Exit criteria
 
@@ -81,3 +82,8 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
   Escape from a draft set aside returns to its ask, as ADR-0095 §4 requires.
 - An interaction that does not offer `Cancel` cannot accept a skip. Preserve its
   interrupt-only escape route; do not invent an unsupported answer or trap focus.
+- The extra Form block comes from a missing source item on tool questions.
+  Bind the executor's call prompter to its existing item and carry it through
+  `ToolHost::ask_for` (defaulting to `ask` for existing hosts). This repairs the
+  receipt link for every tool without guessing from text or tool names. The
+  TUI's existing linked-receipt rendering then owns the one receipt.

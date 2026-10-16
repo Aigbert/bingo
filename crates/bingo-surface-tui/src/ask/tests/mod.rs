@@ -323,3 +323,39 @@ fn escaping_questions_and_forms_skips_without_stopping() {
         assert!(crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now).is_empty());
     }
 }
+
+#[test]
+fn a_single_answered_step_uses_the_singular() {
+    let receipt = item(
+        "answer",
+        ItemStatus::Completed,
+        bingo_sdk::ItemBody::QuestionAnswer {
+            item: Some(bingo_sdk::ItemId::from_raw("call")),
+            interaction: bingo_sdk::InteractionId::from_raw("q"),
+            question: "Form".into(),
+            answer: "Beta".into(),
+        },
+    );
+    let state = folded(vec![
+        frame(1, started("trn_1")),
+        frame(
+            2,
+            bingo_sdk::Event::ItemCompleted {
+                item: tool(
+                    "call",
+                    "AskUserQuestion",
+                    json!({}),
+                    Some(bingo_sdk::ToolOutput::text("The user answered: Beta")),
+                    ItemStatus::Completed,
+                ),
+            },
+        ),
+        frame(3, bingo_sdk::Event::ItemCompleted { item: receipt }),
+        frame(4, completed("trn_1", bingo_sdk::TurnStatus::Completed)),
+    ]);
+    let text = super::receipts::folded(&state).unwrap();
+    assert!(text.contains("1 step ·"), "{text}");
+    let (mut ui, now) = scene();
+    let screen = draw_sized(108, 30, &state, &mut ui, still(now));
+    assert!(!screen.contains("⏺ Form"), "{screen}");
+}

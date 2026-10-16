@@ -204,6 +204,16 @@ impl ToolContext {
 /// (ADR-0011 §3).
 #[async_trait]
 pub trait ToolHost: Prompter {
+    /// Ask on behalf of the running item; older hosts retain their ask behavior.
+    async fn ask_for(
+        &self,
+        _item: &ItemId,
+        kind: crate::InteractionKind,
+        answers: Vec<crate::AnswerSpec>,
+    ) -> Result<crate::Answer, crate::KernelError> {
+        self.ask(kind, answers).await
+    }
+
     fn progress(&self, item: &ItemId, tail: String);
     /// Record an item outside the call (a background completion, a notice).
     async fn record(&self, body: ItemBody) -> Result<ItemId, KernelError>;

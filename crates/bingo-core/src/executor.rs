@@ -14,6 +14,8 @@ use std::time::Instant;
 use bingo_sdk::*;
 use futures::future::join_all;
 
+mod asking;
+
 pub const MAX_CONCURRENCY: usize = 10;
 pub const MAX_RESULT_CHARS: usize = 50_000;
 pub const INTERRUPTED_MARKER: &str = "[Request interrupted by user for tool use]";
@@ -145,6 +147,7 @@ async fn run_one(
     cancel: &CancellationToken,
     dispatch: Option<&Dispatch<'_>>,
 ) -> ToolOutcome {
+    let cx = asking::bind(cx);
     let started = Instant::now();
     let finish = |output: ToolOutput, status: ItemStatus| ToolOutcome {
         item: pc.item.clone(),

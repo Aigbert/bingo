@@ -549,6 +549,10 @@ pane
 keys C-g
 press_until '2' 'Question done.'
 await 'you: Route: Beta'
+if pane | grep -qF '⏺ Form'; then
+  echo 'tui-smoke: question answer has a second Form receipt' >&2
+  exit 1
+fi
 pane
 finish
 
