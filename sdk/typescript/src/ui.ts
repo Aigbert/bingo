@@ -56,8 +56,29 @@ export class Handlers {
 }
 
 import type { HookSite, Tone, Level, InteractionKind, AnswerSpec, Answer, Slot, SurfaceName, PanePlace, PaneSize } from './wire.ts';
-export type OpenPane = {id: string; title: string; focus?: boolean; closeOnEscape?: boolean; holdToasts?: boolean; rows?: number; place?: PanePlace[]; size?: PaneSize; props?: unknown};
-export function ui(rpc: Rpc, site: HookSite) {
+import type { DollarCalls } from './dollar-types.ts';
+// Each comment is the Rust `Open` field's doc; a test in ui.rs pins them.
+export type OpenPane = {
+  /** The pane's id; a `ui.render` hook sees it as `requestId`. */
+  id: string;
+  /** The title shown on the pane. */
+  title: string;
+  /** Take keyboard focus when shown; `true` unless given. */
+  focus?: boolean;
+  /** Escape closes the pane; `true` unless given. */
+  closeOnEscape?: boolean;
+  /** Hold toasts while the pane is shown; they appear after it closes unless expired. */
+  holdToasts?: boolean;
+  /** Height in rows when `size` is not given; 8 unless given. */
+  rows?: number;
+  /** Where the pane may sit, in order of preference; `['above']` unless given. */
+  place?: PanePlace[];
+  /** Rows and columns, each fixed or a share of the screen. */
+  size?: PaneSize;
+  /** Facts handed to the `ui.render` hook as `props`. */
+  props?: unknown;
+};
+export function ui(rpc: Rpc, site: HookSite): DollarCalls['ui'] {
   const call = <T>(method: string, params: unknown): Promise<T> =>
     rpc.request<{result:T}>('service/call', {key:'bingo.plugin.ui', method, params}).then(reply => reply.result);
   const toast = (method: string, text: string, options: {duration?:number} = {}) =>
@@ -85,7 +106,7 @@ export function ui(rpc: Rpc, site: HookSite) {
 // References cross the hook's synchronous expression; only resolved elements cross the wire.
 const elements = new WeakMap<object, Promise<string>>();
 type ElementReference = Readonly<object>;
-type ElementTable = Record<string, string | ElementReference> & PromiseLike<Record<string, string>>;
+export type ElementTable = Record<string, string | ElementReference> & PromiseLike<Record<string, string>>;
 function elementReferences(table: Promise<Record<string, string>>): ElementTable {
   void table.catch(() => {});
   const references = new Map<string, ElementReference>();

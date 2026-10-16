@@ -1,5 +1,6 @@
 //! The host nouns, defined once for both transports.
 mod client;
+pub mod nouns;
 mod params;
 pub mod read;
 mod runtime;

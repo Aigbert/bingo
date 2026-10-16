@@ -36,20 +36,29 @@ pub(crate) fn install(
 #[serde(rename_all = "camelCase")]
 struct Open {
     session: SessionId,
+    /// The pane's id; a `ui.render` hook sees it as `requestId`.
     id: String,
+    /// The title shown on the pane.
     title: String,
+    /// Take keyboard focus when shown; `true` unless given.
     #[serde(default = "yes")]
     focus: bool,
+    /// Escape closes the pane; `true` unless given.
     #[serde(default = "yes")]
     close_on_escape: bool,
+    /// Hold toasts while the pane is shown; they appear after it closes unless expired.
     #[serde(default)]
     hold_toasts: bool,
+    /// Height in rows when `size` is not given; 8 unless given.
     #[serde(default)]
     rows: Option<u16>,
+    /// Where the pane may sit, in order of preference; `['above']` unless given.
     #[serde(default = "bingo_sdk::slot::above")]
     place: Vec<bingo_sdk::slot::Place>,
+    /// Rows and columns, each fixed or a share of the screen.
     #[serde(default)]
     size: Option<bingo_sdk::slot::PaneSize>,
+    /// Facts handed to the `ui.render` hook as `props`.
     #[serde(default)]
     props: Value,
 }
@@ -65,6 +74,7 @@ struct Close {
 struct Toast {
     session: SessionId,
     text: String,
+    /// Milliseconds the toast stays; 4000 unless given.
     #[serde(default = "duration")]
     duration: u64,
 }
@@ -323,6 +333,21 @@ async fn remember(memory: &choices::Memory, caller: &Caller, pane: &str, open: b
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_authors_open_pane_type_carries_the_rust_field_docs() {
+        let schema = schemars::schema_for!(Open).to_value();
+        let typescript = include_str!("../../../sdk/typescript/src/ui.ts");
+        let fields = schema["properties"].as_object().unwrap();
+        assert!(fields.len() > 5);
+        for (name, field) in fields.iter().filter(|(name, _)| *name != "session") {
+            let doc = field["description"].as_str().expect(name);
+            assert!(
+                typescript.contains(&format!("  /** {doc} */\n  {name}")),
+                "OpenPane.{name} must carry the doc of Open.{name}: {doc}"
+            );
+        }
+    }
     #[tokio::test]
     async fn opening_publishes_a_pulled_pane_and_cannot_spoof_asked() {
         let root = tempfile::tempdir().unwrap();

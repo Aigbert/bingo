@@ -1,6 +1,7 @@
 export type { Register, On, Hook, Next } from './on.ts';
 export type { Dollar, WithServices } from './dollar.ts';
 export type * from './events.ts';
+export type * as Wire from './wire.ts';
 export { h, Fragment } from './elements';
 export type { Element } from './elements';
 import type { Dollar } from './dollar.ts';

@@ -215,55 +215,64 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/TextChild"
-              }
+              },
+              "description": "Strings and nested `Text` nodes, drawn in order."
             },
             "color": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme."
             },
             "dimColor": {
               "type": [
                 "boolean",
                 "null"
-              ]
+              ],
+              "description": "Draw the text dimmed."
             },
             "bold": {
               "type": [
                 "boolean",
                 "null"
-              ]
+              ],
+              "description": "Draw the text bold."
             },
             "italic": {
               "type": [
                 "boolean",
                 "null"
-              ]
+              ],
+              "description": "Draw the text in italics."
             },
             "underline": {
               "type": [
                 "boolean",
                 "null"
-              ]
+              ],
+              "description": "Underline the text."
             },
             "strikethrough": {
               "type": [
                 "boolean",
                 "null"
-              ]
+              ],
+              "description": "Strike the text through."
             },
             "inverse": {
               "type": [
                 "boolean",
                 "null"
-              ]
+              ],
+              "description": "Swap the foreground and background colours."
             },
             "wrap": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "`wrap` breaks long lines at the width; `truncate` cuts them."
             },
             "kind": {
               "type": "string",
@@ -273,16 +282,19 @@
           "required": [
             "kind",
             "children"
-          ]
+          ],
+          "description": "A run of text: strings and nested `Text` nodes, which keep their own style."
         },
         {
           "type": "object",
           "properties": {
             "text": {
-              "type": "string"
+              "type": "string",
+              "description": "The Markdown source."
             },
             "dimColor": {
-              "type": "boolean"
+              "type": "boolean",
+              "description": "Draw it dimmed."
             },
             "kind": {
               "type": "string",
@@ -292,7 +304,8 @@
           "required": [
             "kind",
             "text"
-          ]
+          ],
+          "description": "Markdown text the surface renders."
         },
         {
           "type": "object",
@@ -301,10 +314,12 @@
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "The language name for highlighting, such as `rust`."
             },
             "source": {
-              "type": "string"
+              "type": "string",
+              "description": "The code itself."
             },
             "kind": {
               "type": "string",
@@ -314,13 +329,15 @@
           "required": [
             "kind",
             "source"
-          ]
+          ],
+          "description": "A block of source code."
         },
         {
           "type": "object",
           "properties": {
             "unified": {
-              "type": "string"
+              "type": "string",
+              "description": "The diff in unified format."
             },
             "kind": {
               "type": "string",
@@ -330,7 +347,8 @@
           "required": [
             "kind",
             "unified"
-          ]
+          ],
+          "description": "A diff drawn with added and removed lines marked."
         },
         {
           "type": "object",
@@ -339,7 +357,8 @@
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "One string per item."
             },
             "kind": {
               "type": "string",
@@ -349,7 +368,8 @@
           "required": [
             "kind",
             "items"
-          ]
+          ],
+          "description": "A bulleted list of lines."
         },
         {
           "type": "object",
@@ -358,7 +378,8 @@
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "The column headings."
             },
             "rows": {
               "type": "array",
@@ -367,7 +388,8 @@
                 "items": {
                   "type": "string"
                 }
-              }
+              },
+              "description": "One array of cells per row, in column order."
             },
             "kind": {
               "type": "string",
@@ -378,7 +400,8 @@
             "kind",
             "headers",
             "rows"
-          ]
+          ],
+          "description": "A table of strings."
         },
         {
           "type": "object",
@@ -397,7 +420,8 @@
                 ],
                 "minItems": 2,
                 "maxItems": 2
-              }
+              },
+              "description": "`[label, value]` pairs, in order."
             },
             "kind": {
               "type": "string",
@@ -407,7 +431,8 @@
           "required": [
             "kind",
             "rows"
-          ]
+          ],
+          "description": "Aligned label and value pairs."
         },
         {
           "type": "object",
@@ -415,7 +440,8 @@
             "value": {
               "type": "integer",
               "format": "uint64",
-              "minimum": 0
+              "minimum": 0,
+              "description": "How much is done."
             },
             "total": {
               "type": [
@@ -423,13 +449,15 @@
                 "null"
               ],
               "format": "uint64",
-              "minimum": 0
+              "minimum": 0,
+              "description": "The whole; without it the surface shows a count."
             },
             "label": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "Text drawn beside the bar."
             },
             "kind": {
               "type": "string",
@@ -439,16 +467,19 @@
           "required": [
             "kind",
             "value"
-          ]
+          ],
+          "description": "A progress bar, or a count when there is no total."
         },
         {
           "type": "object",
           "properties": {
             "text": {
-              "type": "string"
+              "type": "string",
+              "description": "The label."
             },
             "tone": {
               "$ref": "#/$defs/Tone",
+              "description": "`neutral`, `good`, `bad` or `attention`; the surface picks the colour.",
               "default": "neutral"
             },
             "kind": {
@@ -459,7 +490,8 @@
           "required": [
             "kind",
             "text"
-          ]
+          ],
+          "description": "A short label coloured by its tone."
         },
         {
           "type": "object",
@@ -468,7 +500,8 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/TreeNode"
-              }
+              },
+              "description": "The top-level nodes."
             },
             "kind": {
               "type": "string",
@@ -478,7 +511,8 @@
           "required": [
             "kind",
             "nodes"
-          ]
+          ],
+          "description": "An indented tree of labelled nodes."
         },
         {
           "type": "object",
@@ -487,7 +521,8 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/View"
-              }
+              },
+              "description": "The views inside, in order."
             },
             "question": {
               "anyOf": [
@@ -518,13 +553,15 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "A handler for a key pressed while this box's pane has focus; return `{handled: false}` to give the key back."
             },
             "key": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "A stable identity among siblings."
             },
             "flexDirection": {
               "anyOf": [
@@ -534,7 +571,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "`row` or `column` (the default)."
             },
             "flexGrow": {
               "type": [
@@ -543,7 +581,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "How much of the spare room this box takes; `0` takes none."
             },
             "flexWrap": {
               "anyOf": [
@@ -553,7 +592,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "`wrap` lets children flow onto another line."
             },
             "alignItems": {
               "anyOf": [
@@ -563,7 +603,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "Cross-axis alignment: `flex-start`, `center`, `flex-end` or `stretch`."
             },
             "justifyContent": {
               "anyOf": [
@@ -573,7 +614,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "Main-axis distribution, such as `flex-start` or `space-between`."
             },
             "gap": {
               "type": [
@@ -582,7 +624,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "Cells between children."
             },
             "width": {
               "type": [
@@ -591,7 +634,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The width in cells."
             },
             "height": {
               "type": [
@@ -600,7 +644,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The height in rows."
             },
             "margin": {
               "type": [
@@ -609,7 +654,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "Cells outside the box on every side."
             },
             "marginX": {
               "type": [
@@ -618,7 +664,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "Cells outside the box on the left and right."
             },
             "marginY": {
               "type": [
@@ -627,7 +674,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "Rows outside the box above and below."
             },
             "padding": {
               "type": [
@@ -636,7 +684,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "Cells inside the box on every side."
             },
             "paddingX": {
               "type": [
@@ -645,7 +694,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "Cells inside the box on the left and right."
             },
             "paddingY": {
               "type": [
@@ -654,25 +704,29 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "Rows inside the box above and below."
             },
             "borderStyle": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "Any value but `none` draws a border."
             },
             "borderColor": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "The border colour."
             },
             "display": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "`none` hides the box and its controls."
             },
             "kind": {
               "type": "string",
@@ -682,16 +736,19 @@
           "required": [
             "kind",
             "children"
-          ]
+          ],
+          "description": "A flex container: lays its children out in a row or a column."
         },
         {
           "type": "object",
           "properties": {
             "title": {
-              "type": "string"
+              "type": "string",
+              "description": "The heading."
             },
             "child": {
-              "$ref": "#/$defs/View"
+              "$ref": "#/$defs/View",
+              "description": "The view inside."
             },
             "kind": {
               "type": "string",
@@ -702,7 +759,8 @@
             "kind",
             "title",
             "child"
-          ]
+          ],
+          "description": "One view under a title."
         },
         {
           "type": "object",
@@ -711,7 +769,8 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/ActionItem"
-              }
+              },
+              "description": "The buttons, in order."
             },
             "kind": {
               "type": "string",
@@ -721,7 +780,8 @@
           "required": [
             "kind",
             "items"
-          ]
+          ],
+          "description": "A row of buttons that each run a named action."
         },
         {
           "type": "object",
@@ -730,19 +790,22 @@
               "type": "array",
               "items": {
                 "$ref": "#/$defs/TextChild"
-              }
+              },
+              "description": "The button's text, when `label` is not given."
             },
             "key": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "A stable identity among siblings."
             },
             "label": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "The button's text."
             },
             "hotkey": {
               "type": [
@@ -750,19 +813,22 @@
                 "null"
               ],
               "minLength": 1,
-              "maxLength": 1
+              "maxLength": 1,
+              "description": "One letter: pressed with Alt in a band, or alone in a focused pane, it presses the button."
             },
             "dimColor": {
               "type": [
                 "boolean",
                 "null"
-              ]
+              ],
+              "description": "Draw the button dimmed."
             },
             "variant": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "`primary` draws it bold, `danger` in the alarm colour."
             },
             "onPress": {
               "anyOf": [
@@ -772,7 +838,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "The handler run when the button is pressed: a mod passes a function."
             },
             "kind": {
               "type": "string",
@@ -781,7 +848,8 @@
           },
           "required": [
             "kind"
-          ]
+          ],
+          "description": "A pressable control; a mod's `onPress` runs when it is pressed."
         },
         {
           "type": "object",
@@ -790,25 +858,29 @@
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "A stable identity among siblings."
             },
             "label": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "Text before the field."
             },
             "placeholder": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "Text shown while the field is empty."
             },
             "value": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "The text in the field."
             },
             "onInput": {
               "anyOf": [
@@ -818,7 +890,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "The handler run as the text changes: a mod passes a function."
             },
             "onSubmit": {
               "anyOf": [
@@ -828,7 +901,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "The handler run when the person presses Enter: a mod passes a function."
             },
             "kind": {
               "type": "string",
@@ -837,7 +911,8 @@
           },
           "required": [
             "kind"
-          ]
+          ],
+          "description": "A one-line text field."
         },
         {
           "type": "object",
@@ -846,19 +921,22 @@
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "A stable identity among siblings."
             },
             "label": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "Text before the choice."
             },
             "value": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "The chosen option's `value`."
             },
             "options": {
               "type": [
@@ -867,7 +945,8 @@
               ],
               "items": {
                 "$ref": "#/$defs/SelectOption"
-              }
+              },
+              "description": "The choices, each `{label, value}`."
             },
             "onSelect": {
               "anyOf": [
@@ -877,7 +956,8 @@
                 {
                   "type": "null"
                 }
-              ]
+              ],
+              "description": "The handler run with the chosen value: a mod passes a function."
             },
             "kind": {
               "type": "string",
@@ -886,19 +966,22 @@
           },
           "required": [
             "kind"
-          ]
+          ],
+          "description": "A choice among options."
         },
         {
           "type": "object",
           "properties": {
             "href": {
-              "type": "string"
+              "type": "string",
+              "description": "The URL."
             },
             "label": {
               "type": [
                 "string",
                 "null"
-              ]
+              ],
+              "description": "The text shown; the URL when absent."
             },
             "kind": {
               "type": "string",
@@ -908,16 +991,19 @@
           "required": [
             "kind",
             "href"
-          ]
+          ],
+          "description": "A link the person can open."
         },
         {
           "type": "object",
           "properties": {
             "source": {
-              "type": "string"
+              "type": "string",
+              "description": "A path or a `data:` URL."
             },
             "alt": {
-              "type": "string"
+              "type": "string",
+              "description": "Text shown where the image cannot be."
             },
             "columns": {
               "type": [
@@ -926,7 +1012,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The width in terminal columns."
             },
             "rows": {
               "type": [
@@ -935,7 +1022,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The height in terminal rows."
             },
             "kind": {
               "type": "string",
@@ -946,7 +1034,8 @@
             "kind",
             "source",
             "alt"
-          ]
+          ],
+          "description": "A picture; surfaces that cannot draw it show `alt`."
         },
         {
           "type": "object",
@@ -955,19 +1044,22 @@
               "type": "integer",
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The width in cells."
             },
             "rows": {
               "type": "integer",
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The height in cells."
             },
             "cells": {
               "type": "array",
               "items": {
                 "type": "string"
-              }
+              },
+              "description": "The cells, row by row."
             },
             "kind": {
               "type": "string",
@@ -979,16 +1071,19 @@
             "columns",
             "rows",
             "cells"
-          ]
+          ],
+          "description": "A grid of character cells, drawn by terminals only."
         },
         {
           "type": "object",
           "properties": {
             "source": {
-              "type": "string"
+              "type": "string",
+              "description": "The SVG markup."
             },
             "alt": {
-              "type": "string"
+              "type": "string",
+              "description": "Text shown where the drawing cannot be."
             },
             "width": {
               "type": [
@@ -997,7 +1092,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The width in pixels."
             },
             "height": {
               "type": [
@@ -1006,7 +1102,8 @@
               ],
               "format": "uint16",
               "minimum": 0,
-              "maximum": 65535
+              "maximum": 65535,
+              "description": "The height in pixels."
             },
             "kind": {
               "type": "string",
@@ -1017,15 +1114,19 @@
             "kind",
             "source",
             "alt"
-          ]
+          ],
+          "description": "An SVG drawing, for surfaces that draw vectors; others show `alt`."
         },
         {
           "type": "object",
           "properties": {
             "component": {
-              "$ref": "#/$defs/Component"
+              "$ref": "#/$defs/Component",
+              "description": "The component bingo draws, such as `ToolUse`."
             },
-            "props": true,
+            "props": {
+              "description": "That component's props, as its `ui.render` event carried them."
+            },
             "kind": {
               "type": "string",
               "const": "Engine"
@@ -1035,17 +1136,22 @@
             "kind",
             "component",
             "props"
-          ]
+          ],
+          "description": "bingo's own drawing of a component, placed inside a mod's view."
         },
         {
           "type": "object",
           "properties": {
             "customKind": {
-              "type": "string"
+              "type": "string",
+              "description": "The element's own name."
             },
-            "data": true,
+            "data": {
+              "description": "Whatever the element needs."
+            },
             "fold": {
-              "type": "string"
+              "type": "string",
+              "description": "The plain text drawn where the element is unknown."
             },
             "kind": {
               "type": "string",
@@ -1057,7 +1163,8 @@
             "customKind",
             "data",
             "fold"
-          ]
+          ],
+          "description": "An element bingo has no name for; surfaces that do not know it show `fold`."
         }
       ]
     },
@@ -1274,10 +1381,12 @@
       "type": "object",
       "properties": {
         "label": {
-          "type": "string"
+          "type": "string",
+          "description": "The text shown."
         },
         "value": {
-          "type": "string"
+          "type": "string",
+          "description": "The value chosen."
         }
       },
       "required": [
@@ -1332,7 +1441,8 @@
       "type": "object",
       "properties": {
         "session": {
-          "$ref": "#/$defs/SessionId"
+          "$ref": "#/$defs/SessionId",
+          "description": "The session this concerns; `$` methods default it to the current one."
         }
       },
       "required": [
@@ -1616,13 +1726,15 @@
           "$ref": "#/$defs/SessionId"
         },
         "url": {
-          "type": "string"
+          "type": "string",
+          "description": "The URL to fetch."
         },
         "method": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "`GET` unless given."
         },
         "headers": {
           "type": [
@@ -1631,13 +1743,15 @@
           ],
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "description": "Request headers."
         },
         "body": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The request body, as text."
         }
       },
       "required": [
@@ -1652,25 +1766,30 @@
           "type": "integer",
           "format": "uint16",
           "minimum": 0,
-          "maximum": 65535
+          "maximum": 65535,
+          "description": "The HTTP status."
         },
         "headers": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
-          }
+          },
+          "description": "Response headers."
         },
         "body": {
-          "type": "string"
+          "type": "string",
+          "description": "The body, as text."
         },
         "truncated": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether the body was cut at the host's limit."
         },
         "notice": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "A note from the host about the fetch, if any."
         }
       },
       "required": [
@@ -1687,7 +1806,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "description": "The variable's name."
         }
       },
       "required": [
@@ -1702,10 +1822,12 @@
           "$ref": "#/$defs/SessionId"
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "description": "The variable's name."
         },
         "value": {
-          "type": "string"
+          "type": "string",
+          "description": "Its value."
         }
       },
       "required": [
@@ -1724,13 +1846,15 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "The program and its arguments; no shell is involved."
         },
         "cwd": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Working directory; the session's cwd unless given."
         },
         "timeoutMs": {
           "type": [
@@ -1738,7 +1862,8 @@
             "null"
           ],
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Kill the process after this many milliseconds."
         }
       },
       "required": [
@@ -1754,13 +1879,16 @@
             "integer",
             "null"
           ],
-          "format": "int32"
+          "format": "int32",
+          "description": "The exit code, or `null` when killed by a signal."
         },
         "stdout": {
-          "type": "string"
+          "type": "string",
+          "description": "Everything written to stdout."
         },
         "stderr": {
-          "type": "string"
+          "type": "string",
+          "description": "Everything written to stderr."
         }
       },
       "required": [
@@ -1775,7 +1903,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "id": {
-          "type": "string"
+          "type": "string",
+          "description": "The id `spawn` answered."
         }
       },
       "required": [
@@ -1790,13 +1919,15 @@
           "$ref": "#/$defs/SessionId"
         },
         "id": {
-          "type": "string"
+          "type": "string",
+          "description": "The id `spawn` answered."
         },
         "body": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Text for stdin; `null` closes it."
         }
       },
       "required": [
@@ -1811,7 +1942,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Relative to the session's cwd, or absolute under a granted root."
         },
         "encoding": {
           "anyOf": [
@@ -1821,7 +1953,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "`utf8` (the default) or `base64`."
         }
       },
       "required": [
@@ -1843,10 +1976,12 @@
           "$ref": "#/$defs/SessionId"
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Relative to the session's cwd, or absolute under a granted root."
         },
         "body": {
-          "type": "string"
+          "type": "string",
+          "description": "The new contents."
         },
         "encoding": {
           "anyOf": [
@@ -1856,7 +1991,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "How `body` is encoded: `utf8` (the default) or `base64`."
         }
       },
       "required": [
@@ -1872,7 +2008,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "The directory to list."
         },
         "limit": {
           "type": [
@@ -1880,7 +2017,8 @@
             "null"
           ],
           "format": "uint",
-          "minimum": 0
+          "minimum": 0,
+          "description": "At most this many entries."
         }
       },
       "required": [
@@ -1895,7 +2033,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "path": {
-          "type": "string"
+          "type": "string",
+          "description": "Relative to the session's cwd, or absolute under a granted root."
         }
       },
       "required": [
@@ -1909,13 +2048,16 @@
         "size": {
           "type": "integer",
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Size in bytes."
         },
         "directory": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether it is a directory."
         },
         "file": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether it is a regular file."
         }
       },
       "required": [
@@ -1931,7 +2073,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "description": "One file or directory name, without a separator."
         }
       },
       "required": [
@@ -1946,7 +2089,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "page": {
-          "$ref": "#/$defs/HistoryPage"
+          "$ref": "#/$defs/HistoryPage",
+          "description": "Which page of history."
         }
       },
       "required": [
@@ -2607,7 +2751,8 @@
       "type": "object",
       "properties": {
         "session": {
-          "$ref": "#/$defs/Usage"
+          "$ref": "#/$defs/Usage",
+          "description": "Tokens used by the whole session."
         },
         "context": {
           "anyOf": [
@@ -2617,7 +2762,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "The current context window reading, once known."
         },
         "lastTurn": {
           "anyOf": [
@@ -2627,7 +2773,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Tokens used by the last turn."
         }
       },
       "required": [
@@ -2705,13 +2852,16 @@
       "type": "object",
       "properties": {
         "to": {
-          "$ref": "#/$defs/SessionId"
+          "$ref": "#/$defs/SessionId",
+          "description": "The receiving session."
         },
         "input": {
-          "$ref": "#/$defs/Input"
+          "$ref": "#/$defs/Input",
+          "description": "What is sent."
         },
         "delivery": {
-          "$ref": "#/$defs/Delivery"
+          "$ref": "#/$defs/Delivery",
+          "description": "Whether it wakes the receiver or waits for its next turn."
         }
       },
       "required": [
@@ -2822,13 +2972,15 @@
           "$ref": "#/$defs/SessionId"
         },
         "kind": {
-          "$ref": "#/$defs/InteractionKind"
+          "$ref": "#/$defs/InteractionKind",
+          "description": "What kind of question it is."
         },
         "answers": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/AnswerSpec"
-          }
+          },
+          "description": "The answers the person may give."
         }
       },
       "required": [
@@ -3341,7 +3493,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "input": {
-          "$ref": "#/$defs/Input"
+          "$ref": "#/$defs/Input",
+          "description": "What to submit, as a person would type it."
         }
       },
       "required": [
@@ -3356,13 +3509,15 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/QueueEntry"
-          }
+          },
+          "description": "Inputs waiting for the next turn."
         },
         "last": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The last submitted line."
         }
       },
       "required": [
@@ -3452,7 +3607,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "call": {
-          "$ref": "#/$defs/ToolCall"
+          "$ref": "#/$defs/ToolCall",
+          "description": "The tool and its arguments."
         }
       },
       "required": [
@@ -3527,9 +3683,12 @@
           "$ref": "#/$defs/SessionId"
         },
         "name": {
-          "type": "string"
+          "type": "string",
+          "description": "The command's name, without the slash."
         },
-        "args": true
+        "args": {
+          "description": "Its arguments."
+        }
       },
       "required": [
         "session",
@@ -3773,7 +3932,8 @@
           "$ref": "#/$defs/SessionId"
         },
         "key": {
-          "type": "string"
+          "type": "string",
+          "description": "The setting's dotted key."
         }
       },
       "required": [
@@ -3788,9 +3948,12 @@
           "$ref": "#/$defs/SessionId"
         },
         "key": {
-          "type": "string"
+          "type": "string",
+          "description": "The setting's dotted key."
         },
-        "value": true
+        "value": {
+          "description": "Its new value."
+        }
       },
       "required": [
         "session",
@@ -4306,13 +4469,15 @@
           ]
         },
         "text": {
-          "type": "string"
+          "type": "string",
+          "description": "The text to classify."
         },
         "labels": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "The labels the model chooses from."
         }
       },
       "required": [
@@ -4338,7 +4503,8 @@
           ]
         },
         "prompt": {
-          "type": "string"
+          "type": "string",
+          "description": "The one-off question."
         }
       },
       "required": [
@@ -4407,7 +4573,8 @@
         "ms": {
           "type": "integer",
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Milliseconds."
         }
       },
       "required": [
@@ -4423,7 +4590,8 @@
         "ms": {
           "type": "integer",
           "format": "uint64",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Milliseconds."
         },
         "callback": {
           "type": "string"
@@ -4438,168 +4606,229 @@
     "DollarInputs": {
       "type": "object",
       "properties": {
-        "mcp.call": true,
-        "mcp.connect": true,
-        "agent.spawn": true,
-        "agent.list": {
-          "$ref": "#/$defs/Session"
+        "mcp.call": {
+          "description": "Call `tool` on MCP `server` with `args`, through the MCP service."
         },
-        "agent.register": true,
+        "mcp.connect": {
+          "description": "Connect MCP `server`, through the MCP service."
+        },
+        "agent.spawn": {
+          "description": "Start a sub-agent with `{args: {prompt, agent?}}`, through the agent service; answers with its result."
+        },
+        "agent.list": {
+          "$ref": "#/$defs/Session",
+          "description": "The sub-agents of a session, through the agent service."
+        },
+        "agent.register": {
+          "description": "Register an agent `{definition}`, through the agent service."
+        },
         "http.fetch": {
-          "$ref": "#/$defs/Fetch"
+          "$ref": "#/$defs/Fetch",
+          "description": "Fetch a URL through the host; the body is text and may be `truncated`."
         },
         "env.get": {
-          "$ref": "#/$defs/EnvGet"
+          "$ref": "#/$defs/EnvGet",
+          "description": "Read a variable from the mod's environment overlay, or `null`."
         },
         "env.set": {
-          "$ref": "#/$defs/EnvSet"
+          "$ref": "#/$defs/EnvSet",
+          "description": "Set a variable in the mod's environment overlay; processes it starts see it."
         },
         "process.run": {
-          "$ref": "#/$defs/ProcessInput"
+          "$ref": "#/$defs/ProcessInput",
+          "description": "Run `argv` to completion and answer with its exit code and output."
         },
         "process.spawn": {
-          "$ref": "#/$defs/ProcessInput"
+          "$ref": "#/$defs/ProcessInput",
+          "description": "Start `argv` in the background; the author call answers with a handle to read, write or kill."
         },
         "process.read": {
-          "$ref": "#/$defs/ProcessId"
+          "$ref": "#/$defs/ProcessId",
+          "description": "Wait for a spawned process to exit and read all its output; a process is read once."
         },
         "process.write": {
-          "$ref": "#/$defs/ProcessWrite"
+          "$ref": "#/$defs/ProcessWrite",
+          "description": "Write `body` to a spawned process's stdin; `null` closes it."
         },
         "process.kill": {
-          "$ref": "#/$defs/ProcessId"
+          "$ref": "#/$defs/ProcessId",
+          "description": "Kill a spawned process."
         },
         "fs.read": {
-          "$ref": "#/$defs/FileRead"
+          "$ref": "#/$defs/FileRead",
+          "description": "Read a file under a granted root, as UTF-8 text or base64."
         },
         "fs.write": {
-          "$ref": "#/$defs/FileWrite"
+          "$ref": "#/$defs/FileWrite",
+          "description": "Write a file under a granted root, replacing it."
         },
         "fs.list": {
-          "$ref": "#/$defs/FileList"
+          "$ref": "#/$defs/FileList",
+          "description": "List the entries of a directory under a granted root, up to `limit`."
         },
         "fs.exists": {
-          "$ref": "#/$defs/FilePath"
+          "$ref": "#/$defs/FilePath",
+          "description": "Whether a path exists under a granted root."
         },
         "fs.stat": {
-          "$ref": "#/$defs/FilePath"
+          "$ref": "#/$defs/FilePath",
+          "description": "Size and kind of a path under a granted root."
         },
         "fs.ancestors": {
-          "$ref": "#/$defs/Ancestors"
+          "$ref": "#/$defs/Ancestors",
+          "description": "Each directory from the session's cwd up to the project root that holds `name`, nearest first."
         },
         "session.messages": {
-          "$ref": "#/$defs/Messages"
+          "$ref": "#/$defs/Messages",
+          "description": "A page of the session's history."
         },
         "session.cwd": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "The session's working directory."
         },
         "session.root": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "The session's project root."
         },
         "session.model": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "The model the session is using, or `null`."
         },
         "session.turns": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "The ids of the session's turns, oldest first."
         },
         "session.id": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "The current session's id."
         },
         "session.surfaces": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "The clients attached to the session."
         },
         "session.usage": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "Token usage: the whole session, the last turn, and `context`, the current context window reading."
         },
         "session.version": {
-          "type": "null"
+          "type": "null",
+          "description": "The bingo version running the mod."
         },
         "session.compact": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "Ask the session to compact its history; runs `session.compact`."
         },
         "session.send": {
-          "$ref": "#/$defs/Send"
+          "$ref": "#/$defs/Send",
+          "description": "Send input to another session; runs `session.send`."
         },
         "session.append": {
-          "$ref": "#/$defs/Extend"
+          "$ref": "#/$defs/Extend",
+          "description": "Append a record this plugin owns to the session's history; runs `session.append`."
         },
         "session.authorize": {
-          "$ref": "#/$defs/Authorize"
+          "$ref": "#/$defs/Authorize",
+          "description": "Ask the person a question with the given answer kinds and wait for the answer."
         },
         "turn.abort": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "End the session's running turn, as `esc` does."
         },
         "prompt.submit": {
-          "$ref": "#/$defs/Submit"
+          "$ref": "#/$defs/Submit",
+          "description": "Submit input to the session as if typed; runs `prompt.submit`."
         },
         "prompt.read": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "The session's queued inputs and the last submitted line."
         },
         "tool.list": {
-          "type": "null"
+          "type": "null",
+          "description": "Every tool the session offers the model."
         },
         "tool.call": {
-          "$ref": "#/$defs/Invoke"
+          "$ref": "#/$defs/Invoke",
+          "description": "Call a tool as the model would; runs `tool.check` and `tool.call`, so permission still applies."
         },
         "tool.register": {
-          "$ref": "#/$defs/RegisterTool"
+          "$ref": "#/$defs/RegisterTool",
+          "description": "Register a tool the model can call; the author call takes the spec and a handler."
         },
         "command.list": {
-          "type": "null"
+          "type": "null",
+          "description": "Every slash command the session offers."
         },
         "command.run": {
-          "$ref": "#/$defs/Run"
+          "$ref": "#/$defs/Run",
+          "description": "Run a slash command by name; runs `command.run`."
         },
         "command.register": {
-          "$ref": "#/$defs/RegisterCommand"
+          "$ref": "#/$defs/RegisterCommand",
+          "description": "Register a slash command; the author call takes the spec and an optional handler."
         },
         "config.list": {
-          "$ref": "#/$defs/Session"
+          "$ref": "#/$defs/Session",
+          "description": "Every setting as the session sees it."
         },
         "config.read": {
-          "$ref": "#/$defs/Read"
+          "$ref": "#/$defs/Read",
+          "description": "Read one setting by its dotted key."
         },
         "config.set": {
-          "$ref": "#/$defs/Setting"
+          "$ref": "#/$defs/Setting",
+          "description": "Change one setting; runs `config.set`."
         },
         "model.complete": {
-          "$ref": "#/$defs/Complete"
+          "$ref": "#/$defs/Complete",
+          "description": "Ask the host's model for a completion; runs `model.complete`."
         },
         "model.classify": {
-          "$ref": "#/$defs/Classify"
+          "$ref": "#/$defs/Classify",
+          "description": "Ask the model to pick one of `labels` for `text`, or `null`."
         },
         "model.fork": {
-          "$ref": "#/$defs/Fork"
+          "$ref": "#/$defs/Fork",
+          "description": "Ask the model a one-off `prompt` with the session's context, outside the history."
         },
         "state.get": {
-          "$ref": "#/$defs/StateGet"
+          "$ref": "#/$defs/StateGet",
+          "description": "Read this plugin's value for `key` in the current session, with its version, or `null`."
         },
         "state.set": {
-          "$ref": "#/$defs/StateSet"
+          "$ref": "#/$defs/StateSet",
+          "description": "Write this plugin's value for `key` in the current session; `ifVersion` refuses a stale write."
         },
         "store.get": {
-          "$ref": "#/$defs/StateGet"
+          "$ref": "#/$defs/StateGet",
+          "description": "Read this plugin's global value for `key`, shared across sessions, or `null`."
         },
         "store.set": {
-          "$ref": "#/$defs/StateSet"
+          "$ref": "#/$defs/StateSet",
+          "description": "Write this plugin's global value for `key`; `ifVersion` refuses a stale write."
         },
         "store.delete": {
-          "$ref": "#/$defs/StateGet"
+          "$ref": "#/$defs/StateGet",
+          "description": "Delete this plugin's global value for `key`; answers whether it existed."
         },
         "store.keys": {
-          "type": "null"
+          "type": "null",
+          "description": "Every key this plugin has in the global store."
         },
         "clock.now": {
-          "type": "null"
+          "type": "null",
+          "description": "The host's time in milliseconds since the epoch; tests can set it."
         },
         "clock.sleep": {
-          "$ref": "#/$defs/Millis"
+          "$ref": "#/$defs/Millis",
+          "description": "Wait `ms` milliseconds on the host clock."
         },
         "clock.after": {
-          "$ref": "#/$defs/Timer"
+          "$ref": "#/$defs/Timer",
+          "description": "Run a callback once after `ms` milliseconds; answers its timer id."
         },
         "clock.every": {
-          "$ref": "#/$defs/Timer"
+          "$ref": "#/$defs/Timer",
+          "description": "Run a callback every `ms` milliseconds; answers its timer id."
         }
       },
       "required": [
@@ -4667,167 +4896,215 @@
       "type": "object",
       "properties": {
         "mcp.call": {
-          "$ref": "#/$defs/ToolOutput"
+          "$ref": "#/$defs/ToolOutput",
+          "description": "Call `tool` on MCP `server` with `args`, through the MCP service."
         },
         "mcp.connect": {
-          "type": "null"
+          "type": "null",
+          "description": "Connect MCP `server`, through the MCP service."
         },
         "agent.spawn": {
-          "$ref": "#/$defs/ToolOutput"
+          "$ref": "#/$defs/ToolOutput",
+          "description": "Start a sub-agent with `{args: {prompt, agent?}}`, through the agent service; answers with its result."
         },
         "agent.list": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/SessionSummary"
-          }
+          },
+          "description": "The sub-agents of a session, through the agent service."
         },
         "agent.register": {
-          "type": "null"
+          "type": "null",
+          "description": "Register an agent `{definition}`, through the agent service."
         },
         "http.fetch": {
-          "$ref": "#/$defs/Fetched"
+          "$ref": "#/$defs/Fetched",
+          "description": "Fetch a URL through the host; the body is text and may be `truncated`."
         },
         "env.get": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Read a variable from the mod's environment overlay, or `null`."
         },
         "env.set": {
-          "type": "null"
+          "type": "null",
+          "description": "Set a variable in the mod's environment overlay; processes it starts see it."
         },
         "process.run": {
-          "$ref": "#/$defs/ProcessOutput"
+          "$ref": "#/$defs/ProcessOutput",
+          "description": "Run `argv` to completion and answer with its exit code and output."
         },
         "process.spawn": {
-          "type": "string"
+          "type": "string",
+          "description": "Start `argv` in the background; the author call answers with a handle to read, write or kill."
         },
         "process.read": {
-          "$ref": "#/$defs/ProcessOutput"
+          "$ref": "#/$defs/ProcessOutput",
+          "description": "Wait for a spawned process to exit and read all its output; a process is read once."
         },
         "process.write": {
-          "type": "null"
+          "type": "null",
+          "description": "Write `body` to a spawned process's stdin; `null` closes it."
         },
         "process.kill": {
-          "type": "null"
+          "type": "null",
+          "description": "Kill a spawned process."
         },
         "fs.read": {
-          "type": "string"
+          "type": "string",
+          "description": "Read a file under a granted root, as UTF-8 text or base64."
         },
         "fs.write": {
-          "type": "null"
+          "type": "null",
+          "description": "Write a file under a granted root, replacing it."
         },
         "fs.list": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "List the entries of a directory under a granted root, up to `limit`."
         },
         "fs.exists": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether a path exists under a granted root."
         },
         "fs.stat": {
-          "$ref": "#/$defs/FileStat"
+          "$ref": "#/$defs/FileStat",
+          "description": "Size and kind of a path under a granted root."
         },
         "fs.ancestors": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Each directory from the session's cwd up to the project root that holds `name`, nearest first."
         },
         "session.messages": {
-          "$ref": "#/$defs/HistoryChunk"
+          "$ref": "#/$defs/HistoryChunk",
+          "description": "A page of the session's history."
         },
         "session.cwd": {
-          "type": "string"
+          "type": "string",
+          "description": "The session's working directory."
         },
         "session.root": {
-          "type": "string"
+          "type": "string",
+          "description": "The session's project root."
         },
         "session.model": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "The model the session is using, or `null`."
         },
         "session.turns": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/TurnId"
-          }
+          },
+          "description": "The ids of the session's turns, oldest first."
         },
         "session.id": {
-          "$ref": "#/$defs/SessionId"
+          "$ref": "#/$defs/SessionId",
+          "description": "The current session's id."
         },
         "session.surfaces": {
           "type": "array",
           "items": {
             "$ref": "#/$defs/ClientIdentity"
-          }
+          },
+          "description": "The clients attached to the session."
         },
         "session.usage": {
-          "$ref": "#/$defs/UsageView"
+          "$ref": "#/$defs/UsageView",
+          "description": "Token usage: the whole session, the last turn, and `context`, the current context window reading."
         },
         "session.version": {
-          "type": "string"
+          "type": "string",
+          "description": "The bingo version running the mod."
         },
         "session.compact": {
-          "$ref": "#/$defs/IntentId"
+          "$ref": "#/$defs/IntentId",
+          "description": "Ask the session to compact its history; runs `session.compact`."
         },
         "session.send": {
-          "type": "null"
+          "type": "null",
+          "description": "Send input to another session; runs `session.send`."
         },
         "session.append": {
-          "type": "null"
+          "type": "null",
+          "description": "Append a record this plugin owns to the session's history; runs `session.append`."
         },
         "session.authorize": {
-          "$ref": "#/$defs/Answer"
+          "$ref": "#/$defs/Answer",
+          "description": "Ask the person a question with the given answer kinds and wait for the answer."
         },
         "turn.abort": {
-          "type": "null"
+          "type": "null",
+          "description": "End the session's running turn, as `esc` does."
         },
         "prompt.submit": {
-          "$ref": "#/$defs/IntentId"
+          "$ref": "#/$defs/IntentId",
+          "description": "Submit input to the session as if typed; runs `prompt.submit`."
         },
         "prompt.read": {
-          "$ref": "#/$defs/PromptView"
+          "$ref": "#/$defs/PromptView",
+          "description": "The session's queued inputs and the last submitted line."
         },
         "tool.list": {
-          "$ref": "#/$defs/Catalog"
+          "$ref": "#/$defs/Catalog",
+          "description": "Every tool the session offers the model."
         },
         "tool.call": {
-          "$ref": "#/$defs/ToolOutput"
+          "$ref": "#/$defs/ToolOutput",
+          "description": "Call a tool as the model would; runs `tool.check` and `tool.call`, so permission still applies."
         },
         "tool.register": {
-          "type": "string"
+          "type": "string",
+          "description": "Register a tool the model can call; the author call takes the spec and a handler."
         },
         "command.list": {
-          "$ref": "#/$defs/Catalog"
+          "$ref": "#/$defs/Catalog",
+          "description": "Every slash command the session offers."
         },
         "command.run": {
-          "$ref": "#/$defs/IntentId"
+          "$ref": "#/$defs/IntentId",
+          "description": "Run a slash command by name; runs `command.run`."
         },
         "command.register": {
-          "type": "string"
+          "type": "string",
+          "description": "Register a slash command; the author call takes the spec and an optional handler."
         },
         "config.list": {
-          "$ref": "#/$defs/ConfigView"
+          "$ref": "#/$defs/ConfigView",
+          "description": "Every setting as the session sees it."
         },
-        "config.read": true,
+        "config.read": {
+          "description": "Read one setting by its dotted key."
+        },
         "config.set": {
-          "type": "null"
+          "type": "null",
+          "description": "Change one setting; runs `config.set`."
         },
         "model.complete": {
-          "$ref": "#/$defs/Completed"
+          "$ref": "#/$defs/Completed",
+          "description": "Ask the host's model for a completion; runs `model.complete`."
         },
         "model.classify": {
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "description": "Ask the model to pick one of `labels` for `text`, or `null`."
         },
         "model.fork": {
-          "$ref": "#/$defs/Completed"
+          "$ref": "#/$defs/Completed",
+          "description": "Ask the model a one-off `prompt` with the session's context, outside the history."
         },
         "state.get": {
           "anyOf": [
@@ -4837,10 +5114,12 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Read this plugin's value for `key` in the current session, with its version, or `null`."
         },
         "state.set": {
-          "$ref": "#/$defs/StateValue"
+          "$ref": "#/$defs/StateValue",
+          "description": "Write this plugin's value for `key` in the current session; `ifVersion` refuses a stale write."
         },
         "store.get": {
           "anyOf": [
@@ -4850,32 +5129,40 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Read this plugin's global value for `key`, shared across sessions, or `null`."
         },
         "store.set": {
-          "$ref": "#/$defs/StateValue"
+          "$ref": "#/$defs/StateValue",
+          "description": "Write this plugin's global value for `key`; `ifVersion` refuses a stale write."
         },
         "store.delete": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Delete this plugin's global value for `key`; answers whether it existed."
         },
         "store.keys": {
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "description": "Every key this plugin has in the global store."
         },
         "clock.now": {
           "type": "integer",
-          "format": "int64"
+          "format": "int64",
+          "description": "The host's time in milliseconds since the epoch; tests can set it."
         },
         "clock.sleep": {
-          "type": "null"
+          "type": "null",
+          "description": "Wait `ms` milliseconds on the host clock."
         },
         "clock.after": {
-          "type": "string"
+          "type": "string",
+          "description": "Run a callback once after `ms` milliseconds; answers its timer id."
         },
         "clock.every": {
-          "type": "string"
+          "type": "string",
+          "description": "Run a callback every `ms` milliseconds; answers its timer id."
         }
       },
       "required": [
@@ -4948,6 +5235,7 @@
         "face": "mcp",
         "owner": true
       },
+      "description": "Call `tool` on MCP `server` with `args`, through the MCP service.",
       "unsafe": false,
       "input": true,
       "result": {
@@ -4961,6 +5249,7 @@
         "face": "mcp",
         "owner": true
       },
+      "description": "Connect MCP `server`, through the MCP service.",
       "unsafe": true,
       "input": true,
       "result": {
@@ -4974,6 +5263,7 @@
         "face": "agent",
         "owner": true
       },
+      "description": "Start a sub-agent with `{args: {prompt, agent?}}`, through the agent service; answers with its result.",
       "unsafe": true,
       "input": true,
       "result": {
@@ -4987,6 +5277,7 @@
         "face": "agent",
         "owner": true
       },
+      "description": "The sub-agents of a session, through the agent service.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5005,6 +5296,7 @@
         "face": "agent",
         "owner": true
       },
+      "description": "Register an agent `{definition}`, through the agent service.",
       "unsafe": false,
       "input": true,
       "result": {
@@ -5017,6 +5309,7 @@
       "door": {
         "face": "bingo.plugin.http"
       },
+      "description": "Fetch a URL through the host; the body is text and may be `truncated`.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/Fetch"
@@ -5031,6 +5324,7 @@
       "door": {
         "face": "bingo.plugin.env"
       },
+      "description": "Read a variable from the mod's environment overlay, or `null`.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/EnvGet"
@@ -5048,6 +5342,7 @@
       "door": {
         "face": "bingo.plugin.env"
       },
+      "description": "Set a variable in the mod's environment overlay; processes it starts see it.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/EnvSet"
@@ -5062,6 +5357,7 @@
       "door": {
         "face": "bingo.plugin.process"
       },
+      "description": "Run `argv` to completion and answer with its exit code and output.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/ProcessInput"
@@ -5076,6 +5372,7 @@
       "door": {
         "face": "bingo.plugin.process"
       },
+      "description": "Start `argv` in the background; the author call answers with a handle to read, write or kill.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/ProcessInput"
@@ -5090,6 +5387,7 @@
       "door": {
         "face": "bingo.plugin.process"
       },
+      "description": "Wait for a spawned process to exit and read all its output; a process is read once.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/ProcessId"
@@ -5104,6 +5402,7 @@
       "door": {
         "face": "bingo.plugin.process"
       },
+      "description": "Write `body` to a spawned process's stdin; `null` closes it.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/ProcessWrite"
@@ -5118,6 +5417,7 @@
       "door": {
         "face": "bingo.plugin.process"
       },
+      "description": "Kill a spawned process.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/ProcessId"
@@ -5132,6 +5432,7 @@
       "door": {
         "face": "bingo.plugin.fs"
       },
+      "description": "Read a file under a granted root, as UTF-8 text or base64.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/FileRead"
@@ -5146,6 +5447,7 @@
       "door": {
         "face": "bingo.plugin.fs"
       },
+      "description": "Write a file under a granted root, replacing it.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/FileWrite"
@@ -5160,6 +5462,7 @@
       "door": {
         "face": "bingo.plugin.fs"
       },
+      "description": "List the entries of a directory under a granted root, up to `limit`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/FileList"
@@ -5177,6 +5480,7 @@
       "door": {
         "face": "bingo.plugin.fs"
       },
+      "description": "Whether a path exists under a granted root.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/FilePath"
@@ -5191,6 +5495,7 @@
       "door": {
         "face": "bingo.plugin.fs"
       },
+      "description": "Size and kind of a path under a granted root.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/FilePath"
@@ -5205,6 +5510,7 @@
       "door": {
         "face": "bingo.plugin.fs"
       },
+      "description": "Each directory from the session's cwd up to the project root that holds `name`, nearest first.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Ancestors"
@@ -5222,6 +5528,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "A page of the session's history.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Messages"
@@ -5236,6 +5543,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "The session's working directory.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5250,6 +5558,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "The session's project root.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5264,6 +5573,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "The model the session is using, or `null`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5281,6 +5591,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "The ids of the session's turns, oldest first.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5298,6 +5609,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "The current session's id.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5312,6 +5624,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "The clients attached to the session.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5329,6 +5642,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "Token usage: the whole session, the last turn, and `context`, the current context window reading.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5343,6 +5657,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "The bingo version running the mod.",
       "unsafe": false,
       "input": {
         "type": "null"
@@ -5357,6 +5672,7 @@
       "door": {
         "kernel": "session.compact"
       },
+      "description": "Ask the session to compact its history; runs `session.compact`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5371,6 +5687,7 @@
       "door": {
         "kernel": "session.send"
       },
+      "description": "Send input to another session; runs `session.send`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Send"
@@ -5385,6 +5702,7 @@
       "door": {
         "kernel": "session.append"
       },
+      "description": "Append a record this plugin owns to the session's history; runs `session.append`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Extend"
@@ -5399,6 +5717,7 @@
       "door": {
         "face": "bingo.plugin.session"
       },
+      "description": "Ask the person a question with the given answer kinds and wait for the answer.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Authorize"
@@ -5413,6 +5732,7 @@
       "door": {
         "face": "bingo.plugin.turn"
       },
+      "description": "End the session's running turn, as `esc` does.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5427,6 +5747,7 @@
       "door": {
         "kernel": "prompt.submit"
       },
+      "description": "Submit input to the session as if typed; runs `prompt.submit`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Submit"
@@ -5441,6 +5762,7 @@
       "door": {
         "face": "bingo.plugin.prompt"
       },
+      "description": "The session's queued inputs and the last submitted line.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5455,6 +5777,7 @@
       "door": {
         "face": "bingo.plugin.tool"
       },
+      "description": "Every tool the session offers the model.",
       "unsafe": false,
       "input": {
         "type": "null"
@@ -5469,6 +5792,7 @@
       "door": {
         "kernel": "tool.call"
       },
+      "description": "Call a tool as the model would; runs `tool.check` and `tool.call`, so permission still applies.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Invoke"
@@ -5483,6 +5807,7 @@
       "door": {
         "face": "bingo.plugin.tool"
       },
+      "description": "Register a tool the model can call; the author call takes the spec and a handler.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/RegisterTool"
@@ -5497,6 +5822,7 @@
       "door": {
         "face": "bingo.plugin.command"
       },
+      "description": "Every slash command the session offers.",
       "unsafe": false,
       "input": {
         "type": "null"
@@ -5511,6 +5837,7 @@
       "door": {
         "kernel": "command.run"
       },
+      "description": "Run a slash command by name; runs `command.run`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Run"
@@ -5525,6 +5852,7 @@
       "door": {
         "face": "bingo.plugin.command"
       },
+      "description": "Register a slash command; the author call takes the spec and an optional handler.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/RegisterCommand"
@@ -5539,6 +5867,7 @@
       "door": {
         "face": "bingo.plugin.config"
       },
+      "description": "Every setting as the session sees it.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Session"
@@ -5553,6 +5882,7 @@
       "door": {
         "face": "bingo.plugin.config"
       },
+      "description": "Read one setting by its dotted key.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Read"
@@ -5565,6 +5895,7 @@
       "door": {
         "kernel": "config.set"
       },
+      "description": "Change one setting; runs `config.set`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Setting"
@@ -5579,6 +5910,7 @@
       "door": {
         "kernel": "model.complete"
       },
+      "description": "Ask the host's model for a completion; runs `model.complete`.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/Complete"
@@ -5593,6 +5925,7 @@
       "door": {
         "face": "bingo.plugin.model"
       },
+      "description": "Ask the model to pick one of `labels` for `text`, or `null`.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/Classify"
@@ -5610,6 +5943,7 @@
       "door": {
         "face": "bingo.plugin.model"
       },
+      "description": "Ask the model a one-off `prompt` with the session's context, outside the history.",
       "unsafe": true,
       "input": {
         "$ref": "#/$defs/Fork"
@@ -5624,6 +5958,7 @@
       "door": {
         "face": "bingo.plugin.state"
       },
+      "description": "Read this plugin's value for `key` in the current session, with its version, or `null`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/StateGet"
@@ -5645,6 +5980,7 @@
       "door": {
         "face": "bingo.plugin.state"
       },
+      "description": "Write this plugin's value for `key` in the current session; `ifVersion` refuses a stale write.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/StateSet"
@@ -5659,6 +5995,7 @@
       "door": {
         "face": "bingo.plugin.store"
       },
+      "description": "Read this plugin's global value for `key`, shared across sessions, or `null`.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/StateGet"
@@ -5680,6 +6017,7 @@
       "door": {
         "face": "bingo.plugin.store"
       },
+      "description": "Write this plugin's global value for `key`; `ifVersion` refuses a stale write.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/StateSet"
@@ -5694,6 +6032,7 @@
       "door": {
         "face": "bingo.plugin.store"
       },
+      "description": "Delete this plugin's global value for `key`; answers whether it existed.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/StateGet"
@@ -5708,6 +6047,7 @@
       "door": {
         "face": "bingo.plugin.store"
       },
+      "description": "Every key this plugin has in the global store.",
       "unsafe": false,
       "input": {
         "type": "null"
@@ -5725,6 +6065,7 @@
       "door": {
         "face": "bingo.plugin.clock"
       },
+      "description": "The host's time in milliseconds since the epoch; tests can set it.",
       "unsafe": false,
       "input": {
         "type": "null"
@@ -5740,6 +6081,7 @@
       "door": {
         "face": "bingo.plugin.clock"
       },
+      "description": "Wait `ms` milliseconds on the host clock.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Millis"
@@ -5754,6 +6096,7 @@
       "door": {
         "face": "bingo.plugin.clock"
       },
+      "description": "Run a callback once after `ms` milliseconds; answers its timer id.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Timer"
@@ -5768,6 +6111,7 @@
       "door": {
         "face": "bingo.plugin.clock"
       },
+      "description": "Run a callback every `ms` milliseconds; answers its timer id.",
       "unsafe": false,
       "input": {
         "$ref": "#/$defs/Timer"

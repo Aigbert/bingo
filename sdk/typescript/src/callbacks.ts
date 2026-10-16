@@ -29,7 +29,7 @@ async function command(handler: Callback, api: Dollar, input: unknown): Promise<
   const scoped = new Proxy(api, {get: (target, key) => key === 'ui' ? ui : Reflect.get(target, key)});
   const result = await handler(scoped, input);
   if (!opened || (result != null && (typeof result !== 'object' || !('kind' in result) || result.kind !== 'applied'))) return result;
-  const message = result && 'message' in result ? result.message : undefined;
+  const message = result != null && typeof result === 'object' && 'message' in result ? result.message : undefined;
   return {kind:'surface', action:{name:'Pane',args:{plugin:api.plugin.name,id:opened.id}},
     fallback:typeof message === 'string' ? message : `Opened ${opened.title}.`};
 }
