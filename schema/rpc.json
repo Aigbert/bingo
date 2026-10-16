@@ -6700,7 +6700,7 @@
         "stopped",
         "failed"
       ],
-      "description": "How a turn ended, for its folded line."
+      "description": "How a turn ended, for its folded line. A line folded from a `failed`\nturn does not say so: the line under the turn says why, and a failed step\nalready says `failed`."
     },
     "TurnFoldProps": {
       "type": "object",

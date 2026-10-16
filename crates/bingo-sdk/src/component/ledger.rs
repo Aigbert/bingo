@@ -39,7 +39,9 @@ pub struct Step {
     pub answer: Option<Upshot>,
 }
 
-/// How a turn ended, for its folded line.
+/// How a turn ended, for its folded line. A line folded from a `failed`
+/// turn does not say so: the line under the turn says why, and a failed step
+/// already says `failed`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum TurnEnd {
@@ -277,12 +279,9 @@ impl TurnFoldProps {
             out.push(Piece::new(" \u{b7} ", Ink::Dim));
             out.extend(run.pieces());
         }
-        let ended = match self.outcome {
-            TurnEnd::Done => None,
-            TurnEnd::Stopped => Some(" \u{b7} stopped"),
-            TurnEnd::Failed => Some(" \u{b7} failed"),
-        };
-        out.extend(ended.map(|words| Piece::new(words, Ink::Bad)));
+        if self.outcome == TurnEnd::Stopped {
+            out.push(Piece::new(" \u{b7} stopped", Ink::Bad));
+        }
         for answer in self.steps.iter().filter_map(|s| s.answer.as_ref()) {
             let Upshot::Words { text, .. } = answer else {
                 continue;
@@ -465,6 +464,23 @@ mod tests {
             None,
             "no fold line for a turn with nothing to fold"
         );
+    }
+
+    #[test]
+    fn a_failed_turn_says_failed_once_on_the_step_that_failed() {
+        let fold = TurnFoldProps {
+            steps: vec![step("bash", "cargo test", StepState::Failed, None)],
+            outcome: TurnEnd::Failed,
+            elapsed: 1_000,
+            thought: false,
+            is_expanded: false,
+        };
+        let line = text(&fold.row(GLYPHS, 80, cells).unwrap());
+        assert!(
+            line.starts_with("   \u{25b8} 1 step \u{b7} bash failed  "),
+            "{line:?}"
+        );
+        assert_eq!(line.matches("failed").count(), 1, "{line:?}");
     }
 
     #[test]
