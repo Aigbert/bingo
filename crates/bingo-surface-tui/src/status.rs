@@ -234,7 +234,7 @@ fn right(tree: &Tree, site: &mut crate::component::Site<'_>, now: Now) -> Vec<Sp
         let mut facts = Vec::new();
         if let Some(model) = &props.model {
             facts.push(Span::styled(
-                model.clone(),
+                model_name(model).to_owned(),
                 if model_flash(state, now).is_some() {
                     theme::glow().patch(theme::bold())
                 } else {
@@ -258,6 +258,13 @@ fn right(tree: &Tree, site: &mut crate::component::Site<'_>, now: Now) -> Vec<Sp
         vec![Line::from(facts)]
     });
     lines.into_iter().next().unwrap_or_default().spans
+}
+
+/// The model's own name, without the provider path a routed id carries
+/// (`clinepass/cline-pass/deepseek-v4.1-flash` reads `deepseek-v4.1-flash`):
+/// the footer has room for one name, and the full id is on `/status`.
+fn model_name(id: &str) -> &str {
+    id.rsplit('/').find(|part| !part.is_empty()).unwrap_or(id)
 }
 
 pub(crate) fn session_facts(state: &SessionState) -> bingo_sdk::component::SessionStatusProps {
@@ -529,6 +536,19 @@ mod tests {
         assert!(medium.contains("14k / 200k"));
         let narrow = line(&solo(&state), &ui, 50, now).to_string();
         assert!(!narrow.contains("14k / 200k"));
+    }
+
+    #[test]
+    fn the_footer_names_the_model_without_its_provider_path() {
+        let (ui, now) = scene();
+        let mut state = state();
+        state.summary.model = Some("clinepass/cline-pass/deepseek-v4.1-flash".into());
+        state.summary.effort = Some(Effort::XHigh);
+        let drawn = line(&solo(&state), &ui, 108, now).to_string();
+        assert!(drawn.contains(" deepseek-v4.1-flash ∴ xhigh"), "{drawn}");
+        assert!(!drawn.contains("cline"), "{drawn}");
+        assert_eq!(super::model_name("fake-1"), "fake-1");
+        assert_eq!(super::model_name("trailing/"), "trailing");
     }
 
     #[test]
