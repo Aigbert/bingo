@@ -66,6 +66,7 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
 - Local filtering must use the same matcher the mod uses, or rows shift when the real answer lands: reuse the mod's matcher from the sdk-level pure function, or keep the old rows unfiltered until the answer arrives.
 - M180's guarantee (keys never lost, never into an ask) must hold: its tests stay green unchanged.
 - Follow-up: bug 8's warning is hidden only in the picker (`bingo-mod-models/src/label.rs`); the kernel still publishes `switchAt` from the fallback window (`host/catalog/limits.rs:25`) and `model_switch.rs::needs_compaction` still compacts on it — move the known-window rule into the kernel later.
+  Done 2026-10-16: `models::resolve` says whether the window was stated; no `switchAt` and no switch compaction on a guessed one, and the picker check is gone.
 
 ## Implementation decisions
 
