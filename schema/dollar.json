@@ -54,6 +54,17 @@
               "type": "null"
             }
           ]
+        },
+        "upshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Upshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the call came to in one line, for the step that shows it\n(ADR-0095 §9). The model never reads it."
         }
       },
       "required": [
@@ -1437,6 +1448,57 @@
         "Toast",
         "Welcome"
       ]
+    },
+    "Upshot": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "added": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "removed": {
+              "type": "integer",
+              "format": "uint32",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "diff"
+            }
+          },
+          "required": [
+            "kind",
+            "added",
+            "removed"
+          ],
+          "description": "Lines a change added and removed; counts add up across a turn."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "tone": {
+              "$ref": "#/$defs/Tone"
+            },
+            "kind": {
+              "type": "string",
+              "const": "words"
+            }
+          },
+          "required": [
+            "kind",
+            "text",
+            "tone"
+          ],
+          "description": "A few words, and whether they are good or bad news."
+        }
+      ],
+      "description": "A call's result in one line: `+1 −1`, `3 passed`, `exit 1`."
     },
     "Session": {
       "type": "object",

@@ -136,11 +136,11 @@ impl Command for BoardCommand {
         publish(&cx.host, &cx.session, state, item.clone()).await?;
         Ok(if item.is_none() {
             CommandOutcome::Record {
-                body: ItemBody::Notice {
+                body: Box::new(ItemBody::Notice {
                     level: Level::Info,
                     code: ANCHOR.into(),
                     text: "Board".into(),
-                },
+                }),
             }
         } else {
             CommandOutcome::Applied {

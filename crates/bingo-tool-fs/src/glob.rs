@@ -121,10 +121,10 @@ impl Tool for GlobTool {
             .await
             .map_err(|e| ToolError::Failed(format!("the search did not finish: {e}")))?;
         if found.is_empty() {
-            return Ok(ToolOutput::text(format!(
-                "No files matched {}",
-                args.pattern
-            )));
+            return Ok(
+                ToolOutput::text(format!("No files matched {}", args.pattern))
+                    .with_upshot(crate::upshot::found(0, "files")),
+            );
         }
         newest_first(&mut found);
         let paths: Vec<String> = found
@@ -141,7 +141,7 @@ impl Tool for GlobTool {
             MAX_RESULTS,
             "files",
         )));
-        Ok(result)
+        Ok(result.with_upshot(crate::upshot::found(found.len(), "files")))
     }
 }
 

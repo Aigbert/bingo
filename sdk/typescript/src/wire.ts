@@ -1348,7 +1348,17 @@ export type ToolGroupProps = { "calls": Array<ToolUseProps>; "isActive": boolean
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
  */
-export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
+export type ToolOutput = {
+  "display"?: (View | null);
+  "isError"?: boolean;
+  "parts": Array<ContentPart>;
+  /**
+   * What the call came to in one line, for the step that shows it
+   * (ADR-0095 §9). The model never reads it.
+   */
+  "upshot"?: (Upshot | null);
+  [key: string]: unknown;
+};
 /** Plugin → kernel, while a call runs: the whole of the live output line. */
 export type ToolProgressParams = { "callId": string; "tail": string; [key: string]: unknown; };
 export type ToolProgressProps = { "hint": string; "kind": string; "tool_use_id": string; [key: string]: unknown; };
@@ -1391,6 +1401,8 @@ export type TurnOrigin = ("submit" | "queue" | "peer" | "auto");
 export type TurnProgressProps = { "elapsedMs": number; "interruptible": boolean; "stopping": boolean; "tokensOut": number; [key: string]: unknown; };
 export type TurnStatus = ({ "kind": "completed"; [key: string]: unknown; } | { "error": KernelError; "kind": "failed"; [key: string]: unknown; } | { "kind": "interrupted"; "reason": InterruptReason; [key: string]: unknown; });
 export type UnifiedFinish = ("stop" | "length" | "toolCalls" | "contentFilter" | "error" | "other");
+/** A call's result in one line: `+1 −1`, `3 passed`, `exit 1`. */
+export type Upshot = ({ "added": number; "kind": "diff"; "removed": number; [key: string]: unknown; } | { "kind": "words"; "text": string; "tone": Tone; [key: string]: unknown; });
 /**
  * Token counts as the provider reports them, the three input counts kept
  * apart: `input_tokens` is what the model read fresh, the cache counts are

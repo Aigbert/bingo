@@ -126,7 +126,7 @@ pub fn shape(command: &str, output: &str, ended: Ended) -> ToolOutput {
         ToolOutput::error(text)
     };
     result.display = Some(bingo_sdk::View::text(display(body, ended)));
-    result
+    result.with_upshot(crate::upshot::upshot(body, ended))
 }
 
 fn display(body: &str, ended: Ended) -> String {
@@ -208,6 +208,15 @@ mod tests {
             let out = shape(command, text, ended);
             assert_eq!(out.parts[0].as_text(), Some(expected), "{command}");
             assert_eq!(out.is_error, error, "{command}");
+            let tone = out.outcome().map(|upshot| match upshot {
+                bingo_sdk::Upshot::Words { tone, .. } => tone,
+                bingo_sdk::Upshot::Diff { .. } => bingo_sdk::Tone::Neutral,
+            });
+            let expected_tone = match error {
+                true => bingo_sdk::Tone::Bad,
+                false => bingo_sdk::Tone::Good,
+            };
+            assert_eq!(tone, Some(expected_tone), "{command}");
         }
     }
 

@@ -8,6 +8,7 @@ mod grep;
 mod output;
 mod path;
 mod read;
+mod upshot;
 mod write;
 
 use std::sync::Arc;

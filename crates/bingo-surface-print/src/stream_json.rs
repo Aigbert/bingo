@@ -890,6 +890,7 @@ mod tests {
             ],
             is_error: false,
             display: None,
+            upshot: None,
         };
         let frames = vec![frame(
             1,

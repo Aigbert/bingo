@@ -102,6 +102,7 @@ fn answered_with(text: &str, view: View) -> Option<ToolOutput> {
         parts: vec![ContentPart::text(text)],
         is_error: false,
         display: Some(view),
+        upshot: None,
     })
 }
 

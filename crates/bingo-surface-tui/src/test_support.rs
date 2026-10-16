@@ -458,6 +458,7 @@ pub fn diff_output() -> ToolOutput {
         display: Some(View::Diff {
             unified: "@@ -1,2 +1,2 @@\n-let a = 1;\n+let a = 2;\n ok\n".into(),
         }),
+        upshot: None,
     }
 }
 

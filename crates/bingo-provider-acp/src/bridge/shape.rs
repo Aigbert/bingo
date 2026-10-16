@@ -200,6 +200,7 @@ mod tests {
             parts: vec![ContentPart::text("done")],
             is_error: false,
             display: Some(bingo_sdk::View::text("a pretty card")),
+            upshot: None,
         };
         let written = wire(&answered(output)).to_string();
         assert!(!written.contains("pretty card"), "{written}");
@@ -217,6 +218,7 @@ mod tests {
             })],
             is_error: false,
             display: None,
+            upshot: None,
         };
         assert_eq!(
             wire(&answered(output))["content"],

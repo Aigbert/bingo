@@ -252,11 +252,11 @@ pub async fn handler(
     };
     Ok(match notice {
         Some(text) => CommandOutcome::Record {
-            body: ItemBody::Notice {
+            body: Box::new(ItemBody::Notice {
                 level: Level::Warn,
                 code: "UI_HANDLER".into(),
                 text: format!("{plugin}: {text}"),
-            },
+            }),
         },
         None => CommandOutcome::Applied { message: None },
     })

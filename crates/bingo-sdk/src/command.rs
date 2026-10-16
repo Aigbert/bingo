@@ -286,9 +286,10 @@ pub enum CommandOutcome {
         text: String,
     },
     /// One completed item the kernel records in the transcript (a shell
-    /// line's output, a login's receipt); the ack carries its id.
+    /// line's output, a login's receipt); the ack carries its id. Boxed: an
+    /// item body outweighs every other outcome.
     Record {
-        body: ItemBody,
+        body: Box<ItemBody>,
     },
 }
 

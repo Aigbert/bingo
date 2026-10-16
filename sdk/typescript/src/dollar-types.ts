@@ -843,7 +843,17 @@ export type ToolCall = { "callId": string; "input": unknown; "name": string; [ke
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
  */
-export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
+export type ToolOutput = {
+  "display"?: (View | null);
+  "isError"?: boolean;
+  "parts": Array<ContentPart>;
+  /**
+   * What the call came to in one line, for the step that shows it
+   * (ADR-0095 §9). The model never reads it.
+   */
+  "upshot"?: (Upshot | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
@@ -860,6 +870,8 @@ export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>
 /** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
 export type UnifiedFinish = ("stop" | "length" | "toolCalls" | "contentFilter" | "error" | "other");
+/** A call's result in one line: `+1 −1`, `3 passed`, `exit 1`. */
+export type Upshot = ({ "added": number; "kind": "diff"; "removed": number; [key: string]: unknown; } | { "kind": "words"; "text": string; "tone": Tone; [key: string]: unknown; });
 /**
  * Token counts as the provider reports them, the three input counts kept
  * apart: `input_tokens` is what the model read fresh, the cache counts are

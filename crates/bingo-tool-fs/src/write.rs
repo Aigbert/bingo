@@ -111,10 +111,13 @@ impl Tool for WriteTool {
             args.content.len(),
             path.display()
         ));
-        if let Some(old) = old {
-            out.display = Some(View::Diff {
-                unified: diff::unified(&path, &old, &args.content),
-            });
+        match old {
+            Some(old) => {
+                out.display = Some(View::Diff {
+                    unified: diff::unified(&path, &old, &args.content),
+                })
+            }
+            None => out = out.with_upshot(crate::upshot::created(&args.content)),
         }
         Ok(out)
     }
@@ -170,6 +173,13 @@ mod tests {
             Some(true)
         );
         assert_eq!(out.display, None);
+        assert_eq!(
+            out.outcome(),
+            Some(bingo_sdk::Upshot::Diff {
+                added: 1,
+                removed: 0
+            })
+        );
         assert!(!out.is_error);
     }
 
@@ -193,6 +203,13 @@ mod tests {
         );
         assert!(unified.contains("-one\n"), "got {unified}");
         assert!(unified.contains("+two\n"), "got {unified}");
+        assert_eq!(
+            bingo_sdk::Upshot::of_diff(&unified),
+            bingo_sdk::Upshot::Diff {
+                added: 1,
+                removed: 1
+            }
+        );
         assert_eq!(
             std::fs::read_to_string(dir.path().join("a.txt")).expect("read"),
             "two\n"

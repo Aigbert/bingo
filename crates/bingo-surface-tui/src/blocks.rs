@@ -608,6 +608,7 @@ mod tests {
                 data: serde_json::json!({ "id": "job_ab12cd34", "command": "sleep 45" }),
                 fold: "Started in the background as job_ab12cd34".into(),
             }),
+            upshot: None,
         };
         let set = serde_json::json!({
             "kind": "table", "headers": ["job", "command", "since"],

@@ -42,6 +42,7 @@ mod shell;
 mod sink;
 mod supervise;
 mod tail;
+mod upshot;
 
 use std::path::Path;
 use std::sync::Arc;
@@ -257,6 +258,7 @@ fn answered(text: String, job: &Job) -> ToolOutput {
         parts: vec![ContentPart::text(text)],
         is_error: false,
         display: Some(jobs::shown(job)),
+        upshot: Some(bingo_sdk::Upshot::plain("in background")),
     }
 }
 

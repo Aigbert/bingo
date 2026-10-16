@@ -201,6 +201,13 @@ mod tests {
         );
         let text = out.parts[0].as_text().expect("text");
         assert!(text.ends_with(": 1 replacement"), "got {text}");
+        assert_eq!(
+            out.outcome(),
+            Some(bingo_sdk::Upshot::Diff {
+                added: 1,
+                removed: 1
+            })
+        );
         assert!(!out.is_error);
     }
 

@@ -866,6 +866,7 @@ mod tests {
             )],
             is_error: false,
             display: None,
+            upshot: None,
         };
         let state = folded(vec![item_frame(
             1,
@@ -1312,6 +1313,7 @@ mod tests {
                         parts: vec![ContentPart::text("reviewer started")],
                         is_error: false,
                         display: None,
+                        upshot: None,
                     }),
                     ItemStatus::Completed,
                 ),
@@ -1480,6 +1482,7 @@ mod tests {
                     vec!["2".into(), "ship it".into()],
                 ],
             }),
+            upshot: None,
         };
         let state = folded(vec![item_frame(
             1,
@@ -1757,6 +1760,7 @@ mod tests {
             )],
             is_error: false,
             display: None,
+            upshot: None,
         };
         let state = folded(vec![item_frame(
             1,
@@ -1799,6 +1803,7 @@ mod tests {
             )],
             is_error: false,
             display: None,
+            upshot: None,
         };
         let state = folded(vec![item_frame(
             1,

@@ -215,6 +215,7 @@ mod tests {
                 parts,
                 is_error: false,
                 display: None,
+                upshot: None,
             },
         };
         output("pictures", Ok(serde_json::to_value(result).unwrap()))

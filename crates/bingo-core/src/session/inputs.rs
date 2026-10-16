@@ -126,7 +126,7 @@ impl Actor {
             Ok(CommandOutcome::View { view }) => {
                 self.applied(intent, json!({ "view": view })).await?
             }
-            Ok(CommandOutcome::Record { body }) => self.recorded(intent, body).await?,
+            Ok(CommandOutcome::Record { body }) => self.recorded(intent, *body).await?,
             Ok(CommandOutcome::Prompt { text }) => {
                 let text = invocation.prompt(&text);
                 gate::gate_input(

@@ -92,7 +92,16 @@ impl Tool for WebSearchTool {
         }
         let found = self.find(query).await?;
         let kept = hits::filter(found, &args.allowed_domains, &args.blocked_domains);
-        Ok(ToolOutput::text(hits::render(query, &kept)))
+        Ok(ToolOutput::text(hits::render(query, &kept)).with_upshot(results(kept.len())))
+    }
+}
+
+/// How many results a search kept, the line its step shows.
+fn results(count: usize) -> bingo_sdk::Upshot {
+    match count {
+        0 => bingo_sdk::Upshot::plain("none"),
+        1 => bingo_sdk::Upshot::plain("1 result"),
+        many => bingo_sdk::Upshot::plain(format!("{many} results")),
     }
 }
 
@@ -167,6 +176,11 @@ mod tests {
         assert!(out.starts_with("Results for \"rust async\":"), "got {out}");
         assert!(out.contains("1. Title — https://a.example/1"), "got {out}");
         assert!(out.contains("2. Title — https://b.example/2"), "got {out}");
+        let found = tool
+            .call(serde_json::json!({ "query": "rust async" }), &context())
+            .await
+            .expect("search");
+        assert_eq!(found.outcome(), Some(bingo_sdk::Upshot::plain("2 results")));
     }
 
     #[tokio::test]

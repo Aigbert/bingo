@@ -2742,6 +2742,7 @@ mod tests {
                             )],
                             display: None,
                             is_error: false,
+                            upshot: None,
                         }),
                         progress: None,
                         duration_ms: Some(3),

@@ -2598,6 +2598,17 @@
                     "type": "null"
                   }
                 ]
+              },
+              "upshot": {
+                "description": "What the call came to in one line, for the step that shows it\n(ADR-0095 §9). The model never reads it.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Upshot"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -3979,6 +3990,57 @@
               "SessionStatus",
               "Toast",
               "Welcome"
+            ]
+          },
+          "Upshot": {
+            "description": "A call's result in one line: `+1 −1`, `3 passed`, `exit 1`.",
+            "oneOf": [
+              {
+                "description": "Lines a change added and removed; counts add up across a turn.",
+                "type": "object",
+                "properties": {
+                  "added": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "removed": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "diff"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "added",
+                  "removed"
+                ]
+              },
+              {
+                "description": "A few words, and whether they are good or bad news.",
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "$ref": "#/$defs/Tone"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "words"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text",
+                  "tone"
+                ]
+              }
             ]
           }
         }
@@ -6961,6 +7023,17 @@
                     "type": "null"
                   }
                 ]
+              },
+              "upshot": {
+                "description": "What the call came to in one line, for the step that shows it\n(ADR-0095 §9). The model never reads it.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Upshot"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -8197,6 +8270,57 @@
               "SessionStatus",
               "Toast",
               "Welcome"
+            ]
+          },
+          "Upshot": {
+            "description": "A call's result in one line: `+1 −1`, `3 passed`, `exit 1`.",
+            "oneOf": [
+              {
+                "description": "Lines a change added and removed; counts add up across a turn.",
+                "type": "object",
+                "properties": {
+                  "added": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "removed": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "diff"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "added",
+                  "removed"
+                ]
+              },
+              {
+                "description": "A few words, and whether they are good or bad news.",
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "$ref": "#/$defs/Tone"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "words"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text",
+                  "tone"
+                ]
+              }
             ]
           },
           "Level": {
@@ -10098,7 +10222,7 @@
                 ]
               },
               {
-                "description": "One completed item the kernel records in the transcript (a shell\nline's output, a login's receipt); the ack carries its id.",
+                "description": "One completed item the kernel records in the transcript (a shell\nline's output, a login's receipt); the ack carries its id. Boxed: an\nitem body outweighs every other outcome.",
                 "type": "object",
                 "properties": {
                   "body": {
@@ -12100,10 +12224,72 @@
                     "type": "null"
                   }
                 ]
+              },
+              "upshot": {
+                "description": "What the call came to in one line, for the step that shows it\n(ADR-0095 §9). The model never reads it.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Upshot"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
               "parts"
+            ]
+          },
+          "Upshot": {
+            "description": "A call's result in one line: `+1 −1`, `3 passed`, `exit 1`.",
+            "oneOf": [
+              {
+                "description": "Lines a change added and removed; counts add up across a turn.",
+                "type": "object",
+                "properties": {
+                  "added": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "removed": {
+                    "type": "integer",
+                    "format": "uint32",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "diff"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "added",
+                  "removed"
+                ]
+              },
+              {
+                "description": "A few words, and whether they are good or bad news.",
+                "type": "object",
+                "properties": {
+                  "text": {
+                    "type": "string"
+                  },
+                  "tone": {
+                    "$ref": "#/$defs/Tone"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "words"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "text",
+                  "tone"
+                ]
+              }
             ]
           },
           "TurnId": {

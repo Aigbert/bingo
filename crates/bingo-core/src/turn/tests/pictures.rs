@@ -28,6 +28,7 @@ impl Tool for PictureTool {
             parts: vec![ContentPart::Image(self.image.clone())],
             is_error: false,
             display: None,
+            upshot: None,
         })
     }
 }

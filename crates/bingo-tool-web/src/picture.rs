@@ -27,5 +27,6 @@ pub(crate) fn output(image: Image) -> ToolOutput {
         parts: vec![ContentPart::Image(image)],
         is_error: false,
         display: None,
+        upshot: None,
     }
 }

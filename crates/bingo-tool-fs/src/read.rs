@@ -100,6 +100,7 @@ async fn bounded(
         parts,
         is_error: false,
         display: None,
+        upshot: None,
     })
 }
 
@@ -137,6 +138,7 @@ fn original(media_type: &'static str, bytes: &[u8], path: &Path) -> Result<ToolO
         parts: vec![ContentPart::Image(seen.at(path))],
         is_error: false,
         display: None,
+        upshot: None,
     })
 }
 

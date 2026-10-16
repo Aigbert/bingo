@@ -38,11 +38,11 @@ fn outcome(value: Value) -> Result<Value, KernelError> {
         return Ok(value);
     };
     serde_json::to_value(CommandOutcome::Record {
-        body: ItemBody::Notice {
+        body: Box::new(ItemBody::Notice {
             level: Level::Info,
             code: "model.choice".into(),
             text,
-        },
+        }),
     })
     .map_err(crate::error)
 }
@@ -54,7 +54,7 @@ mod tests {
     fn choice_receipts_are_recorded_and_other_outcomes_are_unchanged() {
         let value = outcome(json!({"kind":"applied","message":"⇄ small · here"})).unwrap();
         assert!(
-            matches!(serde_json::from_value::<CommandOutcome>(value).unwrap(), CommandOutcome::Record { body: ItemBody::Notice {text, ..}} if text == "⇄ small · here")
+            matches!(serde_json::from_value::<CommandOutcome>(value).unwrap(), CommandOutcome::Record { body } if matches!(body.as_ref(), ItemBody::Notice {text, ..} if text == "⇄ small · here"))
         );
         let other = json!({"kind":"applied","message":"pinned"});
         assert_eq!(outcome(other.clone()).unwrap(), other);

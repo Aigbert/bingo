@@ -335,7 +335,8 @@ impl Tool for GrepTool {
             .await
             .map_err(|e| ToolError::Failed(format!("the search did not finish: {e}")))?;
         if found.is_empty() {
-            return Ok(ToolOutput::text(format!("No matches for {}", args.pattern)));
+            return Ok(ToolOutput::text(format!("No matches for {}", args.pattern))
+                .with_upshot(crate::upshot::found(0, noun(mode))));
         }
         let lines = found
             .iter()
@@ -351,7 +352,7 @@ impl Tool for GrepTool {
             usize::MAX,
             noun(mode),
         )));
-        Ok(result)
+        Ok(result.with_upshot(crate::upshot::found(found.len(), noun(mode))))
     }
 }
 
@@ -441,6 +442,22 @@ mod tests {
                 path: PathBuf::from("/work/src")
             }]
         );
+    }
+
+    #[tokio::test]
+    async fn a_search_says_how_much_it_found_in_one_line() {
+        let dir = tree();
+        let cx = context(dir.path());
+        let found = GrepTool
+            .call(serde_json::json!({ "pattern": "needle" }), &cx)
+            .await
+            .expect("grep");
+        assert_eq!(found.outcome(), Some(bingo_sdk::Upshot::plain("1 file")));
+        let none = GrepTool
+            .call(serde_json::json!({ "pattern": "absent" }), &cx)
+            .await
+            .expect("grep");
+        assert_eq!(none.outcome(), Some(bingo_sdk::Upshot::plain("none")));
     }
 
     #[tokio::test]

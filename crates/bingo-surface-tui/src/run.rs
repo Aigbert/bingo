@@ -1961,6 +1961,7 @@ mod tests {
                 ))],
                 display: None,
                 is_error: false,
+                upshot: None,
             }),
             ItemStatus::Completed,
         );
@@ -2114,6 +2115,7 @@ mod tests {
                 parts: vec![bingo_sdk::ContentPart::Image(picture)],
                 display: None,
                 is_error: false,
+                upshot: None,
             }),
             ItemStatus::Completed,
         );
@@ -2717,6 +2719,7 @@ mod tests {
                 ))],
                 display: None,
                 is_error: false,
+                upshot: None,
             }),
             ItemStatus::Completed,
         );

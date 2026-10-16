@@ -373,6 +373,7 @@ fn block() -> ToolOutput {
         parts: vec![ContentPart::text("1 row")],
         is_error: false,
         display: Some(board("pending")),
+        upshot: None,
     }
 }
 

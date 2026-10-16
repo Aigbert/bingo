@@ -658,8 +658,20 @@ export type Tone = (("neutral" | "good" | "bad") | "attention");
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
  */
-export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
+export type ToolOutput = {
+  "display"?: (View | null);
+  "isError"?: boolean;
+  "parts": Array<ContentPart>;
+  /**
+   * What the call came to in one line, for the step that shows it
+   * (ADR-0095 §9). The model never reads it.
+   */
+  "upshot"?: (Upshot | null);
+  [key: string]: unknown;
+};
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
+/** A call's result in one line: `+1 −1`, `3 passed`, `exit 1`. */
+export type Upshot = ({ "added": number; "kind": "diff"; "removed": number; [key: string]: unknown; } | { "kind": "words"; "text": string; "tone": Tone; [key: string]: unknown; });
 export type View = ({
   /** Draw the text bold. */
   "bold"?: (boolean | null);
@@ -1355,7 +1367,17 @@ export type Tone = (("neutral" | "good" | "bad") | "attention");
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
  */
-export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
+export type ToolOutput = {
+  "display"?: (View | null);
+  "isError"?: boolean;
+  "parts": Array<ContentPart>;
+  /**
+   * What the call came to in one line, for the step that shows it
+   * (ADR-0095 §9). The model never reads it.
+   */
+  "upshot"?: (Upshot | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
@@ -1371,6 +1393,8 @@ export type ToolSpec = {
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
 /** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
+/** A call's result in one line: `+1 −1`, `3 passed`, `exit 1`. */
+export type Upshot = ({ "added": number; "kind": "diff"; "removed": number; [key: string]: unknown; } | { "kind": "words"; "text": string; "tone": Tone; [key: string]: unknown; });
 export type View = ({
   /** Draw the text bold. */
   "bold"?: (boolean | null);
@@ -2113,10 +2137,22 @@ export type Tone = (("neutral" | "good" | "bad") | "attention");
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
  */
-export type ToolOutput = { "display"?: (View | null); "isError"?: boolean; "parts": Array<ContentPart>; [key: string]: unknown; };
+export type ToolOutput = {
+  "display"?: (View | null);
+  "isError"?: boolean;
+  "parts": Array<ContentPart>;
+  /**
+   * What the call came to in one line, for the step that shows it
+   * (ADR-0095 §9). The model never reads it.
+   */
+  "upshot"?: (Upshot | null);
+  [key: string]: unknown;
+};
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
 /** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
+/** A call's result in one line: `+1 −1`, `3 passed`, `exit 1`. */
+export type Upshot = ({ "added": number; "kind": "diff"; "removed": number; [key: string]: unknown; } | { "kind": "words"; "text": string; "tone": Tone; [key: string]: unknown; });
 export type View = ({
   /** Draw the text bold. */
   "bold"?: (boolean | null);

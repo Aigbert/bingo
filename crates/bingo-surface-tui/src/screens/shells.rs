@@ -36,6 +36,7 @@ fn backgrounded(seq: u64) -> bingo_sdk::Frame {
             data: json!({ "id": ID, "command": COMMAND }),
             fold: format!("Started in the background as {ID}"),
         }),
+        upshot: None,
     };
     item(
         seq,

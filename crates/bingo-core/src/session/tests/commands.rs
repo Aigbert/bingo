@@ -242,11 +242,11 @@ async fn a_record_outcome_is_an_item_and_an_action_dispatches_by_name() {
         "note",
         true,
         Ok(CommandOutcome::Record {
-            body: ItemBody::Action {
+            body: Box::new(ItemBody::Action {
                 name: "note".into(),
                 args: json!("x"),
                 result: Some(json!("ok")),
-            },
+            }),
         }),
     );
     let mailbox = with_commands(ScriptedProvider::new(vec![]), vec![note.clone()]);

@@ -306,6 +306,7 @@ fn quiet_is_a_record_flag_and_still_shows_displays_and_failures() {
             parts: vec![],
             is_error: false,
             display: Some(View::text("placed result")),
+            upshot: None,
         }),
         ItemStatus::Completed,
     );

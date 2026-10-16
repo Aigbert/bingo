@@ -134,6 +134,7 @@ pub async fn output(result: CallToolResult) -> ToolOutput {
         parts,
         is_error: result.is_error.unwrap_or(false),
         display: None,
+        upshot: None,
     }
 }
 

@@ -24,7 +24,7 @@ use crate::contributor::CONTRIBUTOR_PREFIX;
 use crate::error::KernelError;
 use crate::ids::{IntentId, InteractionId, ItemId, Seq, SessionId, TurnId};
 use crate::model::{ContentPart, ProviderMetadata, Usage};
-use crate::view::View;
+use crate::view::{Tone, View};
 
 fn is_false(b: &bool) -> bool {
     !*b
@@ -633,6 +633,10 @@ pub struct ToolOutput {
     pub is_error: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display: Option<View>,
+    /// What the call came to in one line, for the step that shows it
+    /// (ADR-0095 §9). The model never reads it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub upshot: Option<Upshot>,
 }
 
 impl ToolOutput {
@@ -641,6 +645,7 @@ impl ToolOutput {
             parts: vec![ContentPart::text(text)],
             is_error: false,
             display: None,
+            upshot: None,
         }
     }
 
@@ -649,8 +654,71 @@ impl ToolOutput {
             parts: vec![ContentPart::text(text)],
             is_error: true,
             display: None,
+            upshot: None,
         }
     }
+
+    pub fn with_upshot(mut self, upshot: Upshot) -> Self {
+        self.upshot = Some(upshot);
+        self
+    }
+
+    /// What the call came to: the line the tool wrote, else the counts of the
+    /// change it showed. The diff is the fact and its counts are read off it,
+    /// never written beside it.
+    pub fn outcome(&self) -> Option<Upshot> {
+        self.upshot.clone().or_else(|| match &self.display {
+            Some(View::Diff { unified }) => Some(Upshot::of_diff(unified)),
+            _ => None,
+        })
+    }
+}
+
+impl Upshot {
+    /// The lines a unified diff adds and removes, counted past its header.
+    pub fn of_diff(unified: &str) -> Self {
+        let hunks = unified.lines().skip_while(|line| !line.starts_with("@@"));
+        let (mut added, mut removed) = (0, 0);
+        for line in hunks {
+            match line.as_bytes().first() {
+                Some(b'+') => added += 1,
+                Some(b'-') => removed += 1,
+                _ => {}
+            }
+        }
+        Self::Diff { added, removed }
+    }
+
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self::Words {
+            text: text.into(),
+            tone: Tone::Neutral,
+        }
+    }
+
+    pub fn good(text: impl Into<String>) -> Self {
+        Self::Words {
+            text: text.into(),
+            tone: Tone::Good,
+        }
+    }
+
+    pub fn bad(text: impl Into<String>) -> Self {
+        Self::Words {
+            text: text.into(),
+            tone: Tone::Bad,
+        }
+    }
+}
+
+/// A call's result in one line: `+1 −1`, `3 passed`, `exit 1`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Upshot {
+    /// Lines a change added and removed; counts add up across a turn.
+    Diff { added: u32, removed: u32 },
+    /// A few words, and whether they are good or bad news.
+    Words { text: String, tone: Tone },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -1307,6 +1375,32 @@ mod tests {
         assert!(ItemStatus::Failed.failed(None));
         assert!(ItemStatus::Failed.failed(Some(&clean)));
         assert!(!ItemStatus::Interrupted.failed(Some(&clean)));
+    }
+
+    /// A change's counts come off its diff, so the tool writes them once;
+    /// a line the tool wrote wins over them.
+    #[test]
+    fn a_calls_outcome_is_its_own_line_else_its_diffs_counts() {
+        let unified = "--- a.rs\n+++ a.rs\n@@ -1,2 +1,2 @@\n one\n-two\n+too\n+three\n";
+        let mut changed = ToolOutput::text("Edited a.rs");
+        changed.display = Some(View::Diff {
+            unified: unified.into(),
+        });
+        assert_eq!(
+            changed.outcome(),
+            Some(Upshot::Diff {
+                added: 2,
+                removed: 1
+            })
+        );
+        let said = ToolOutput::text("ok").with_upshot(Upshot::good("3 passed"));
+        assert_eq!(said.outcome(), Some(Upshot::good("3 passed")));
+        assert_eq!(ToolOutput::text("plain").outcome(), None);
+        let wire = serde_json::to_value(Upshot::bad("exit 1")).expect("an upshot");
+        assert_eq!(
+            wire,
+            serde_json::json!({ "kind": "words", "text": "exit 1", "tone": "bad" })
+        );
     }
 
     #[test]

@@ -280,6 +280,7 @@ mod tests {
             parts: vec![ContentPart::text("one"), ContentPart::text("two")],
             is_error: false,
             display: None,
+            upshot: None,
         };
         let value = response(&output);
         assert_eq!(

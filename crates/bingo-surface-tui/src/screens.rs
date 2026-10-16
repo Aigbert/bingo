@@ -264,6 +264,7 @@ fn tool_done_with_output() {
         )],
         is_error: false,
         display: None,
+        upshot: None,
     };
     let state = folded(vec![
         item(1, user("itm_0", "read the manifest")),

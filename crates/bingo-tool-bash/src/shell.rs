@@ -56,12 +56,12 @@ impl Command for ShellCommand {
             .await
             .map_err(failed)?;
         Ok(CommandOutcome::Record {
-            body: ItemBody::Shell {
+            body: Box::new(ItemBody::Shell {
                 command: line.to_string(),
                 output: wrote(&finished),
                 exit: exit_of(finished.ended),
                 cwd: cx.cwd.clone(),
-            },
+            }),
         })
     }
 }
@@ -111,15 +111,15 @@ mod tests {
             .run(line, &context(cwd.to_path_buf()))
             .await
             .expect("the line ran");
-        let CommandOutcome::Record {
-            body:
-                ItemBody::Shell {
-                    command,
-                    output,
-                    exit,
-                    cwd: ran_in,
-                },
-        } = &outcome
+        let CommandOutcome::Record { body } = &outcome else {
+            panic!("a shell line records an item, got {outcome:?}");
+        };
+        let ItemBody::Shell {
+            command,
+            output,
+            exit,
+            cwd: ran_in,
+        } = body.as_ref()
         else {
             panic!("a shell line records a shell item, got {outcome:?}");
         };

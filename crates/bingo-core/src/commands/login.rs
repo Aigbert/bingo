@@ -115,11 +115,11 @@ fn parse(args: &str) -> Result<(&str, Option<LoginMethod>), KernelError> {
 /// they typed and the model learns what changed.
 fn receipt_of(name: &str, provider: &str, receipt: String) -> CommandOutcome {
     CommandOutcome::Record {
-        body: ItemBody::Action {
+        body: Box::new(ItemBody::Action {
             name: name.into(),
             args: json!(provider),
             result: Some(json!(receipt)),
-        },
+        }),
     }
 }
 
