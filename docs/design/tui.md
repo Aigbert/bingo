@@ -360,30 +360,30 @@ A payload carrying `slots` is drawn only in those places. Payloads without that 
 
 A word the vocabulary does not have is `View::Custom{kind, data, fold}` (ADR-0038): the plugin names the element, ships the data it owns and writes the fold, and this surface draws the fold — the same text it draws for a `kind` off the wire that is newer than the binary reading it.
 
-The worked example is `crates/bingo-demo-ui` — read it whole; this is a minimal placement example (the plugin also supplies Tick/Reset actions), and `cargo test --doc -p bingo-demo-ui` compiles it:
+The worked example is `crates/bingo-mod-hello` — read it whole; this is a minimal placement example (the plugin also supplies Tick/Reset actions), and `cargo test --doc -p bingo-mod-hello` compiles it:
 
 ```rust
-use bingo_demo_ui::Board;
+use bingo_mod_hello::board;
 use bingo_sdk::{ContentPart, HostHandle, ItemId, KernelError, SessionId, ToolOutput, View};
 use bingo_sdk::slot::{self, Slot};
 
 /// The block lane: a person reads the board, the model reads the text.
 fn block() -> ToolOutput {
     ToolOutput {
-        parts: vec![ContentPart::text("3 rows")],
+        parts: vec![ContentPart::text("1 row")],
         is_error: false,
-        display: Some(Board::default().view()),
+        display: Some(board("pending")),
     }
 }
 
 /// A journaled row, attached to the item recorded by the command.
 async fn row(host: &HostHandle, session: &SessionId, item: ItemId) -> Result<(), KernelError> {
-    let board = Board::default();
-    let payload = serde_json::to_value(board.view()).unwrap_or_default();
-    host.extend(session, "bingo.demo.ui", "board",
+    let board = board("pending");
+    let payload = serde_json::to_value(board.clone()).unwrap_or_default();
+    host.extend(session, "hello", "board",
         slot::with(payload, [Slot::Row {
             item, mark: None, title: Some("Board".into()), badge: None, caption: None,
-            body: Some(board.view()), actions: vec![],
+            body: Some(board.clone()), actions: vec![],
         }])).await
 }
 
@@ -393,7 +393,7 @@ async fn live(host: &HostHandle, session: &SessionId, step: u64) -> Result<(), K
     let payload = slot::with(serde_json::json!({}), [Slot::Activity {
         verb: None, view: bar.into(),
     }]);
-    host.signal(session, "bingo.demo.ui", "progress", payload).await
+    host.signal(session, "hello", "progress", payload).await
 }
 ```
 

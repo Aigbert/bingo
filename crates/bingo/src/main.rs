@@ -24,7 +24,6 @@ use bingo_checkpoints::CheckpointsPlugin;
 use bingo_context::ContextPlugin;
 use bingo_core::settings;
 use bingo_core::{Host, HostConfig};
-use bingo_demo_ui::DemoUiPlugin;
 use bingo_experience::ExperiencePlugin;
 use bingo_hooks_shell::ShellHooksPlugin;
 use bingo_mcp::McpPlugin;
@@ -144,10 +143,8 @@ struct Cli {
     #[arg(long)]
     no_print_on_exit: bool,
 
-    /// Register the demo plugin: `/board`, `DemoProgress`, and the three
-    /// lanes of ADR-0013 to look at. Off unless this or
-    /// `enabledPlugins["bingo.demo.ui"]` says otherwise.
-    #[arg(long, global = true)]
+    /// Accepted for compatibility; the demo plugin has been removed.
+    #[arg(long, global = true, hide = true)]
     demo_ui: bool,
 
     /// Listen on an IM channel beside this run: `loopback[=host:port]`
@@ -331,6 +328,7 @@ async fn run(cli: Cli) -> Result<i32, KernelError> {
     // pidfile goes only once every plugin has given its own claims back.
     let mut resident = resident(work, &cwd)?;
     let config = host_config(&cli, &cwd, &platforms)?;
+    composition::retired_demo(&cli, &config.layers);
     let merged = composition::merged(&config.layers, &platforms)?;
     let listening = composition::listening(&cli, &merged, &platforms)?;
     let composition = Composition::for_cli(&cli, &merged);
@@ -557,6 +555,7 @@ async fn switched_plugins(
         "cli",
         cli_layer(cli),
     ));
+    composition::retired_demo(cli, &layers);
     let merged = composition::merged(&layers, platforms)?;
     let composed = plugins(Composition::for_cli(cli, &merged), platforms, cwd)?;
     plugins::run(action, env, cwd, &layers, composed)
@@ -742,8 +741,10 @@ fn plugins(
         Box::new(TuiPlugin::new(composition.tui)),
         Box::new(ChannelsPlugin::new(platforms.clone())),
     ]);
-    if composition.demo {
-        all.push(Box::new(DemoUiPlugin::default()));
+    if std::env::var_os(bingo_provider_fake::SCRIPT_ENV).is_some()
+        && std::env::var_os(bingo_mod_hello::ENABLE_ENV).is_some()
+    {
+        all.push(Box::new(bingo_mod_hello::Harness));
     }
     Ok(all)
 }
@@ -934,10 +935,7 @@ mod tests {
         let cli = Cli::parse_from(["bingo"]);
         let platforms = platforms(&Env::rooted(std::env::temp_dir()));
         let claims: Vec<_> = plugins(
-            Composition {
-                demo: true,
-                ..Default::default()
-            },
+            Composition::default(),
             &platforms,
             std::path::Path::new("."),
         )
@@ -945,25 +943,16 @@ mod tests {
         .iter()
         .filter_map(|plugin| settings::Claim::from_manifest(plugin.manifest()))
         .collect();
-        for (lower, higher, demo, chat) in [
-            (json!({}), json!({}), false, false),
-            (
-                json!({}),
-                json!({"enabledPlugins": {"bingo.demo.ui": true}}),
-                true,
-                false,
-            ),
-            (json!({"demoUi": true}), json!({}), true, false),
+        for (lower, higher, chat) in [
+            (json!({}), json!({}), false),
             (
                 json!({"channels": {"feishu": {"appId": "test"}}}),
                 json!({"channels": null}),
-                false,
                 false,
             ),
             (
                 json!({"channels": {"feishu": {"appId": "test"}}}),
                 json!({"channels": {"coalesce": {"minChars": 12}}}),
-                false,
                 true,
             ),
         ] {
@@ -971,11 +960,6 @@ mod tests {
             let merged = settings::merge(&layers, &claims).unwrap();
             let slice = &merged.plugins[ChannelsPlugin::new(platforms.clone()).manifest().id];
             assert_eq!(bingo_channels::wanted(slice, &platforms).unwrap(), chat);
-            assert_eq!(
-                composition::demo(cli.demo_ui, &merged),
-                demo,
-                "demo: {layers:?}"
-            );
             assert_eq!(
                 composition::listening(&cli, &merged, &platforms).unwrap(),
                 chat,

@@ -1,5 +1,5 @@
 //! Black-box: a plugin's three lanes (ADR-0013 §2) over the wire and through
-//! the journal, with the demo plugin turned on by `--demo-ui`. A panel is
+//! the journal, with the hello fixture enabled explicitly. A panel is
 //! durable and comes back for the next run; a signal is on the live stream
 //! and nowhere else; a button fires a command and the table changes.
 
@@ -17,13 +17,19 @@ use crate::support;
 
 use support::{LIMIT, Server, ack_for, create, ready, who};
 
-/// One turn that calls the demo's tool, and one that says so.
+/// Two fixture progress calls followed by one answer.
 const PROGRESS_TURN: &str = r#"{"responses":[
-    {"steps":[{"toolCall":{"name":"DemoProgress","input":{"label":"cargo test"}}}]},
+    {"steps":[{"toolCall":{"name":"HelloProgress","input":{"value":0}}}]},
+    {"steps":[{"toolCall":{"name":"HelloProgress","input":{"value":100}}}]},
     {"steps":[{"text":"The bar has run."}]}
 ]}"#;
 
 const NOTHING: &str = r#"{"responses":[{"steps":[{"text":"nothing to do"}]}]}"#;
+
+fn hello(home: tempfile::TempDir, script: &str) -> Server {
+    let cwd = home.path().to_path_buf();
+    Server::spawn_in_with_env(home, script, &[], &cwd, &[("BINGO_FAKE_HELLO", "1")])
+}
 
 fn intent(n: u8) -> IntentId {
     IntentId::from_raw(format!("req_01HVIEWS00000000000000000{n}"))
@@ -40,6 +46,11 @@ async fn command(attachment: &mut Attachment, n: u8, text: &str) -> IntentOutcom
 
 /// Fire a button, which is what a surface does with a `View::Actions` item.
 async fn fire(attachment: &mut Attachment, n: u8, name: &str) -> IntentOutcome {
+    let intent = submit_action(attachment, n, name);
+    ack_for(attachment, &intent).await
+}
+
+fn submit_action(attachment: &Attachment, n: u8, name: &str) -> IntentId {
     let intent = intent(n);
     attachment.handle.submit(
         intent.clone(),
@@ -51,7 +62,7 @@ async fn fire(attachment: &mut Attachment, n: u8, name: &str) -> IntentOutcome {
             origin: Some(bingo_sdk::Origin::surface("tui")),
         },
     );
-    ack_for(attachment, &intent).await
+    intent
 }
 
 /// The board as the session has it, read as the vocabulary it is published in.
@@ -59,7 +70,7 @@ fn board(attachment: &Attachment) -> View {
     let payload = attachment
         .snapshot
         .extensions
-        .get("bingo.demo.ui")
+        .get("hello")
         .and_then(|kinds| kinds.get("board"))
         .unwrap_or_else(|| panic!("no board in {:?}", attachment.snapshot.extensions));
     serde_json::from_value(payload.clone()).expect("a panel published in the vocabulary")
@@ -103,14 +114,14 @@ fn buttons(view: &View) -> Vec<String> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_button_fires_its_command_and_the_table_changes() {
-    let mut server = Server::spawn_with(NOTHING, &["--demo-ui"]);
+    let mut server = hello(tempfile::tempdir().unwrap(), NOTHING);
     let kernel = ready(&mut server).await;
     let mut attachment = kernel
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
 
-    let published = command(&mut attachment, 1, "/board").await;
+    let published = command(&mut attachment, 1, "/hello-board").await;
     assert!(
         matches!(published, IntentOutcome::Applied { .. }),
         "{published:?}"
@@ -118,12 +129,12 @@ async fn a_button_fires_its_command_and_the_table_changes() {
     let first = board(&attachment);
     assert_eq!(
         buttons(&first),
-        ["board.tick", "board.reset"],
+        ["hello.tick", "hello.reset"],
         "a button names the command a surface fires"
     );
     assert_eq!(rows(&first)[0][2], "pending");
 
-    let ticked = fire(&mut attachment, 2, "board.tick").await;
+    let ticked = fire(&mut attachment, 2, "hello.tick").await;
     assert!(
         matches!(ticked, IntentOutcome::Applied { .. }),
         "{ticked:?}"
@@ -134,6 +145,29 @@ async fn a_button_fires_its_command_and_the_table_changes() {
         "the row the button moved on"
     );
 
+    let reset = fire(&mut attachment, 3, "hello.reset").await;
+    assert!(matches!(reset, IntentOutcome::Applied { .. }), "{reset:?}");
+    assert_eq!(rows(&board(&attachment))[0][2], "pending");
+    kernel.shutdown().await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn concurrent_buttons_preserve_both_changes_and_the_placed_row() {
+    let mut server = hello(tempfile::tempdir().unwrap(), NOTHING);
+    let kernel = ready(&mut server).await;
+    let mut first = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    command(&mut first, 1, "/hello-board").await;
+    let waiting = vec![
+        submit_action(&first, 2, "hello.tick"),
+        submit_action(&first, 3, "hello.tick"),
+    ];
+    applied(&mut first, waiting).await;
+    assert_eq!(rows(&board(&first))[0][2], "done");
+    let placed = bingo_sdk::slot::placed(&first.snapshot);
+    assert!(placed.iter().any(|placed| matches!(&placed.slot, bingo_sdk::slot::Slot::Row { body: Some(View::Table { rows, .. }), .. } if rows[0][2] == "done")));
     kernel.shutdown().await.unwrap();
 }
 
@@ -141,13 +175,13 @@ async fn a_button_fires_its_command_and_the_table_changes() {
 /// out of the journal the next run replays.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_signal_is_on_the_live_stream_and_never_in_the_journal() {
-    let mut server = Server::spawn_with(PROGRESS_TURN, &["--demo-ui"]);
+    let mut server = hello(tempfile::tempdir().unwrap(), PROGRESS_TURN);
     let kernel = ready(&mut server).await;
     let mut attachment = kernel
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    command(&mut attachment, 1, "/board").await;
+    command(&mut attachment, 1, "/hello-board").await;
 
     let intent = intent(2);
     attachment.handle.submit(
@@ -156,6 +190,23 @@ async fn a_signal_is_on_the_live_stream_and_never_in_the_journal() {
     );
     let live = until_completed(&mut attachment).await;
 
+    assert_progress_lanes(&attachment, &live);
+    let reset = fire(&mut attachment, 3, "hello.reset").await;
+    assert!(matches!(reset, IntentOutcome::Applied { .. }), "{reset:?}");
+    assert!(
+        attachment
+            .snapshot
+            .signals
+            .get("hello")
+            .is_none_or(|kinds| !kinds.contains_key("progress"))
+    );
+
+    kernel.shutdown().await.unwrap();
+    assert!(server.child.wait().await.unwrap().success());
+    assert_journal_lanes(&server, &attachment, &live);
+}
+
+fn assert_progress_lanes(attachment: &Attachment, live: &[bingo_sdk::Frame]) {
     let bars: Vec<&Event> = live
         .iter()
         .map(|frame| &frame.event)
@@ -163,12 +214,25 @@ async fn a_signal_is_on_the_live_stream_and_never_in_the_journal() {
         .collect();
     assert!(bars.len() > 1, "the bar moved: {} frames", bars.len());
     assert!(
-        attachment.snapshot.signals.contains_key("bingo.demo.ui"),
+        attachment.snapshot.signals.contains_key("hello"),
         "and the latest frame is what a client shows"
     );
 
-    kernel.shutdown().await.unwrap();
-    assert!(server.child.wait().await.unwrap().success());
+    assert!(live.iter().any(|frame| matches!(&frame.event,
+        Event::ItemCompleted { item } if matches!(&item.body,
+            bingo_sdk::ItemBody::ToolCall { name, output: Some(output), .. }
+            if name == "HelloProgress" && matches!(output.display, Some(View::Progress { .. }))
+        )
+    )));
+    for event in &bars {
+        let Event::Signal { payload, .. } = event else {
+            unreachable!()
+        };
+        assert_eq!(payload["slots"][0]["kind"], "activity");
+    }
+}
+
+fn assert_journal_lanes(server: &Server, attachment: &Attachment, live: &[bingo_sdk::Frame]) {
     // events_since also tails live signals, even after TurnCompleted.
     let dir = server.sessions_dir().join(attachment.session.as_str());
     let journal = bingo_store_jsonl::journal::replay(&dir, Seq::ZERO).unwrap();
@@ -184,7 +248,7 @@ async fn a_signal_is_on_the_live_stream_and_never_in_the_journal() {
     );
     assert!(
         journal.iter().any(
-            |frame| matches!(&frame.event, Event::Extension { plugin, .. } if plugin == "bingo.demo.ui")
+            |frame| matches!(&frame.event, Event::Extension { plugin, .. } if plugin == "hello")
         ),
         "and the panel beside it is"
     );
@@ -194,14 +258,14 @@ async fn a_signal_is_on_the_live_stream_and_never_in_the_journal() {
 /// bar that was moving while it ran.
 #[tokio::test(flavor = "multi_thread")]
 async fn a_second_run_reads_the_board_back_and_not_the_bar() {
-    let mut first = Server::spawn_with(PROGRESS_TURN, &["--demo-ui"]);
+    let mut first = hello(tempfile::tempdir().unwrap(), PROGRESS_TURN);
     let kernel = ready(&mut first).await;
     let mut attachment = kernel
         .open(create(first.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    command(&mut attachment, 1, "/board").await;
-    fire(&mut attachment, 2, "board.tick").await;
+    command(&mut attachment, 1, "/hello-board").await;
+    fire(&mut attachment, 2, "hello.tick").await;
     let intent = intent(3);
     attachment.handle.submit(
         intent.clone(),
@@ -214,7 +278,7 @@ async fn a_second_run_reads_the_board_back_and_not_the_bar() {
 
     let home = first.into_home();
     let cwd = home.path().to_path_buf();
-    let mut second = Server::spawn_at(home, NOTHING, &["--demo-ui"]);
+    let mut second = hello(home, NOTHING);
     let kernel = ready(&mut second).await;
     let mut attachment = kernel
         .open(
@@ -238,14 +302,13 @@ async fn a_second_run_reads_the_board_back_and_not_the_bar() {
 
     // A second tick moves the same row on, which it could not do if the
     // journal had handed this run a fresh board.
-    fire(&mut attachment, 4, "board.tick").await;
+    fire(&mut attachment, 4, "hello.tick").await;
     assert_eq!(rows(&board(&attachment))[0][2], "done");
 
     kernel.shutdown().await.unwrap();
 }
 
-/// Fold frames until the turn completes; the frames seen. The demo's bar runs
-/// for three seconds, so this waits longer than a text turn would.
+/// Fold frames until the scripted turn completes.
 async fn until_completed(attachment: &mut Attachment) -> Vec<bingo_sdk::Frame> {
     let mut seen = Vec::new();
     let deadline = tokio::time::sleep(LIMIT + Duration::from_secs(10));
@@ -264,4 +327,28 @@ async fn until_completed(attachment: &mut Attachment) -> Vec<bingo_sdk::Frame> {
             _ = &mut deadline => panic!("the turn never completed"),
         }
     }
+}
+
+async fn applied(attachment: &mut Attachment, mut waiting: Vec<IntentId>) {
+    tokio::time::timeout(LIMIT, async {
+        while !waiting.is_empty() {
+            let frame = attachment
+                .events
+                .next()
+                .await
+                .expect("the stream stays open");
+            attachment.snapshot.apply(&frame);
+            if let Event::IntentAck { intent, outcome } = frame.event
+                && waiting.contains(&intent)
+            {
+                assert!(
+                    matches!(outcome, IntentOutcome::Applied { .. }),
+                    "{outcome:?}"
+                );
+                waiting.retain(|id| id != &intent);
+            }
+        }
+    })
+    .await
+    .expect("both buttons finish");
 }

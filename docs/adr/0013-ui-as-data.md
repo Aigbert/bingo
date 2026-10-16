@@ -40,3 +40,7 @@ Plan §2.10's "`View` generic rendering plus a `Widget` extension point; plugin 
 **2026-10-14 (M140, ADR-0079 §§1,3,6):** canonical elements replace written Stack/Columns while legacy views still read; styled Text carries children, Code carries source/language. Pulled placements and element handlers reuse View and Input::Action; hidden runtime UI commands own their handlers.
 
 **2026-10-14 (M141, ADR-0079 §4):** matched typed components may substitute the TUI’s own drawings through Engine; permission prompts remain engine-only.
+
+Amended 2026-10-16 (M181): retire `bingo-demo-ui`. The three-lane executable
+example and smoke use `bingo-mod-hello`, enabled only with an explicit scripted
+fake-provider fixture. Legacy demo inputs parse and report removal for one release.

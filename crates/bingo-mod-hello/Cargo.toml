@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "Built-in mod fixture and template; absent from the release list"
+description = "Built-in mod fixture and template for scripted harnesses"
 
 [lints]
 workspace = true

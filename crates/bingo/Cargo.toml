@@ -13,6 +13,7 @@ description = "bingo: a local coding-agent harness"
 workspace = true
 
 [dependencies]
+bingo-mod-hello.workspace = true
 # M133: typed scenarios, their schema, streams and disposable author-test homes.
 serde.workspace = true
 schemars.workspace = true
@@ -59,7 +60,6 @@ bingo-tasks.workspace = true
 bingo-experience.workspace = true
 bingo-schedule.workspace = true
 bingo-checkpoints.workspace = true
-bingo-demo-ui.workspace = true
 bingo-channels.workspace = true
 # `bingo provider add` writes a pasted key to the one credential store
 # (ADR-0012 §2): the library tier, not a new external crate.

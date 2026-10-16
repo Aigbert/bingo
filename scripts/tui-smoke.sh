@@ -393,11 +393,12 @@ for size in '80 24' '120 40' '200 50'; do
   tmux -L "$SOCKET" resize-window -t "$SESSION" -x "$width" -y "$height"
   step "placed board and activity at ${width}x${height} with a room open"
   start '{"responses":[
-    {"steps":[{"toolCall":{"name":"DemoProgress","input":{"label":"cargo test"}}}]},
-    {"steps":[{"text":"The bar has run."}]}]}' 'BINGO_MOTION=off' '--demo-ui'
+    {"steps":[{"toolCall":{"name":"HelloProgress","input":{"value":0}}}]},
+    {"steps":[{"delay":{"ms":1000}},{"toolCall":{"name":"HelloProgress","input":{"value":100}}}]},
+    {"steps":[{"delay":{"ms":500}},{"text":"The bar has run."}]}]}' 'BINGO_MOTION=off BINGO_FAKE_HELLO=1'
   keys '/room design' Enter
   await '#design'
-  keys '/board' Enter
+  keys '/hello-board' Enter
   await '[ 1 Tick ]'
   keys Tab
   await '❯ Board'
@@ -406,7 +407,7 @@ for size in '80 24' '120 40' '200 50'; do
   # The removed shortcut neither opens a sheet nor takes focus from the row.
   keys C-p
   keys '2'
-  await 'board reset'
+  await 'pending'
   await '❯ Board'
   keys Tab
   keys 'run the bar' Enter

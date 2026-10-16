@@ -23,8 +23,6 @@ bingo (bin)                     composes Vec<Box<dyn Plugin>>, picks a Surface
 │               bingo-persona               one system block: the stance bingo takes when it
 │                                           thinks the person's path is wrong (ADR-0059)
 │   surfaces    bingo-surface-print · bingo-surface-rpc · bingo-surface-tui · bingo-channels
-│   demo        bingo-demo-ui               off unless `--demo-ui`: the worked example of ADR-0013's
-│                                           three lanes, and what a plugin author reads first
 ├── compositions (`tier = "composition"`: the binary's own, moved out of it; only bingo depends
 │                on one, ADR-0020)
 │   bingo-gateway               one resident bingo per data dir, managed like a service: the

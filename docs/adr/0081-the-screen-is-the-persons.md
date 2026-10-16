@@ -69,13 +69,13 @@ No kernel door opens here: one sdk reducer rule changes (§5).
 
 - The transcript is the screen at every width; nothing appears beside it
   but a pane the person opened.
-- In-tree producers move to slots: demo-ui's board is a `Row` (its table
+- In-tree producers move to slots: the hello fixture's board is a `Row` (its table
   the body, Tick and Reset its actions), its progress an `Activity`; the
   schedule's `wake` and rooms' `owed`/`members` are data.
 - A plugin on the legacy lanes (protocol 1, external) is not drawn by the
   TUI until it places itself; its data is never lost.
 - The rail's snapshots, the sheet's and the pin tests go; `tui-smoke.sh`
-  reaches the board through `/board`.
+  reaches the board through `/hello-board`.
 - Mods parity: Claude Code's engine docks a pane by its own width rule;
   a bingo pane declares its place and size and the TUI honours what fits
   (M151). Nothing appears beside the transcript unless asked for.
@@ -92,3 +92,7 @@ Only person input writes it. At host publication, an unasked pane remembered
 open is seated; closed or unknown panes wait. Clicks submit host actions so all
 surfaces read the same decision. The input task-local remains unspoofable.
 Missing or corrupt choice data means waiting and never prevents startup.
+
+Amended 2026-10-16 (M181): retire `bingo-demo-ui`. The three-lane executable
+example and smoke use `bingo-mod-hello`, enabled only with an explicit scripted
+fake-provider fixture. Legacy demo inputs parse and report removal for one release.

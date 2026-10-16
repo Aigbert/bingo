@@ -268,31 +268,6 @@ fn an_external_plugins_tier_is_listed_from_user_settings_only() {
 }
 
 #[test]
-fn the_demo_is_opt_in_and_legacy_settings_report_the_new_switch() {
-    let home = tempfile::tempdir().unwrap();
-    let absent = run(plugins(home.path()).arg("list"));
-    assert_eq!(absent.status.code(), Some(0), "{}", stderr(&absent));
-    assert!(!stdout(&absent).contains("bingo.demo.ui"));
-    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
-    std::fs::write(user_settings(home.path()), "demoUi = true\n").unwrap();
-    let legacy = scripted(home.path(), &script(UNUSED), "/board");
-    assert_eq!(legacy.status.code(), Some(0), "{}", stderr(&legacy));
-    assert!(
-        stderr(&legacy).contains("enabledPlugins"),
-        "{}",
-        stderr(&legacy)
-    );
-    std::fs::write(
-        user_settings(home.path()),
-        "[enabledPlugins]\n\"bingo.demo.ui\" = true\n",
-    )
-    .unwrap();
-    let switched = run(plugins(home.path()).arg("list"));
-    assert_eq!(switched.status.code(), Some(0), "{}", stderr(&switched));
-    assert_eq!(row(&stdout(&switched), "bingo.demo.ui")[2], "on");
-}
-
-#[test]
 fn surface_values_match_the_help_snapshot() {
     let out = run(bingo().arg("--help"));
     assert_eq!(out.status.code(), Some(0));
@@ -635,4 +610,51 @@ fn a_session_leaves_a_personal_mod_directory_as_the_author_wrote_it() {
         ["main.ts", "plugin.json"],
         "no .bingo/, no tsconfig.json"
     );
+}
+
+#[test]
+fn retired_demo_inputs_parse_and_report_removal() {
+    for (settings, extra, notice) in [
+        ("", vec![], false),
+        ("demoUi = true\n", vec![], true),
+        ("[enabledPlugins]\n\"bingo.demo.ui\" = true\n", vec![], true),
+        ("", vec!["--demo-ui"], true),
+    ] {
+        let home = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+        std::fs::write(user_settings(home.path()), settings).unwrap();
+        let output = run(bingo()
+            .envs(home_env(home.path()))
+            .args(extra)
+            .arg("--cwd")
+            .arg(home.path())
+            .args(["plugins", "list"]));
+        assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+        assert!(!stdout(&output).contains("bingo.demo.ui"));
+        assert_eq!(
+            stderr(&output).contains("DEMO_REMOVED"),
+            notice,
+            "{}",
+            stderr(&output)
+        );
+    }
+}
+
+#[test]
+fn retired_demo_notice_keeps_ndjson_clean() {
+    let home = tempfile::tempdir().unwrap();
+    let fixture = script(UNUSED);
+    let output = run(bingo()
+        .envs(home_env(home.path()))
+        .env("BINGO_FAKE_SCRIPT", fixture.path())
+        .args(["--demo-ui", "--print", "--output-format", "json", "--cwd"])
+        .arg(home.path())
+        .arg("/status"));
+    assert_eq!(output.status.code(), Some(0), "{}", stderr(&output));
+    assert!(stderr(&output).contains("DEMO_REMOVED"));
+    let text = stdout(&output);
+    assert!(!text.trim().is_empty());
+    for line in text.lines() {
+        serde_json::from_str::<serde_json::Value>(line).expect("pure NDJSON");
+    }
 }

@@ -7,7 +7,6 @@ use bingo_sdk::{ErrorCode, KernelError, Plugin};
 
 #[derive(Default)]
 pub(crate) struct Composition {
-    pub demo: bool,
     pub mods: bingo_plugin_rpc::Settings,
     pub print: bingo_surface_print::Options,
     pub rpc: bingo_surface_rpc::Options,
@@ -17,7 +16,6 @@ pub(crate) struct Composition {
 impl Composition {
     pub fn for_cli(cli: &Cli, merged: &Merged) -> Self {
         Self {
-            demo: demo(cli.demo_ui, merged),
             mods: serde_json::from_value(
                 merged
                     .plugins
@@ -45,35 +43,13 @@ pub(crate) fn merged(
     layers: &[settings::Layer],
     platforms: &Platforms,
 ) -> Result<Merged, KernelError> {
-    // Include the opt-in plugin's claim before deciding whether to compose it.
-    let candidates = crate::plugins(
-        Composition {
-            demo: true,
-            ..Default::default()
-        },
-        platforms,
-        std::path::Path::new("."),
-    )?;
+    let candidates = crate::plugins(Composition::default(), platforms, std::path::Path::new("."))?;
     let claims: Vec<_> = candidates
         .iter()
         .filter_map(|plugin| Claim::from_manifest(plugin.manifest()))
         .collect();
     settings::merge(layers, &claims)
         .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e.to_string()))
-}
-
-pub(crate) fn demo(flag: bool, merged: &Merged) -> bool {
-    flag || merged
-        .kernel
-        .enabled_plugins
-        .get(bingo_demo_ui::PLUGIN)
-        .copied()
-        .unwrap_or_else(|| {
-            merged
-                .plugins
-                .get(bingo_demo_ui::PLUGIN)
-                .is_some_and(bingo_demo_ui::wanted)
-        })
 }
 
 pub(crate) fn listening(
@@ -90,4 +66,22 @@ pub(crate) fn listening(
     Ok(!cli.channels.is_empty()
         || bingo_channels::wanted(&slice, platforms)
             .map_err(|e| KernelError::new(ErrorCode::InvalidInput, e))?)
+}
+
+// Remove these compatibility inputs after the next release; never rewrite settings.
+pub(crate) fn retired_demo(cli: &Cli, layers: &[settings::Layer]) {
+    if cli.demo_ui
+        || layers.iter().any(|layer| {
+            layer.value.contains_key("demoUi")
+                || layer
+                    .value
+                    .get("enabledPlugins")
+                    .and_then(|value| value.get("bingo.demo.ui"))
+                    .is_some()
+        })
+    {
+        eprintln!(
+            "[notice] DEMO_REMOVED: the demo plugin is gone; remove --demo-ui, demoUi, or enabledPlugins[\"bingo.demo.ui\"]"
+        );
+    }
 }

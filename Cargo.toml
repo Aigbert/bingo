@@ -66,7 +66,6 @@ bingo-hooks-shell = { path = "crates/bingo-hooks-shell" }
 bingo-agents = { path = "crates/bingo-agents" }
 bingo-rooms = { path = "crates/bingo-rooms" }
 bingo-tasks = { path = "crates/bingo-tasks" }
-bingo-demo-ui = { path = "crates/bingo-demo-ui" }
 bingo-auth-oauth = { path = "crates/bingo-auth-oauth" }
 bingo-plugin-rpc = { path = "crates/bingo-plugin-rpc" }
 bingo-experience = { path = "crates/bingo-experience" }

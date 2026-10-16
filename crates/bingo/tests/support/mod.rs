@@ -56,6 +56,16 @@ impl Server {
         extra: &[&str],
         cwd: &std::path::Path,
     ) -> Server {
+        Self::spawn_in_with_env(home, script, extra, cwd, &[])
+    }
+
+    pub fn spawn_in_with_env(
+        home: tempfile::TempDir,
+        script: &str,
+        extra: &[&str],
+        cwd: &std::path::Path,
+        env: &[(&str, &str)],
+    ) -> Server {
         let path = home.path().join("script.json");
         std::fs::File::create(&path)
             .unwrap()
@@ -67,6 +77,7 @@ impl Server {
             .arg(cwd)
             .args(extra)
             .env("BINGO_FAKE_SCRIPT", &path)
+            .envs(env.iter().copied())
             .envs(home::home_env(home.path()))
             .env(bingo_channel_adapter::loopback::ENABLE_ENV, "1")
             .stdin(Stdio::piped())

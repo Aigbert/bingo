@@ -126,3 +126,7 @@ Verified 2026-10-14 (M138, ADR-0078): one noun table declares kernel and face do
 Verified 2026-10-14 (M139, ADR-0078): face nouns resolve through the existing registry with key/noun collision checks; MCP and agents own their world contracts.
 
 Verified 2026-10-14 (M142, ADR-0078 §8): the host catalogue enumerates kernel and registered face contracts for author types; the kernel and SDK still name no tool.
+
+Amended 2026-10-16 (M181): retire `bingo-demo-ui`. The three-lane executable
+example and smoke use `bingo-mod-hello`, enabled only with an explicit scripted
+fake-provider fixture. Legacy demo inputs parse and report removal for one release.

@@ -45,7 +45,7 @@ The naming examples above are historical; `bingo-teams`, `bingo-acp` and
 
 - binary: `bingo`.
 - plugin/surface: `bingo-agents`, `bingo-channels`, `bingo-checkpoints`, `bingo-context`,
-  `bingo-demo-ui`, `bingo-experience`, `bingo-hooks-shell`, `bingo-mcp`, `bingo-permissions`,
+  `bingo-experience`, `bingo-hooks-shell`, `bingo-mcp`, `bingo-permissions`,
   `bingo-persona`, `bingo-plugin-rpc`, `bingo-provider-acp`, `bingo-provider-anthropic`,
   `bingo-provider-fake`, `bingo-provider-openai`, `bingo-rooms`, `bingo-schedule`,
   `bingo-skills`, `bingo-store-jsonl`, `bingo-surface-print`, `bingo-surface-rpc`,
@@ -59,3 +59,7 @@ The naming examples above are historical; `bingo-teams`, `bingo-acp` and
 registers nothing and depends only on std and `thiserror`.
 
 Amended 2026-10-13 by ADR-0069 §1–4 (M119): `bingo-services` now exists in the library tier and owns shared typed contracts; `bingo-teams` and `bingo-acp` never shipped as crates.
+
+Amended 2026-10-16 (M181): retire `bingo-demo-ui`. The three-lane executable
+example and smoke use `bingo-mod-hello`, enabled only with an explicit scripted
+fake-provider fixture. Legacy demo inputs parse and report removal for one release.

@@ -39,3 +39,7 @@ the kernel independent of runtimes. Built-in switches still take effect at
 next start, and process-plugin reload behavior is unchanged.
 
 Amended 2026-10-15 by ADR-0087 (M171): `PluginStatus.state` is the sole status representation, with `On`, `Off { why }`, `Failed { why }`, `Waiting { changed }`, and `Pending`. Enabling a repository plugin does not approve it; waiting catalogue rows use distinct command-prefixed IDs.
+
+Amended 2026-10-16 (M181): retire `bingo-demo-ui`. The three-lane executable
+example and smoke use `bingo-mod-hello`, enabled only with an explicit scripted
+fake-provider fixture. Legacy demo inputs parse and report removal for one release.

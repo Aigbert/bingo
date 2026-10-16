@@ -258,7 +258,6 @@ dependencies = [
  "bingo-collab",
  "bingo-context",
  "bingo-core",
- "bingo-demo-ui",
  "bingo-experience",
  "bingo-gateway",
  "bingo-hooks-shell",
@@ -267,6 +266,7 @@ dependencies = [
  "bingo-mod-ask",
  "bingo-mod-browse",
  "bingo-mod-crew",
+ "bingo-mod-hello",
  "bingo-mod-memory",
  "bingo-mod-models",
  "bingo-mod-palette",
@@ -500,20 +500,6 @@ dependencies = [
  "tokio-util",
  "toml_edit",
  "tracing",
-]
-
-[[package]]
-name = "bingo-demo-ui"
-version = "0.6.6"
-dependencies = [
- "async-trait",
- "bingo-sdk",
- "futures",
- "jiff",
- "schemars 1.2.2",
- "serde",
- "serde_json",
- "tokio",
 ]
 
 [[package]]
