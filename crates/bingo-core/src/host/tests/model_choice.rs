@@ -327,10 +327,11 @@ async fn catalogue_switch_threshold_uses_the_resolved_output_budget() {
     host.shutdown().await;
 }
 
-/// A window nobody stated is the fallback guess: it draws no switch line and
-/// no claim that a switch compacts, however full the session is.
+/// A window nobody stated is the fallback guess: the picker draws no switch
+/// line for it, yet a session over the guessed trigger still compacts first,
+/// because the guess is the only bound the next round's summariser has.
 #[tokio::test]
-async fn a_guessed_window_draws_no_switch_line_and_never_compacts() {
+async fn a_guessed_window_draws_no_switch_line_yet_still_compacts() {
     let home = tempfile::tempdir().unwrap();
     let (host, provider) = setup(home.path(), vec![response(10)], None).await;
     provider.serves(&["large", "small", "guess"]);
@@ -349,9 +350,6 @@ async fn a_guessed_window_draws_no_switch_line_and_never_compacts() {
     let decided = switches.catalog(catalog, &client.state);
     let guess = decided.entries.iter().find(|e| e.id == "scripted/guess");
     assert!(guess.unwrap().meta.get("compacts").is_none());
-    if let Some(context) = &mut client.state.context {
-        context.used = u64::MAX;
-    }
     let target = crate::host::model_switch::proposed_model(
         &host,
         &client.state.summary.id,
@@ -361,10 +359,12 @@ async fn a_guessed_window_draws_no_switch_line_and_never_compacts() {
     .await
     .unwrap();
     assert!(!target.window_known);
-    assert!(!crate::host::model_switch::needs_compaction(
-        &client.state,
-        &target
-    ));
+    let needs = crate::host::model_switch::needs_compaction;
+    assert!(!needs(&client.state, &target), "under the guessed trigger");
+    if let Some(context) = &mut client.state.context {
+        context.used = u64::MAX;
+    }
+    assert!(needs(&client.state, &target), "over the guessed trigger");
     host.shutdown().await;
 }
 
