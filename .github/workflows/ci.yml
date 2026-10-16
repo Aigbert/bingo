@@ -37,7 +37,7 @@ jobs:
         with: { node-version: '24.17.0' }
       - run: node --test sdk/typescript/src/*.test.ts
         if: runner.os == 'Linux'
-      - run: cargo test -p bingo --test plugin_kit --locked -- --nocapture
+      - run: cargo test -p bingo --test plugin_kit --locked -- --nocapture --test-threads=2
         if: runner.os == 'Linux'
         env: { BINGO_REQUIRE_NODE: '1' }
       - run: cargo check --workspace --all-targets --locked
