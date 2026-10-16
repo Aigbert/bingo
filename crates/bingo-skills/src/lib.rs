@@ -62,6 +62,7 @@ mod library;
 mod listing;
 mod pages;
 mod scan;
+mod shelf;
 mod skill;
 mod tool;
 
@@ -77,6 +78,7 @@ pub use command::{SkillCommand, SkillCommands};
 pub use contributor::SkillsContributor;
 pub use expand::expand;
 pub use library::Library;
+pub use shelf::Shelf;
 pub use skill::Skill;
 pub use tool::{SkillArgs, SkillTool};
 

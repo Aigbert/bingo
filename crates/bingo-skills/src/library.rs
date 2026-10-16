@@ -13,6 +13,7 @@ use std::time::SystemTime;
 
 use bingo_sdk::{Env, HostHandle};
 
+use crate::shelf::Shelf;
 use crate::skill::Skill;
 use crate::{layers, pages, scan};
 
@@ -71,6 +72,16 @@ impl Library {
         let skills = Arc::clone(&fresh.skills);
         cache.insert(cwd.to_path_buf(), fresh);
         skills
+    }
+
+    /// The shelf `skill` was read from. A page is told from the bundled
+    /// guide by being one of the pages: neither has a directory.
+    pub fn shelf(&self, skill: &Skill) -> Shelf {
+        let page = || self.pages().iter().any(|page| page.name == skill.name);
+        match Shelf::of(&self.env, &skill.dir) {
+            Shelf::BuiltIn if page() => Shelf::Guide,
+            shelf => shelf,
+        }
     }
 
     /// The pages read at start; none, in a process that never started this

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use bingo_sdk::Env;
 
 /// The directory a layer keeps its skills in.
-const SKILLS: &str = "skills";
+pub(crate) const SKILLS: &str = "skills";
 
 /// The directory a project keeps its own configuration in.
 const PROJECT: &str = ".bingo";

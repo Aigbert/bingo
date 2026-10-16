@@ -11,10 +11,8 @@ use bingo_sdk::{
 
 use crate::expand::expand;
 use crate::library::Library;
+use crate::shelf::Shelf;
 use crate::skill::Skill;
-
-/// The family every skill command belongs to, for a client that groups them.
-const FAMILY: &str = "skill";
 
 /// One `/name` per skill.
 #[derive(Debug)]
@@ -38,30 +36,24 @@ impl CommandSource for SkillCommands {
         self.library
             .skills(cwd)
             .iter()
-            .cloned()
-            .map(|skill| Arc::new(SkillCommand::new(skill)) as Arc<dyn Command>)
+            .map(|skill| {
+                let shelf = self.library.shelf(skill);
+                Arc::new(SkillCommand::new(skill.clone(), shelf)) as Arc<dyn Command>
+            })
             .collect()
     }
 }
 
-/// One skill, typed as `/name args`.
+/// One skill, typed as `/name args`, and the shelf it was read from.
 #[derive(Debug)]
 pub struct SkillCommand {
     skill: Skill,
+    shelf: Shelf,
 }
 
 impl SkillCommand {
-    pub fn new(skill: Skill) -> Self {
-        Self { skill }
-    }
-
-    /// What a client shows beside the name: what the arguments are when the
-    /// skill said, else what the skill is for.
-    fn hint(&self) -> String {
-        self.skill
-            .argument_hint
-            .clone()
-            .unwrap_or_else(|| crate::listing::one_line(&self.skill.description))
+    pub fn new(skill: Skill, shelf: Shelf) -> Self {
+        Self { skill, shelf }
     }
 }
 
@@ -74,14 +66,16 @@ impl Command for SkillCommand {
             hidden: false,
             name: self.skill.name.clone(),
             aliases: Vec::new(),
-            hint: self.hint(),
+            // What the skill is for: the menu's line. The argument syntax is
+            // `args`'s to say, and a client completing it reads it there.
+            hint: crate::listing::one_line(&self.skill.description),
             args: ArgSpec::Free {
                 hint: self.skill.argument_hint.clone().unwrap_or_default(),
             },
             // A skill is a prompt: it opens a turn, so it waits for the one
             // that is running.
             instant: false,
-            family: FAMILY.into(),
+            family: self.shelf.family(),
         }
     }
 
@@ -100,11 +94,10 @@ mod tests {
     use crate::tests::{Tree, command_context};
 
     fn command(source: &str) -> SkillCommand {
-        SkillCommand::new(Skill::parse(
-            "deploy",
-            PathBuf::from("/skills/deploy"),
-            source,
-        ))
+        SkillCommand::new(
+            Skill::parse("deploy", PathBuf::from("/skills/deploy"), source),
+            Shelf::Project,
+        )
     }
 
     async fn run(command: &SkillCommand, args: &str) -> CommandOutcome {
@@ -129,10 +122,11 @@ mod tests {
 
     #[test]
     fn the_spec_waits_for_the_turn_and_takes_free_text() {
-        let spec = command("---\nargument-hint: \"[env]\"\n---\nbody\n").spec();
+        let spec =
+            command("---\ndescription: Ship it\nargument-hint: \"[env]\"\n---\nbody\n").spec();
         assert_eq!(spec.name, "deploy");
-        assert_eq!(spec.hint, "[env]");
-        assert_eq!(spec.family, "skill");
+        assert_eq!(spec.hint, "Ship it", "the menu's line is what it is for");
+        assert_eq!(spec.family, "skill/project");
         assert!(!spec.instant, "a skill opens a turn");
         assert_eq!(
             spec.args,
@@ -143,7 +137,7 @@ mod tests {
     }
 
     #[test]
-    fn a_skill_that_declared_no_hint_offers_its_description_instead() {
+    fn a_skill_that_declared_no_hint_completes_free_text_with_no_hint() {
         let spec = command("---\ndescription: Ship the build\n---\nbody\n").spec();
         assert_eq!(spec.hint, "Ship the build");
         assert_eq!(
@@ -178,5 +172,34 @@ mod tests {
         once.dedup();
         assert_eq!(once.len(), names.len(), "one command per name: {names:?}");
         assert_eq!(source.id(), "skills");
+    }
+
+    #[tokio::test]
+    async fn each_command_names_the_shelf_its_skill_was_read_from() {
+        let tree = Tree::new();
+        tree.user_skill("mine", "mine\n");
+        let cwd = tree.project_skill("work", "theirs", "theirs\n");
+        let library = Arc::new(Library::new(bingo_sdk::Env::rooted(tree.root())));
+        library
+            .read_pages(&crate::tests::host_with_pages(&[(
+                "bingo.mcp",
+                crate::tests::PAGES,
+            )]))
+            .await;
+
+        let families: std::collections::BTreeMap<String, String> = SkillCommands::new(library)
+            .commands(&cwd)
+            .await
+            .iter()
+            .map(|command| (command.spec().name, command.spec().family))
+            .collect();
+        for (name, family) in [
+            ("mine", "skill/yours"),
+            ("theirs", "skill/project"),
+            ("guide", "skill/built in"),
+            ("guide-first", "skill/guide"),
+        ] {
+            assert_eq!(families[name], family, "{name}");
+        }
     }
 }
