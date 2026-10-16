@@ -183,7 +183,7 @@ fn setup() -> (SessionState, Ui, Now) {
         ),
     );
     let (mut ui, now) = scene();
-    ui.catalogs.commands=[("model",json!({"kind":"catalog","source":"models"})),("think",json!({"kind":"words","values":["off","low","high"]})),("rename",json!({"kind":"free","hint":"a name for this session"})),("permission",json!({"kind":"words","values":["default","acceptEdits","plan"]})),("resume",json!({"kind":"none"}))].into_iter().map(|(name,args)|serde_json::from_value(json!({"name":name,"hint":format!("choose {name}"),"args":args,"family":"session","keys":if name=="resume"{vec!["ctrl+r"]}else{vec![]}})).unwrap()).collect();
+    ui.catalogs.commands=[("model",json!({"kind":"catalog","source":"models"})),("think",json!({"kind":"words","values":["off","low","high"]})),("rename",json!({"kind":"free","hint":"a name for this session"})),("permission",json!({"kind":"words","values":["default","acceptEdits","plan"]})),("resume",json!({"kind":"none"})),("login",json!({"kind":"catalog","source":"providers"}))].into_iter().map(|(name,args)|serde_json::from_value(json!({"name":name,"hint":format!("choose {name}"),"args":args,"family":"session","keys":if name=="resume"{vec!["ctrl+r"]}else{vec![]}})).unwrap()).collect();
     ui.catalogs.values.insert(
         "models".into(),
         ["fake/small", "fake/large"]
@@ -193,6 +193,23 @@ fn setup() -> (SessionState, Ui, Now) {
                 meta: Value::Null,
             })
             .to_vec(),
+    );
+    ui.catalogs.values.insert(
+        "providers".into(),
+        [
+            ("anthropic", json!({"kind": "ready"})),
+            (
+                "openai",
+                json!({"kind": "missing", "hint": "set OPENAI_API_KEY"}),
+            ),
+            ("fake", json!({"kind": "notApplicable"})),
+        ]
+        .map(|(id, auth)| CatalogEntry {
+            id: id.into(),
+            label: id.into(),
+            meta: json!({ "auth": auth }),
+        })
+        .to_vec(),
     );
     (state, ui, still(now))
 }
@@ -217,6 +234,8 @@ async fn prototype_scenarios_at_both_sizes() {
             ("think", PaletteOpen::Commands, "/think "),
             ("rename", PaletteOpen::Commands, "/rename release notes"),
             ("permission", PaletteOpen::Commands, "/permission "),
+            ("resume", PaletteOpen::Commands, "/resume "),
+            ("login", PaletteOpen::Commands, "/login "),
         ] {
             let fixture = Fixture::new();
             let (state, mut ui, now) = setup();

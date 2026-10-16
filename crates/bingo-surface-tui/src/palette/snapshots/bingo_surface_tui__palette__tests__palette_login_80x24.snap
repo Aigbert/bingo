@@ -1,0 +1,28 @@
+---
+source: crates/bingo-surface-tui/src/palette/tests.rs
+expression: screen
+---
+" bingo▍ /tmp/project                                                 session 1  "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"────────────────────────────────────────────────────────────────────────────────"
+" ▍ /login                                                                       "
+"   /login  choose login                                                         "
+" ❯ anthropic                                                       ● signed in  "
+"   openai                                                         ○ signed out  "
+"   fake                                                                         "
