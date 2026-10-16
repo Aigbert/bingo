@@ -25,6 +25,7 @@ impl Hook for Refresh {
             Event::ConfigChanged { .. }
                 | Event::SessionUpdated { .. }
                 | Event::TurnUsage { .. }
+                | Event::ContextChanged { .. }
                 | Event::UsageCharged { .. }
         ) && !matches!(&frame.event, Event::Extension { plugin, .. } if plugin == "bingo.schedule")
         {

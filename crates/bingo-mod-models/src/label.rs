@@ -29,9 +29,10 @@ pub fn label(model: &CatalogEntry, provider: &CatalogEntry, keep: bool) -> Strin
     }
 }
 /// The kernel's decision for this session (`bingo_sdk::switch`); the picker
-/// never measures the chat against `switchAt` itself.
+/// never measures the chat against `switchAt` itself, and a window nobody
+/// stated has no `switchAt` to decide on.
 pub fn compacts(model: &CatalogEntry) -> bool {
-    crate::card::known(&model.meta["context"]).is_some() && model.meta["compacts"] == true
+    model.meta["compacts"] == true
 }
 pub fn status(provider: &CatalogEntry) -> String {
     match reach(provider) {

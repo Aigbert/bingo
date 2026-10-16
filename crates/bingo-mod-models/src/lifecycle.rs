@@ -20,7 +20,10 @@ impl Hook for Lifecycle {
         }
         if !matches!(
             frame.event,
-            Event::CatalogChanged { .. } | Event::SessionUpdated { .. } | Event::TurnUsage { .. }
+            Event::CatalogChanged { .. }
+                | Event::SessionUpdated { .. }
+                | Event::TurnUsage { .. }
+                | Event::ContextChanged { .. }
         ) {
             return;
         }
