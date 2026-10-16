@@ -21,6 +21,15 @@ const UNKNOWN: ModelFacts = ModelFacts {
     chat: true,
 };
 
+/// What a turn may assume about its model, and whether anybody stated the
+/// window in it or it is the guess a model nobody knows is given. A guessed
+/// window measures a request; it never draws a line a person acts on.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Resolved {
+    pub capabilities: ModelCapabilities,
+    pub window_known: bool,
+}
+
 /// `declared > learned clamp > catalogue > unknown`, field by field; the
 /// endpoint's facts are composed in, never overridden, because no setting can
 /// make a proxy forward an image it strips.
@@ -34,20 +43,24 @@ pub fn resolve(
     learned: Option<u64>,
     catalogue: Option<ModelFacts>,
     endpoint: EndpointCapabilities,
-) -> ModelCapabilities {
+) -> Resolved {
     let facts = catalogue.unwrap_or(UNKNOWN);
     let declared = declared.cloned().unwrap_or_default();
-    let window = endpoint
+    let stated = endpoint
         .context_window
         .or(declared.context_window)
-        .unwrap_or_else(|| learned.map_or(facts.context_window, |l| l.min(facts.context_window)));
-    ModelCapabilities {
-        context_window: window,
-        max_output: declared.max_output.unwrap_or(facts.max_output),
-        images: declared.images.unwrap_or(facts.images) && endpoint.images,
-        reasoning: declared.reasoning.unwrap_or(facts.reasoning),
-        count_tokens: endpoint.count_tokens,
-        caching: endpoint.caching,
+        .or_else(|| learned.map(|l| l.min(facts.context_window)))
+        .or(catalogue.map(|known| known.context_window));
+    Resolved {
+        capabilities: ModelCapabilities {
+            context_window: stated.unwrap_or(UNKNOWN.context_window),
+            max_output: declared.max_output.unwrap_or(facts.max_output),
+            images: declared.images.unwrap_or(facts.images) && endpoint.images,
+            reasoning: declared.reasoning.unwrap_or(facts.reasoning),
+            count_tokens: endpoint.count_tokens,
+            caching: endpoint.caching,
+        },
+        window_known: stated.is_some(),
     }
 }
 
@@ -75,6 +88,15 @@ mod tests {
         }
     }
 
+    fn capabilities(
+        declared: Option<&Declared>,
+        learned: Option<u64>,
+        catalogue: Option<ModelFacts>,
+        endpoint: EndpointCapabilities,
+    ) -> ModelCapabilities {
+        resolve(declared, learned, catalogue, endpoint).capabilities
+    }
+
     fn facts() -> ModelFacts {
         ModelFacts {
             context_window: 1_000_000,
@@ -89,6 +111,8 @@ mod tests {
     #[test]
     fn an_unknown_model_has_conservative_output_and_no_reasoning_metadata() {
         let caps = resolve(None, None, None, endpoint(true));
+        assert!(!caps.window_known, "the default is a guess");
+        let caps = caps.capabilities;
         assert_eq!(caps.context_window, 200_000);
         assert_eq!(caps.max_output, 8_192);
         assert!(!caps.reasoning);
@@ -98,7 +122,7 @@ mod tests {
 
     #[test]
     fn the_catalogue_speaks_when_nobody_else_does_and_the_default_budget_bounds_it() {
-        let caps = resolve(None, None, Some(facts()), endpoint(true));
+        let caps = capabilities(None, None, Some(facts()), endpoint(true));
         assert_eq!(caps.context_window, 1_000_000);
         assert_eq!(caps.max_output, 64_000);
         assert!(caps.reasoning);
@@ -108,14 +132,14 @@ mod tests {
 
     #[test]
     fn a_learned_window_clamps_the_catalogue_and_a_declaration_outranks_both() {
-        let learned = resolve(None, Some(200_000), Some(facts()), endpoint(true));
+        let learned = capabilities(None, Some(200_000), Some(facts()), endpoint(true));
         assert_eq!(learned.context_window, 200_000);
         let declared = Declared {
             context_window: Some(500_000),
             reasoning: Some(false),
             ..Declared::default()
         };
-        let caps = resolve(
+        let caps = capabilities(
             Some(&declared),
             Some(200_000),
             Some(facts()),
@@ -139,23 +163,43 @@ mod tests {
             context_window: Some(1_000_000),
             ..endpoint(true)
         };
-        let caps = resolve(Some(&declared), Some(150_000), None, held);
+        let caps = capabilities(Some(&declared), Some(150_000), None, held);
         assert_eq!(caps.context_window, 1_000_000);
         assert_eq!(
-            resolve(Some(&declared), None, None, endpoint(true)).context_window,
+            capabilities(Some(&declared), None, None, endpoint(true)).context_window,
             200_000,
             "and the declaration stands where the endpoint names nothing"
         );
     }
 
+    /// A window is known when an owner stated it; the guess a model nobody
+    /// knows gets is not knowledge, however plausible the number.
+    #[test]
+    fn only_a_stated_window_is_known() {
+        let declared = Declared {
+            context_window: Some(64_000),
+            ..Declared::default()
+        };
+        let named = EndpointCapabilities {
+            context_window: Some(1_000_000),
+            ..endpoint(true)
+        };
+        assert!(resolve(Some(&declared), None, None, endpoint(true)).window_known);
+        assert!(resolve(None, Some(150_000), None, endpoint(true)).window_known);
+        assert!(resolve(None, None, Some(facts()), endpoint(true)).window_known);
+        assert!(resolve(None, None, None, named).window_known);
+        assert!(!resolve(None, None, None, endpoint(true)).window_known);
+        assert!(!resolve(Some(&Declared::default()), None, None, endpoint(true)).window_known);
+    }
+
     #[test]
     fn images_need_both_the_model_and_the_endpoint() {
-        assert!(!resolve(None, None, Some(facts()), endpoint(false)).images);
+        assert!(!capabilities(None, None, Some(facts()), endpoint(false)).images);
         let blind = Declared {
             images: Some(false),
             ..Declared::default()
         };
-        assert!(!resolve(Some(&blind), None, Some(facts()), endpoint(true)).images);
+        assert!(!capabilities(Some(&blind), None, Some(facts()), endpoint(true)).images);
     }
 
     fn any_declared() -> impl Strategy<Value = Option<Declared>> {
@@ -204,7 +248,7 @@ mod tests {
             facts in any_facts(),
             endpoint_images in any::<bool>(),
         ) {
-            let caps = resolve(declared.as_ref(), learned, facts, endpoint(endpoint_images));
+            let caps = capabilities(declared.as_ref(), learned, facts, endpoint(endpoint_images));
             if let Some(d) = &declared {
                 if let Some(w) = d.context_window { prop_assert_eq!(caps.context_window, w); }
                 if let Some(o) = d.max_output { prop_assert_eq!(caps.max_output, o); }
@@ -228,9 +272,9 @@ mod tests {
 
                 ..endpoint(true)
             };
-            let caps = resolve(declared.as_ref(), learned, facts, endpoint);
+            let caps = capabilities(declared.as_ref(), learned, facts, endpoint);
             prop_assert_eq!(caps.context_window, named);
-            let guessed = resolve(declared.as_ref(), learned, facts, self::endpoint(true));
+            let guessed = capabilities(declared.as_ref(), learned, facts, self::endpoint(true));
             prop_assert_eq!(caps.max_output, guessed.max_output);
             prop_assert_eq!(caps.reasoning, guessed.reasoning);
         }
@@ -240,7 +284,7 @@ mod tests {
             learned in 8_000u64..2_000_000,
             facts in any_facts(),
         ) {
-            let caps = resolve(None, Some(learned), facts, endpoint(true));
+            let caps = capabilities(None, Some(learned), facts, endpoint(true));
             let ceiling = facts.map_or(UNKNOWN.context_window, |f| f.context_window);
             prop_assert!(caps.context_window <= ceiling);
             prop_assert!(caps.context_window <= learned);
@@ -252,7 +296,7 @@ mod tests {
             facts in any_facts(),
             endpoint_images in any::<bool>(),
         ) {
-            let caps = resolve(declared.as_ref(), None, facts, endpoint(endpoint_images));
+            let caps = capabilities(declared.as_ref(), None, facts, endpoint(endpoint_images));
             if !endpoint_images { prop_assert!(!caps.images); }
             if caps.images { prop_assert!(endpoint_images); }
         }
@@ -263,7 +307,7 @@ mod tests {
             facts in any_facts(),
             max_tokens_setting in proptest::option::of(1u32..1_000_000),
         ) {
-            let caps = resolve(declared.as_ref(), None, facts, endpoint(true));
+            let caps = capabilities(declared.as_ref(), None, facts, endpoint(true));
             let budget = max_tokens(&caps, max_tokens_setting);
             prop_assert!(budget >= 1);
             prop_assert!(u64::from(budget) <= caps.context_window / 2);

@@ -83,14 +83,18 @@ fn facts(provider: &str, model: &str) -> crate::models::ModelFacts {
 #[tokio::test]
 async fn a_named_instance_reads_its_family_s_shelf_then_the_id_s_own() {
     let (host, provider) = host_fronting("openai").await;
-    let dated = host.resolve_model(provider.as_ref(), "gpt-5.5-pro-2026-01-01");
+    let dated = host
+        .resolve_model(provider.as_ref(), "gpt-5.5-pro-2026-01-01")
+        .capabilities;
     assert_eq!(
         dated.context_window,
         facts("openai", "gpt-5.5-pro").context_window,
         "a dated snapshot of the family's model is that model"
     );
 
-    let proxied = host.resolve_model(provider.as_ref(), "deepseek-v4-pro");
+    let proxied = host
+        .resolve_model(provider.as_ref(), "deepseek-v4-pro")
+        .capabilities;
     let known = facts("deepseek", "deepseek-v4-pro");
     assert_eq!(proxied.context_window, known.context_window);
     assert_eq!(proxied.max_output, known.max_output);
@@ -99,7 +103,9 @@ async fn a_named_instance_reads_its_family_s_shelf_then_the_id_s_own() {
         "a proxied model that reasons is not asked to stop"
     );
 
-    let private = host.resolve_model(provider.as_ref(), "house-private-1");
+    let private = host
+        .resolve_model(provider.as_ref(), "house-private-1")
+        .capabilities;
     assert!(
         !private.reasoning && private.context_window > 0,
         "an id nobody carries still fails closed on the default, not on nothing"
@@ -112,10 +118,14 @@ async fn a_named_instance_reads_its_family_s_shelf_then_the_id_s_own() {
 #[tokio::test]
 async fn an_endpoint_that_holds_the_context_names_the_window_the_session_uses() {
     let (host, provider) = host_fronting("openai").await;
-    let guessed = host.resolve_model(provider.as_ref(), "gpt-5.5-pro");
+    let guessed = host
+        .resolve_model(provider.as_ref(), "gpt-5.5-pro")
+        .capabilities;
 
     let provider = provider.clone().holding(1_000_000);
-    let held = host.resolve_model(provider.as_ref(), "gpt-5.5-pro");
+    let held = host
+        .resolve_model(provider.as_ref(), "gpt-5.5-pro")
+        .capabilities;
     assert_eq!(held.context_window, 1_000_000);
     assert_eq!(
         held.max_output, guessed.max_output,

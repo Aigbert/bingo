@@ -17,7 +17,7 @@ pub use alias::alias_of;
 pub use catalog::{ModelCatalog, ModelFacts};
 pub use declared::Declared;
 pub use learned::{Learned, window_from_overflow};
-pub use resolve::{DEFAULT_MAX_TOKENS, max_tokens, resolve};
+pub use resolve::{DEFAULT_MAX_TOKENS, Resolved, max_tokens, resolve};
 pub use served::{Offer, Served, ServedModels, Source};
 
 mod persist;

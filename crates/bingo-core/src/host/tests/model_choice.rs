@@ -327,6 +327,47 @@ async fn catalogue_switch_threshold_uses_the_resolved_output_budget() {
     host.shutdown().await;
 }
 
+/// A window nobody stated is the fallback guess: it draws no switch line and
+/// no claim that a switch compacts, however full the session is.
+#[tokio::test]
+async fn a_guessed_window_draws_no_switch_line_and_never_compacts() {
+    let home = tempfile::tempdir().unwrap();
+    let (host, provider) = setup(home.path(), vec![response(10)], None).await;
+    provider.serves(&["large", "small", "guess"]);
+    host.refresh_models().await;
+    let mut client = Client::open(&host).await;
+    client.ack(&"word ".repeat(12000)).await;
+    client.until_turn_completed().await;
+    let catalog = host.catalog(CatalogKind::Models).await.unwrap();
+    let guess = catalog.entries.iter().find(|e| e.id == "scripted/guess");
+    let guess = guess.unwrap();
+    assert!(guess.meta.get("switchAt").is_none(), "{:?}", guess.meta);
+    assert!(guess.meta.get("context").is_none(), "{:?}", guess.meta);
+    let switches = HostHandle(host.clone())
+        .service(&bingo_sdk::switch::MODEL_SWITCH)
+        .unwrap();
+    let decided = switches.catalog(catalog, &client.state);
+    let guess = decided.entries.iter().find(|e| e.id == "scripted/guess");
+    assert!(guess.unwrap().meta.get("compacts").is_none());
+    if let Some(context) = &mut client.state.context {
+        context.used = u64::MAX;
+    }
+    let target = crate::host::model_switch::proposed_model(
+        &host,
+        &client.state.summary.id,
+        Some("scripted".into()),
+        "guess".into(),
+    )
+    .await
+    .unwrap();
+    assert!(!target.window_known);
+    assert!(!crate::host::model_switch::needs_compaction(
+        &client.state,
+        &target
+    ));
+    host.shutdown().await;
+}
+
 static REORDER: PluginManifest = PluginManifest {
     id: "test.reorder",
     version: "0",

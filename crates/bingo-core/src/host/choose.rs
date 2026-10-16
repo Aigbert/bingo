@@ -128,9 +128,13 @@ impl Host {
         let provider = self.provider(spec.provider.as_deref()).await?;
         auth::check(provider.as_ref())?;
         let model = self.model(provider.as_ref(), spec.model.as_deref()).await?;
-        let capabilities = self.resolve_model(provider.as_ref(), &model);
+        let models::Resolved {
+            capabilities,
+            window_known,
+        } = self.resolve_model(provider.as_ref(), &model);
         Ok(ModelChoice {
             max_tokens: models::max_tokens(&capabilities, self.settings.kernel.max_tokens),
+            window_known,
             reasoning: spec.thinking.flatten(),
             learned: self.learned.clone(),
             endpoint: Endpoint::Provider(provider),
@@ -157,7 +161,10 @@ impl Host {
                 })?,
         };
         let key = models::declared::key(agent.id(), &id);
-        let capabilities = models::resolve(
+        let models::Resolved {
+            capabilities,
+            window_known,
+        } = models::resolve(
             self.settings.kernel.models.get(&key),
             self.learned.window(agent.id(), &id),
             None,
@@ -171,13 +178,14 @@ impl Host {
             id,
             max_tokens: models::max_tokens(&capabilities, None),
             capabilities,
+            window_known,
             reasoning: spec.thinking.flatten(),
             learned: self.learned.clone(),
         })
     }
 
     /// The four owners of a model's facts, read once per session (ADR-0004).
-    pub(super) fn resolve_model(&self, provider: &dyn Provider, model: &str) -> ModelCapabilities {
+    pub(super) fn resolve_model(&self, provider: &dyn Provider, model: &str) -> models::Resolved {
         let key = models::declared::key(provider.id(), model);
         models::resolve(
             self.settings.kernel.models.get(&key),

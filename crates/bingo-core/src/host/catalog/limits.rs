@@ -1,6 +1,7 @@
 //! Publish resolved limits through the catalogue so clients share the switch ruler.
 use crate::context::budget::Thresholds;
 use crate::host::Host;
+use crate::models::Resolved;
 use bingo_sdk::{CatalogEntry, Provider};
 use serde_json::json;
 use std::sync::Arc;
@@ -20,14 +21,14 @@ pub(in crate::host) fn apply(
         let declared = host.settings.kernel.models.get(&entry.id);
         let learned = host.learned.window(id, model);
         let endpoint = provider.endpoint(model);
-        let caps = host.resolve_model(provider.as_ref(), model);
-        let max_tokens = crate::models::max_tokens(&caps, host.settings.kernel.max_tokens);
-        entry.meta["switchAt"] = json!(Thresholds::of(caps.context_window, max_tokens).trigger);
-        if entry.meta.get("context").is_some()
-            || declared.is_some_and(|d| d.context_window.is_some())
-            || learned.is_some()
-            || endpoint.context_window.is_some()
-        {
+        let Resolved {
+            capabilities: caps,
+            window_known,
+        } = host.resolve_model(provider.as_ref(), model);
+        // A guessed window draws no switch line: a person would act on it.
+        if window_known {
+            let max_tokens = crate::models::max_tokens(&caps, host.settings.kernel.max_tokens);
+            entry.meta["switchAt"] = json!(Thresholds::of(caps.context_window, max_tokens).trigger);
             entry.meta["context"] = json!(caps.context_window);
         }
         if entry.meta.get("output").is_some() || declared.is_some_and(|d| d.max_output.is_some()) {

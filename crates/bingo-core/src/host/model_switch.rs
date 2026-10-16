@@ -60,14 +60,17 @@ pub(crate) async fn compact_for_switch(
     ))
 }
 
+/// A target whose window is only the fallback guess draws no line to compact
+/// under: the guess measures requests, it is no reason to rewrite a session.
 pub(crate) fn needs_compaction(state: &SessionState, target: &ModelChoice) -> bool {
-    compacts(
-        state,
-        context_used(state),
-        target.endpoint.id(),
-        &target.id,
-        trigger(target),
-    )
+    target.window_known
+        && compacts(
+            state,
+            context_used(state),
+            target.endpoint.id(),
+            &target.id,
+            trigger(target),
+        )
 }
 
 /// A switch compacts first when the session holds at least what the target

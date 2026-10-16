@@ -125,6 +125,7 @@ fn config(provider: Arc<ScriptedProvider>, tools: Vec<Arc<dyn Tool>>) -> TurnCon
             endpoint: crate::turn::Endpoint::Provider(provider),
             id: "m".into(),
             capabilities: capabilities(),
+            window_known: true,
             max_tokens: 1000,
             reasoning: None,
             learned: Arc::new(crate::models::Learned::default()),

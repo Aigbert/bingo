@@ -41,6 +41,9 @@ pub struct ModelChoice {
     pub endpoint: super::Endpoint,
     pub id: String,
     pub capabilities: ModelCapabilities,
+    /// Whether anybody stated `capabilities.context_window`; a guessed
+    /// window measures requests but draws no line a client is shown.
+    pub window_known: bool,
     pub max_tokens: u32,
     /// The requested level, independent of model metadata; `None` omits it.
     pub reasoning: Option<Effort>,
