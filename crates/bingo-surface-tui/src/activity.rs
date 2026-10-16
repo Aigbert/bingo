@@ -258,14 +258,14 @@ fn pending(origin: &Origin) -> bool {
     )
 }
 
-/// `▍ Kindling… (esc to interrupt · 4s · ↓ 1.2k)` — but only once the
+/// `▍ Kindling… (4s · ↓ 1.2k)` — but only once the
 /// turn has been at it for [`ACTIVITY_AFTER`]: a turn that answers at once
 /// says nothing at all, because a row that flashes reports nothing (§6).
 ///
 /// A turn a person has asked to stop reads `▍ Stopping… (4s · ↓ 1.2k)`
 /// from the frame the key was pressed and dims its caret and keeps its clock
-/// until `TurnCompleted` takes the row away. The hint goes with the asking:
-/// `esc` has been pressed, and there is nothing further to press.
+/// until `TurnCompleted` takes the row away. The keys a turn answers are the
+/// KeyBar's to say, never this row's.
 ///
 /// While a task on the list is in progress the verb is that task's own words
 /// — `▍ Writing the plan…` — as Claude Code's spinner reads (M74); bingo's
