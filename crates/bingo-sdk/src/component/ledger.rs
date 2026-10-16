@@ -282,13 +282,23 @@ impl TurnFoldProps {
         if self.outcome == TurnEnd::Stopped {
             out.push(Piece::new(" \u{b7} stopped", Ink::Bad));
         }
-        for answer in self.steps.iter().filter_map(|s| s.answer.as_ref()) {
-            let Upshot::Words { text, .. } = answer else {
-                continue;
-            };
-            out.push(Piece::new(format!(" \u{b7} {text}"), Ink::Ash));
-        }
+        out.extend(self.answers());
         Some(out)
+    }
+
+    /// What the person answered along the way, each answer once.
+    fn answers(&self) -> Vec<Piece> {
+        let mut said: Vec<&str> = Vec::new();
+        for answer in self.steps.iter().filter_map(|s| s.answer.as_ref()) {
+            if let Upshot::Words { text, .. } = answer
+                && !said.contains(&text.as_str())
+            {
+                said.push(text);
+            }
+        }
+        said.into_iter()
+            .map(|text| Piece::new(format!(" \u{b7} {text}"), Ink::Ash))
+            .collect()
     }
 }
 
@@ -504,7 +514,7 @@ mod tests {
     }
 
     #[test]
-    fn an_answered_step_says_the_answer_at_the_right_and_the_fold_repeats_it() {
+    fn an_answered_step_says_the_answer_at_the_right_and_the_fold_repeats_it_once() {
         let mut edit = step(
             "edit",
             "src/main.rs",
@@ -521,18 +531,28 @@ mod tests {
             "{row:?}"
         );
         assert!(row.ends_with(" you: yes"), "{row:?}");
+        let mut refused = step("bash", "rm -rf build", StepState::Done, None);
+        refused.answer = Some(Upshot::Words {
+            text: "you: no".into(),
+            tone: Tone::Bad,
+        });
         let fold = TurnFoldProps {
-            steps: vec![step("read", "a", StepState::Done, None), edit],
+            steps: vec![
+                step("read", "a", StepState::Done, None),
+                edit,
+                refused.clone(),
+                refused,
+            ],
             outcome: TurnEnd::Done,
             elapsed: 1_000,
             thought: false,
             is_expanded: false,
         };
         let pieces = fold.row(GLYPHS, 80, cells).unwrap();
+        let line = text(&pieces);
         assert!(
-            text(&pieces).contains("edit +1 \u{2212}1 \u{b7} you: yes"),
-            "{:?}",
-            text(&pieces)
+            line.contains("bash \u{d7}2 \u{b7} you: yes \u{b7} you: no "),
+            "each answer once: {line:?}"
         );
         assert!(pieces.iter().any(|p| p.ink == Ink::Ash));
     }

@@ -134,11 +134,28 @@ pub fn folded(item: &Item, fold: &TurnFoldProps) -> (String, Props) {
 }
 
 /// The items a producer drew a row of its own for: those keep their drawing.
+/// A row that only offers actions draws nothing of its own; its actions hang
+/// under the step.
 fn rowed(state: &SessionState) -> Vec<ItemId> {
     bingo_sdk::slot::placed(state)
         .into_iter()
         .filter_map(|placed| match placed.slot {
-            bingo_sdk::slot::Slot::Row { item, .. } => Some(item),
+            bingo_sdk::slot::Slot::Row {
+                item,
+                mark,
+                title,
+                badge,
+                caption,
+                body,
+                ..
+            } => {
+                let drawn = mark.is_some()
+                    || title.is_some()
+                    || badge.is_some()
+                    || caption.is_some()
+                    || body.is_some();
+                drawn.then_some(item)
+            }
             _ => None,
         })
         .collect()
@@ -192,7 +209,7 @@ impl Turn<'_> {
         let said = self.steps(&steps);
         self.stops(&said, roles);
         let fold = TurnFoldProps {
-            steps: said,
+            steps: self.news(&steps, said),
             outcome: self.outcome(),
             elapsed: self.elapsed(),
             thought,
@@ -246,6 +263,21 @@ impl Turn<'_> {
     fn steps(&self, at: &[usize]) -> Vec<Step> {
         at.iter()
             .map(|&at| step(self.items[at], self.state))
+            .collect()
+    }
+
+    /// The steps as the folded line repeats them: a yes to a permission is
+    /// how the work went on, not news, so only other answers stay.
+    fn news(&self, at: &[usize], steps: Vec<Step>) -> Vec<Step> {
+        at.iter()
+            .zip(steps)
+            .map(|(&at, step)| match granted(self.items[at], self.state) {
+                true => Step {
+                    answer: None,
+                    ..step
+                },
+                false => step,
+            })
             .collect()
     }
 
@@ -355,7 +387,7 @@ pub fn step(item: &Item, state: &SessionState) -> Step {
 
 /// A tool's name as a row says it: `Read` is `read`, `WebSearch` is
 /// `web search`.
-fn verb(name: &str) -> String {
+pub fn verb(name: &str) -> String {
     let mut out = String::with_capacity(name.len() + 2);
     let mut lower = false;
     for c in name.chars() {
@@ -385,6 +417,19 @@ fn step_state(item: &Item, state: &SessionState) -> StepState {
         status if status.failed(output.as_ref()) => StepState::Failed,
         _ => StepState::Done,
     }
+}
+
+/// Whether everything the person answered for the step was a yes to a
+/// permission.
+fn granted(item: &Item, state: &SessionState) -> bool {
+    let mut receipts = crate::ask::receipts::linked(state, &item.id).peekable();
+    receipts.peek().is_some()
+        && receipts.all(|receipt| {
+            matches!(
+                receipt.body,
+                ItemBody::PermissionReceipt { decision, .. } if decision != DecisionKind::Deny
+            )
+        })
 }
 
 /// What the person answered when the step asked, in the receipt's words.
