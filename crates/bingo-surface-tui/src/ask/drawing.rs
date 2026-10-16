@@ -50,19 +50,7 @@ pub fn splice(
         .map(|(from, to)| (from, to - from))
         .unwrap_or((frame.height, 0));
     if !matches!(interaction.kind, InteractionKind::Permission { .. }) {
-        drawing.rows.insert(
-            0,
-            (
-                Line::from(Span::styled(
-                    format!(
-                        "   {} asks you · needs you",
-                        theme::glyphs().chrome.steps[1]
-                    ),
-                    theme::presence(),
-                )),
-                None,
-            ),
-        );
+        drawing.rows.insert(0, (asking(), None));
     }
     drawing.rows = fit(
         drawing.rows,
@@ -74,14 +62,28 @@ pub fn splice(
         .guard_until
         .is_some_and(|until| now.wall < until)
     {
-        for (line, _) in &mut drawing.rows {
-            for span in &mut line.spans {
-                span.style = span.style.patch(theme::dim());
-            }
-        }
+        dim(&mut drawing);
     }
     frame.inline = Some((at, removed, drawing.rows.len()));
     Some((at, removed, drawing))
+}
+
+/// The row a card that no step asked for is headed with.
+fn asking() -> Line<'static> {
+    let mark = theme::glyphs().chrome.steps[1];
+    Line::from(Span::styled(
+        format!("   {mark} asks you · needs you"),
+        theme::presence(),
+    ))
+}
+
+/// A card that cannot be answered yet is drawn faint.
+fn dim(drawing: &mut Drawing) {
+    for (line, _) in &mut drawing.rows {
+        for span in &mut line.spans {
+            span.style = span.style.patch(theme::dim());
+        }
+    }
 }
 
 pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
