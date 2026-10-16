@@ -24,7 +24,7 @@ expression: screen
 "       qwen3-coder-30b 128k                             │                                                   "
 "   codex  ○ not signed in                               │                                                   "
 "   ↓ 2 more                                             │                                                   "
-" ↑↓ pick  ←→ effort  * pin  tab keep  ⏎ use here  esc close                                                 "
+" ↑↓ pick  ←→ effort  * unpin  tab keep  ⏎ use here  esc close                                               "
 "   /model                                                                                                   "
 "                                                                                                            "
 "                                                                                                            "

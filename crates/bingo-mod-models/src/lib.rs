@@ -9,6 +9,7 @@ mod guide;
 mod keys;
 pub mod label;
 mod lifecycle;
+mod pins;
 mod receipts;
 pub mod rows;
 pub mod sheet;
@@ -65,3 +66,6 @@ impl Plugin for Models {
 fn error(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::InvalidInput, error.to_string())
 }
+
+#[cfg(test)]
+mod test_support;

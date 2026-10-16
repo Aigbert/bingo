@@ -250,3 +250,71 @@ mod receipt {
         assert_eq!(buffer[(0, 0)].symbol(), "⇄");
     }
 }
+
+#[test]
+fn a_filtered_picker_reflows_its_cursor_when_the_pane_shrinks() {
+    let (picker, models, providers) = filtered_last_model();
+    let state = state();
+    let request = render::RenderRequest {
+        component: render::Component::ModelPicker,
+        request_id: "filtered".into(),
+        surface: render::SurfaceName::Terminal,
+        props: json!(picker.props),
+        viewport: render::Viewport {
+            columns: 108,
+            rows: 18,
+            place: None,
+        },
+    };
+    let mut memo = crate::pulled::Memo::default();
+    let tall = crate::pulled::Key::new(&state, &request, 108, 18);
+    assert!(memo.request(&tall));
+    memo.answer(
+        tall,
+        bingo_mod_models::draw::tree(&picker, &models, &providers, &Chat::default(), 108, 18),
+    );
+    let short = crate::pulled::Key::new(&state, &request, 108, 8);
+    assert!(memo.request(&short), "a short pane needs a new row window");
+    memo.answer(
+        short.clone(),
+        bingo_mod_models::draw::tree(&picker, &models, &providers, &Chat::default(), 108, 8),
+    );
+    let view = memo.get(&short).unwrap();
+    let lines = crate::views::render(view, 108);
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(108, 8)).unwrap();
+    terminal
+        .draw(|frame| {
+            frame.render_widget(
+                ratatui::widgets::Paragraph::new(lines.clone()),
+                frame.area(),
+            )
+        })
+        .unwrap();
+    let screen = format!("{:?}", terminal.backend().buffer());
+    assert!(
+        screen
+            .lines()
+            .any(|line| line.contains('❯') && line.contains("m29")),
+        "{screen}"
+    );
+}
+
+fn filtered_last_model() -> (Picker, Vec<CatalogEntry>, Vec<CatalogEntry>) {
+    let (_, providers) = entries();
+    let models: Vec<_> = (0..30)
+        .map(|i| CatalogEntry {
+            id: format!("openai/m{i}"),
+            label: format!("m{i}"),
+            meta: json!({"provider":"openai","context":128000}),
+        })
+        .collect();
+    let picker = Picker {
+        props: component::ModelPickerProps {
+            filter: "openai/".into(),
+            selected: Some("model:openai/m29".into()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    (picker, models, providers)
+}

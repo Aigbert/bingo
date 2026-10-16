@@ -24,7 +24,7 @@ expression: screen
 "                                                        │                                                   "
 "                                                        │                                                   "
 "                                                        │                                                   "
-" ↑↓ pick  ←→ effort  * pin  tab keep  ⏎ use here  esc close                                                 "
+" ↑↓ pick  ←→ effort  * unpin  tab keep  ⏎ use here  esc close                                               "
 "   /model opus                                                                                              "
 "                                                                                                            "
 "                                                                                                            "

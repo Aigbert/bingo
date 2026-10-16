@@ -157,7 +157,7 @@ async fn act(
         "left" | "right" => dial(picker, row, models, key == "right"),
         "*" | "shift+*" => {
             if let Some(id) = row.model() {
-                pin(cx, id, models).await?;
+                crate::pins::toggle(picker, cx, id, models).await?;
             }
         }
         "enter" => return activate(picker, row, models, providers, cx).await,
@@ -188,19 +188,6 @@ fn dial(picker: &mut Picker, row: &Row, models: &[CatalogEntry], forward: bool) 
         index.saturating_sub(1)
     };
     picker.props.effort = Some(efforts[index]);
-}
-async fn pin(cx: &CommandContext, id: &str, models: &[CatalogEntry]) -> Result<(), KernelError> {
-    let pinned = models
-        .iter()
-        .any(|m| m.id == id && m.meta["pinned"] == true);
-    crate::bridge::run(
-        &cx.host,
-        &cx.session,
-        "model",
-        &format!("{} {id}", if pinned { "unpin" } else { "pin" }),
-        None,
-    )
-    .await
 }
 async fn activate(
     picker: &mut Picker,
@@ -503,3 +490,6 @@ fn back(picker: &mut Picker) -> bool {
     }
     picker.sheet.take().is_none()
 }
+
+#[cfg(test)]
+mod tests;

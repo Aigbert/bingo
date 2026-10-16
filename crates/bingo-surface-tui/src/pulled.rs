@@ -60,7 +60,9 @@ impl Key {
             && self.request.viewport.place == other.request.viewport.place
             && (!matches!(
                 self.request.component,
-                bingo_sdk::render::Component::Pane | bingo_sdk::render::Component::Status
+                bingo_sdk::render::Component::Pane
+                    | bingo_sdk::render::Component::Status
+                    | bingo_sdk::render::Component::ModelPicker
             ) || self.request.viewport.rows == other.request.viewport.rows)
     }
 }
@@ -191,7 +193,9 @@ impl Memo {
             (answered
                 && !matches!(
                     entry.key.request.component,
-                    bingo_sdk::render::Component::Pane | bingo_sdk::render::Component::Status
+                    bingo_sdk::render::Component::Pane
+                        | bingo_sdk::render::Component::Status
+                        | bingo_sdk::render::Component::ModelPicker
                 ))
                 || drawn.iter().any(|key| key.same_request(&entry.key))
         });

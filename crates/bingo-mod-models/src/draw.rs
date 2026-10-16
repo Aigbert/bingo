@@ -146,7 +146,12 @@ impl List<'_> {
             Some(id) => format!("use {id}"),
             None => action_label(row, self.models, self.providers, picker),
         };
-        children.push(key_hint(&label, picker.keep()));
+        let pinned = row.and_then(Row::model).is_some_and(|id| {
+            self.models
+                .iter()
+                .any(|m| m.id == id && m.meta["pinned"] == true)
+        });
+        children.push(key_hint(&label, picker.keep(), pinned));
         children
     }
     /// One visible line: a keyed row on the left, a line of the card on the right.
@@ -191,9 +196,10 @@ pub fn header(rows: &[Row], filter: &str, providers: usize) -> String {
         format!("{models} {matches} for “{filter}”")
     }
 }
-fn key_hint(label: &str, keep: bool) -> View {
+fn key_hint(label: &str, keep: bool, pinned: bool) -> View {
     dim(format!(
-        " ↑↓ pick  ←→ effort  * pin  tab {}  ⏎ {label}  esc close",
+        " ↑↓ pick  ←→ effort  * {}  tab {}  ⏎ {label}  esc close",
+        if pinned { "unpin" } else { "pin" },
         if keep { "here only" } else { "keep" }
     ))
 }
