@@ -197,15 +197,6 @@ async fn event_above_the_desktop_queue_budget_is_read_only_on_demand() {
     deferred_event_case(4_400_000).await;
 }
 
-/// Stress case is separate from the routine suite: the synthetic 100MiB
-/// payload exercises the agreed single-reference pin ceiling without making
-/// every CI matrix job allocate several copies of it.
-#[tokio::test]
-#[ignore = "100MiB pinned-event stress; run explicitly after bounded server implementation"]
-async fn hundred_megabyte_event_is_not_pushed_on_open() {
-    deferred_event_case(11_500_000).await;
-}
-
 #[tokio::test]
 async fn oversized_nonitem_open_retains_trusted_cwd_and_serves_immutable_field_by_part() {
     let mut state = super::host::fresh_state();

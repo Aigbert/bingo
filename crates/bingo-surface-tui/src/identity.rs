@@ -1,6 +1,6 @@
 //! M149's visible contracts, before their implementation.
 use crate::test_support::*;
-use crate::{activity, opening, theme, welcome};
+use crate::{activity, theme, welcome};
 use bingo_sdk::{Event, ItemStatus};
 use ratatui::style::Color;
 
@@ -50,18 +50,6 @@ fn opening_wordmark_and_frames() {
     assert_eq!(rows[2].to_string(), "█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍");
     assert_eq!(rows[3].to_string(), "                ▄▄▄▄▄█");
     assert_eq!(welcome::lines(&state(), 38, None)[0].to_string(), "bingo▍");
-    for t in [0.0, 0.5, 1.2, 2.0, 2.4] {
-        let frame = opening::frame(t, &rows);
-        assert_eq!(frame.len(), rows.len());
-        insta::assert_snapshot!(
-            format!("wordmark_{t:.1}"),
-            frame
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("\n")
-        );
-    }
 }
 
 #[test]

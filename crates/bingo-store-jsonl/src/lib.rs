@@ -697,37 +697,4 @@ mod runtime_contract {
 }
 
 #[cfg(test)]
-mod append_measurement {
-    use super::*;
-
-    #[tokio::test]
-    #[ignore = "manual before/after measurement; no time budget"]
-    async fn append_thousand_frames() {
-        let (_root, store) = tests::root_with();
-        let summary = tests::summary();
-        store.create(&summary).await.unwrap();
-        let start = std::time::Instant::now();
-        for seq in 1..=1000 {
-            store
-                .append(
-                    &summary.id,
-                    &tests::frame(
-                        seq,
-                        Event::SessionUpdated {
-                            summary: summary.clone(),
-                        },
-                    ),
-                )
-                .await
-                .unwrap();
-        }
-        eprintln!("1000 appends: {:?}", start.elapsed());
-        assert_eq!(
-            store.replay(&summary.id, Seq::ZERO).await.unwrap().len(),
-            1000
-        );
-    }
-}
-
-#[cfg(test)]
 mod inspection_tests;

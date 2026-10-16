@@ -124,3 +124,8 @@ Brick 1 (context, surface-tui): check 0; clippy 0; test 0 (1,422 passed, 2 ignor
 Brick 2 (core, sdk, provider-acp, provider-openai, surface-rpc, update,
          mods, plugin-host): check 0; clippy 0; test 0.
 ```
+
+```text
+Brick 3 (store-jsonl, mods, bin, surface-rpc, surface-tui, pictures):
+check 0; clippy 0; test 0; all six ignored/manual tests removed.
+```

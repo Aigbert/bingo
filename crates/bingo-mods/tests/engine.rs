@@ -86,45 +86,6 @@ async fn an_allocation_failure_leaves_the_runtime_available() {
 }
 
 #[tokio::test]
-#[ignore = "manual RSS measurement; no timing or memory assertion"]
-async fn fifty_idle_modules_rss() {
-    #[cfg(unix)]
-    fn rss() -> String {
-        let output = std::process::Command::new("ps")
-            .args(["-o", "rss=", "-p", &std::process::id().to_string()])
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        String::from_utf8(output.stdout).unwrap().trim().to_string()
-    }
-    #[cfg(windows)]
-    fn rss() -> String {
-        let output = std::process::Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-Command",
-                &format!(
-                    "[math]::Round((Get-Process -Id {}).WorkingSet64 / 1024)",
-                    std::process::id()
-                ),
-            ])
-            .output()
-            .unwrap();
-        assert!(output.status.success());
-        String::from_utf8(output.stdout).unwrap().trim().to_string()
-    }
-    let before = rss();
-    let mut engines = Vec::new();
-    for _ in 0..50 {
-        engines.push(load("hello.ts", Limits::default()).await);
-    }
-    println!("idle modules: 50; RSS KiB before={before}; after={}", rss());
-    for engine in engines {
-        engine.close().await;
-    }
-}
-
-#[tokio::test]
 async fn an_unawaited_dollar_call_finishes_before_the_hook_returns() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("main.ts"), "export const register = on => on('tool.call', $ => { void $.ui.status('queued'); return {parts:[]}; });").unwrap();

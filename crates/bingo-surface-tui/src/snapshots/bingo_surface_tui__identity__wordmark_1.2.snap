@@ -1,9 +1,0 @@
----
-source: crates/bingo-surface-tui/src/identity.rs
-expression: "frame.iter().map(ToString::to_string).collect::<Vec<_>>().join(\"\\n\")"
----
-█      ▀                       
-█▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█
-█▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
-                ▄▄▄▄▄█
-fake-1 · /tmp/
