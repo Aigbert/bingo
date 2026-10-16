@@ -47,7 +47,7 @@ impl Piece {
 /// The cells a right-hand part stops short of the edge, as the prototype
 /// leaves them.
 pub const MARGIN: usize = 2;
-/// The least room the left part keeps before the right one gives way.
+/// The least space the left part keeps before the right one gives way.
 const LEFT_KEEPS: usize = 12;
 
 /// `left` from the row's start and `right` ending [`MARGIN`] cells short of
@@ -62,29 +62,29 @@ pub fn laid(
 ) -> Vec<Piece> {
     let measure = |pieces: &[Piece]| pieces.iter().map(|p| cells(&p.text)).sum::<usize>();
     let right_cells = measure(&right);
-    let room = width.saturating_sub(MARGIN);
-    let keeps_right = !right.is_empty() && room >= right_cells + 1 + LEFT_KEEPS;
-    let left_room = match keeps_right {
-        true => room - right_cells - 1,
-        false => room,
+    let space = width.saturating_sub(MARGIN);
+    let keeps_right = !right.is_empty() && space >= right_cells + 1 + LEFT_KEEPS;
+    let left_space = match keeps_right {
+        true => space - right_cells - 1,
+        false => space,
     };
-    let mut out = cut(left, left_room, &cells);
+    let mut out = cut(left, left_space, &cells);
     if keeps_right {
-        let gap = room - right_cells - measure(&out);
+        let gap = space - right_cells - measure(&out);
         out.push(Piece::new(" ".repeat(gap), Ink::Plain));
         out.extend(right);
     }
     out
 }
 
-/// The pieces that fit in `room` cells, the last of them ending in `…` when
+/// The pieces that fit in `space` cells, the last of them ending in `…` when
 /// anything had to go.
-fn cut(pieces: Vec<Piece>, room: usize, cells: &impl Fn(&str) -> usize) -> Vec<Piece> {
+fn cut(pieces: Vec<Piece>, space: usize, cells: &impl Fn(&str) -> usize) -> Vec<Piece> {
     let whole: usize = pieces.iter().map(|p| cells(&p.text)).sum();
-    if whole <= room {
+    if whole <= space {
         return pieces;
     }
-    let mut left = room.saturating_sub(1);
+    let mut left = space.saturating_sub(1);
     let mut out = Vec::new();
     for piece in pieces {
         let mut kept = String::new();
