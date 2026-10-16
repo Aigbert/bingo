@@ -458,3 +458,29 @@ Captures waited for the existing eight-second migration notice and permission
 mode notices to expire. Those transient hints retain their current placement
 until M184. The harness set `exit-empty off` on its private server so closing one
 pane could not race the next session; cleanup still killed that server at the end.
+
+### Verified — fix round (2026-10-16)
+
+Release build, fake provider, private `tmux -L m183fix` server, temporary
+HOME. `win` declares `models."fake/fake-1".contextWindow = 200000`; `bare`
+declares nothing.
+
+```text
+before first round, win:   ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ 0k / 200k   …   fake-1
+before first round, bare:  ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?       …   fake-1
+shift+tab, then `/permission `:
+   default
+ ❯ accept edits  acceptEdits                                        now
+   plan
+   bypass  bypassPermissions
+   don't ask  dontAsk
+row bypass + enter:        ⏵⏵ bypass …         (ran /permission bypassPermissions)
+row accept edits + enter:  ⏵⏵ accept edits …
+typed /permission acceptEdits (bare): permission mode: accept edits
+after first round, win:    ▰▱▱▱▱▱▱▱ 14k / 191k
+/think high:               fake-1 ∴ high
+```
+
+The window before the first measure is the catalogue's `context`, which core
+sets only from a stated source. The measured window is the effective one, so
+the denominator drops to 191k on the first round by the output reserve.
