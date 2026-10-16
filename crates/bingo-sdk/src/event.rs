@@ -3,6 +3,7 @@
 //! `Item` is one unit in transcript order. Deltas, notices and lag markers are
 //! ephemeral (never journaled); everything else is durable.
 
+mod hunks;
 mod interaction;
 mod raw;
 mod record;
@@ -675,17 +676,9 @@ impl ToolOutput {
 }
 
 impl Upshot {
-    /// The lines a unified diff adds and removes, counted past its header.
+    /// The lines a unified diff adds and removes, counted inside its hunks.
     pub fn of_diff(unified: &str) -> Self {
-        let hunks = unified.lines().skip_while(|line| !line.starts_with("@@"));
-        let (mut added, mut removed) = (0, 0);
-        for line in hunks {
-            match line.as_bytes().first() {
-                Some(b'+') => added += 1,
-                Some(b'-') => removed += 1,
-                _ => {}
-            }
-        }
+        let (added, removed) = hunks::counts(unified);
         Self::Diff { added, removed }
     }
 
@@ -1381,7 +1374,7 @@ mod tests {
     /// a line the tool wrote wins over them.
     #[test]
     fn a_calls_outcome_is_its_own_line_else_its_diffs_counts() {
-        let unified = "--- a.rs\n+++ a.rs\n@@ -1,2 +1,2 @@\n one\n-two\n+too\n+three\n";
+        let unified = "--- a.rs\n+++ a.rs\n@@ -1,2 +1,3 @@\n one\n-two\n+too\n+three\n";
         let mut changed = ToolOutput::text("Edited a.rs");
         changed.display = Some(View::Diff {
             unified: unified.into(),
