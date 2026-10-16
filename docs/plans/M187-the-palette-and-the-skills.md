@@ -11,6 +11,10 @@ reachable from `/`.
 
 ## Bricks
 
+0. **The palette sits under the prompt line** (the person, 2026-10-16: "把/slash
+   command放到对话框最下面反而是最好的 就和claude code一样"). It takes the
+   KeyBar's and the footer's rows while open, and the transcript gives up the
+   rest of the room; the prompt line moves up with it. The `@` menu stays.
 1. **Command use counts** per person (a `recent` group of up to 3 on a bare `/`).
 2. Groups `recent`, `commands`, `skills`, `sessions`, `keys`; short
    descriptions with right-aligned values; plain-word key rows.

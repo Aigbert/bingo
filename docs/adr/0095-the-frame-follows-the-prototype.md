@@ -26,6 +26,8 @@ every drawing that shows them (status, footer, header, receipts).
    session-scoped; the default scope draws nothing. The footer's middle slot
    and the notice line go; what they carried moves to toasts or the `KeyBar`
    (a pending other session is a `KeyBar` pair, `ctrl+g` and its count).
+   The `/` palette opens under the prompt line in place of the `KeyBar` and
+   footer, and the transcript gives up the room (the person, 2026-10-16).
 2. **Toasts live in the `KeyBar`'s left end**, one at a time, 2.8 s on the wall
    clock: nothing above them moves, and a toast whose moment has passed is
    dropped, never replayed.
