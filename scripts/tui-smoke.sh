@@ -310,8 +310,8 @@ start '{"responses":[
 keys 'write the note' Enter
 await 'Do you want to '
 if pane | grep -qF 'ctrl+g back to it'; then keys C-g; fi
-# The framed preview belongs to the pending step in the transcript.
-await '│'
+# The pending question leaves the prompt available below the rule.
+await '▍ answer above'
 press_until 'y' 'Wrote it.'
 [ -f "$WORK/cwd/note.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
 grep -q 'written by the smoke test' "$WORK/cwd/note.txt"
