@@ -55,6 +55,10 @@ impl State {
     pub fn sync(&mut self, state: &SessionState, now: Now) -> bool {
         let mut toasts = placed(state);
         toasts.sort_by_key(|toast| toast.until);
+        // A key forgotten here is harmless if it comes back: its age is kept
+        // below, so an expired toast is never said again.
+        self.seen
+            .retain(|key| toasts.iter().any(|toast| &toast.key == key));
         let mut alert = false;
         for toast in toasts {
             if self.seen.insert(toast.key.clone()) {
@@ -193,6 +197,45 @@ mod tests {
         );
         state.signals.clear();
         assert!(super::current(&ui, &state, later(now, 200)).is_none());
+    }
+
+    #[test]
+    fn a_toast_that_comes_back_after_expiry_is_not_said_again() {
+        let (_, now) = scene();
+        let mut toasts = super::State::default();
+        let mut state = state();
+        let slot = bingo_sdk::slot::with(
+            serde_json::json!({}),
+            [Slot::Toast {
+                text: "once".into(),
+                until: later(now, 2000).wall,
+                alert: true,
+            }],
+        );
+        state
+            .signals
+            .entry("counter".into())
+            .or_default()
+            .insert("toast".into(), slot.clone().into());
+        assert!(toasts.sync(&state, now), "a new alert rings");
+        state.signals.clear();
+        toasts.sync(&state, later(now, 100));
+        assert!(
+            toasts.seen.is_empty(),
+            "a toast no longer placed is forgotten"
+        );
+        state
+            .signals
+            .entry("counter".into())
+            .or_default()
+            .insert("toast".into(), slot.into());
+        let after = later(now, 2100);
+        assert!(
+            !toasts.sync(&state, after),
+            "an expired toast rings no more"
+        );
+        assert!(toasts.next(&state, after).is_none());
+        assert!(toasts.lines(&state, after, 80).is_empty());
     }
 
     #[test]
