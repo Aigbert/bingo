@@ -77,7 +77,7 @@ impl Terminal {
         );
     }
 
-    /// Whether every cell of the row carrying `needle` is written in the
+    /// Whether the prose after the three-cell answer prefix is written in the
     /// terminal's own foreground — SGR 39 and no colour of bingo's, which is
     /// what body text is drawn in since M73, in every look.
     fn own_ink(&self, needle: &str) -> bool {
@@ -86,7 +86,7 @@ impl Terminal {
         let Some(row) = (0..ROWS).find(|y| row_text(screen, *y).contains(needle)) else {
             return false;
         };
-        (0..COLS)
+        (3..COLS)
             .filter_map(|x| screen.cell(row, x))
             .filter(|cell| !cell.contents().trim().is_empty())
             .all(|cell| cell.fgcolor() == vt100::Color::Default)
@@ -95,10 +95,7 @@ impl Terminal {
 
 /// One row of the terminal's screen, as text.
 fn row_text(screen: &vt100::Screen, row: u16) -> String {
-    (0..COLS)
-        .filter_map(|x| screen.cell(row, x))
-        .map(|cell| cell.contents().to_string())
-        .collect()
+    screen.contents_between(row, 0, row, COLS)
 }
 
 /// Whether a colour of this weight is the light palette's. Its raised tint is
