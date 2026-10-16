@@ -14,6 +14,9 @@ struct Offer<'a> {
     /// The level's lines are ones only the person may run, so a row shows
     /// the argument it runs and whatever names it only as secondary text.
     guarded: bool,
+    /// The first level's words the session offers, when fewer than the
+    /// spec's: a model's own thinking levels.
+    only: Option<Vec<String>>,
 }
 fn named<'a>(name: &str, commands: &'a [CatalogEntry]) -> Option<(&'a CatalogEntry, CommandSpec)> {
     let entry = commands.iter().find(|entry| {
@@ -50,6 +53,9 @@ pub fn arguments(
                 .strip_prefix(&format!("/{name} "))
                 .unwrap_or_default(),
         ),
+        only: (prefix == format!("/{name} "))
+            .then(|| serde_json::from_value(entry.meta["offered"].clone()).ok())
+            .flatten(),
     };
     let rows = option_rows(&spec.args, text, &format!("/{name} "), &offer)
         .unwrap_or_else(|| offered(args, &prefix, query, &offer));
@@ -97,6 +103,7 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
             then,
         } => values
             .iter()
+            .filter(|value| offer.only.as_ref().is_none_or(|only| only.contains(value)))
             .filter_map(|value| {
                 word_row(
                     value,
@@ -269,7 +276,29 @@ mod tests {
             catalogs,
             current,
             guarded: false,
+            only: None,
         }
+    }
+    #[test]
+    fn a_session_offering_fewer_words_lists_only_those() {
+        let commands = vec![CatalogEntry {
+            id: "think".into(),
+            label: "think".into(),
+            meta: serde_json::json!({"name":"think","hint":"how hard it thinks","family":"session","now":"low","offered":["low","high","off"],"args":{"kind":"options","args":{"kind":"words","values":["minimal","low","medium","high","off"]},"flags":["--keep"]}}),
+        }];
+        let offered = arguments("/think ", &commands, &BTreeMap::new()).unwrap();
+        let labels = offered
+            .rows
+            .iter()
+            .map(|row| row.label.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(labels, ["low", "high", "off"]);
+        assert_eq!(offered.rows[offered.selected].label, "low");
+        let flags = arguments("/think high ", &commands, &BTreeMap::new()).unwrap();
+        assert_eq!(
+            flags.rows[0].label, "--keep",
+            "a later level is not narrowed"
+        );
     }
     #[test]
     fn words_options_catalog_free_and_none_have_one_argument_path() {
