@@ -1,5 +1,5 @@
 import { atom, read, update } from 'bingo';
-import type { On } from 'bingo';
+import type { On, Wire } from 'bingo';
 const hidden = atom('hidden', false);
 const summary = atom<{calls:number; seconds:number} | null>('summary', null);
 
@@ -18,7 +18,7 @@ export function register(on: On) {
     return next(event);
   });
   on('ui.render', {component: 'AbovePrompt', requestId: 'AbovePrompt'}, async ($, event, next) => {
-    if (event.props.hasSurvey) return next(event);
+    if ((event.props as Wire.AbovePromptProps).hasSurvey) return next(event);
     const {Box, Text, Button} = await $.ui.resolve(event);
     if (await read($, hidden)) return {kind: Box, children: []};
     const completed = await read($, summary);

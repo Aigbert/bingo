@@ -1,6 +1,6 @@
 # Tool call example
 
-Run `bingo --plugin-dir examples/plugins/tool-call`. This original module denies
+From this directory, run `bingo --plugin-dir .`. This original module denies
 edits to `.env`, `.env.*`, and `protected.txt`, rewrites the exact Bash command `echo before` to
 `echo after`, and counts calls to Bash, Read and Edit in the status line.
 Bash whitespace is trimmed, and a failure status clears on success.

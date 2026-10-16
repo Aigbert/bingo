@@ -608,6 +608,68 @@ fn types_are_laid_on_request_and_keep_the_authors_tsconfig() {
 }
 
 #[test]
+fn types_lay_the_reference_and_examples_that_validate_and_pass() {
+    let home = tempfile::tempdir().unwrap();
+    let plugin = fixture(home.path(), "band");
+    let written = success(&run(home.path(), "types", &plugin));
+    let reference = std::fs::read_to_string(plugin.join(".bingo/reference.md")).unwrap();
+    assert!(reference.contains("### `tool.call`") && reference.contains("### `$.ui`"));
+    for name in ["tool-call", "band", "pane", "ts-status"] {
+        let example = plugin.join(".bingo/examples").join(name);
+        assert!(
+            written.contains(&format!("examples/{name}/plugin.json")),
+            "{written}"
+        );
+        success(&run(home.path(), "validate", &example));
+        let tested = success(&run(home.path(), "test", &example));
+        assert!(
+            tested.contains("PASS") && !tested.contains("FAIL"),
+            "{name}: {tested}"
+        );
+    }
+    let tested = success(&run(home.path(), "test", &plugin));
+    assert!(
+        !tested.contains(".bingo"),
+        "the root runs only its own tests: {tested}"
+    );
+}
+
+/// Each `$` noun's `@example` runs in the test runtime, so the text an author
+/// copies from the types or the reference is code that works.
+#[test]
+fn every_noun_example_runs_in_the_test_runtime() {
+    use bingo_mods::dollar::nouns::NOUNS;
+    let home = tempfile::tempdir().unwrap();
+    let plugin = home.path().join("nouns");
+    std::fs::create_dir_all(&plugin).unwrap();
+    let uses: Vec<&str> = NOUNS
+        .iter()
+        .filter(|noun| noun.runs && noun.name != "plugin")
+        .map(|noun| noun.name)
+        .collect();
+    let manifest =
+        serde_json::json!({"name": "nouns", "version": "1", "module": "register.ts", "uses": uses});
+    std::fs::write(plugin.join("plugin.json"), manifest.to_string()).unwrap();
+    std::fs::write(
+        plugin.join("register.ts"),
+        "export const register = on => {};\n",
+    )
+    .unwrap();
+    let mut tests = String::from("import {test} from 'bingo/testing';\n");
+    for noun in NOUNS {
+        let run = if noun.runs { "test" } else { "test.skip" };
+        tests.push_str(&format!(
+            "{run}('$.{}', async $ => {{\n{}\n}});\n",
+            noun.name, noun.example
+        ));
+    }
+    std::fs::write(plugin.join("nouns.test.ts"), tests).unwrap();
+    let tested = success(&run(home.path(), "test", &plugin));
+    let passed = NOUNS.iter().filter(|noun| noun.runs).count();
+    assert_eq!(tested.matches("PASS").count(), passed, "{tested}");
+}
+
+#[test]
 fn validate_and_test_lay_types_but_never_into_a_process_plugin() {
     for verb in ["validate", "test"] {
         let home = tempfile::tempdir().unwrap();

@@ -6,7 +6,7 @@ test('ledger draws two calls, survives reload and resize, then closes on Escape'
     {steps:[{toolCall:{name:'Read',input:{file_path:'plugin.json'}}}]},
     {steps:[{text:'Two files read.'}]},
   ]}});
-  await $.command.run({name:'ledger',args:{}});
+  await $.command.run({name:'ledger',args:''});
   const pane = await $.ui.mount({pane:'ledger'});
   expect(await pane.drawn()).toBe('No calls yet');
   await mock.session.submit('Read both files');

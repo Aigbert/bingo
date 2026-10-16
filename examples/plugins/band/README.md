@@ -1,6 +1,6 @@
 # Band example
 
-Run `bingo --plugin-dir examples/plugins/band`. Click the Hide band button or
+From this directory, run `bingo --plugin-dir .`. Click the Hide band button or
 press Alt+h while the composer has focus. The state read invalidates the
 AbovePrompt request after the handler writes; hiding persists across reload.
 The module yields to a survey when `hasSurvey` is true. Typing `h` still edits

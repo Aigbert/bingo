@@ -4,20 +4,14 @@ use serde_json::{Value, json};
 pub(super) fn events(catalog: &Catalog) -> String {
     let mut result = String::from("// Generated from the live host event catalogue.\n");
     for entry in &catalog.entries {
-        let title = title(&entry.id);
-        for field in ["input", "result"] {
-            let schema = payload(&entry.meta[field]);
-            result.push_str(&format!(
-                "export namespace {title}{} {{\n{}\n}}\n",
-                self::title(field),
-                bingo_schema_ts::render(&schema)
-            ));
-        }
-        result.push_str(&format!("export type {title} = {title}Input.Payload;\n"));
+        result.push_str(&event_namespaces(entry));
     }
     for field in ["input", "result"] {
         result.push_str(&format!("export interface Event{}s {{\n", title(field)));
         for entry in &catalog.entries {
+            if let Some(text) = event_doc(&entry.id, &entry.meta) {
+                result.push_str(&bingo_schema_ts::doc(&text, ""));
+            }
             result.push_str(&format!(
                 "{}: {}{}.Payload;\n",
                 json!(entry.id),
@@ -29,6 +23,56 @@ pub(super) fn events(catalog: &Catalog) -> String {
     }
     result
 }
+
+fn event_namespaces(entry: &bingo_sdk::CatalogEntry) -> String {
+    let title = title(&entry.id);
+    let mut result = String::new();
+    for field in ["input", "result"] {
+        let schema = payload(&entry.meta[field]);
+        result.push_str(&format!(
+            "export namespace {title}{} {{\n{}\n}}\n",
+            self::title(field),
+            bingo_schema_ts::render(&schema)
+        ));
+    }
+    if let Some(text) = event_doc(&entry.id, &entry.meta) {
+        result.push_str(&bingo_schema_ts::doc(&text, ""));
+    }
+    result.push_str(&format!("export type {title} = {title}Input.Payload;\n"));
+    result
+}
+
+/// What an event is and what `next` does, with the fields a matcher may
+/// name.
+fn event_doc(id: &str, meta: &Value) -> Option<String> {
+    let text = event_text(id, meta)?;
+    let fields: Vec<String> = meta["matcher"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+        .map(|field| format!("`{field}`"))
+        .collect();
+    Some(if fields.is_empty() {
+        text
+    } else {
+        format!("{text}\n\nMatch on: {}.", fields.join(", "))
+    })
+}
+
+/// A kernel event carries its catalogue doc; a service face falls back to
+/// the `$` row that calls it.
+pub(super) fn event_text(id: &str, meta: &Value) -> Option<String> {
+    let described = meta["description"].as_str().map(str::to_string);
+    described.or_else(|| {
+        let (noun, method) = id.split_once('.')?;
+        let row = crate::dollar::table::ROWS
+            .iter()
+            .find(|row| row.noun == noun && row.method == method)?;
+        Some(row.doc.trim().to_string())
+    })
+}
+
 pub(super) fn tools(catalog: &Catalog) -> String {
     let mut result = String::from("// Generated from this host's tool input schemas.\n");
     for (index, entry) in catalog.entries.iter().enumerate() {
@@ -45,7 +89,7 @@ pub(super) fn tools(catalog: &Catalog) -> String {
     result.push_str("}\n");
     result
 }
-fn title(name: &str) -> String {
+pub(super) fn title(name: &str) -> String {
     name.split('.')
         .map(|part| {
             let mut chars = part.chars();
@@ -67,23 +111,7 @@ fn title(name: &str) -> String {
         })
         .collect()
 }
-pub(super) fn elements() -> String {
-    let schema =
-        serde_json::to_value(schemars::schema_for!(bingo_sdk::View)).unwrap_or(Value::Null);
-    let mut result = bingo_schema_ts::render(&schema);
-    result.push_str("export type Element = View;\nexport declare function h(kind: unknown, props: unknown, ...children: unknown[]): Element;\nexport declare const Fragment: 'Fragment';\ndeclare global { namespace JSX { type Element = import('./elements').Element; interface IntrinsicElements {\n");
-    for element in bingo_sdk::view::table::ELEMENTS {
-        result.push_str(&format!("{}: {{", json!(element.kind)));
-        for prop in element.props {
-            result.push_str(&format!("{}?: any;", json!(prop)));
-        }
-        result.push_str("};\n");
-    }
-    result.push_str("} } function h(kind: unknown, props: unknown, ...children: unknown[]): JSX.Element; const Fragment: 'Fragment'; }\n");
-    result
-}
-
-fn payload(schema: &Value) -> Value {
+pub(super) fn payload(schema: &Value) -> Value {
     let mut schema = if schema.is_object() {
         schema.clone()
     } else {

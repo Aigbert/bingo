@@ -2,7 +2,10 @@
 //! their bytes change. A run never writes them: the runtime embeds the API.
 use bingo_sdk::Catalog;
 use std::path::{Path, PathBuf};
+mod elements;
+mod examples;
 mod files;
+mod reference;
 mod render;
 /// The files whose bytes changed, in writing order.
 pub fn write(root: &Path, events: &Catalog, tools: &Catalog) -> Result<Vec<PathBuf>, String> {
@@ -20,15 +23,16 @@ pub fn write(root: &Path, events: &Catalog, tools: &Catalog) -> Result<Vec<PathB
     }
     Ok(written)
 }
-fn sources(events: &Catalog, tools: &Catalog) -> Vec<(&'static str, String)> {
+fn sources(events: &Catalog, tools: &Catalog) -> Vec<(String, String)> {
     let mut files = vec![
         ("types/bingo/index.d.ts",include_str!("types/index.d.ts").into()),
         ("types/bingo/testing.d.ts",include_str!("types/testing.d.ts").replace("./bingo/","./")),
-        ("types/bingo/elements.d.ts",render::elements()),
+        ("types/bingo/elements.d.ts",elements::declarations()),
         ("types/bingo/events.ts",render::events(events)),
         ("types/bingo/services.ts",render::services(events)),
         ("types/bingo-tools/index.d.ts",render::tools(tools)),
         ("types/bingo/rpc.ts","export interface Rpc {request<T>(method: string, params: unknown): Promise<T>}\n".into()),
+        ("reference.md",reference::reference(events)),
         (".gitignore","*\n".into()),
         ("tsconfig.json",serde_json::json!({"compilerOptions":{"target":"ES2023","module":"ESNext","moduleResolution":"Bundler","allowImportingTsExtensions":true,"noEmit":true,"skipLibCheck":true,"lib":["ES2023"],"jsx":"react","jsxFactory":"h","jsxFragmentFactory":"Fragment","baseUrl":".","paths":{"bingo":["types/bingo/index.d.ts"],"bingo/testing":["types/bingo/testing.d.ts"],"bingo-tools":["types/bingo-tools/index.d.ts"]}}}).to_string()),
     ];
@@ -63,6 +67,10 @@ fn sources(events: &Catalog, tools: &Catalog) -> Vec<(&'static str, String)> {
             .replace("Record<string,string>", &format!("{{{table}}}")),
     ));
     files
+        .into_iter()
+        .map(|(name, text)| (name.to_owned(), text))
+        .chain(examples::laid().map(|(name, text)| (name, text.to_owned())))
+        .collect()
 }
 #[cfg(test)]
 mod tests {
@@ -115,5 +123,50 @@ mod tests {
             std::fs::read_to_string(root.path().join("tsconfig.json")).unwrap(),
             "{\"author\":true}"
         );
+    }
+
+    /// Every line of `text` is the content of a JSDoc line in `laid`.
+    fn carried(laid: &str, text: &str) -> bool {
+        let jsdoc: std::collections::HashSet<&str> = laid
+            .lines()
+            .map(str::trim)
+            .filter_map(|line| line.strip_prefix("/**").or_else(|| line.strip_prefix('*')))
+            .map(|line| line.strip_suffix("*/").unwrap_or(line).trim())
+            .collect();
+        text.lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .all(|line| jsdoc.contains(line))
+    }
+
+    #[test]
+    fn the_laid_types_carry_every_event_and_method_doc_as_jsdoc() {
+        use crate::dollar::nouns::{CALLS, NOUNS};
+        use crate::dollar::table::ROWS;
+        let root = tempfile::tempdir().unwrap();
+        let tools = Catalog {
+            kind: CatalogKind::Tools,
+            entries: Vec::new(),
+        };
+        write(root.path(), &reference::tests::kernel_events(), &tools).unwrap();
+        let bingo = root.path().join(".bingo/types/bingo");
+        let laid: String = std::fs::read_dir(&bingo)
+            .unwrap()
+            .map(|file| std::fs::read_to_string(file.unwrap().path()).unwrap())
+            .collect();
+        for entry in bingo_sdk::catalogue::ALL {
+            let doc = entry.description().unwrap();
+            assert!(carried(&laid, &doc), "{}", entry.name);
+        }
+        for row in ROWS {
+            assert!(carried(&laid, row.doc), "{}.{}", row.noun, row.method);
+        }
+        for call in CALLS.iter().filter_map(|call| call.doc) {
+            assert!(carried(&laid, call), "{call}");
+        }
+        for noun in NOUNS {
+            assert!(carried(&laid, noun.doc), "{}", noun.name);
+            assert!(carried(&laid, noun.example), "{}", noun.name);
+        }
     }
 }

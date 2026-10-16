@@ -23,7 +23,7 @@ export function register(on: On) {
       await $.ui.status(`Example calls: ${await read($, calls)}`);
     }
     if (event.tool === 'Bash') {
-      const command = event.command.trim();
+      const command = String(event.command).trim();
       const result = await next({...event, command: command === 'echo before' ? 'echo after' : command});
       await $.ui.status(result.isError ? `failed: ${command}` : null, {key:'failure'});
       return result;
