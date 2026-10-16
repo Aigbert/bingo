@@ -216,6 +216,12 @@ fn frame_cases_preserve_the_envelope_and_nested_interactions() {
         .enumerate()
     {
         let frame: bingo_sdk::Frame = serde_json::from_str(wire).unwrap();
+        assert_eq!(
+            serde_json::to_string(&frame).unwrap(),
+            wire,
+            "row {} key order",
+            row + 1
+        );
         let expected: serde_json::Value = serde_json::from_str(wire).unwrap();
         assert_eq!(
             serde_json::to_value(&frame).unwrap(),
