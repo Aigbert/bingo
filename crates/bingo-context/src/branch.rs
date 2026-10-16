@@ -13,28 +13,36 @@ pub(crate) struct Branch {
 }
 
 impl Branch {
-    async fn publish(&self, cwd: &Path, cx: &HookContext) {
-        let changed = match self.directories.lock() {
-            Ok(mut directories) => {
-                if directories
-                    .get(&cx.session)
-                    .is_some_and(|previous| previous == cwd)
-                {
-                    false
-                } else {
-                    directories.insert(cx.session.clone(), cwd.to_path_buf());
-                    true
-                }
-            }
-            Err(_) => false,
-        };
-        if changed
+    async fn publish(&self, session: &SessionId, cwd: &Path, cx: &HookContext) {
+        if self.moved(session, cwd)
             && let Err(error) = cx
                 .host
-                .extend(&cx.session, "_bingo.context", "location", read(cwd).await)
+                .extend(session, "_bingo.context", "location", read(cwd).await)
                 .await
         {
             tracing::warn!(%error, "context: branch was not published");
+        }
+    }
+
+    /// Records `cwd` as the session's directory; true when it was not already.
+    fn moved(&self, session: &SessionId, cwd: &Path) -> bool {
+        let Ok(mut directories) = self.directories.lock() else {
+            return false;
+        };
+        if directories
+            .get(session)
+            .is_some_and(|previous| previous == cwd)
+        {
+            return false;
+        }
+        directories.insert(session.clone(), cwd.to_path_buf());
+        true
+    }
+
+    /// A closed session publishes nothing more; reopening reads the branch anew.
+    fn closed(&self, session: &SessionId) {
+        if let Ok(mut directories) = self.directories.lock() {
+            directories.remove(session);
         }
     }
 }
@@ -77,8 +85,12 @@ impl Hook for Branch {
     }
 
     async fn on_event(&self, frame: &Frame, cx: &HookContext) {
-        if let Event::SessionUpdated { summary } = &frame.event {
-            self.publish(Path::new(&summary.cwd), cx).await;
+        match &frame.event {
+            Event::SessionUpdated { summary } => {
+                self.publish(&cx.session, Path::new(&summary.cwd), cx).await;
+            }
+            Event::SessionClosed { .. } => self.closed(&cx.session),
+            _ => {}
         }
     }
 }
@@ -86,6 +98,18 @@ impl Hook for Branch {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_directory_is_read_once_per_change_and_forgotten_on_close() {
+        let branch = Branch::default();
+        let session = SessionId::from_raw("ses_branch");
+        assert!(branch.moved(&session, Path::new("/work")));
+        assert!(!branch.moved(&session, Path::new("/work")));
+        assert!(branch.moved(&session, Path::new("/elsewhere")));
+        branch.closed(&session);
+        assert!(branch.directories.lock().unwrap().is_empty());
+        assert!(branch.moved(&session, Path::new("/elsewhere")), "reopened");
+    }
 
     #[tokio::test]
     async fn a_branch_is_a_cwd_fact_and_detached_or_non_git_is_absent() {
