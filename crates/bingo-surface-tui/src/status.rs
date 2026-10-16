@@ -39,7 +39,7 @@ pub fn components(
             dimmed(" solo".into()),
         ];
     }
-    let context = context_bar(tree.viewed().context);
+    let context = context_bar(tree.viewed().context, catalogued_window(ui, tree.viewed()));
     footer(left, crew, context, right, width)
 }
 
@@ -80,11 +80,40 @@ fn footer(
     (Line::from(clip(spans, width)), hit)
 }
 
-fn context_bar(context: Option<bingo_sdk::ContextUsage>) -> Vec<Span<'static>> {
+/// The window the model catalogue states for this session's model. The
+/// kernel's fallback guess is never published there, so a model it only
+/// guesses for stays unknown here too.
+fn catalogued_window(ui: &Ui, state: &SessionState) -> Option<u64> {
+    let summary = &state.summary;
+    let id = format!(
+        "{}/{}",
+        summary.provider.as_deref()?,
+        summary.model.as_deref()?
+    );
+    ui.catalogs
+        .values
+        .get("models")?
+        .iter()
+        .find(|entry| entry.id == id)?
+        .meta["context"]
+        .as_u64()
+        .filter(|window| *window > 0)
+}
+
+/// Before the first measure nothing is spent: a stated window reads
+/// `0k / 200k`, an unknown one `? / ?`.
+fn context_bar(
+    context: Option<bingo_sdk::ContextUsage>,
+    window: Option<u64>,
+) -> Vec<Span<'static>> {
     let Some(context) = context else {
+        let said = window.map_or_else(
+            || " ? / ?".into(),
+            |window| format!(" 0k / {}", crate::count::count(window)),
+        );
         return vec![
             Span::styled(theme::glyphs().chrome.context[1].repeat(8), theme::ash()),
-            dimmed(" ? / ?".into()),
+            dimmed(said),
         ];
     };
     let share = context.used as f64 / context.window.max(1) as f64;
@@ -653,7 +682,7 @@ mod tests {
                 trigger: 100_000,
                 parts: None,
             };
-            let spans = context_bar(Some(context));
+            let spans = context_bar(Some(context), Some(1_000_000));
             assert_eq!(spans[0].content, "▰".repeat(fill));
             assert_eq!(spans[1].content, "▱".repeat(8 - fill));
             assert_eq!(
@@ -663,6 +692,46 @@ mod tests {
             assert_eq!(spans[2].style, theme::dim());
             assert!(spans[2].content.contains(" / 200k"));
         }
+    }
+
+    #[test]
+    fn before_the_first_measure_a_catalogued_window_reads_zero_of_it() {
+        let (mut ui, now) = scene();
+        let entry = |id: &str, meta| bingo_sdk::CatalogEntry {
+            id: id.into(),
+            label: id.into(),
+            meta,
+        };
+        ui.catalogs.values.insert(
+            "models".into(),
+            vec![
+                entry("other/fake-1", serde_json::json!({"context": 64_000})),
+                entry("fake/fake-1", serde_json::json!({"context": 200_000})),
+            ],
+        );
+        let drawn = line(&solo(&state()), &ui, 108, now).to_string();
+        assert!(drawn.contains("▱▱▱▱▱▱▱▱ 0k / 200k"), "{drawn}");
+        let mut measured = state();
+        measured.context = Some(ContextUsage {
+            used: 14_000,
+            window: 191_000,
+            trigger: 180_000,
+            parts: None,
+        });
+        let drawn = line(&solo(&measured), &ui, 108, now).to_string();
+        assert!(drawn.contains("14k / 191k"), "the measure wins: {drawn}");
+        ui.catalogs.values.insert(
+            "models".into(),
+            vec![entry(
+                "fake/fake-1",
+                serde_json::json!({"switchAt": 150_000}),
+            )],
+        );
+        let drawn = line(&solo(&state()), &ui, 108, now).to_string();
+        assert!(
+            drawn.contains("▱▱▱▱▱▱▱▱ ? / ?"),
+            "a guess is unknown: {drawn}"
+        );
     }
 
     #[test]
