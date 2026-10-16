@@ -339,7 +339,7 @@ fn a_form_crosses_the_json_wire_as_one_frame() {
 }
 
 #[test]
-fn a_question_is_declined_when_nobody_is_at_the_keyboard() {
+fn a_question_is_skipped_when_nobody_is_at_the_keyboard() {
     let script = script(
         r#"{"responses":[
             {"steps":[{"text":"Asking."},{"toolCall":{"name":"AskUserQuestion","input":{"questions":[
@@ -354,7 +354,25 @@ fn a_question_is_declined_when_nobody_is_at_the_keyboard() {
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert_eq!(stdout(&out), "Asking.Fine.\n");
     let err = stderr(&out);
-    assert!(err.contains("[tool] AskUserQuestion error"), "{err}");
+    assert!(err.contains("[tool] AskUserQuestion ok"), "{err}");
+    assert!(!err.contains("[tool] AskUserQuestion error"), "{err}");
+    let json = run(bingo().env("BINGO_FAKE_SCRIPT", script.path()).args([
+        "--print",
+        "--output-format",
+        "json",
+        "pick one",
+    ]));
+    assert_eq!(json.status.code(), Some(0), "{}", stderr(&json));
+    let frames = frames_of(&json);
+    assert!(frames.iter().any(|frame| matches!(&frame.event,
+        Event::ItemCompleted { item } if matches!(&item.body,
+            bingo_sdk::ItemBody::ToolCall { name, output:Some(output), .. }
+            if name == "AskUserQuestion" && !output.is_error
+                && output.parts.iter().any(|part| matches!(part,
+                    bingo_sdk::ContentPart::Text { text } if text.contains("skipped these questions")
+                ))
+        )
+    )));
 }
 
 #[test]
