@@ -163,7 +163,8 @@ mod tests {
         assert_eq!(
             command.now(&bingo_sdk::command::SessionView {
                 state: &state,
-                providers: &[]
+                providers: &[],
+                models: &[],
             }),
             Some("plan".into())
         );

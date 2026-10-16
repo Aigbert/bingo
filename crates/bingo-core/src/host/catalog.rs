@@ -679,6 +679,9 @@ impl command::CommandCatalog for Scoped {
         for entry in &mut catalog.entries {
             if let Some(command) = commands.get(&entry.id) {
                 entry.meta["now"] = json!(command.now(view));
+                if let Some(offered) = command.offered(view) {
+                    entry.meta["offered"] = json!(offered);
+                }
             }
         }
         catalog
@@ -731,6 +734,7 @@ mod current_values {
             &command::SessionView {
                 state: &state,
                 providers: &[],
+                models: &[],
             },
         );
         for (name, want) in [
@@ -760,6 +764,7 @@ mod current_values {
         let view = command::SessionView {
             state: &state,
             providers: &providers,
+            models: &[],
         };
         for command in &host.registry.commands {
             let value = command.now(&view);
@@ -843,6 +848,7 @@ mod linear_values {
             &command::SessionView {
                 state: &state,
                 providers: &[],
+                models: &[],
             },
         );
         assert_eq!(calls.load(Ordering::Relaxed), 3);

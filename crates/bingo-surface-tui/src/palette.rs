@@ -163,6 +163,7 @@ fn command_entries(
                 &command::SessionView {
                     state,
                     providers: &providers,
+                    models: catalogs.get("models").map_or(&[], Vec::as_slice),
                 },
             )
             .entries;

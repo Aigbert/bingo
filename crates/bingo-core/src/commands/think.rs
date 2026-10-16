@@ -20,6 +20,10 @@ impl Command for ThinkCommand {
         Some(Effort::word(effort).into())
     }
 
+    fn offered(&self, view: &command::SessionView<'_>) -> Option<Vec<String>> {
+        offered(view)
+    }
+
     fn spec(&self) -> CommandSpec {
         let mut spec = super::spec(
             "think",
@@ -107,6 +111,27 @@ async fn set(
     })
 }
 
+/// The levels the session's model has, off among them; every level while
+/// the model is not in the catalogue the client holds.
+fn offered(view: &command::SessionView<'_>) -> Option<Vec<String>> {
+    let summary = &view.state.summary;
+    let id = format!(
+        "{}/{}",
+        summary.provider.as_deref()?,
+        summary.model.as_deref()?
+    );
+    let model = view.models.iter().find(|entry| entry.id == id)?;
+    let efforts: Vec<Effort> = serde_json::from_value(model.meta["efforts"].clone()).ok()?;
+    Some(
+        efforts
+            .into_iter()
+            .map(|effort| Effort::word(Some(effort)))
+            .chain([Effort::word(None)])
+            .map(str::to_owned)
+            .collect(),
+    )
+}
+
 fn said(level: Option<Effort>) -> String {
     format!("thinking: {}", Effort::word(level))
 }
@@ -125,5 +150,41 @@ mod tests {
     #[test]
     fn the_usage_line_lists_every_word_a_level_may_be_said_in() {
         assert_eq!(levels(), "<minimal|low|medium|high|xhigh|max|off>");
+    }
+
+    #[test]
+    fn only_the_session_model_s_levels_are_offered() {
+        let mut state = SessionState::new(crate::test_support::summary("ses_1"));
+        state.summary.provider = Some("fake".into());
+        state.summary.model = Some("large".into());
+        let models = [
+            CatalogEntry {
+                id: "fake/large".into(),
+                label: "large".into(),
+                meta: serde_json::json!({"efforts": ["low", "xHigh"]}),
+            },
+            CatalogEntry {
+                id: "fake/small".into(),
+                label: "small".into(),
+                meta: serde_json::json!({"efforts": []}),
+            },
+        ];
+        let view = |models| command::SessionView {
+            state: &state,
+            providers: &[],
+            models,
+        };
+        assert_eq!(
+            offered(&view(&models)),
+            Some(vec!["low".into(), "xhigh".into(), "off".into()])
+        );
+        assert_eq!(offered(&view(&models[1..])), None, "not in the catalogue");
+        state.summary.model = Some("small".into());
+        let view = command::SessionView {
+            state: &state,
+            providers: &[],
+            models: &models,
+        };
+        assert_eq!(offered(&view), Some(vec!["off".into()]));
     }
 }

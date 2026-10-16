@@ -293,6 +293,12 @@ pub trait Command: Send + Sync {
         None
     }
 
+    /// The words a `Words` argument offers in the supplied session when they
+    /// are fewer than the spec's, without I/O; `None` offers every one.
+    fn offered(&self, _view: &SessionView<'_>) -> Option<Vec<String>> {
+        None
+    }
+
     /// Whether this invocation may run beside the current turn. Implementations
     /// inspect the supplied state without calling back into its session actor.
     async fn is_instant(&self, _args: &str, _state: &crate::SessionState) -> bool {
@@ -490,6 +496,8 @@ mod surface_contract {
 pub struct SessionView<'a> {
     pub state: &'a crate::SessionState,
     pub providers: &'a [crate::AuthStatus],
+    /// The models catalogue as the client last read it; empty before it has.
+    pub models: &'a [crate::CatalogEntry],
 }
 
 #[cfg(test)]
