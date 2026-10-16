@@ -438,7 +438,29 @@ impl HostApi for RemoteKernel {
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
         self.connection
-            .call(name::CATALOG_READ, &CatalogParams { kind })
+            .call(
+                name::CATALOG_READ,
+                &CatalogParams {
+                    kind,
+                    session: None,
+                },
+            )
+            .await
+    }
+
+    async fn catalog_for(
+        &self,
+        session: &SessionId,
+        kind: CatalogKind,
+    ) -> Result<Catalog, KernelError> {
+        self.connection
+            .call(
+                name::CATALOG_READ,
+                &CatalogParams {
+                    kind,
+                    session: Some(session.clone()),
+                },
+            )
             .await
     }
 

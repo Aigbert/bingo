@@ -37,6 +37,7 @@ pub(super) struct Scripts {
     pub withdraw: Option<Script<(SessionId, IntentId, ClientIdentity), Input>>,
     pub reconfigure: Option<Script<(SessionId, SessionChange), ()>>,
     pub catalog: Option<Script<(CatalogKind,), Catalog>>,
+    pub catalog_for: Option<Script<(SessionId, CatalogKind), Catalog>>,
 }
 
 #[derive(Default)]
@@ -281,6 +282,17 @@ impl TestHost {
         Fut: Future<Output = Result<Catalog, KernelError>> + Send + 'static,
     {
         locked(&self.inner.scripts).catalog = Some(Arc::new(move |(kind,)| Box::pin(script(kind))));
+    }
+
+    /// Override `catalog_for`; the call is recorded before this script runs.
+    pub fn on_catalog_for<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId, CatalogKind) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Catalog, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).catalog_for = Some(Arc::new(move |(session, kind)| {
+            Box::pin(script(session, kind))
+        }));
     }
 
     /// Override `notice`; the call is recorded before this script runs.

@@ -222,6 +222,14 @@ impl HostApi for PluginHost {
         self.inner().catalog(kind).await
     }
 
+    async fn catalog_for(
+        &self,
+        session: &SessionId,
+        kind: CatalogKind,
+    ) -> Result<Catalog, KernelError> {
+        self.inner().catalog_for(session, kind).await
+    }
+
     async fn notice(&self, _level: Level, _code: &str, _text: &str) -> Result<(), KernelError> {
         self.inner().notice(_level, _code, _text).await
     }

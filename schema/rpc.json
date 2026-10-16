@@ -562,6 +562,16 @@
       "properties": {
         "kind": {
           "$ref": "#/$defs/CatalogKind"
+        },
+        "session": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SessionId"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [

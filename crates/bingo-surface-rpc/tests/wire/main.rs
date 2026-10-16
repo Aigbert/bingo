@@ -7,6 +7,7 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 mod bounded;
+mod catalogue;
 mod host;
 
 use std::time::Duration;

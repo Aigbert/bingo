@@ -46,6 +46,8 @@ drive bugs are gone, each with a test that failed before the fix.
 - `crates/bingo-core/src/host/catalog.rs`, interaction receipts, `bingo-tool-fs/src/ask.rs`,
   the TUI crate guide, and isolated question smoke coverage.
 - `bingo-sdk/src/tool.rs`, core executor call binding and `host/tool_host.rs`.
+- Session catalogue API in sdk/core, RPC params/client/server and generated schema;
+  TUI catalogue refresh on view/attachment changes.
 
 ## Exit criteria
 
@@ -87,3 +89,9 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
   `ToolHost::ask_for` (defaulting to `ask` for existing hosts). This repairs the
   receipt link for every tool without guessing from text or tool names. The
   TUI's existing linked-receipt rendering then owns the one receipt.
+- Catalogue requests carry an optional session through the existing RPC method.
+  Session requests use its cwd (including hook context); unscoped callers use
+  configured host home. Changing the viewed session clears/refetches commands;
+  existing request generations discard stale answers. No kernel feature noun.
+- Toast deadlines ignore `holdToasts`; the existing wire field stays compatible.
+  Only the alert-once set remains, with no paused copy of a deadline.

@@ -641,11 +641,11 @@ impl Server {
 
     async fn catalog(&mut self, params: Value) -> Result<Reply, RpcError> {
         let params: CatalogParams = parse(params)?;
-        let catalog = self
-            .host
-            .catalog(params.kind)
-            .await
-            .map_err(crate::codec::from_kernel)?;
+        let catalog = match params.session {
+            Some(session) => self.host.catalog_for(&session, params.kind).await,
+            None => self.host.catalog(params.kind).await,
+        }
+        .map_err(crate::codec::from_kernel)?;
         Reply::of(&catalog)
     }
 

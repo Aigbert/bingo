@@ -7,6 +7,7 @@ use super::*;
 use crate::test_support::*;
 
 mod ask;
+mod catalog_cwd;
 mod catalogue;
 mod checkpoint;
 mod commands;

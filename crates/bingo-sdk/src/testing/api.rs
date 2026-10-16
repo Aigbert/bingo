@@ -355,6 +355,22 @@ impl HostApi for TestHost {
         NoHost.catalog(kind).await
     }
 
+    async fn catalog_for(
+        &self,
+        session: &SessionId,
+        kind: CatalogKind,
+    ) -> Result<Catalog, KernelError> {
+        self.record(HostCall::CatalogFor {
+            session: session.clone(),
+            kind,
+        });
+        let script = locked(&self.inner.scripts).catalog_for.clone();
+        if let Some(script) = script {
+            return script((session.clone(), kind)).await;
+        }
+        self.catalog(kind).await
+    }
+
     async fn notice(&self, level: Level, code: &str, text: &str) -> Result<(), KernelError> {
         self.record(HostCall::Notice {
             level,

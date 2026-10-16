@@ -46,6 +46,7 @@ pub(super) fn catalogue_context(host: &Host, session: Option<&SessionId>) -> Hoo
 pub(super) async fn catalogue_answer(
     host: &Host,
     kind: CatalogKind,
+    cx: &HookContext,
 ) -> Result<Catalog, KernelError> {
     register_pending(host).await;
     let resolved = host.providers().await;
@@ -58,6 +59,7 @@ pub(super) async fn catalogue_answer(
             host.settings.kernel.model.as_deref(),
             &host.served,
             kind,
+            &cx.cwd,
         )
         .await,
     };
@@ -78,7 +80,7 @@ pub(super) async fn catalogue_answer(
     let mut result = crate::chain::autocomplete::catalog(
         catalog,
         &host.hook_set().links().await,
-        &host.catalogue_context(None),
+        cx,
         report.clone(),
     )
     .await;

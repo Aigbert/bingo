@@ -39,13 +39,14 @@ pub(super) async fn entries(
     model: Option<&str>,
     served: &ServedModels,
     kind: CatalogKind,
+    cwd: &std::path::Path,
 ) -> Vec<CatalogEntry> {
     let mut entries = match kind {
         CatalogKind::Events => events(registry),
         CatalogKind::Models => models(resolved, model, served),
         CatalogKind::Providers => providers(registry, resolved),
         CatalogKind::Tools => tools(registry).await,
-        CatalogKind::Commands => commands(registry).await,
+        CatalogKind::Commands => commands(registry, cwd).await,
         CatalogKind::Plugins => plugins(registry).await,
     };
     for agent in &registry.agents {
@@ -211,13 +212,10 @@ fn tool_entry(tool: &dyn Tool) -> CatalogEntry {
     }
 }
 
-/// The catalogue has no session, so a source is asked for the process's own
-/// directory; a session working elsewhere still dispatches by its own.
-async fn commands(registry: &Registry) -> Vec<CatalogEntry> {
-    let here = std::env::current_dir().unwrap_or_default();
+async fn commands(registry: &Registry, cwd: &std::path::Path) -> Vec<CatalogEntry> {
     let mut all = Vec::new();
     for source in registry.command_sources() {
-        all.extend(source.commands(&here).await);
+        all.extend(source.commands(cwd).await);
     }
     all.iter()
         .map(|c| c.spec())

@@ -749,6 +749,15 @@ pub trait HostApi: Send + Sync {
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError>;
 
+    /// Read a catalogue in the named session's directory.
+    async fn catalog_for(
+        &self,
+        _session: &SessionId,
+        kind: CatalogKind,
+    ) -> Result<Catalog, KernelError> {
+        self.catalog(kind).await
+    }
+
     /// Say one line to the person, wherever they are: a transcript notice on
     /// every session that is open right now. It belongs to no session and no
     /// call — a plugin process that died, a hook that never decided, a plugin

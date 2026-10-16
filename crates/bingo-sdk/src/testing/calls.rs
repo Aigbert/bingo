@@ -95,6 +95,10 @@ pub enum HostCall {
     Catalog {
         kind: CatalogKind,
     },
+    CatalogFor {
+        session: SessionId,
+        kind: CatalogKind,
+    },
     Notice {
         level: Level,
         code: String,
@@ -213,6 +217,9 @@ impl std::fmt::Debug for HostCall {
                 "Reconfigure",
                 &[("session", session), ("change", change)],
             ),
+            Self::CatalogFor { session, kind } => {
+                fields(f, "CatalogFor", &[("session", session), ("kind", kind)])
+            }
             Self::Catalog { kind } => f.debug_struct("Catalog").field("kind", kind).finish(),
             Self::Notice { level, code, text } => f
                 .debug_struct("Notice")

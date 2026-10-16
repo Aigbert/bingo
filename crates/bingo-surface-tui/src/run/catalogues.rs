@@ -19,7 +19,8 @@ pub(super) async fn fetch_all(run: &mut Run) {
     run.typeahead.catalogue_pending = true;
     let generation = next_fetch(run);
     let host = run.host.clone();
-    let mut request = Box::pin(request_commands(host));
+    let session = run.session.tree.view().clone();
+    let mut request = Box::pin(request_commands(host, session));
     match tokio::time::timeout(INITIAL_WAIT, &mut request).await {
         Ok(result) => received(run, generation, result),
         Err(_) => run.spawn(async move { Ok(Reply::Commands(generation, request.await)) }),
@@ -32,16 +33,33 @@ pub(super) async fn fetch_all(run: &mut Run) {
 pub(super) fn fetch_commands(run: &mut Run) {
     let generation = next_fetch(run);
     let host = run.host.clone();
-    run.spawn(async move { Ok(Reply::Commands(generation, request_commands(host).await)) });
+    let session = run.session.tree.view().clone();
+    run.spawn(async move {
+        Ok(Reply::Commands(
+            generation,
+            request_commands(host, session).await,
+        ))
+    });
 }
 
-async fn request_commands(host: HostHandle) -> Result<Vec<CommandSpec>, KernelError> {
-    tokio::time::timeout(COMMAND_WAIT, host.catalog(CatalogKind::Commands))
-        .await
-        .map_err(|_| {
-            KernelError::new(bingo_sdk::ErrorCode::Timeout, "command catalogue timed out")
-        })?
-        .map(|catalog| commands::specs_from(&catalog))
+pub(super) fn view_changed(run: &mut Run) {
+    run.ui.catalogs.commands.clear();
+    run.ui.placed.pulled.invalidate();
+    run.typeahead.catalogue_pending = true;
+    fetch_commands(run);
+}
+
+async fn request_commands(
+    host: HostHandle,
+    session: SessionId,
+) -> Result<Vec<CommandSpec>, KernelError> {
+    tokio::time::timeout(
+        COMMAND_WAIT,
+        host.catalog_for(&session, CatalogKind::Commands),
+    )
+    .await
+    .map_err(|_| KernelError::new(bingo_sdk::ErrorCode::Timeout, "command catalogue timed out"))?
+    .map(|catalog| commands::specs_from(&catalog))
 }
 
 fn next_fetch(run: &mut Run) -> u64 {

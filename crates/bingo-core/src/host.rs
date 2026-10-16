@@ -925,7 +925,21 @@ impl HostApi for Host {
     }
 
     async fn catalog(&self, kind: CatalogKind) -> Result<Catalog, KernelError> {
-        interception::catalogue_answer(self, kind).await
+        interception::catalogue_answer(self, kind, &self.catalogue_context(None)).await
+    }
+
+    async fn catalog_for(
+        &self,
+        session: &SessionId,
+        kind: CatalogKind,
+    ) -> Result<Catalog, KernelError> {
+        let live = self.live(session)?;
+        let cx = HookContext {
+            session: session.clone(),
+            cwd: live.spec.cwd,
+            ..self.catalogue_context(None)
+        };
+        interception::catalogue_answer(self, kind, &cx).await
     }
 
     /// Every session that is open right now, and no other: a line that belongs

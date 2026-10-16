@@ -798,6 +798,7 @@ impl Run {
     /// time, so what is typed there reaches it.
     fn show(&mut self, session: SessionId) {
         self.session.tree.show(&session);
+        catalogues::view_changed(self);
         // Somewhere else is somewhere else: the transcript comes back up out
         // of dim so the change of place is seen and not just noticed (§6).
         self.ui.switched = Some(Instant::now());
@@ -908,6 +909,7 @@ impl Run {
         let sessions: Vec<_> = self.session.handles.keys().cloned().collect();
         self.discard_actions(&sessions);
         self.session = Attached::new(attachment.snapshot, attachment.handle);
+        catalogues::view_changed(self);
         *events = Some(attachment.events);
         self.ui.opening = false;
         self.ui.scroll = Default::default();

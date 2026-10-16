@@ -227,3 +227,40 @@ async fn an_older_fetch_cannot_replace_a_newer_catalogue_or_report_failure() {
     );
     assert!(run.ui.notices.is_empty());
 }
+
+#[tokio::test]
+async fn command_requests_follow_the_viewed_session() {
+    let mut run = super::super::tests::idle(scene().1.instant);
+    run.session.tree = folded_tree(vec![child_frame(1, announced("child"))]);
+    let (tx, mut replies) = mpsc::channel(16);
+    run.replies = tx;
+    run.session.handles.insert(
+        child_id(),
+        bingo_sdk::SessionHandle(Arc::new(TestSession::default())),
+    );
+    let host = TestHost::default();
+    host.on_catalog(|kind| async move { Ok(answer(kind)) });
+    run.host = host.handle();
+    fetch_all(&mut run).await;
+    assert!(host.calls().iter().any(|call| matches!(call,
+        bingo_sdk::testing::HostCall::CatalogFor { session, kind: CatalogKind::Commands }
+        if session == run.session.tree.view()
+    )));
+    let previous = run.command_fetch;
+    run.show(child_id());
+    assert_eq!(run.command_fetch, previous + 1);
+    assert!(run.ui.catalogs.commands.is_empty());
+    assert!(run.typeahead.catalogue_pending);
+    loop {
+        let reply = replies.recv().await.unwrap();
+        let ready = matches!(reply, Reply::Commands(..));
+        run.reply(reply, &mut None);
+        if ready {
+            break;
+        }
+    }
+    assert!(host.calls().iter().any(|call| matches!(call,
+        bingo_sdk::testing::HostCall::CatalogFor { session, kind: CatalogKind::Commands }
+        if session == &child_id()
+    )));
+}
