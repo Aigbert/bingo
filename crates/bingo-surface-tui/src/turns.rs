@@ -248,7 +248,11 @@ impl Turn<'_> {
 
     /// The stop line, wherever the turn says the person stopped it.
     fn stops(&self, steps: &[Step], roles: &mut BTreeMap<ItemId, Role>) {
-        let ran = steps.iter().filter(|step| ran(step)).count();
+        let calls = self.items.iter().filter(|item| self.is_step(item));
+        let ran = calls
+            .zip(steps)
+            .filter(|(call, step)| ran(step, self.answers.to(&call.id)))
+            .count();
         for item in self.items {
             if matches!(item.body, ItemBody::Interruption { .. }) {
                 let total = steps.len();
@@ -342,15 +346,21 @@ fn narrates(item: &Item, at: usize, last_step: Option<usize>) -> bool {
 
 /// Whether a step had run when its turn ended: it came back, and the person
 /// had not said no to it.
-fn ran(step: &Step) -> bool {
-    let denied = matches!(
-        &step.answer,
-        Some(Upshot::Words {
-            tone: Tone::Bad,
-            ..
-        })
-    );
-    matches!(step.state, StepState::Done | StepState::Failed) && !denied
+fn ran(step: &Step, answers: &[&Item]) -> bool {
+    matches!(step.state, StepState::Done | StepState::Failed) && !refused(answers)
+}
+
+/// Whether the person said no to a step.
+fn refused(answers: &[&Item]) -> bool {
+    answers.iter().any(|receipt| {
+        matches!(
+            receipt.body,
+            ItemBody::PermissionReceipt {
+                decision: DecisionKind::Deny,
+                ..
+            }
+        )
+    })
 }
 
 /// One call, in the words its row shows.
@@ -453,18 +463,9 @@ fn answer(receipts: &[&Item]) -> Option<Upshot> {
     if words.is_empty() {
         return None;
     }
-    let refused = receipts.iter().any(|receipt| {
-        matches!(
-            receipt.body,
-            ItemBody::PermissionReceipt {
-                decision: DecisionKind::Deny,
-                ..
-            }
-        )
-    });
     Some(Upshot::Words {
         text: words.join(" \u{b7} "),
-        tone: match refused {
+        tone: match refused(receipts) {
             true => Tone::Bad,
             false => Tone::Neutral,
         },

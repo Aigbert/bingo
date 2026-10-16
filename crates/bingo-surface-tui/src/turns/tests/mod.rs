@@ -103,6 +103,35 @@ fn a_stopped_turn_says_how_many_of_its_steps_had_run() {
     assert_eq!(fold.steps[3].state, StepState::Stopped);
 }
 
+/// A step the person said no to came back, but it did not run.
+#[test]
+fn a_step_the_person_refused_is_not_counted_as_run() {
+    let mut frames = stopped_turn();
+    let refusal = Item {
+        turn: Some(bingo_sdk::TurnId::from_raw("trn_1")),
+        ..crate::test_support::item(
+            "trn_1_r",
+            ItemStatus::Completed,
+            ItemBody::PermissionReceipt {
+                item: Some(id("trn_1_5")),
+                interaction: bingo_sdk::InteractionId::from_raw("int_1"),
+                tool: "Edit".into(),
+                decision: DecisionKind::Deny,
+                feedback: Some("not that file".into()),
+            },
+        )
+    };
+    frames.push(crate::test_support::frame(
+        99,
+        bingo_sdk::Event::ItemCompleted { item: refusal },
+    ));
+    let state = folded(frames);
+    assert_eq!(
+        roles(&state, &Folds::new()).of_item(&id("trn_1_8")),
+        &Role::Stop { ran: 2, total: 4 }
+    );
+}
+
 #[test]
 fn every_part_of_a_turn_opens_from_the_line_that_holds_it() {
     let state = folded(finished_turn());
