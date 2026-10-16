@@ -61,7 +61,7 @@ pub fn worked(turn: &str) -> Vec<Item> {
 /// A call named after its item, as every call of a session is named apart.
 fn called(mut item: Item) -> Item {
     if let ItemBody::ToolCall { call_id, .. } = &mut item.body {
-        *call_id = format!("call_{}", item.id).into();
+        *call_id = format!("call_{}", item.id);
     }
     item
 }
