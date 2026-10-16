@@ -41,7 +41,11 @@ fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block 
         rows.width,
         |changed, width| ledger(changed, width, rows.now),
     );
-    out.extend(super::slots::actions_under(item, HANG, rows));
+    // An action is on what the step is doing; a step that has ended is doing
+    // nothing, whatever a producer last said.
+    if matches!(step.state, StepState::Running | StepState::Asked) {
+        out.extend(super::slots::actions_under(item, HANG, rows));
+    }
     if !opened {
         return out.into();
     }

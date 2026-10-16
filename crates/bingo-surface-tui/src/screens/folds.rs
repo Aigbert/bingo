@@ -183,3 +183,15 @@ fn an_action_on_a_running_step_hangs_under_it() {
     assert!(screen.contains("     [ b background ]"), "{screen}");
     assert_aligned(&screen, 80);
 }
+
+/// A step that has ended offers nothing, even where its producer has not
+/// yet taken the action back.
+#[test]
+fn an_ended_step_hangs_no_action() {
+    let (_, mut ui, now) = expanded();
+    let state = crate::transcript::slots::fixtures::with_promotions(folded(finished_turn()));
+    open_the_turns(&mut ui, &state);
+    let screen = draw_tree(120, 40, &solo(&state), &mut ui, now);
+    assert!(screen.contains("   ✓ bash cargo test -q"), "{screen}");
+    assert!(!screen.contains("background"), "{screen}");
+}
