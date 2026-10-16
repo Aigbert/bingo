@@ -39,7 +39,7 @@ pub fn components(
             dimmed(" solo".into()),
         ];
     }
-    let context = context_bar(tree.viewed().context, catalogued_window(ui, tree.viewed()));
+    let context = context_bar(tree.viewed().context);
     footer(left, crew, context, right, width)
 }
 
@@ -80,44 +80,17 @@ fn footer(
     (Line::from(clip(spans, width)), hit)
 }
 
-/// The window the model catalogue states for this session's model. The
-/// kernel's fallback guess is never published there, so a model it only
-/// guesses for stays unknown here too.
-fn catalogued_window(ui: &Ui, state: &SessionState) -> Option<u64> {
-    let summary = &state.summary;
-    let id = format!(
-        "{}/{}",
-        summary.provider.as_deref()?,
-        summary.model.as_deref()?
-    );
-    ui.catalogs
-        .values
-        .get("models")?
-        .iter()
-        .find(|entry| entry.id == id)?
-        .meta["context"]
-        .as_u64()
-        .filter(|window| *window > 0)
-}
-
-/// Before the first measure nothing is spent: a stated window reads
-/// `0k / 200k`, an unknown one `? / ?`.
-fn context_bar(
-    context: Option<bingo_sdk::ContextUsage>,
-    window: Option<u64>,
-) -> Vec<Span<'static>> {
+/// The kernel's reading of the context, which it states once the window is
+/// known; an unknown one reads `? / ?`, and nothing spent is no fill.
+fn context_bar(context: Option<bingo_sdk::ContextUsage>) -> Vec<Span<'static>> {
     let Some(context) = context else {
-        let said = window.map_or_else(
-            || " ? / ?".into(),
-            |window| format!(" 0k / {}", crate::count::count(window)),
-        );
         return vec![
             Span::styled(theme::glyphs().chrome.context[1].repeat(8), theme::ash()),
-            dimmed(said),
+            dimmed(" ? / ?".into()),
         ];
     };
     let share = context.used as f64 / context.window.max(1) as f64;
-    let fill = if context.window == 0 {
+    let fill = if context.window == 0 || context.used == 0 {
         0
     } else {
         (share * 8.0).round().clamp(1.0, 8.0) as usize
@@ -679,7 +652,7 @@ mod tests {
                 trigger: 100_000,
                 parts: None,
             };
-            let spans = context_bar(Some(context), Some(1_000_000));
+            let spans = context_bar(Some(context));
             assert_eq!(spans[0].content, "▰".repeat(fill));
             assert_eq!(spans[1].content, "▱".repeat(8 - fill));
             assert_eq!(
@@ -691,44 +664,28 @@ mod tests {
         }
     }
 
+    /// The kernel states the window when the session opens; the footer
+    /// draws it as nothing spent of it, and the first measure keeps it.
     #[test]
-    fn before_the_first_measure_a_catalogued_window_reads_zero_of_it() {
-        let (mut ui, now) = scene();
-        let entry = |id: &str, meta| bingo_sdk::CatalogEntry {
-            id: id.into(),
-            label: id.into(),
-            meta,
-        };
-        ui.catalogs.values.insert(
-            "models".into(),
-            vec![
-                entry("other/fake-1", serde_json::json!({"context": 64_000})),
-                entry("fake/fake-1", serde_json::json!({"context": 200_000})),
-            ],
-        );
-        let drawn = line(&solo(&state()), &ui, 108, now).to_string();
-        assert!(drawn.contains("▱▱▱▱▱▱▱▱ 0k / 200k"), "{drawn}");
-        let mut measured = state();
-        measured.context = Some(ContextUsage {
-            used: 14_000,
-            window: 191_000,
-            trigger: 180_000,
+    fn before_the_first_measure_the_stated_window_reads_zero_of_it() {
+        let (ui, now) = scene();
+        let opened = |context| folded(vec![frame(1, Event::ContextChanged { context })]);
+        let resting = ContextUsage {
+            used: 0,
+            window: 199_000,
+            trigger: 179_100,
             parts: None,
-        });
-        let drawn = line(&solo(&measured), &ui, 108, now).to_string();
-        assert!(drawn.contains("14k / 191k"), "the measure wins: {drawn}");
-        ui.catalogs.values.insert(
-            "models".into(),
-            vec![entry(
-                "fake/fake-1",
-                serde_json::json!({"switchAt": 150_000}),
-            )],
-        );
-        let drawn = line(&solo(&state()), &ui, 108, now).to_string();
-        assert!(
-            drawn.contains("▱▱▱▱▱▱▱▱ ? / ?"),
-            "a guess is unknown: {drawn}"
-        );
+        };
+        let drawn = line(&solo(&opened(Some(resting))), &ui, 108, now).to_string();
+        assert!(drawn.contains("▱▱▱▱▱▱▱▱ 0 / 199k"), "{drawn}");
+        let measured = ContextUsage {
+            used: 14_000,
+            ..resting
+        };
+        let drawn = line(&solo(&opened(Some(measured))), &ui, 108, now).to_string();
+        assert!(drawn.contains("▰▱▱▱▱▱▱▱ 14k / 199k"), "{drawn}");
+        let drawn = line(&solo(&opened(None)), &ui, 108, now).to_string();
+        assert!(drawn.contains("▱▱▱▱▱▱▱▱ ? / ?"), "unknown: {drawn}");
     }
 
     #[test]
