@@ -2300,7 +2300,9 @@
         "TurnProgress",
         "SessionStatus",
         "Toast",
-        "Welcome"
+        "Welcome",
+        "Ledger",
+        "TurnFold"
       ]
     },
     "ComposerProps": {
@@ -5387,6 +5389,21 @@
         "level"
       ]
     },
+    "LedgerProps": {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Step"
+          }
+        }
+      },
+      "required": [
+        "steps"
+      ],
+      "description": "The `Ledger` site: the rows of a running turn's steps."
+    },
     "Length": {
       "anyOf": [
         {
@@ -8116,6 +8133,38 @@
             "component",
             "props"
           ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "Ledger"
+            },
+            "props": {
+              "$ref": "#/$defs/LedgerProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "component": {
+              "type": "string",
+              "const": "TurnFold"
+            },
+            "props": {
+              "$ref": "#/$defs/TurnFoldProps"
+            }
+          },
+          "required": [
+            "component",
+            "props"
+          ]
         }
       ]
     },
@@ -10159,6 +10208,62 @@
       },
       "description": "Optional facts supplied by the asking surface, without transcript bodies."
     },
+    "Step": {
+      "type": "object",
+      "properties": {
+        "verb": {
+          "type": "string",
+          "description": "What the step does, one lowercase word: `read`, `bash`."
+        },
+        "target": {
+          "type": "string",
+          "description": "What it does it to, shortened for one row."
+        },
+        "state": {
+          "$ref": "#/$defs/StepState"
+        },
+        "upshot": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Upshot"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "What the tool said the call came to."
+        }
+      },
+      "required": [
+        "verb",
+        "target",
+        "state"
+      ],
+      "description": "One tool call of a turn, in the words a row shows."
+    },
+    "StepState": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "running",
+            "done",
+            "failed"
+          ]
+        },
+        {
+          "type": "string",
+          "const": "asked",
+          "description": "Waits for a person's answer."
+        },
+        {
+          "type": "string",
+          "const": "stopped",
+          "description": "Was in flight when the person stopped the turn."
+        }
+      ],
+      "description": "What a step is doing, as far as the turn has come."
+    },
     "StopResult": {
       "oneOf": [
         {
@@ -10762,6 +10867,49 @@
         "word",
         "durationMs"
       ]
+    },
+    "TurnEnd": {
+      "type": "string",
+      "enum": [
+        "done",
+        "stopped",
+        "failed"
+      ],
+      "description": "How a turn ended, for its folded line."
+    },
+    "TurnFoldProps": {
+      "type": "object",
+      "properties": {
+        "steps": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Step"
+          }
+        },
+        "outcome": {
+          "$ref": "#/$defs/TurnEnd"
+        },
+        "elapsed": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "description": "From the turn's first item to its last, in milliseconds."
+        },
+        "thought": {
+          "type": "boolean",
+          "description": "The turn thought before or between its steps."
+        },
+        "isExpanded": {
+          "type": "boolean",
+          "description": "The person opened the fold to read the steps inline."
+        }
+      },
+      "required": [
+        "steps",
+        "outcome",
+        "elapsed"
+      ],
+      "description": "The `TurnFold` site: a finished turn as one line, and the stop line when\nthe person stopped it."
     },
     "TurnId": {
       "type": "string",

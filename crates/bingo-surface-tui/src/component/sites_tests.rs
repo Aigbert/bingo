@@ -133,7 +133,9 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         Component::PromptHint
         | Component::AbovePrompt
         | Component::SessionStatus
-        | Component::Welcome => state(),
+        | Component::Welcome
+        | Component::Ledger
+        | Component::TurnFold => state(),
         Component::Toast | Component::Pane | Component::Status => placed_site(component),
         Component::Reasoning
         | Component::Compaction

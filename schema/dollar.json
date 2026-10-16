@@ -1446,7 +1446,9 @@
         "TurnProgress",
         "SessionStatus",
         "Toast",
-        "Welcome"
+        "Welcome",
+        "Ledger",
+        "TurnFold"
       ]
     },
     "Upshot": {

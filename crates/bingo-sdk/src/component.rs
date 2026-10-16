@@ -6,7 +6,10 @@ use serde_json::Value;
 
 mod keybar;
 pub use keybar::*;
+pub mod ledger;
+pub use ledger::{LedgerProps, Step, StepState, TurnEnd, TurnFoldProps};
 mod model_picker;
+pub mod row;
 pub use model_picker::*;
 mod browse;
 pub use browse::*;
@@ -52,6 +55,7 @@ components! {
     PromptHint(PromptHintProps), AbovePrompt(AbovePromptProps), Pane(PaneProps),
     Permission(PermissionProps), SignIn(SignInProps),
     Reasoning(ReasoningProps), Compaction(CompactionProps), Rewind(RewindProps), Interruption(InterruptionProps), QuestionAnswer(QuestionAnswerProps), PermissionReceipt(PermissionReceiptProps), Asset(AssetProps), ShellRun(ShellRunProps), Action(ActionProps), TurnProgress(TurnProgressProps), SessionStatus(SessionStatusProps), Toast(ToastProps), Welcome(Box<WelcomeProps>),
+    Ledger(LedgerProps), TurnFold(TurnFoldProps),
 }
 impl Props {
     pub fn parse(component: Component, props: Value) -> Result<Self, serde_json::Error> {

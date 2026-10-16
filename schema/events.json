@@ -235,7 +235,9 @@
               "TurnProgress",
               "SessionStatus",
               "Toast",
-              "Welcome"
+              "Welcome",
+              "Ledger",
+              "TurnFold"
             ]
           },
           "SurfaceName": {
@@ -1588,7 +1590,9 @@
               "TurnProgress",
               "SessionStatus",
               "Toast",
-              "Welcome"
+              "Welcome",
+              "Ledger",
+              "TurnFold"
             ]
           }
         }
@@ -3989,7 +3993,9 @@
               "TurnProgress",
               "SessionStatus",
               "Toast",
-              "Welcome"
+              "Welcome",
+              "Ledger",
+              "TurnFold"
             ]
           },
           "Upshot": {
@@ -8269,7 +8275,9 @@
               "TurnProgress",
               "SessionStatus",
               "Toast",
-              "Welcome"
+              "Welcome",
+              "Ledger",
+              "TurnFold"
             ]
           },
           "Upshot": {
@@ -11619,7 +11627,9 @@
               "TurnProgress",
               "SessionStatus",
               "Toast",
-              "Welcome"
+              "Welcome",
+              "Ledger",
+              "TurnFold"
             ]
           },
           "ItemBody": {

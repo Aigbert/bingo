@@ -48,6 +48,8 @@ pub enum Component {
     SessionStatus,
     Toast,
     Welcome,
+    Ledger,
+    TurnFold,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -135,6 +137,12 @@ impl Component {
             Self::SessionStatus => "The status line: model, effort, directory and context use.",
             Self::Toast => "A short-lived notification.",
             Self::Welcome => "The welcome card a new session opens with.",
+            Self::Ledger => {
+                "A running turn's step: its glyph, verb, target and right-aligned outcome."
+            }
+            Self::TurnFold => {
+                "A finished turn folded to one line of its steps, and the stop line if stopped."
+            }
         }
     }
 
@@ -183,7 +191,9 @@ impl Component {
             | Self::TurnProgress
             | Self::SessionStatus
             | Self::Toast
-            | Self::Welcome => &[
+            | Self::Welcome
+            | Self::Ledger
+            | Self::TurnFold => &[
                 SurfaceName::Terminal,
                 SurfaceName::Desktop,
                 SurfaceName::Text,
@@ -191,7 +201,7 @@ impl Component {
         }
     }
 
-    pub const ALL: [Self; 38] = [
+    pub const ALL: [Self; 40] = [
         Self::KeyBar,
         Self::Composer,
         Self::ModelPicker,
@@ -230,6 +240,8 @@ impl Component {
         Self::SessionStatus,
         Self::Toast,
         Self::Welcome,
+        Self::Ledger,
+        Self::TurnFold,
     ];
 }
 impl RenderRequest {

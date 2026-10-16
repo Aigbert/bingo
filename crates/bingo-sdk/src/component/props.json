@@ -414,5 +414,48 @@
       "tag": "? ",
       "placeholder": "ask anything"
     }
+  },
+  {
+    "component": "Ledger",
+    "props": {
+      "steps": [
+        {
+          "verb": "bash",
+          "target": "cargo test -q",
+          "state": "done",
+          "upshot": {
+            "kind": "words",
+            "text": "3 passed",
+            "tone": "good"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "component": "TurnFold",
+    "props": {
+      "steps": [
+        {
+          "verb": "edit",
+          "target": "src/main.rs",
+          "state": "done",
+          "upshot": {
+            "kind": "diff",
+            "added": 1,
+            "removed": 1
+          }
+        },
+        {
+          "verb": "bash",
+          "target": "cargo test",
+          "state": "stopped"
+        }
+      ],
+      "outcome": "stopped",
+      "elapsed": 7000,
+      "thought": true,
+      "isExpanded": true
+    }
   }
 ]
