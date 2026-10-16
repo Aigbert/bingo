@@ -39,22 +39,35 @@ impl Source {
 
     /// What a Markdown destination names. A destination is spelled the way a
     /// URL is, so a path in one carries its spaces and its non-ASCII letters
-    /// percent-encoded; they are decoded before the path is looked up.
-    pub fn link(destination: &str, cwd: &Path) -> Source {
-        match is_url(destination) || has_scheme(destination, FILE) {
-            true => Source::parse(destination, cwd),
-            false => Source::parse(&percent_decoded(destination), cwd),
+    /// percent-encoded.
+    ///
+    /// The order is the point. The scheme is read off the destination as it
+    /// was written, so a `%3A` never becomes the colon of an address; a path
+    /// is decoded once, and a `file:` URL only by its own parser; and `~` is
+    /// `expand`ed last, so a home directory with a `%` in its name is never
+    /// decoded as though the destination had spelled it.
+    pub fn link(destination: &str, cwd: &Path, expand: impl FnOnce(&str) -> String) -> Source {
+        if is_url(destination) || has_scheme(destination, FILE) {
+            return Source::parse(destination, cwd);
         }
+        Source::Path(cwd.join(expand(&percent_decoded(destination))))
     }
 }
 
 /// The path a `file:` URL names, decoded — or nothing when the word is not
-/// one, or names another machine's file.
+/// one, or names another machine's file. A host is another machine whatever
+/// the platform: Windows would read `file://host/share` as the share
+/// `\\host\share`, and reaching for one hands that machine the person's
+/// credentials. `localhost` is no host — the URL parser already empties it.
 fn file_path(word: &str) -> Option<PathBuf> {
     if !has_scheme(word, FILE) {
         return None;
     }
-    reqwest::Url::parse(word).ok()?.to_file_path().ok()
+    let url = reqwest::Url::parse(word).ok()?;
+    if url.host_str().is_some_and(|host| !host.is_empty()) {
+        return None;
+    }
+    url.to_file_path().ok()
 }
 
 /// `%XX` as the byte it stands for. A `%` that is not followed by two hex
@@ -199,6 +212,20 @@ mod tests {
             Source::parse("file://elsewhere/x.png", cwd),
             Source::Path(PathBuf::from("/work/file://elsewhere/x.png"))
         );
+        assert_eq!(
+            Source::parse("file://localhost/tmp/x.png", cwd),
+            Source::Path(PathBuf::from("/tmp/x.png")),
+            "localhost is this machine"
+        );
+    }
+
+    /// A `file:` URL with a host names another machine's file on every
+    /// platform — on Windows it would otherwise be an SMB share, reached with
+    /// the person's credentials.
+    #[test]
+    fn a_file_url_with_a_host_is_never_read() {
+        assert_eq!(file_path("file://host/share/x.png"), None);
+        assert_eq!(file_path("FILE://192.168.0.9/c$/x.png"), None);
     }
 
     #[cfg(windows)]
@@ -216,11 +243,11 @@ mod tests {
     fn a_link_is_decoded_and_a_typed_word_is_not() {
         let cwd = Path::new("/work");
         assert_eq!(
-            Source::link("my%20shot.png", cwd),
+            link("my%20shot.png", cwd),
             Source::Path(PathBuf::from("/work/my shot.png"))
         );
         assert_eq!(
-            Source::link("%E6%A1%8C%E9%9D%A2.png", cwd),
+            link("%E6%A1%8C%E9%9D%A2.png", cwd),
             Source::Path(PathBuf::from("/work/桌面.png"))
         );
         assert_eq!(
@@ -228,9 +255,55 @@ mod tests {
             Source::Path(PathBuf::from("/work/my%20shot.png"))
         );
         assert_eq!(
-            Source::link("https://x.dev/a%20b.png", cwd),
+            link("https://x.dev/a%20b.png", cwd),
             Source::Url("https://x.dev/a%20b.png".into()),
             "an address is fetched as written"
+        );
+    }
+
+    /// A link with nothing to expand.
+    fn link(destination: &str, cwd: &Path) -> Source {
+        Source::link(destination, cwd, str::to_owned)
+    }
+
+    /// The scheme is read before anything is decoded, and a path is decoded
+    /// once: a `%3A` is not the colon of an address, and a `%25` that decodes
+    /// to `%` is not decoded again.
+    #[test]
+    fn a_link_is_read_for_its_scheme_before_it_is_decoded_and_only_once() {
+        let cwd = Path::new("/work");
+        assert_eq!(
+            link("https%3A//x.dev/a.png", cwd),
+            Source::Path(PathBuf::from("/work/https://x.dev/a.png")),
+            "an escaped scheme is a path, never fetched"
+        );
+        assert_eq!(
+            link("file%3A///tmp/a%2520b.png", cwd),
+            Source::Path(PathBuf::from("/work/file:///tmp/a%20b.png")),
+            "and is never read as a file URL either"
+        );
+        assert_eq!(
+            link("100%2525.png", cwd),
+            Source::Path(PathBuf::from("/work/100%25.png"))
+        );
+    }
+
+    /// `~` is expanded after the destination is decoded, so a home with a `%`
+    /// in its name is taken as it is.
+    #[test]
+    fn a_home_is_expanded_after_the_link_is_decoded() {
+        let expand = |path: &str| match path.strip_prefix('~') {
+            Some(rest) => format!("/home/a%20b{rest}"),
+            None => path.to_owned(),
+        };
+        assert_eq!(
+            Source::link("~/my%20shot.png", Path::new("/work"), expand),
+            Source::Path(PathBuf::from("/home/a%20b/my shot.png"))
+        );
+        assert_eq!(
+            Source::link("%7E/x.png", Path::new("/work"), expand),
+            Source::Path(PathBuf::from("/home/a%20b/x.png")),
+            "a `~` the destination escaped is still home"
         );
     }
 

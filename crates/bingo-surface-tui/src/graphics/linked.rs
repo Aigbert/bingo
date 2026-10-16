@@ -141,7 +141,7 @@ impl Linked {
 /// that is not there, which is the answer a person sees rather than a scheme
 /// this surface invented a way to follow.
 pub fn source(dest: &str, cwd: &Path, home: Option<&str>) -> Source {
-    Source::link(&crate::paths::expand(dest, home), cwd)
+    Source::link(dest, cwd, |path| crate::paths::expand(path, home))
 }
 
 /// The picture at a destination, off the loop's own thread. A fetched one is
