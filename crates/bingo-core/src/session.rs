@@ -482,7 +482,7 @@ impl Actor {
     /// The next turn runs on a config the host rebuilt; the running one
     /// keeps its own. The summary says what changed.
     async fn reconfigure(&mut self, config: Arc<TurnConfig>) -> Result<(), KernelError> {
-        let switched = model_key(&self.config) != model_key(&config);
+        let switched = crate::turn::switched(&self.config, &config);
         self.config = config;
         let summary = self.restated();
         self.publish_summary(summary).await?;
@@ -494,13 +494,9 @@ impl Actor {
     /// Where the context stands on the model the next round runs on, so a
     /// client shows its window before a round has measured it.
     async fn restate_context(&mut self, switched: bool) -> Result<(), KernelError> {
-        let reading = self
-            .config
-            .model
-            .as_ref()
-            .and_then(|model| crate::turn::resting_reading(model, &self.state));
-        if crate::turn::restates(self.state.context, reading, switched) {
-            self.publish(Event::ContextChanged { context: reading }, None)
+        let model = self.config.model.as_ref();
+        if let Some(context) = crate::turn::restated(model, &self.state, switched) {
+            self.publish(Event::ContextChanged { context }, None)
                 .await?;
         }
         Ok(())
@@ -978,11 +974,3 @@ fn panic_message(payload: Box<dyn std::any::Any + Send>) -> String {
 
 #[cfg(test)]
 mod tests;
-
-/// Which model answers under `config`: a change of it is a switch.
-fn model_key(config: &TurnConfig) -> Option<(&str, &str)> {
-    config
-        .model
-        .as_ref()
-        .map(|model| (model.endpoint.id(), model.id.as_str()))
-}

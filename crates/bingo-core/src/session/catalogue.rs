@@ -126,9 +126,11 @@ pub(super) async fn finished(actor: &mut Actor, completed: Completed) -> Result<
     if !actor.is_running(&turn) {
         return Ok(Flow::Continue);
     }
-    if let Some(running) = actor.running.take() {
+    let switched = actor.running.take().is_some_and(|running| {
+        let switched = crate::turn::switched(&running.config, &actor.config);
         running.finish();
-    }
+        switched
+    });
     actor
         .publish(
             Event::TurnCompleted {
@@ -139,6 +141,11 @@ pub(super) async fn finished(actor: &mut Actor, completed: Completed) -> Result<
             None,
         )
         .await?;
+    // The turn measured its rounds on the model it started with; the one a
+    // mid-turn switch chose has the word now.
+    if switched {
+        actor.restate_context(true).await?;
+    }
     for notice in notices {
         actor.record(notice).await?;
     }

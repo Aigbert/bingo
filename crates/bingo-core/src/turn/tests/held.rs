@@ -186,3 +186,25 @@ async fn an_overflow_on_a_held_session_fails_the_turn_without_a_ladder() {
         "and no lesson was drawn about a window that is not ours"
     );
 }
+
+/// ADR-0055 §1: what a held context last said is in the endpoint's own
+/// window, which is the one its next round reports in; a model that has said
+/// nothing yet reads zero in the window it declares.
+#[test]
+fn a_held_context_rests_in_the_endpoints_own_window() {
+    let cfg = held(ScriptedProvider::new(vec![]), 200_000);
+    let model = cfg.model.as_ref().expect("a model");
+    let mut state = SessionState::new(crate::test_support::summary("ses_1"));
+    state.context = Some(ContextUsage {
+        parts: None,
+        used: 412_000,
+        window: 1_000_000,
+        trigger: 1_000_000,
+    });
+    let rest = |switched| {
+        let reading = super::super::resting::reading(model, &state, switched).expect("known");
+        (reading.used, reading.window, reading.trigger)
+    };
+    assert_eq!(rest(false), (412_000, 1_000_000, 1_000_000));
+    assert_eq!(rest(true), (0, 200_000, 200_000));
+}
