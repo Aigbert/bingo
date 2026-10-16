@@ -3613,6 +3613,13 @@
                 "type": "string"
               }
             },
+            "labels": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "What a surface shows for a value that is not its own best name;\nthe line still runs the value, and a value without one reads as\nitself."
+            },
             "person": {
               "type": "array",
               "items": {

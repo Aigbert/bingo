@@ -5708,7 +5708,8 @@
           "type": "object",
           "properties": {
             "current": {
-              "type": "string"
+              "type": "string",
+              "description": "The mode's value: the argument of the item that chooses it."
             },
             "modes": {
               "type": "array",

@@ -69,6 +69,7 @@ fn resolve<'a>(args: &'a ArgSpec, text: &'a str, prefix: String) -> (&'a ArgSpec
     match args {
         ArgSpec::Options { args, .. } => resolve(args, text, prefix),
         ArgSpec::Words {
+            labels: _,
             person: _,
             values,
             alone,
@@ -89,6 +90,7 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
     let current = offer.current;
     match args {
         ArgSpec::Words {
+            labels,
             person: _,
             values,
             alone,
@@ -98,7 +100,7 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
             .filter_map(|value| {
                 choice(
                     value,
-                    value,
+                    labels.get(value).unwrap_or(value),
                     prefix,
                     query,
                     current,
@@ -261,6 +263,7 @@ mod tests {
                 hint: "title".into(),
             },
             ArgSpec::Words {
+                labels: Default::default(),
                 person: vec![],
                 values: vec!["low".into()],
                 alone: vec![],
@@ -268,6 +271,7 @@ mod tests {
             },
             ArgSpec::Options {
                 args: Box::new(ArgSpec::Words {
+                    labels: Default::default(),
                     person: vec![],
                     values: vec!["low".into()],
                     alone: vec![],
@@ -293,6 +297,7 @@ mod tests {
             .is_empty()
         );
         let args = ArgSpec::Words {
+            labels: Default::default(),
             person: vec![],
             values: vec!["enable".into(), "reload".into()],
             alone: vec!["reload".into()],
@@ -381,5 +386,41 @@ mod tests {
             bare.rows[bare.selected].target,
             Target::Run("/model".into())
         );
+    }
+    /// A word's label is what the row says; the value is what it runs and
+    /// what the command's `now` names, so every mode is found, not only the
+    /// one whose label happens to be its value.
+    #[test]
+    fn a_labelled_word_is_drawn_by_label_and_marked_by_value() {
+        let modes = [
+            ("default", "default"),
+            ("acceptEdits", "accept edits"),
+            ("plan", "plan"),
+            ("bypassPermissions", "bypass"),
+            ("dontAsk", "don't ask"),
+        ];
+        for (value, label) in modes {
+            let commands = vec![CatalogEntry {
+                id: "permission".into(),
+                label: "permission".into(),
+                meta: serde_json::json!({"name":"permission","hint":"mode","family":"session","now":value,"args":{
+                    "kind":"words","values":modes.map(|(v, _)| v),
+                    "person":modes.map(|(v, _)| v),
+                    "alone":modes.map(|(v, _)| v),
+                    "labels":{"acceptEdits":"accept edits","bypassPermissions":"bypass","dontAsk":"don't ask"}}}),
+            }];
+            let offered = arguments("/permission ", &commands, &BTreeMap::new()).unwrap();
+            let chosen = &offered.rows[offered.selected];
+            assert_eq!(chosen.now, "now", "{value}");
+            assert_eq!(chosen.label, label, "{value}");
+            assert_eq!(chosen.target, Target::Run(format!("/permission {value}")));
+            assert_eq!(
+                offered.rows.iter().filter(|row| row.now == "now").count(),
+                1,
+                "{value}"
+            );
+            let typed = arguments("/permission accept", &commands, &BTreeMap::new()).unwrap();
+            assert_eq!(typed.rows[0].label, "accept edits");
+        }
     }
 }

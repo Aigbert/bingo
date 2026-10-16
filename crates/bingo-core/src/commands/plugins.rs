@@ -34,6 +34,7 @@ impl Command for PluginsCommand {
                 "plugins",
                 "list, trust, approve, reload, enable or disable plugins",
                 ArgSpec::Words {
+                    labels: Default::default(),
                     person: vec!["approve".into(), "trust".into()],
                     alone: vec!["reload".into()],
                     values: vec![
@@ -282,6 +283,7 @@ mod tests {
         assert_eq!(spec.name, "plugins");
         assert_eq!(spec.aliases, ["modules"]);
         let ArgSpec::Words {
+            labels: _,
             values,
             then,
             alone,

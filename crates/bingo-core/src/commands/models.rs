@@ -24,6 +24,7 @@ impl Command for ModelsCommand {
             "models",
             "list available models",
             ArgSpec::Words {
+                labels: Default::default(),
                 person: vec![],
                 alone: vec![],
                 values: vec![REFRESH.into()],

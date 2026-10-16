@@ -11383,6 +11383,13 @@
                       "type": "string"
                     }
                   },
+                  "labels": {
+                    "description": "What a surface shows for a value that is not its own best name;\nthe line still runs the value, and a value without one reads as\nitself.",
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
                   "person": {
                     "description": "Words among `values` only the person may run: they raise trust or\nlet repository code run, so no link rewrites a line that starts\nwith one and no view bingo did not draw may send one.",
                     "type": "array",
@@ -11583,6 +11590,13 @@
                   "values": {
                     "type": "array",
                     "items": {
+                      "type": "string"
+                    }
+                  },
+                  "labels": {
+                    "description": "What a surface shows for a value that is not its own best name;\nthe line still runs the value, and a value without one reads as\nitself.",
+                    "type": "object",
+                    "additionalProperties": {
                       "type": "string"
                     }
                   },

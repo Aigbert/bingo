@@ -4,6 +4,7 @@
 //! runs the command on its own task and answers with an `IntentAck` whose
 //! `Applied.result` is `{"message"}`, `{"view"}` or `{"item"}` (ADR-0008).
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use async_trait::async_trait;
@@ -144,6 +145,11 @@ pub enum ArgSpec {
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         alone: Vec<String>,
         values: Vec<String>,
+        /// What a surface shows for a value that is not its own best name;
+        /// the line still runs the value, and a value without one reads as
+        /// itself.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        labels: BTreeMap<String, String>,
         /// Words among `values` only the person may run: they raise trust or
         /// let repository code run, so no link rewrites a line that starts
         /// with one and no view bingo did not draw may send one.
@@ -336,6 +342,7 @@ mod tests {
     #[test]
     fn a_word_list_crosses_the_wire_as_its_kind_and_its_values() {
         let args = ArgSpec::Words {
+            labels: Default::default(),
             person: vec![],
             alone: vec![],
             values: vec!["off".into(), "low".into()],
@@ -352,6 +359,7 @@ mod tests {
     #[test]
     fn a_verb_carries_the_spec_of_the_word_after_it() {
         let args = ArgSpec::Words {
+            labels: Default::default(),
             person: vec![],
             alone: vec![],
             values: vec!["enable".into()],

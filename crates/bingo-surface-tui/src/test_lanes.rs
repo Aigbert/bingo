@@ -373,7 +373,13 @@ pub fn plugin_view(plugin: &str, value: Value) -> Event {
             .into_iter()
             .flatten()
             .map(|mode| bingo_sdk::ActionItem {
-                label: mode.as_str().unwrap().into(),
+                label: match mode.as_str().unwrap() {
+                    "acceptEdits" => "accept edits",
+                    "bypassPermissions" => "bypass",
+                    "dontAsk" => "don't ask",
+                    other => other,
+                }
+                .into(),
                 key: None,
                 action: bingo_sdk::Action {
                     name: "permission".into(),

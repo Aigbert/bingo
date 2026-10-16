@@ -39,7 +39,7 @@ fn next_mode(slot: bingo_sdk::slot::Slot) -> Option<bingo_sdk::Action> {
     let bingo_sdk::slot::Slot::Mode { current, modes } = slot else {
         return None;
     };
-    let at = modes.iter().position(|item| item.label == current)?;
+    let at = bingo_sdk::slot::mode_at(&current, &modes)?;
     modes
         .get((at + 1) % modes.len())
         .map(|item| item.action.clone())

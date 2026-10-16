@@ -134,7 +134,9 @@ fn mode(state: &SessionState, site: &mut crate::component::Site<'_>) -> Vec<Span
     let modes: Vec<String> = bingo_sdk::slot::placed(state)
         .into_iter()
         .filter_map(|placed| match placed.slot {
-            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
+            bingo_sdk::slot::Slot::Mode { current, modes } => {
+                Some(bingo_sdk::slot::mode_label(&current, &modes).to_owned())
+            }
             _ => None,
         })
         .collect();
@@ -163,28 +165,26 @@ fn mode(state: &SessionState, site: &mut crate::component::Site<'_>) -> Vec<Span
     .spans
 }
 
-/// Every mode has a visible label, including the resting default.
+/// Every mode has a visible label, including the resting default. The tone
+/// follows the value; the words are the ones its placer offered.
 fn left(state: &SessionState) -> Vec<Span<'static>> {
-    let label = bingo_sdk::slot::placed(state)
+    let (value, label) = bingo_sdk::slot::placed(state)
         .into_iter()
         .find_map(|placed| match placed.slot {
-            bingo_sdk::slot::Slot::Mode { current, .. } => Some(current),
+            bingo_sdk::slot::Slot::Mode { current, modes } => {
+                let label = bingo_sdk::slot::mode_label(&current, &modes).to_owned();
+                Some((current, label))
+            }
             _ => None,
         })
-        .unwrap_or_else(|| "default".into());
-    let label = match label.as_str() {
-        "acceptEdits" => "accept edits",
-        "bypassPermissions" => "bypass",
-        "dontAsk" => "don't ask",
-        other => other,
-    };
-    let style = match label {
-        "accept edits" => theme::good(),
+        .unwrap_or_else(|| ("default".into(), "default".into()));
+    let style = match value.as_str() {
+        "acceptEdits" => theme::good(),
         "plan" => theme::crew(2),
-        "bypass" => theme::bad(),
+        "bypassPermissions" => theme::bad(),
         _ => theme::mode(),
     };
-    let glyph = if label == "plan" {
+    let glyph = if value == "plan" {
         theme::glyphs().chrome.pause
     } else {
         theme::glyphs().mode

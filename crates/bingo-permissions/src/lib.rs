@@ -231,7 +231,7 @@ impl PermissionPolicy for PermissionsPolicy {
         bingo_sdk::slot::with(
             payload,
             [bingo_sdk::slot::Slot::Mode {
-                current: self.mode_for(session).label().to_string(),
+                current: self.mode_for(session).as_str().to_string(),
                 modes: self
                     .mode
                     .cycle()

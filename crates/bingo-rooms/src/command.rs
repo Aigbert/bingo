@@ -41,6 +41,7 @@ impl Command for RoomCommand {
             aliases: vec!["rooms".into()],
             hint: "the rooms under this session, or open one".into(),
             args: ArgSpec::Words {
+                labels: Default::default(),
                 then: None,
                 alone: vec![],
                 values: ["seat", "unseat", "purpose", "close"]

@@ -28,6 +28,7 @@ impl Command for AgentsCommand {
             aliases: Vec::new(),
             hint: "the sub-agents this session started, or stop or dismiss one".into(),
             args: ArgSpec::Words {
+                labels: Default::default(),
                 then: None,
                 alone: vec![],
                 values: ["stop", "dismiss", "message", "reopen"]

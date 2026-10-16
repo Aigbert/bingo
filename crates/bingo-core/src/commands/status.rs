@@ -67,8 +67,14 @@ fn rows(state: &SessionState) -> Vec<(String, String)> {
 }
 
 fn mode(state: &SessionState) -> String {
-    bingo_sdk::slot::modes(state)
-        .next()
+    bingo_sdk::slot::placed(state)
+        .into_iter()
+        .find_map(|placed| match placed.slot {
+            bingo_sdk::slot::Slot::Mode { current, modes } => {
+                Some(bingo_sdk::slot::mode_label(&current, &modes).to_owned())
+            }
+            _ => None,
+        })
         .unwrap_or_else(|| "default".into())
 }
 
@@ -128,11 +134,18 @@ mod tests {
                 serde_json::json!({}),
                 [bingo_sdk::slot::Slot::Mode {
                     current: "acceptEdits".into(),
-                    modes: vec![],
+                    modes: vec![bingo_sdk::ActionItem {
+                        label: "accept edits".into(),
+                        key: None,
+                        action: bingo_sdk::Action {
+                            name: "permission".into(),
+                            args: serde_json::json!("acceptEdits"),
+                        },
+                    }],
                 }],
             ),
         );
-        assert_eq!(mode(&state), "acceptEdits");
+        assert_eq!(mode(&state), "accept edits");
     }
 
     #[test]

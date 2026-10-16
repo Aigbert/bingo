@@ -45,6 +45,7 @@ impl Command for Consent {
     fn spec(&self) -> CommandSpec {
         let mut spec = self.0.spec();
         spec.args = ArgSpec::Words {
+            labels: Default::default(),
             person: vec!["grant".into()],
             values: vec!["grant".into()],
             alone: vec![],

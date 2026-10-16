@@ -82,6 +82,7 @@ pub enum Slot {
         alert: bool,
     },
     Mode {
+        /// The mode's value: the argument of the item that chooses it.
         current: String,
         /// The first label is the resting mode, which a surface may leave unsaid.
         modes: Vec<ActionItem>,
@@ -191,6 +192,20 @@ pub fn described(state: &SessionState) -> Vec<Placed> {
         .into_iter()
         .flat_map(|(plugin, payload)| read(plugin, "", payload))
         .collect()
+}
+
+/// Where `current` stands among a `Mode` slot's items: the one whose action
+/// argument is that value.
+pub fn mode_at(current: &str, modes: &[ActionItem]) -> Option<usize> {
+    modes
+        .iter()
+        .position(|item| item.action.args.as_str() == Some(current))
+}
+
+/// The words a surface draws for a `Mode` slot's value: its item's label, or
+/// the value itself when the placer offered no item for it.
+pub fn mode_label<'a>(current: &'a str, modes: &'a [ActionItem]) -> &'a str {
+    mode_at(current, modes).map_or(current, |at| modes[at].label.as_str())
 }
 
 fn read<'a>(
@@ -356,6 +371,39 @@ mod described_tests {
         state.config.kernel = json!({ "policy": "bingo.permissions" });
         let found: Vec<_> = described(&state).into_iter().map(|p| p.plugin).collect();
         assert_eq!(found, ["bingo.permissions"]);
+    }
+}
+
+#[cfg(test)]
+mod mode_contract {
+    use super::*;
+    use serde_json::json;
+
+    fn item(label: &str, value: &str) -> ActionItem {
+        ActionItem {
+            label: label.into(),
+            key: None,
+            action: crate::Action {
+                name: "permission".into(),
+                args: json!(value),
+            },
+        }
+    }
+
+    #[test]
+    fn a_mode_is_found_by_its_value_and_drawn_by_its_label() {
+        let modes = [
+            item("default", "default"),
+            item("accept edits", "acceptEdits"),
+        ];
+        assert_eq!(mode_at("acceptEdits", &modes), Some(1));
+        assert_eq!(mode_label("acceptEdits", &modes), "accept edits");
+        assert_eq!(
+            mode_at("accept edits", &modes),
+            None,
+            "a label is not a value"
+        );
+        assert_eq!(mode_label("plan", &modes), "plan", "no item: the value");
     }
 }
 

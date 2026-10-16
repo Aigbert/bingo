@@ -62,6 +62,11 @@ impl Command for PermissionCommand {
             aliases: vec!["permissions".into()],
             hint: "show or change the permission mode".into(),
             args: ArgSpec::Words {
+                labels: Mode::ALL
+                    .iter()
+                    .filter(|mode| mode.label() != mode.as_str())
+                    .map(|mode| (mode.as_str().to_string(), mode.label().to_string()))
+                    .collect(),
                 person: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
                 alone: Mode::ALL.map(|mode| mode.as_str().to_string()).to_vec(),
                 values: Mode::ALL
@@ -346,6 +351,33 @@ mod tests {
             matches!(edit_in(&policy, &session).await, Decision::Deny { .. }),
             "a deny rule stands above every mode"
         );
+    }
+
+    /// The slot names the mode by the value `/permission` runs, so a chooser
+    /// matches it against the spec's words; both carry the words to draw.
+    #[test]
+    fn every_mode_is_current_by_its_value_and_drawn_by_its_label() {
+        for mode in Mode::ALL {
+            let policy = policy(json!({ "permissions": { "defaultMode": mode } }));
+            let session = SessionId::from_raw("ses_every_mode");
+            let payload = policy.describe(&session);
+            let slots: Vec<bingo_sdk::slot::Slot> =
+                serde_json::from_value(payload["slots"].clone()).unwrap();
+            let bingo_sdk::slot::Slot::Mode { current, modes } = &slots[0] else {
+                panic!("mode")
+            };
+            assert_eq!(current, mode.as_str(), "the value, not the words");
+            assert_eq!(bingo_sdk::slot::mode_label(current, modes), mode.label());
+            let ArgSpec::Words { values, labels, .. } = PermissionCommand::new(policy).spec().args
+            else {
+                panic!("a mode is one of the words");
+            };
+            assert!(values.contains(current), "{current} is a word it offers");
+            assert_eq!(
+                labels.get(current).map_or(current.as_str(), String::as_str),
+                mode.label()
+            );
+        }
     }
 
     #[test]

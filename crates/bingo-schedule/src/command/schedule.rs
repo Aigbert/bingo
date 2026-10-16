@@ -36,6 +36,7 @@ impl Command for ScheduleCommand {
             aliases: vec!["schedules".into()],
             hint: "what fires later, and whether anything will fire it".into(),
             args: ArgSpec::Words {
+                labels: Default::default(),
                 alone: vec![],
                 values: [ADD, CONFIRM, "pause", "resume", "run", "forget"]
                     .map(str::to_string)

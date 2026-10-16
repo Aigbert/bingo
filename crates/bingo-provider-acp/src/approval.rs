@@ -33,10 +33,12 @@ impl Command for WaitingAdapters {
             name: "acp".into(),
             hint: "approve a repository adapter for the next start".into(),
             args: ArgSpec::Words {
+                labels: Default::default(),
                 person: vec!["approve".into()],
                 alone: vec![],
                 values: vec!["approve".into()],
                 then: Some(Box::new(ArgSpec::Words {
+                    labels: Default::default(),
                     person: vec![],
                     alone: vec![],
                     values: self.0.iter().map(|entry| entry.name.clone()).collect(),

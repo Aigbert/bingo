@@ -32,6 +32,7 @@ impl McpCommand {
     /// without a catalogue kind of its own (ADR-0008 §6a).
     fn servers(&self) -> ArgSpec {
         ArgSpec::Words {
+            labels: Default::default(),
             person: vec![],
             alone: vec![],
             values: self.manager.names().map(str::to_string).collect(),
@@ -360,6 +361,7 @@ impl Command for McpCommand {
             aliases: Vec::new(),
             hint: format!("[{} <server>]", Verb::ALL.map(Verb::as_str).join("|")),
             args: ArgSpec::Words {
+                labels: Default::default(),
                 person: vec![Verb::Approve.as_str().into()],
                 alone: vec![],
                 values: Verb::ALL.map(|verb| verb.as_str().to_string()).to_vec(),
@@ -546,6 +548,7 @@ mod tests {
         assert_eq!(
             then.as_deref(),
             Some(&ArgSpec::Words {
+                labels: Default::default(),
                 person: vec![],
                 alone: vec![],
                 values: Vec::new(),
@@ -606,6 +609,7 @@ mod tests {
         assert_eq!(
             then.as_deref(),
             Some(&ArgSpec::Words {
+                labels: Default::default(),
                 person: vec![],
                 alone: vec![],
                 values: vec!["files".into()],

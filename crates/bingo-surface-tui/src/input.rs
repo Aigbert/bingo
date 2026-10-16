@@ -1324,7 +1324,7 @@ mod tests {
                     key: None,
                     action: bingo_sdk::Action {
                         name: "permission".into(),
-                        args: "bypassPermissions".into(),
+                        args: mode.into(),
                     },
                 })
                 .to_vec(),
