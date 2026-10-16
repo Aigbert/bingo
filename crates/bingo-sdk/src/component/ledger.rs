@@ -120,13 +120,9 @@ impl Step {
         ];
         let right = match &self.answer {
             Some(answer) => {
-                if let Some(upshot) = self
-                    .upshot
-                    .as_ref()
-                    .filter(|_| self.state != StepState::Running)
-                {
+                if let Some(outcome) = self.outcome() {
                     left.push(Piece::new("  ", Ink::Plain));
-                    left.extend(pieces(upshot, Ink::Dim));
+                    left.extend(pieces(&outcome, Ink::Dim));
                 }
                 pieces(answer, Ink::Dim)
             }
@@ -531,6 +527,13 @@ mod tests {
             "{row:?}"
         );
         assert!(row.ends_with(" you: yes"), "{row:?}");
+        let mut stopped = step("bash", "sleep 60", StepState::Stopped, None);
+        stopped.answer = edit.answer.clone();
+        let row = text(&stopped.row("\u{2717}", 60, cells));
+        assert!(
+            row.contains("sleep 60  stopped "),
+            "the outcome stays: {row:?}"
+        );
         let mut refused = step("bash", "rm -rf build", StepState::Done, None);
         refused.answer = Some(Upshot::Words {
             text: "you: no".into(),
