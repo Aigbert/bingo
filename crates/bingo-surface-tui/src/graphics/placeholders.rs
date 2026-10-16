@@ -57,7 +57,7 @@ const FLOORS: [(&str, Version); 4] = [
 /// cells as text. What tells the two apart is the cell: off, herdr gives the
 /// pane a window of no pixels and answers no `CSI 16 t`, so there is no cell
 /// size and no picture.
-const FORWARDS: &str = "libghostty";
+pub(super) const FORWARDS: &str = "libghostty";
 
 /// Whether this terminal draws the placeholder cells a virtual placement is
 /// made of. A name that is not on the list, and a version below its floor,

@@ -109,7 +109,7 @@ impl Detection {
             motion: self.motion,
         }
     }
-    pub fn notice(&self) -> Option<&'static str> {
+    pub fn notice(&self) -> Option<String> {
         crate::graphics::detect(self.heard.as_ref()).notice
     }
     pub fn reply(&mut self, reply: &[u8]) {
