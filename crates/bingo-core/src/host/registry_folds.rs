@@ -8,6 +8,27 @@ pub(super) struct OwnedCommandFold {
     pub fold: CommandFold,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Refusal {
+    Conflict,
+    Invalid,
+}
+
+impl Refusal {
+    fn code(self) -> &'static str {
+        match self {
+            Self::Conflict => "COMMAND_FOLD_CONFLICT",
+            Self::Invalid => "COMMAND_FOLD_INVALID",
+        }
+    }
+
+    fn from_code(code: &str) -> Option<Self> {
+        [Self::Conflict, Self::Invalid]
+            .into_iter()
+            .find(|refusal| refusal.code() == code)
+    }
+}
+
 impl Registry {
     pub(super) fn add_command_fold(&mut self, plugin: &str, fold: CommandFold) {
         self.commands.folds.push(OwnedCommandFold {
@@ -26,20 +47,24 @@ impl Registry {
             .collect();
         // Off residents keep their slot so re-enabling cannot create competing folds.
         for owned in std::mem::take(&mut self.commands.folds) {
-            if let Some((code, why)) = refusal(&owned.fold, &self.commands.folds, &specs) {
+            if let Some((refusal, why)) = refusal(&owned.fold, &self.commands.folds, &specs) {
                 let text = format!(
                     "{} cannot fold into {}: {why}",
                     owned.plugin, owned.fold.into
                 );
                 tracing::warn!(plugin = owned.plugin, %text, "command fold refused");
-                self.notices.push((code.into(), text));
+                self.notices.push((refusal.code().into(), text));
             } else {
                 self.commands.folds.push(owned);
             }
         }
     }
 
-    pub(super) fn folded_into(&self, spec: &CommandSpec) -> Option<&str> {
+    pub(super) fn folded_into<'a>(
+        &self,
+        name: &str,
+        aliases: impl Iterator<Item = &'a str> + Clone,
+    ) -> Option<&str> {
         let off = self
             .switches
             .running
@@ -51,7 +76,7 @@ impl Registry {
             .commands
             .folds
             .iter()
-            .any(|owned| !off.contains(&owned.plugin) && owned.fold.into == spec.name)
+            .any(|owned| !off.contains(&owned.plugin) && owned.fold.into == name)
         {
             return None;
         }
@@ -64,7 +89,7 @@ impl Registry {
                     .fold
                     .names
                     .iter()
-                    .any(|name| name == &spec.name || spec.aliases.contains(name))
+                    .any(|source| source == name || aliases.clone().any(|alias| alias == source))
             })
             .map(|owned| owned.fold.into.as_str())
     }
@@ -87,18 +112,12 @@ fn refusal(
     fold: &CommandFold,
     accepted: &[OwnedCommandFold],
     specs: &[CommandSpec],
-) -> Option<(&'static str, String)> {
+) -> Option<(Refusal, String)> {
     if fold.into.trim().is_empty() || fold.names.iter().any(|name| name.trim().is_empty()) {
-        return Some((
-            "COMMAND_FOLD_INVALID",
-            "command names must not be empty".into(),
-        ));
+        return Some((Refusal::Invalid, "command names must not be empty".into()));
     }
     if contains(fold, &fold.into, specs) {
-        return Some((
-            "COMMAND_FOLD_INVALID",
-            "a destination cannot fold itself".into(),
-        ));
+        return Some((Refusal::Invalid, "a destination cannot fold itself".into()));
     }
     for held in accepted {
         if let Some(name) = fold
@@ -107,14 +126,14 @@ fn refusal(
             .find(|name| contains(&held.fold, name, specs))
         {
             return Some((
-                "COMMAND_FOLD_CONFLICT",
+                Refusal::Conflict,
                 format!("{} already folds {name}", held.plugin),
             ));
         }
         // A fold is one hop to a visible destination, never a hidden chain.
         if contains(&held.fold, &fold.into, specs) || contains(fold, &held.fold.into, specs) {
             return Some((
-                "COMMAND_FOLD_INVALID",
+                Refusal::Invalid,
                 format!(
                     "destinations must stay visible; conflicts with {}",
                     held.plugin
@@ -127,10 +146,7 @@ fn refusal(
 
 pub(super) async fn report(host: &Host, mailbox: &Mailbox) {
     for (code, text) in &host.registry.notices {
-        if !matches!(
-            code.as_str(),
-            "COMMAND_FOLD_CONFLICT" | "COMMAND_FOLD_INVALID"
-        ) {
+        if Refusal::from_code(code).is_none() {
             continue;
         }
         let body = ItemBody::Notice {
@@ -140,6 +156,56 @@ pub(super) async fn report(host: &Host, mailbox: &Mailbox) {
         };
         if let Err(error) = mailbox.record(body).await {
             tracing::debug!(%error, code, "a fold refusal reached no transcript");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn refusal_codes_keep_their_notice_spelling() {
+        assert_eq!(Refusal::Conflict.code(), "COMMAND_FOLD_CONFLICT");
+        assert_eq!(Refusal::Invalid.code(), "COMMAND_FOLD_INVALID");
+        for refusal in [Refusal::Conflict, Refusal::Invalid] {
+            assert_eq!(Refusal::from_code(refusal.code()), Some(refusal));
+        }
+        assert_eq!(Refusal::from_code("COMMAND_FOLD_UNKNOWN"), None);
+        assert_eq!(Refusal::from_code("command_fold_invalid"), None);
+    }
+
+    #[test]
+    fn refusal_kinds_preserve_alias_conflicts_and_visible_destinations() {
+        let specs = [CommandSpec {
+            name: "first".into(),
+            aliases: vec!["alternate".into()],
+            ..CommandSpec::ui("fixture")
+        }];
+        let accepted = [OwnedCommandFold {
+            plugin: "fixture".into(),
+            fold: CommandFold {
+                into: "panel".into(),
+                names: vec!["first".into()],
+            },
+        }];
+        for (into, name, expected) in [
+            (" ", "second", Refusal::Invalid),
+            ("other", " ", Refusal::Invalid),
+            ("first", "alternate", Refusal::Invalid),
+            ("other", "alternate", Refusal::Conflict),
+            ("alternate", "second", Refusal::Invalid),
+            ("other", "panel", Refusal::Invalid),
+        ] {
+            let fold = CommandFold {
+                into: into.into(),
+                names: vec![name.into()],
+            };
+            assert_eq!(
+                refusal(&fold, &accepted, &specs).map(|(kind, _)| kind),
+                Some(expected),
+                "{into}: {name}",
+            );
         }
     }
 }
