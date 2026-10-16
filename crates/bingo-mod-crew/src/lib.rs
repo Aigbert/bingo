@@ -11,7 +11,10 @@ mod live;
 mod opening;
 mod refresh;
 pub mod state;
-use bingo_sdk::*;
+use bingo_sdk::{
+    CommandFold, Contribution, ErrorCode, KernelError, Plugin, PluginError, PluginManifest,
+    Registrar, SessionId, plugin,
+};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -74,11 +77,9 @@ impl Plugin for Crew {
             external: None,
             link: Arc::new(draw::Drawing(self.shared.clone())),
         });
-        registrar.add(Contribution::Interceptor {
-            placement: plugin::Placement::Builtin,
-            external: None,
-            link: Arc::new(lifecycle::Disable(self.shared.clone())),
-        });
+        registrar.add(Contribution::Lifecycle(Arc::new(lifecycle::Disable(
+            self.shared.clone(),
+        ))));
         registrar.add(Contribution::Hook(Arc::new(refresh::Refresh(
             self.shared.clone(),
         ))));

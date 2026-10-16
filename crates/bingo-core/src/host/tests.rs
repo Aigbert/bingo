@@ -22,6 +22,7 @@ mod login;
 mod model_choice;
 mod models;
 mod plugin_approval;
+mod plugin_lifecycle;
 mod policy;
 mod providers;
 mod question_receipt;

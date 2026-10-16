@@ -18,6 +18,7 @@ mod live;
 pub(crate) mod model_switch;
 pub(crate) mod pins;
 pub(crate) mod plugin;
+pub(crate) mod plugin_lifecycle;
 pub(crate) mod provider;
 use live::Live;
 mod deletion;

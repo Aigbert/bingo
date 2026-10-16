@@ -48,6 +48,7 @@ pub struct Switches {
     pub wishes: RwLock<BTreeSet<String>>,
     pub kinds: BTreeMap<String, plugin::PluginSwitch>,
     pub unavailable: RwLock<BTreeMap<String, String>>,
+    pub(super) lifecycle: Vec<super::plugin_lifecycle::OwnedLifecycle>,
 }
 
 #[derive(Default)]
@@ -82,6 +83,7 @@ fn contribution_kind(contribution: &Contribution) -> ContributionKind {
     match contribution {
         Contribution::Command(_) => ContributionKind::Commands,
         Contribution::CommandFold(_) => ContributionKind::Catalogue,
+        Contribution::Lifecycle(_) => ContributionKind::Lifecycle,
         Contribution::Interceptor { link, external, .. } => {
             if external.is_some() {
                 return ContributionKind::Process;
@@ -206,6 +208,7 @@ impl Registry {
         self.commands.entries.retain(|entry| entry.plugin != id);
         self.commands.folds.retain(|entry| entry.plugin != id);
         self.links.retain(|link| link.plugin != id);
+        self.switches.lifecycle.retain(|entry| entry.plugin != id);
         self.unavailable(id, why);
     }
 
@@ -361,6 +364,15 @@ impl Registry {
             }
             Contribution::Hook(hook) => {
                 self.add_hook(plugin, hook);
+                Ok(())
+            }
+            Contribution::Lifecycle(observer) => {
+                self.switches
+                    .lifecycle
+                    .push(super::plugin_lifecycle::OwnedLifecycle {
+                        plugin: plugin.into(),
+                        observer,
+                    });
                 Ok(())
             }
             Contribution::Hooks(source) => {

@@ -9,7 +9,10 @@ mod live;
 mod panel;
 mod rows;
 mod whole;
-use bingo_sdk::*;
+use bingo_sdk::{
+    CancellationToken, CommandFold, Contribution, ErrorCode, HostHandle, Interceptor, KernelError,
+    Plugin, PluginError, PluginManifest, Registrar, SessionId, plugin,
+};
 use bingo_services::schedule;
 use std::{
     collections::BTreeMap,
@@ -50,11 +53,13 @@ impl Plugin for SchedulePanel {
         registrar.add(Contribution::Command(Arc::new(keys::Handler(
             shared.clone(),
         ))));
+        registrar.add(Contribution::Lifecycle(Arc::new(disable::Disable(
+            shared.clone(),
+        ))));
         for link in [
             Arc::new(panel::Open(shared.clone(), "schedule")) as Arc<dyn Interceptor>,
             Arc::new(panel::Open(shared.clone(), "wake")),
             Arc::new(draw::Drawing(shared.clone())),
-            Arc::new(disable::Disable(shared.clone())),
         ] {
             registrar.add(Contribution::Interceptor {
                 placement: plugin::Placement::Builtin,

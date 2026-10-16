@@ -2,8 +2,10 @@
 //! `register` that only adds contributions, and `start`/`stop` for I/O.
 
 mod contents;
+mod lifecycle;
 mod reload;
 pub use contents::PluginContents;
+pub use lifecycle::PluginLifecycle;
 mod settings;
 mod state;
 pub use reload::PluginReload;
@@ -405,6 +407,8 @@ pub enum Contribution {
     Providers(Arc<dyn ProviderSource>),
     Policy(Arc<dyn PermissionPolicy>),
     Hook(Arc<dyn Hook>),
+    /// Native owner-scoped cleanup after a confirmed live disable.
+    Lifecycle(Arc<dyn PluginLifecycle>),
     Interceptor {
         placement: Placement,
         external: Option<String>,
@@ -468,6 +472,7 @@ impl fmt::Debug for Contribution {
             }
             Contribution::Interceptors(source) => write!(f, "Interceptors({})", source.id()),
             Contribution::Hook(h) => write!(f, "Hook({})", h.id()),
+            Contribution::Lifecycle(_) => write!(f, "Lifecycle"),
             Contribution::Hooks(s) => write!(f, "Hooks({})", s.id()),
             Contribution::Context(c) => write!(f, "Context({})", c.id()),
             Contribution::Contexts(s) => write!(f, "Contexts({})", s.id()),
