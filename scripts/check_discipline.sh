@@ -328,4 +328,7 @@ if bad:
 print("catalogue entry declarations ok")
 PYCATALOGUE
 
+# Named and generated snapshots are checked as well as function-named ones.
+python3 scripts/check_snapshots.py
+
 [ "$fail" -eq 0 ] && say "discipline ok" || { say "discipline FAILED"; exit 1; }

@@ -31,7 +31,8 @@ fail-closed test survives, as a table where several said the same thing.
 4. **Tests that restate a constant or manifest.** The manifest / "claims no
    settings" twins across feature crates; plugin-rpc's copy of bingo-jsonrpc's
    codec contract; the guide-page shape test copied into ~16 crates becomes one
-   table in the crate that owns `Page`.
+   table over registered pages in the binary composition tests. The SDK owns
+   `Page` but cannot import the plugins whose pages must be checked.
 5. **Duplicates folded into tables.** TUI `view.rs` snapshots byte-identical to
    the `screens.rs` catalogue; rooms' five fail-closed tests become one table;
    store/wake tests repeating bingo-shelf; fs/bash/web duplicates; provider
@@ -87,3 +88,34 @@ plugin-rpc `holdsContext` stays until ADR-0076 says otherwise.
 - Found, not fixed here: the flakes above; hooks-shell `program.rs:21`;
   five panel mods not closing on disable; auth-oauth `state` disagreement;
   sdk `is_internal_extension` has no caller.
+
+## Decisions
+
+- Scope is the ten bricks above; optional audit refactors are not extra work.
+- Keep the SDK `views` snapshot: `view/tests.rs` explicitly names it. The
+  other seven candidates have no Rust reference, including mounted tests.
+- Keep agents' mounted helpers and `is_internal_extension`; enforcing its
+  namespace rule is separate from removing unused implementation.
+- Snapshot discipline is advisory and recognizes literal and generated names;
+  CI has no cargo-insta installation, so it adds no dependency.
+
+## Verified — 2026-10-16
+
+Commands run in this worktree with disposable HOME/data, provider environment
+removed, `RUST_TEST_THREADS=2`; ignored/manual tests are never enabled.
+
+```text
+Before: RUSTC_BOOTSTRAP=1 cargo test --workspace --locked -- -Z unstable-options --format json --report-time
+exit 0; 6,230 passed, 6 ignored; summed per-test time 525.154 s
+```
+
+The supplied audit measured 6,226 runs / 1,122.2 s under different load;
+the fresh baseline above is the comparison for this worktree.
+
+Brick gates use `cargo check -p <crates> --all-targets --locked`, then
+`cargo clippy -p <crates> --all-targets --locked -- -D warnings`, then
+`cargo test -p <crates> --locked`, with every touched crate selected.
+
+```text
+Brick 1 (context, surface-tui): check 0; clippy 0; test 0 (1,422 passed, 2 ignored).
+```
