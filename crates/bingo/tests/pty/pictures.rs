@@ -4,6 +4,21 @@
 
 use super::*;
 
+/// Ask for the picture and open the turn that read it: a finished turn folds
+/// to one line, and what a step brought back shows under it opened (M185).
+fn look(terminal: &mut Terminal) {
+    terminal.send(b"look at it\r");
+    open_the_turn(terminal);
+}
+
+/// Open the finished turn whose answer is the picture's. What is waited for
+/// next is the picture or its chip: a tall picture scrolls the turn's own
+/// line out of sight.
+fn open_the_turn(terminal: &mut Terminal) {
+    terminal.wait_for("That is the picture.");
+    terminal.send(&[0x0f]);
+}
+
 /// A picture in the transcript on a terminal that says it draws pictures:
 /// the bytes of it go out once, as a virtual placement, and the chip that
 /// stands in for one everywhere else is not drawn (design §5, M46).
@@ -13,8 +28,7 @@ fn a_terminal_that_answers_the_graphics_probe_is_sent_the_picture() {
     let mut terminal = Terminal::opened(&[], READS_A_PICTURE, Answers::Pictures);
     std::fs::write(terminal.home.path().join("shot.png"), &file).unwrap();
     terminal.wait_for("/ commands");
-    terminal.send(b"look at it\r");
-    terminal.wait_for("That is the picture.");
+    look(&mut terminal);
     // The cells are on the screen a frame before the pixels are: fitting a
     // picture to them is a decode, and the run does it off the loop (M61).
     let written = terminal.wait_transmission();
@@ -122,7 +136,7 @@ fn a_terminal_that_says_ok_and_draws_no_placeholder_gets_the_chip() {
     )
     .unwrap();
     terminal.wait_for("/ commands");
-    terminal.send(b"look at it\r");
+    look(&mut terminal);
     terminal.wait_for("[image: image/png]");
     assert!(
         !contains(&terminal.written(), b"\x1b_Ga=T"),
@@ -143,7 +157,7 @@ fn a_terminal_that_answers_only_da1_gets_the_chip() {
     )
     .unwrap();
     terminal.wait_for("/ commands");
-    terminal.send(b"look at it\r");
+    look(&mut terminal);
     terminal.wait_for("[image: image/png]");
     assert!(
         !contains(&terminal.written(), b"\x1b_Ga=T"),
@@ -165,8 +179,7 @@ fn a_picture_under_tmux_travels_in_the_passthrough_envelope() {
     )
     .unwrap();
     terminal.wait_for("/ commands");
-    terminal.send(b"look at it\r");
-    terminal.wait_for("That is the picture.");
+    look(&mut terminal);
     terminal.wait_written(WRAPPED_TRANSMIT);
     let written = terminal.written();
     assert!(
@@ -198,7 +211,7 @@ fn a_tmux_that_carries_nothing_through_gets_the_chip() {
     )
     .unwrap();
     terminal.wait_for("/ commands");
-    terminal.send(b"look at it\r");
+    look(&mut terminal);
     terminal.wait_for("[image: image/png]");
     let written = terminal.written();
     assert!(
@@ -243,7 +256,7 @@ fn an_answer_that_lands_after_the_probe_is_eaten_and_still_counted() {
         );
     }
     terminal.send(b"\r");
-    terminal.wait_for("That is the picture.");
+    open_the_turn(&mut terminal);
     terminal.wait_written(WRAPPED_TRANSMIT);
     let written = terminal.written();
     assert_eq!(
@@ -273,7 +286,7 @@ fn a_passthrough_tmux_says_is_off_is_never_asked_through() {
     )
     .unwrap();
     terminal.wait_for("/ commands");
-    terminal.send(b"look at it\r");
+    look(&mut terminal);
     terminal.wait_for("[image: image/png]");
     let written = terminal.written();
     assert!(
@@ -356,8 +369,7 @@ fn a_herdr_pane_that_draws_pictures_is_sent_the_picture() {
     )
     .unwrap();
     terminal.wait_for("/ commands");
-    terminal.send(b"look at it\r");
-    terminal.wait_for("That is the picture.");
+    look(&mut terminal);
     assert_drawn(&terminal);
     assert!(
         !terminal.screen().contains("[image:"),
@@ -380,7 +392,7 @@ fn a_herdr_pane_with_pictures_off_gets_the_chip_and_the_setting() {
     )
     .unwrap();
     terminal.wait_for("kitty_graphics = true");
-    terminal.send(b"look at it\r");
+    look(&mut terminal);
     terminal.wait_for("[image: image/png]");
     assert!(
         !contains(&terminal.written(), b"\x1b_Ga=T"),
