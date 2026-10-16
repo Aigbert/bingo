@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.rdQH2o3T4h/cwd                                             label the total in main · session 01M5
+
+ › label the total in main
+   ▸ 4 steps · read · grep · edit +1 −1 · bash ok                                                                   5s
+ ▍ Done. main now prints a labelled total.
+
+ ▍ Worked for 5s · done 23:32
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ ask anything
+                                             / commands · ? keys · ctrl+r sessions · shift+tab mode · alt+m next model
+ ⏵⏵ default   ◆ solo   ▰▱▱▱▱▱▱▱ 14k / 191k                                                                      fake-1

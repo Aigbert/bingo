@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.rdQH2o3T4h/cwd                                             label the total in main · session 01M5
+
+Read(src/main.rs)
+
+     1  fn main() {
+     2      println!("{}", total());
+     3  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ ask anything
+                                                          j/k scroll · pgup/pgdn page · g/G ends · / search · esc back
+ ⏵⏵ default   ◆ solo   ▰▱▱▱▱▱▱▱ 14k / 191k                                                                      fake-1

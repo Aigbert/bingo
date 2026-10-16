@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.rdQH2o3T4h/cwd                                             label the total in main · session 01M5
+
+ › label the total in main
+   ✓ read src/main.rs
+   ✓ grep total                                                                                                 1 file
+ ▍ One place prints it.
+   ✓ edit src/main.rs  +1 −1                                                                                  you: yes
+   ⠋ bash python3 -c 'import time; time.sleep(4)'; echo 3 passed                                              you: yes
+     [ b background ]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ▍ sniffing around · 2s
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍
+                                                                                          esc stop · ⏎ queue a message
+ ⏵⏵ default   ◆ solo   ▰▱▱▱▱▱▱▱ 14k / 191k                                                                      fake-1

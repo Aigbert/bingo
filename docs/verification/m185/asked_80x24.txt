@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.8jshUsEJkp/cwd     label the total in main · session 01M5
+
+ ▍ One place prints it.
+   ◆ edit src/main.rs                                                needs you
+     ╭
+     │ ---
+/var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/tmp.8jshUsEJkp/cwd/src/main.rs
+     │ +++
+/var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/tmp.8jshUsEJkp/cwd/src/main.rs
+     │ @@ -1,3 +1,3 @@
+     │  fn main() {
+     ╰ … ctrl+o whole diff
+
+     Do you want to Edit src/main.rs?
+     1  Yes
+     2  Yes for this session
+     3  No, and tell it why
+     4  Change it first
+
+ ▍ Edit /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/tmp.8jshUsEJkp/cwd/src/
+────────────────────────────────────────────────────────────────────────────────
+ ▍ your message waits until the ask is answered
+                                    esc back to the ask · ⏎ queue this message
+ ⏵⏵ default   ◆ solo   ▰▱▱▱▱▱▱▱ 14k / 191k                              fake-1

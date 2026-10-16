@@ -1,0 +1,40 @@
+ bingo▍ /var/…/T/tmp.rdQH2o3T4h/cwd                                             label the total in main · session 01M5
+
+ › label the total in main
+   ✓ read src/main.rs
+   ✓ grep total                                                                                                 1 file
+ ▍ One place prints it.
+   ◆ edit src/main.rs                                                                                        needs you
+     ╭
+     │ --- /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/tmp.rdQH2o3T4h/cwd/src/main.rs
+     │ +++ /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/tmp.rdQH2o3T4h/cwd/src/main.rs
+     │ @@ -1,3 +1,3 @@
+     │  fn main() {
+     │ -    println!("{}", total());
+     │ +    println!("total: {}", total());
+     │  }
+     ╰
+
+     Do you want to Edit src/main.rs?
+     1  Yes
+     2  Yes for this session
+     3  No, and tell it why
+     4  Change it first
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ▍ Edit /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/tmp.rdQH2o3T4h/cwd/src/main.rs is waiting for you
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍ your message waits until the ask is answered
+                                                                            esc back to the ask · ⏎ queue this message
+ ⏵⏵ default   ◆ solo   ▰▱▱▱▱▱▱▱ 14k / 191k                                                                      fake-1
