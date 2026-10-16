@@ -1,6 +1,6 @@
 //! Terminal probe I/O, before the alternate screen is taken.
 
-use crate::graphics::{Passthrough, Transport, probe};
+use crate::graphics::{Cell, Passthrough, Probe, Transport, probe};
 
 /// Put the three queries on the terminal and read until DA1 comes back.
 ///
@@ -34,6 +34,31 @@ pub(super) fn exchange(transport: Transport, passthrough: Passthrough) -> Vec<u8
     };
     let _ = crossterm::terminal::disable_raw_mode();
     answer
+}
+
+/// The answer, with a cell read off the window when the terminal said none.
+/// Only bare: under tmux the pane's window is tmux's own guess at the pixels,
+/// and the terminal behind it is the one whose cells a picture is drawn in.
+pub(super) fn measured(mut heard: Probe, transport: Transport) -> Probe {
+    if transport == Transport::Bare && heard.cell.is_none() {
+        heard.cell = window_cell();
+    }
+    heard
+}
+
+/// The cell the terminal's window says, from its size in pixels and in cells
+/// ([`probe::window_cell`]).
+#[cfg(unix)]
+fn window_cell() -> Option<Cell> {
+    let window = crossterm::terminal::window_size().ok()?;
+    probe::window_cell(window.columns, window.rows, window.width, window.height)
+}
+
+/// No Windows console is asked anything ([`exchange`]), and none has a window
+/// in pixels to read (crossterm answers `Unsupported`).
+#[cfg(not(unix))]
+fn window_cell() -> Option<Cell> {
+    None
 }
 
 /// How long the answers are given. Under a tmux that says it carries them

@@ -199,6 +199,29 @@ fn cell(bytes: &[u8]) -> Option<Cell> {
     (cell.width > 0 && cell.height > 0).then_some(cell)
 }
 
+/// The cell a window says when the terminal will not: its size in pixels
+/// over its size in cells, to the nearest pixel. A pty is given a pixel size
+/// by whatever is in front of it (`TIOCGWINSZ`), and herdr gives its panes one
+/// exactly when it forwards pictures — and answers no `CSI 16 t` either way.
+/// A window of no pixels, or of no cells, says nothing; so does one whose
+/// cell would round to nothing.
+pub fn window_cell(columns: u16, rows: u16, width: u16, height: u16) -> Option<Cell> {
+    let cell = Cell {
+        width: per(width, columns)?,
+        height: per(height, rows)?,
+    };
+    (cell.width > 0 && cell.height > 0).then_some(cell)
+}
+
+/// `pixels` shared out over `cells`, rounded to the nearest whole pixel.
+fn per(pixels: u16, cells: u16) -> Option<u16> {
+    if pixels == 0 || cells == 0 {
+        return None;
+    }
+    let (pixels, cells) = (u32::from(pixels), u32::from(cells));
+    u16::try_from((pixels + cells / 2) / cells).ok()
+}
+
 /// Every name that came back, in the order it arrived. Bare, that is one or
 /// none; under tmux it is tmux's own and then the outer terminal's.
 fn names(bytes: &[u8]) -> Vec<Named> {
@@ -496,6 +519,38 @@ mod tests {
                 cell: None,
                 terminals: one("libghostty", ""),
             }
+        );
+    }
+
+    /// herdr's pane with pictures on: 93×39 cells over 1581×1326 pixels,
+    /// which is the outer Ghostty's 17×34 cell.
+    #[test]
+    fn a_window_of_pixels_over_cells_is_a_cell() {
+        assert_eq!(
+            window_cell(93, 39, 1581, 1326),
+            Some(Cell {
+                width: 17,
+                height: 34
+            })
+        );
+    }
+
+    /// Padding a terminal counts into the window rounds to the nearest pixel
+    /// rather than down — and a window of nothing says nothing.
+    #[test]
+    fn a_window_cell_rounds_and_nothing_is_no_cell() {
+        let cell = |width, height| Some(Cell { width, height });
+        assert_eq!(window_cell(80, 24, 805, 485), cell(10, 20), "down");
+        assert_eq!(window_cell(80, 24, 795, 475), cell(10, 20), "up");
+        assert_eq!(window_cell(80, 24, 840, 492), cell(11, 21), "half is up");
+        assert_eq!(window_cell(93, 39, 0, 0), None, "herdr with pictures off");
+        assert_eq!(window_cell(93, 39, 1581, 0), None, "one side of nothing");
+        assert_eq!(window_cell(0, 0, 1581, 1326), None, "no cells at all");
+        assert_eq!(window_cell(80, 24, 30, 480), None, "a cell of no pixels");
+        assert_eq!(
+            window_cell(1, 1, u16::MAX, u16::MAX),
+            cell(u16::MAX, u16::MAX),
+            "and the widest window does not overflow"
         );
     }
 
