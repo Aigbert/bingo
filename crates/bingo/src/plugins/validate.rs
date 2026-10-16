@@ -2,7 +2,7 @@ use bingo_sdk::{Env, KernelError};
 use std::path::Path;
 
 pub async fn run(root: &Path) -> Result<(), KernelError> {
-    let root = root.canonicalize().map_err(super::invalid)?;
+    let root = super::directory(root)?;
     let manifest = bingo_plugin_rpc::validate::read(&root)?;
     if matches!(
         manifest.launch,

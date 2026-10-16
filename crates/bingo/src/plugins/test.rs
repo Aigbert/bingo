@@ -7,7 +7,7 @@ use bingo_sdk::KernelError;
 use std::path::{Path, PathBuf};
 
 pub async fn run(root: &Path, json: bool) -> Result<(), KernelError> {
-    let root = root.canonicalize().map_err(super::invalid)?;
+    let root = super::directory(root)?;
     let suite = suite::Suite::read(&root).map_err(super::invalid)?;
     // A library package runs under a borrowed manifest; it is no mod to type.
     if suite.module == root {

@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 /// `bingo plugins types <dir>`: one written path per line, none when every
 /// file already held its bytes.
 pub async fn run(root: &Path) -> Result<(), KernelError> {
-    let root = root.canonicalize().map_err(super::invalid)?;
+    let root = super::directory(root)?;
     let manifest = bingo_plugin_rpc::validate::read(&root)?;
     if !matches!(manifest.launch, Launch::Module(_)) {
         return Err(super::invalid(format!(

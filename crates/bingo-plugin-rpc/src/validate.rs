@@ -8,8 +8,16 @@ use crate::wire::{HostEnv, InitializeParams, InitializeResult, PROTOCOL};
 use crate::{Connection, Manifest};
 
 pub fn read(root: &Path) -> Result<Manifest, KernelError> {
-    let raw = std::fs::read_to_string(root.join("plugin.json")).map_err(invalid)?;
-    let manifest: Manifest = serde_json::from_str(&raw).map_err(invalid)?;
+    let path = root.join("plugin.json");
+    let raw = std::fs::read_to_string(&path).map_err(|error| match error.kind() {
+        std::io::ErrorKind::NotFound => invalid(format!(
+            "{}: not found; a plugin directory holds a plugin.json (see /guide-mods)",
+            path.display()
+        )),
+        _ => invalid(format!("{}: {error}", path.display())),
+    })?;
+    let manifest: Manifest = serde_json::from_str(&raw)
+        .map_err(|error| invalid(format!("{}: {error}", path.display())))?;
     let name = &manifest.name;
     if name.is_empty()
         || !name
@@ -258,6 +266,20 @@ mod tests {
             std::fs::write(root.join("plugin.json"), value.to_string()).unwrap();
             assert!(read(&root).unwrap_err().message.contains(field));
         }
+    }
+
+    #[test]
+    fn a_missing_or_broken_manifest_names_its_path() {
+        let home = tempfile::tempdir().unwrap();
+        let root = home.path().join("example");
+        std::fs::create_dir(&root).unwrap();
+        let path = root.join("plugin.json");
+        let missing = read(&root).unwrap_err().message;
+        assert!(missing.contains(&path.display().to_string()), "{missing}");
+        assert!(missing.contains("not found"), "{missing}");
+        std::fs::write(&path, "{").unwrap();
+        let broken = read(&root).unwrap_err().message;
+        assert!(broken.contains(&path.display().to_string()), "{broken}");
     }
 
     #[test]

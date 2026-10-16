@@ -720,3 +720,25 @@ fn sdk_helpers_run_without_a_mod_manifest() {
     assert!(output.contains("SKIP src/on.test.ts"), "{output}");
     assert!(!library.join("plugin.json").exists());
 }
+
+#[test]
+fn a_directory_without_a_manifest_is_named_for_every_author_verb() {
+    let home = tempfile::tempdir().unwrap();
+    let empty = home.path().join("empty");
+    std::fs::create_dir(&empty).unwrap();
+    let absent = home.path().join("absent");
+    // `test` also runs a library package, so its empty-directory line says so.
+    for (verb, unlaid) in [
+        ("types", "plugin.json: not found"),
+        ("validate", "plugin.json: not found"),
+        ("test", "a module manifest or a library package.json"),
+    ] {
+        for (dir, says) in [(&empty, unlaid), (&absent, "absent")] {
+            let refused = run(home.path(), verb, dir);
+            let stderr = String::from_utf8_lossy(&refused.stderr);
+            assert_eq!(refused.status.code(), Some(1), "{verb}: {stderr}");
+            assert!(refused.stdout.is_empty(), "{verb}");
+            assert!(stderr.contains(says), "{verb}: {stderr}");
+        }
+    }
+}

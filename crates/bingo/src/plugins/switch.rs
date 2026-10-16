@@ -26,15 +26,22 @@ use clap::Subcommand;
 #[derive(Clone, Debug, Subcommand)]
 pub enum Action {
     /// Parse a plugin and report its protocol-2 contributions.
-    Validate { dir: std::path::PathBuf },
+    Validate {
+        /// The plugin's directory, the one holding plugin.json.
+        dir: std::path::PathBuf,
+    },
     /// Run TypeScript tests against an isolated host and fake model.
     Test {
+        /// The plugin's directory, the one holding plugin.json.
         dir: std::path::PathBuf,
         #[arg(long)]
         json: bool,
     },
-    /// Write a module plugin's editor types under .bingo/types; print each path written.
-    Types { dir: std::path::PathBuf },
+    /// Write a module plugin's types, reference and examples under .bingo; print each path written.
+    Types {
+        /// The plugin's directory, the one holding plugin.json.
+        dir: std::path::PathBuf,
+    },
     /// List plugins for the next start; use /plugins reload in a running session.
     List,
     /// Approve the current bytes of one repository plugin.
