@@ -147,12 +147,7 @@ pub struct Glyphs {
     pub tick: &'static str,
     /// The permission mode on the status line.
     pub mode: &'static str,
-    pub pause: &'static str,
-    pub steps: [&'static str; 4],
-    pub fold: &'static str,
-    pub stop: &'static str,
-    pub receipts: [&'static str; 4],
-    pub context: [&'static str; 2],
+    pub chrome: ChromeGlyphs,
     /// A tree node: `[0]` with siblings under it, `[1]` the last one. One
     /// field because it is one fact in two states, as the todo box is.
     pub tree: [&'static str; 2],
@@ -161,6 +156,16 @@ pub struct Glyphs {
     /// What opens an item of a list.
     pub point: &'static str,
     pub border: border::Set<'static>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ChromeGlyphs {
+    pub pause: &'static str,
+    pub steps: [&'static str; 4],
+    pub fold: &'static str,
+    pub stop: &'static str,
+    pub receipts: [&'static str; 4],
+    pub context: [&'static str; 2],
 }
 
 pub const UNICODE: Glyphs = Glyphs {
@@ -174,12 +179,14 @@ pub const UNICODE: Glyphs = Glyphs {
     task: ["◻", "◼", "✔"],
     tick: "✔",
     mode: "⏵⏵",
-    pause: "⏸",
-    steps: ["✓", "◆", "◌", "✗"],
-    fold: "▸",
-    stop: "■",
-    receipts: ["⇄", "✎", "⟲", "⇣"],
-    context: ["▰", "▱"],
+    chrome: ChromeGlyphs {
+        pause: "⏸",
+        steps: ["✓", "◆", "◌", "✗"],
+        fold: "▸",
+        stop: "■",
+        receipts: ["⇄", "✎", "⟲", "⇣"],
+        context: ["▰", "▱"],
+    },
     tree: ["├", "└"],
     ellipsis: "…",
     point: "•",
@@ -206,12 +213,14 @@ pub const ASCII: Glyphs = Glyphs {
     task: ["-", "*", "x"],
     tick: "x",
     mode: ">>",
-    pause: "||",
-    steps: ["x", "*", "o", "!"],
-    fold: ">",
-    stop: "#",
-    receipts: ["=", "/", "<", "v"],
-    context: ["#", "-"],
+    chrome: ChromeGlyphs {
+        pause: "||",
+        steps: ["x", "*", "o", "!"],
+        fold: ">",
+        stop: "#",
+        receipts: ["=", "/", "<", "v"],
+        context: ["#", "-"],
+    },
     tree: ["+", "+"],
     ellipsis: "...",
     point: "-",

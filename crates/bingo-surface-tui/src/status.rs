@@ -35,7 +35,7 @@ pub fn components(
     let mut crew = crate::crew::spans(tree, width, width, now);
     if crew.is_empty() {
         crew = vec![
-            Span::styled(theme::glyphs().steps[1], theme::crew(0)),
+            Span::styled(theme::glyphs().chrome.steps[1], theme::crew(0)),
             dimmed(" solo".into()),
         ];
     }
@@ -83,7 +83,7 @@ fn footer(
 fn context_bar(context: Option<bingo_sdk::ContextUsage>) -> Vec<Span<'static>> {
     let Some(context) = context else {
         return vec![
-            Span::styled(theme::glyphs().context[1].repeat(8), theme::ash()),
+            Span::styled(theme::glyphs().chrome.context[1].repeat(8), theme::ash()),
             dimmed(" ? / ?".into()),
         ];
     };
@@ -93,7 +93,7 @@ fn context_bar(context: Option<bingo_sdk::ContextUsage>) -> Vec<Span<'static>> {
     } else {
         (share * 8.0).round().clamp(1.0, 8.0) as usize
     };
-    let [full, empty] = theme::glyphs().context;
+    let [full, empty] = theme::glyphs().chrome.context;
     vec![
         Span::styled(
             full.repeat(fill),
@@ -185,7 +185,7 @@ fn left(state: &SessionState) -> Vec<Span<'static>> {
         _ => theme::mode(),
     };
     let glyph = if label == "plan" {
-        theme::glyphs().pause
+        theme::glyphs().chrome.pause
     } else {
         theme::glyphs().mode
     };
