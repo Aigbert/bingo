@@ -503,7 +503,7 @@ sealed_card() {
   esac
   if [ "$answer" = Escape ]; then
     keys Escape
-    await 'steps had run'
+    await '0 of 1 step had run'
   else
     press_until "$answer" 'Sealed done.'
   fi
