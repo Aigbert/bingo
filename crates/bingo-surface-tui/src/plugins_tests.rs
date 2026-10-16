@@ -258,7 +258,7 @@ fn a_trust_line_nobody_vouched_for_is_refused() {
         let refused = crate::plugins::result(&mut ui, &tree, &answer(line), false, now);
         assert!(!submits(refused), "{line}");
         assert!(
-            ui.notices.last().is_some_and(
+            ui.notice().is_some_and(
                 |notice| notice.text.contains(line) && notice.text.contains("type it yourself")
             ),
             "{line}"

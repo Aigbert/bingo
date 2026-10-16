@@ -80,6 +80,6 @@ mod tests {
             assert!(result(&mut ui, &tree, &action, "built.in", "panel", false, now).is_empty());
             assert!(result(&mut ui, &tree, &action, "other", "panel", true, now).is_empty());
         }
-        assert!(ui.notices.is_empty());
+        assert!(ui.notice.is_none());
     }
 }

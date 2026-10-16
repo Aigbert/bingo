@@ -59,33 +59,34 @@ pub struct Notice {
     /// What it is about, said after it in dim: the line a refused intent
     /// carried, so a person sees which of theirs came back.
     pub about: Option<String>,
-    /// When it took the slot — one notice is read at a time, and the next
-    /// waits (§3). `None` until its turn comes.
-    shown: Option<Instant>,
+    /// When it was said. Its life runs on the wall clock from here, drawn
+    /// or not: a moment that has passed is dropped, never replayed
+    /// (ADR-0095 §2).
+    said: Instant,
 }
 
 impl Notice {
     /// How strongly it is being said: 0 as it arrives, 1 while it is there to
-    /// be read, 0 again as it goes — and nothing at all while it waits.
-    pub fn strength(&self, now: Now) -> Option<f32> {
-        let shown = self.shown?;
+    /// be read, 0 again as it goes.
+    pub fn strength(&self, now: Now) -> f32 {
+        let said = self.said;
         if !now.motion {
-            return Some(1.0);
+            return 1.0;
         }
         let held = NOTICE_FADE + NOTICE;
-        match now.since(shown) {
-            age if age < NOTICE_FADE => Some(Anim::new(shown, NOTICE_FADE).progress(now.instant)),
-            age if age < held => Some(1.0),
-            _ => Some(1.0 - Anim::new(shown + held, NOTICE_FADE).progress(now.instant)),
+        match now.since(said) {
+            age if age < NOTICE_FADE => Anim::new(said, NOTICE_FADE).progress(now.instant),
+            age if age < held => 1.0,
+            _ => 1.0 - Anim::new(said + held, NOTICE_FADE).progress(now.instant),
         }
     }
 
     pub fn next_change(&self, now: Now) -> Option<Instant> {
-        let shown = self.shown?;
-        let expiry = shown + self.life();
+        let said = self.said;
+        let expiry = said + self.life();
         let changes = [
-            shown + NOTICE_FADE,
-            shown + NOTICE_FADE + NOTICE + Duration::from_nanos(1),
+            said + NOTICE_FADE,
+            said + NOTICE_FADE + NOTICE + Duration::from_nanos(1),
             expiry,
         ];
         if now.motion {
@@ -97,8 +98,7 @@ impl Notice {
 
     /// Whether it has said its piece and left.
     fn gone(&self, now: Instant) -> bool {
-        self.shown
-            .is_some_and(|shown| now.saturating_duration_since(shown) >= self.life())
+        now.saturating_duration_since(self.said) >= self.life()
     }
 
     fn life(&self) -> Duration {
@@ -264,7 +264,9 @@ pub struct Ui {
     pub placed: Placed,
     pub(crate) controls: controls::Controls,
     pub scroll: Scroll,
-    pub notices: Vec<Notice>,
+    /// The one notice being said: the latest wins the slot, and nothing waits
+    /// behind it (ADR-0095 §2).
+    pub notice: Option<Notice>,
     /// A command's `View`, shown until the next key.
     pub block: Option<View>,
     pub embers: crate::embers::Embers,
@@ -321,7 +323,7 @@ impl Ui {
             controls: controls::Controls::new(history),
             placed: Placed::default(),
             scroll: Scroll::default(),
-            notices: Vec::new(),
+            notice: None,
             block: None,
             embers: crate::embers::Embers::default(),
             folds: Folds::new(),
@@ -347,42 +349,36 @@ impl Ui {
         self.say(level, text, Some(about), now);
     }
 
-    /// One notice is read at a time; the next takes the slot when this one has
-    /// left it.
+    /// One notice is read at a time, and it is the latest: a newer word
+    /// replaces the one being said, and nothing is queued to be said later.
     fn say(&mut self, level: Level, text: String, about: Option<String>, now: Instant) {
-        let free = self.notices.is_empty();
-        self.notices.push(Notice {
+        self.notice = Some(Notice {
             level,
             text,
             about,
-            shown: free.then_some(now),
+            said: now,
         });
     }
 
     /// The notice on the status line, while one is being said.
     pub fn notice(&self) -> Option<&Notice> {
-        self.notices.first()
+        self.notice.as_ref()
     }
 
     /// Take a notice back. What the opening had to say about the terminal can
     /// turn out to be wrong — a passthrough that answered after the probe gave
     /// up (M60 brick 2) — and a wrong word left standing is worse than none.
-    /// Whichever is waiting behind it takes the slot on the next `expire`.
     pub fn withdraw(&mut self, text: &str) {
-        self.notices.retain(|notice| notice.text != text);
+        if self.notice().is_some_and(|notice| notice.text == text) {
+            self.notice = None;
+        }
     }
 
-    /// Drop what has run out and start what was waiting for it: a notice past
-    /// its window, a layer that has finished leaving. Drawing never mutates,
-    /// so the loop calls this.
+    /// Drop what has run out: a notice past its window, a layer that has
+    /// finished leaving. Drawing never mutates, so the loop calls this.
     pub fn expire(&mut self, now: Now) {
-        if self.notices.first().is_some_and(|n| n.gone(now.instant)) {
-            self.notices.remove(0);
-        }
-        if let Some(next) = self.notices.first_mut()
-            && next.shown.is_none()
-        {
-            next.shown = Some(now.instant);
+        if self.notice().is_some_and(|n| n.gone(now.instant)) {
+            self.notice = None;
         }
         self.focus.expire(now);
     }
@@ -581,25 +577,29 @@ mod tests {
         Ui::new(Vec::new(), Instant::now())
     }
 
+    fn said(ui: &Ui) -> Option<&str> {
+        ui.notice().map(|n| n.text.as_str())
+    }
+
+    fn life() -> i64 {
+        (NOTICE_FADE + NOTICE + NOTICE_FADE).as_millis() as i64
+    }
+
     #[test]
     fn a_notice_lives_its_window_and_the_frames_it_arrives_and_leaves_in() {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "careful", now.instant);
-        let life = (NOTICE_FADE + NOTICE + NOTICE_FADE).as_millis() as i64;
-        ui.expire(later(now, life - 1));
-        assert_eq!(ui.notices.len(), 1);
-        ui.expire(later(now, life));
-        assert!(ui.notices.is_empty());
+        ui.expire(later(now, life() - 1));
+        assert!(ui.notice.is_some());
+        ui.expire(later(now, life()));
+        assert!(ui.notice.is_none());
     }
 
     #[test]
     fn a_notice_fades_in_over_two_frames_holds_and_fades_out() {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "careful", now.instant);
-        let at = |ms| {
-            ui.notice()
-                .and_then(|notice| notice.strength(later(now, ms)))
-        };
+        let at = |ms| ui.notice().map(|notice| notice.strength(later(now, ms)));
         assert_eq!(at(0), Some(0.0), "it starts dim");
         assert_eq!(at(33), Some(0.5), "and arrives over two frames");
         assert_eq!(at(66), Some(1.0));
@@ -614,57 +614,80 @@ mod tests {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "careful", now.instant);
         let still = crate::test_support::still(now);
-        assert_eq!(ui.notice().and_then(|n| n.strength(still)), Some(1.0));
+        assert_eq!(ui.notice().map(|n| n.strength(still)), Some(1.0));
+    }
+
+    /// M182 bug 6: five quick mode switches say five notices; only the mode
+    /// it settled on is said, and nothing is replayed after it.
+    #[test]
+    fn rapid_notices_leave_only_the_last_one_said() {
+        let (mut ui, now) = scene();
+        let modes = [
+            "acceptEdits",
+            "plan",
+            "bypassPermissions",
+            "dontAsk",
+            "default",
+        ];
+        for (step, mode) in modes.iter().enumerate() {
+            ui.notify(Level::Info, *mode, later(now, step as i64 * 100).instant);
+        }
+        let last = later(now, 400);
+        ui.expire(last);
+        assert_eq!(said(&ui), Some("default"));
+        ui.expire(later(last, life()));
+        assert_eq!(said(&ui), None, "and nothing waits behind it");
     }
 
     #[test]
-    fn the_next_notice_waits_until_the_first_has_left() {
+    fn a_notice_whose_moment_passed_behind_another_is_never_said() {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "first", now.instant);
-        ui.notify(Level::Info, "second", now.instant);
+        ui.notify(Level::Info, "second", later(now, 1_000).instant);
         assert_eq!(
-            ui.notice().map(|n| n.text.clone()).as_deref(),
-            Some("first")
+            said(&ui),
+            Some("second"),
+            "the newer word replaces the first"
         );
-        assert_eq!(
-            ui.notices[1].strength(now),
-            None,
-            "the one behind it is not being said at all"
-        );
+        for ms in (1_000..=life() + 2_000).step_by(250) {
+            ui.expire(later(now, ms));
+            assert_ne!(said(&ui), Some("first"), "at {ms} ms");
+        }
+        assert_eq!(said(&ui), None);
+    }
 
-        let life = (NOTICE_FADE + NOTICE + NOTICE_FADE).as_millis() as i64;
-        ui.expire(later(now, life));
+    #[test]
+    fn a_notice_expires_by_the_wall_clock_from_when_it_was_said() {
+        let (mut ui, now) = scene();
+        ui.notify(Level::Info, "said early", now.instant);
+        // The first frame to look at it comes late: its life is not restarted.
+        let looked = later(now, life() - 10);
+        ui.expire(looked);
+        assert_eq!(said(&ui), Some("said early"));
+        let strength = ui.notice().map_or(1.0, |n| n.strength(looked));
+        assert!(strength < 1.0, "first drawn already leaving: {strength}");
+        ui.expire(later(now, life()));
         assert_eq!(
-            ui.notice().map(|n| n.text.clone()).as_deref(),
-            Some("second")
-        );
-        assert_eq!(
-            ui.notices[0].strength(later(now, life)),
-            Some(0.0),
-            "and it arrives from the beginning of its own life"
+            said(&ui),
+            None,
+            "gone at its own deadline, not one drawn later"
         );
     }
 
     /// M60 brick 2: a word the opening said and the terminal then disproved is
-    /// taken back, and whatever was waiting behind it takes the slot.
+    /// taken back.
     #[test]
     fn a_notice_the_terminal_disproved_is_withdrawn() {
         let (mut ui, now) = scene();
         ui.notify(Level::Info, "the passthrough is off", now.instant);
-        ui.notify(Level::Warn, "second", now.instant);
-        ui.withdraw("the passthrough is off");
-        assert_eq!(
-            ui.notice().map(|n| n.text.clone()).as_deref(),
-            Some("second")
-        );
-        ui.expire(now);
-        assert_eq!(
-            ui.notices[0].strength(now),
-            Some(0.0),
-            "and it arrives from the beginning of its own life"
-        );
         ui.withdraw("nobody said that");
-        assert_eq!(ui.notices.len(), 1, "and only what was said is taken back");
+        assert_eq!(
+            said(&ui),
+            Some("the passthrough is off"),
+            "only what was said is taken back"
+        );
+        ui.withdraw("the passthrough is off");
+        assert_eq!(said(&ui), None);
     }
 
     #[test]

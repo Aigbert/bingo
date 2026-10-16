@@ -118,7 +118,7 @@ async fn rapid_pulled_edits_resolve_current_handlers_after_ack_before_rendered()
         deliver(&mut run, now, index + 1, value);
     }
     assert_eq!(received, ["A", "Ad", "Ada"]);
-    assert!(run.ui.notices.is_empty(), "{:?}", run.ui.notices);
+    assert!(run.ui.notice.is_none(), "{:?}", run.ui.notice);
     // Discard optimistic editor state: the final drawing itself must contain Ada.
     run.ui.placed.panes = Default::default();
     run.ui.sync_panes(run.session.tree.viewed());
@@ -147,10 +147,14 @@ async fn a_missing_control_drops_its_edit_with_the_existing_stale_notice() {
     assert!(run.ui.actions.action().is_none());
     assert!(run.mine.is_empty());
     assert_eq!(
-        run.ui.notices[0].text,
+        run.ui.notice().expect("a notice").text,
         format!("counter: {}", bingo_sdk::view::STALE_CONTROL)
     );
-    assert_eq!(run.ui.notices[0].level, Level::Warn, "the host's own level");
+    assert_eq!(
+        run.ui.notice().expect("a notice").level,
+        Level::Warn,
+        "the host's own level"
+    );
 }
 
 #[tokio::test]
@@ -206,7 +210,7 @@ async fn an_edit_typed_during_an_in_flight_redraw_uses_its_new_handler() {
         assert_eq!(session.submitted().len(), index + 1);
         deliver(&mut run, now, index + 2, value);
     }
-    assert!(run.ui.notices.is_empty());
+    assert!(run.ui.notice.is_none());
 }
 
 #[tokio::test]
@@ -302,17 +306,17 @@ async fn an_unkeyed_button_shifted_by_a_redraw_is_stale_not_its_neighbour() {
     let (run, session) = press_b_across_a_shift(false);
     assert_eq!(session.submitted().len(), 1, "A-1 now sits where B was");
     assert_eq!(
-        run.ui.notices[0].text,
+        run.ui.notice().expect("a notice").text,
         format!("counter: {}", bingo_sdk::view::STALE_CONTROL)
     );
-    assert_eq!(run.ui.notices[0].level, Level::Warn);
+    assert_eq!(run.ui.notice().expect("a notice").level, Level::Warn);
 }
 
 #[tokio::test]
 async fn a_keyed_button_moved_by_a_redraw_takes_its_new_handler() {
     let (run, session) = press_b_across_a_shift(true);
     assert_eq!(handler(&session, 1), "B-1");
-    assert!(run.ui.notices.is_empty(), "{:?}", run.ui.notices);
+    assert!(run.ui.notice.is_none(), "{:?}", run.ui.notice);
 }
 
 #[tokio::test]
@@ -361,8 +365,8 @@ async fn a_rebuilt_memo_holds_an_edit_until_its_site_redraws() {
     acknowledge(&mut run, &session, 0);
     assert_eq!(session.submitted().len(), 1, "the site is still placed");
     assert!(run.ui.actions.deadline().is_some());
-    assert!(run.ui.notices.is_empty(), "{:?}", run.ui.notices);
+    assert!(run.ui.notice.is_none(), "{:?}", run.ui.notice);
     deliver(&mut run, now, 1, "Ad");
     assert_eq!(handler(&session, 1), "name-1");
-    assert!(run.ui.notices.is_empty(), "{:?}", run.ui.notices);
+    assert!(run.ui.notice.is_none(), "{:?}", run.ui.notice);
 }

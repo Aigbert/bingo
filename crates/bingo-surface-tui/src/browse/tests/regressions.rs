@@ -189,7 +189,7 @@ fn ordinary_pagers_keep_their_existing_content_projection() {
 }
 
 fn busy_notices(ui: &Ui) -> usize {
-    ui.notices.iter().filter(|n| n.text == BUSY).count()
+    ui.notice().iter().filter(|n| n.text == BUSY).count()
 }
 
 #[tokio::test]

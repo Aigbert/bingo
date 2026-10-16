@@ -234,7 +234,7 @@ pub fn preview(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
         open.confirm = false;
     }
     // Busy is said by the key that asked (`r`, `⏎`); a frame only waits, or
-    // every frame of a running turn would queue the same notice.
+    // every frame of a running turn would say the same notice again.
     if props.previewed || props.selected.is_none() || tree.viewed().busy() {
         return vec![];
     }

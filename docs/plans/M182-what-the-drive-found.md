@@ -65,6 +65,7 @@ The palette's new groups, wording and skills group (M187); the `KeyBar` (M184).
 
 - Local filtering must use the same matcher the mod uses, or rows shift when the real answer lands: reuse the mod's matcher from the sdk-level pure function, or keep the old rows unfiltered until the answer arrives.
 - M180's guarantee (keys never lost, never into an ask) must hold: its tests stay green unchanged.
+- Follow-up: bug 8's warning is hidden only in the picker (`bingo-mod-models/src/label.rs`); the kernel still publishes `switchAt` from the fallback window (`host/catalog/limits.rs:25`) and `model_switch.rs::needs_compaction` still compacts on it — move the known-window rule into the kernel later.
 
 ## Implementation decisions
 
@@ -145,3 +146,13 @@ Windows commands ran separately and sequentially: `cargo check -p <crate> --all-
 - `bingo-sdk`, `bingo-core`, `bingo-surface-rpc`, `bingo-mod-models`: `Finished dev profile`, exit 0 for each.
 - `bingo-tool-fs`, `bingo-surface-tui`: exit 101 in `aws-lc-sys 0.44.0`, C compiler reports `stdlib.h` / `windows.h` not found.
 - `bingo`: exit 101 in `rquickjs-sys 0.14.0` (MSVC C flags passed to the host compiler) and `aws-lc-sys` (same missing Windows headers). These are the allowed C-toolchain deferrals; those crates are not claimed Windows-verified.
+
+## Verified — bug 6 fix round, 2026-10-16
+
+The stale replay was status-line notices (`ui.rs`), not toasts: `Ui::say` queued every notice and showed each for ~4 s. Now one `Option<Notice>` slot, latest wins, life measured from `say` on the wall clock; the queue is deleted. Tests: `rapid_notices_leave_only_the_last_one_said`, `a_notice_whose_moment_passed_behind_another_is_never_said`, `a_notice_expires_by_the_wall_clock_from_when_it_was_said`. The `toast.rs` change (f7e7238f) stays: pausing toast clocks behind a `holdToasts` pane replayed them after it closed. Drive: release build, `tmux -L m182fix -f /dev/null`, temp HOME, fake provider, five BTab 150 ms apart, status line sampled each second:
+
+```text
+ 0.0s permission mode: default    1.1s same    2.1s same    3.1s same
+ 4.1s ? for shortcuts             5.2s–8.3s ? for shortcuts (nothing replayed)
+```
+

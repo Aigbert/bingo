@@ -83,7 +83,7 @@ async fn a_catalogue_error_keeps_startup_and_typing_available() {
     assert!(!run.typeahead.catalogue_pending);
     assert!(
         run.ui
-            .notices
+            .notice()
             .iter()
             .any(|notice| notice.text.contains("offline"))
     );
@@ -146,7 +146,7 @@ async fn a_stalled_initial_catalogue_fails_at_its_overall_deadline() {
     assert_eq!(start.elapsed(), COMMAND_WAIT);
     assert!(!run.typeahead.catalogue_pending);
     assert!(run.typeahead.is_empty());
-    assert!(run.ui.notices.iter().any(|n| n.text.contains("timed out")));
+    assert!(run.ui.notice().iter().any(|n| n.text.contains("timed out")));
 }
 
 #[tokio::test]
@@ -225,7 +225,7 @@ async fn an_older_fetch_cannot_replace_a_newer_catalogue_or_report_failure() {
         crate::keys::commands::line(&run.ui, run.session.tree.viewed(), ctrl('n')).as_deref(),
         Some("/review")
     );
-    assert!(run.ui.notices.is_empty());
+    assert!(run.ui.notice.is_none());
 }
 
 #[tokio::test]

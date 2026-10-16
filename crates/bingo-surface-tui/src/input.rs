@@ -1176,7 +1176,7 @@ mod tests {
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         assert!(!ui.focus.showing());
-        assert!(ui.notices.is_empty(), "and it is silent about it");
+        assert!(ui.notice.is_none(), "and it is silent about it");
     }
 
     fn press(
@@ -1391,7 +1391,7 @@ mod tests {
                 vec![Effect::Run(format!("/permission {next}"))],
                 "{mode}"
             );
-            assert!(ui.notices.is_empty(), "{mode}");
+            assert!(ui.notice.is_none(), "{mode}");
         }
     }
 
@@ -1400,7 +1400,7 @@ mod tests {
         for state in [state(), with_permission_mode("acceptedits")] {
             let (mut ui, now) = scene();
             assert!(press(&mut ui, &state, shift(KeyCode::BackTab), now).is_empty());
-            assert!(ui.notices.iter().any(|n| n.text == UNKNOWN_MODE));
+            assert!(ui.notice().iter().any(|n| n.text == UNKNOWN_MODE));
         }
     }
 
@@ -2934,7 +2934,7 @@ mod tests {
             ))],
             "the row's command is its placer's word, not the person's"
         );
-        assert!(ui.notices.is_empty(), "the plugin answers, not the surface");
+        assert!(ui.notice.is_none(), "the plugin answers, not the surface");
     }
 
     #[test]
@@ -2971,7 +2971,7 @@ mod tests {
         ] {
             let (mut ui, now) = scene();
             assert!(press(&mut ui, &state, ctrl('b'), now).is_empty());
-            assert!(ui.notices.iter().any(|n| n.text == NOTHING_RUNNING));
+            assert!(ui.notice().iter().any(|n| n.text == NOTHING_RUNNING));
         }
     }
 

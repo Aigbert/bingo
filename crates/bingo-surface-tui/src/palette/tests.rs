@@ -471,8 +471,7 @@ fn a_trust_line_nobody_vouched_for_stays_unsent() {
             let effects = result(&mut ui, &solo(&state), &action, vouched, now);
             assert_eq!(submits(&effects), vouched, "{value}");
             let said = ui
-                .notices
-                .last()
+                .notice()
                 .is_some_and(|notice| notice.text.contains("type it yourself"));
             assert_eq!(said, !vouched, "{value}");
         }

@@ -289,9 +289,7 @@ fn notice(ui: &Ui, now: Now) -> Vec<Span<'static>> {
     let Some(notice) = ui.notice() else {
         return Vec::new();
     };
-    let Some(strength) = notice.strength(now) else {
-        return Vec::new();
-    };
+    let strength = notice.strength(now);
     let mut spans = vec![Span::styled(
         notice.text.lines().collect::<Vec<_>>().join(" · "),
         theme::fading(notice.level, strength),

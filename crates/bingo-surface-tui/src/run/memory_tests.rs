@@ -271,7 +271,7 @@ async fn memory_panel_reads_forgets_and_refuses_instruction_deletion() {
         "# Memory\nkeep\n"
     );
     assert!(!fixture.paint(108, 30).await.contains("Use fixtures"));
-    fixture.run.ui.notices.clear();
+    fixture.run.ui.notice = None;
     fixture.press(typed('d')).await;
     let screen = fixture.paint(108, 30).await;
     assert!(screen.contains("edit the file itself"), "{screen}");

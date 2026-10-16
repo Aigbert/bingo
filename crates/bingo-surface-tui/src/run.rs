@@ -1743,7 +1743,7 @@ mod tests {
         assert!(run.mine.contains_key(&IntentId::from_raw("req_1")));
         assert!(run.ui.composer.is_empty());
         assert_eq!(
-            run.ui.notices.last().map(|notice| notice.text.clone()),
+            run.ui.notice().map(|notice| notice.text.clone()),
             Some(withdraw::ALREADY_SENT.to_string())
         );
     }
@@ -1761,7 +1761,7 @@ mod tests {
         let run = told_of_update(0);
         assert_eq!(run.ui.welcome.update.as_deref(), Some("0.5.0"));
         assert!(
-            run.ui.notices.is_empty(),
+            run.ui.notice.is_none(),
             "the box is on screen, so nothing else says it"
         );
     }
@@ -1836,7 +1836,7 @@ mod tests {
         settle(&mut run, &mut waiting).await;
         let image = one_picture(&session, "look at @shot.png");
         assert_eq!(image.media_type, "image/png");
-        assert!(run.ui.notices.is_empty());
+        assert!(run.ui.notice.is_none());
     }
 
     /// A format no provider takes is one a person still has: it is decoded
@@ -1871,7 +1871,7 @@ mod tests {
         run.submit(prose(&line));
         settle(&mut run, &mut waiting).await;
         assert_eq!(one_picture(&session, &line).media_type, "image/jpeg");
-        assert!(run.ui.notices.is_empty());
+        assert!(run.ui.notice.is_none());
     }
 
     #[tokio::test]
@@ -1883,11 +1883,11 @@ mod tests {
         assert_eq!(run.ui.composer.text(), "look at @missing.png");
         assert!(
             run.ui
-                .notices
+                .notice()
                 .iter()
                 .any(|n| n.text.starts_with("missing.png: ") && n.text.contains("could not")),
             "the notice names the mention and says why: {:?}",
-            run.ui.notices
+            run.ui.notice
         );
     }
 
@@ -1912,11 +1912,11 @@ mod tests {
         assert_eq!(run.ui.composer.text(), line);
         assert!(
             run.ui
-                .notices
+                .notice()
                 .iter()
                 .any(|n| n.text.contains("not a picture")),
             "{:?}",
-            run.ui.notices
+            run.ui.notice
         );
     }
 
@@ -1993,8 +1993,8 @@ mod tests {
                 .starts_with(b"\x89PNG"),
             "and the bytes are a PNG"
         );
-        let [notice] = run.ui.notices.as_slice() else {
-            panic!("one notice: {:?}", run.ui.notices)
+        let Some(notice) = run.ui.notice() else {
+            panic!("one notice: {:?}", run.ui.notice)
         };
         assert_eq!(notice.level, Level::Info);
         assert_eq!(notice.text, format!("opened {want}"));
@@ -2068,8 +2068,8 @@ mod tests {
             },
         ));
         let path = dir.path().join("docs/x.png");
-        let [notice] = run.ui.notices.as_slice() else {
-            panic!("one notice: {:?}", run.ui.notices)
+        let Some(notice) = run.ui.notice() else {
+            panic!("one notice: {:?}", run.ui.notice)
         };
         assert_eq!(notice.level, Level::Warn);
         assert!(notice.text.contains(&path.to_string_lossy().into_owned()));
@@ -2089,7 +2089,7 @@ mod tests {
         assert!(seen.lock().expect("the record").is_empty());
         assert!(!dir.path().join(crate::viewer::DIR).exists());
         assert_eq!(
-            run.ui.notices.first().map(|notice| notice.level),
+            run.ui.notice().map(|notice| notice.level),
             Some(Level::Warn)
         );
     }
@@ -2333,7 +2333,7 @@ mod tests {
         });
         assert!(waiting.try_recv().is_err(), "and it is not tried again");
         assert!(
-            run.ui.notices.is_empty(),
+            run.ui.notice.is_none(),
             "a picture that is not there is a note on its own line, not a notice"
         );
     }
@@ -2390,9 +2390,9 @@ mod tests {
             .expect("the notice is not an error");
         assert!(recorder.copies.is_empty(), "nothing was handed over");
         assert!(
-            run.ui.notices.iter().any(|n| n.text.contains("100 KiB")),
+            run.ui.notice().iter().any(|n| n.text.contains("100 KiB")),
             "the refusal names the size: {:?}",
-            run.ui.notices
+            run.ui.notice
         );
     }
 

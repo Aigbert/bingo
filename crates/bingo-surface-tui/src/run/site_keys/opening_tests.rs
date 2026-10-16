@@ -136,6 +136,9 @@ async fn delayed_handoff(ask: bool) {
     assert!(run.site_keys.is_empty());
     assert_eq!(run.ui.composer.text(), if ask { "" } else { "xy" });
     if ask {
-        assert_eq!(run.ui.notices[0].text, typeahead::kept_out_notice(2));
+        assert_eq!(
+            run.ui.notice().expect("a notice").text,
+            typeahead::kept_out_notice(2)
+        );
     }
 }
