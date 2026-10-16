@@ -179,7 +179,7 @@ await '↑↓ pick'
 keys Escape
 vanish '↑↓ pick'
 keys 'composer returned'
-await '> composer returned'
+await '▍ composer returned'
 finish
 
 step 'esc interrupts a turn that is still waiting'
