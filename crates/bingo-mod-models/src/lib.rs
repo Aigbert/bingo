@@ -16,7 +16,10 @@ pub mod rows;
 pub mod sheet;
 mod sheet_actions;
 pub mod state;
-use bingo_sdk::*;
+use bingo_sdk::{
+    CommandFold, Contribution, ErrorCode, Interceptor, KernelError, Plugin, PluginError,
+    PluginManifest, Registrar, SessionId, plugin, render,
+};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Mutex},
@@ -51,11 +54,13 @@ impl Plugin for Models {
         registrar.add(Contribution::Hook(Arc::new(lifecycle::Lifecycle(
             state.clone(),
         ))));
+        registrar.add(Contribution::Lifecycle(Arc::new(disable::Disable(
+            state.clone(),
+        ))));
         for link in [
             Arc::new(commands::Commands(state.clone())) as Arc<dyn Interceptor>,
             Arc::new(receipts::Receipts),
             Arc::new(describe::Describe),
-            Arc::new(disable::Disable(state.clone())),
             Arc::new(draw::Drawing(state.clone(), render::Component::ModelPicker)),
             Arc::new(draw::Drawing(state, render::Component::InfoNotice)),
         ] {

@@ -167,7 +167,8 @@ Open:
 - Concrete passive Event-only hooks use the existing owner running set for live
   delivery. Mixed, empty, decision and source hooks remain restart-only; the
   ADR-0088 amendment reconciles this with ADR-0090's crew live-switch intent.
-- Confirmed crew/model disable clears their active pane state. Refused, pending
-  and overridden switch outcomes preserve the pane.
+- Owner-directed lifecycle callbacks replace command-string disable observers
+  in crew, model and schedule (ADR-0096). Only effective disable clears transient
+  panes; refused, pending and overridden switch outcomes preserve them.
 - No dependencies, transcript or glyph changes were introduced. The frozen
   plugin schema remains unchanged.
