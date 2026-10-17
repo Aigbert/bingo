@@ -5,7 +5,7 @@ expression: "draw_tree(width, height, &tree, &mut ui, now)"
 ---
 " bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
-"   ◆ bash cargo test                                                                             needs you  "
+"   ⏺ bash cargo test                                                                             needs you  "
 "     ╭                                                                                                      "
 "     │ /work                                                                                                "
 "     │ $ cargo test                                                                                         "

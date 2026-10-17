@@ -1,10 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/ask/tests/mod.rs
+assertion_line: 109
 expression: "draw_tree(width, height, &tree, &mut ui, now)"
 ---
 " bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
-"   ◆ asks you · needs you                                                                                   "
+"   ⏺ asks you · needs you                                                                                   "
 "     Which provider?                                                                                        "
 "   ❯ 1  Anthropic                                                                                           "
 "        claude models                                                                                       "

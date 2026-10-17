@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
-assertion_line: 973
+assertion_line: 975
 expression: "screens.join(\"\\n\")"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
@@ -30,7 +30,7 @@ expression: "screens.join(\"\\n\")"
 
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ edit                                                            needs you  "
+"   ⏺ edit                                                            needs you  "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "
@@ -55,7 +55,7 @@ expression: "screens.join(\"\\n\")"
 
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ edit                                                            needs you  "
+"   ⏺ edit                                                            needs you  "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "
@@ -80,7 +80,7 @@ expression: "screens.join(\"\\n\")"
 
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ edit                                                            needs you  "
+"   ⏺ edit                                                            needs you  "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "

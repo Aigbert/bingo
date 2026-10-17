@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 54
+assertion_line: 57
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
@@ -9,8 +9,8 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 "   􎻮̍̅􎻮̍̍􎻮̍̎􎻮̍̐􎻮̍̒􎻮̍̽􎻮̍̾􎻮̍̿􎻮̍͆ 􎻮̍̅􎻮̍̍􎻮̍̎􎻮̍̐ 􎻮̍̅􎻮̍̍􎻮̍̎􎻮̍̐􎻮̍̒􎻮̍̽                                                                                                "
 "   􎻮̎̅􎻮̎̍􎻮̎̎􎻮̎̐􎻮̎̒􎻮̎̽􎻮̎̾􎻮̎̿􎻮̎͆ 􎻮̎̅􎻮̎̍􎻮̎̎􎻮̎̐ 􎻮̎̅􎻮̎̍􎻮̎̎􎻮̎̐􎻮̎̒􎻮̎̽                                                                                                "
 " › which of these has the right margin? [image 1] [image 2] [image 3]                                                   "
-" ▍ The second one: 24px, where the rest are 16px.                                                                       "
 "                                                                                                                        "
+" ▍ The second one: 24px, where the rest are 16px.                                                                       "
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "

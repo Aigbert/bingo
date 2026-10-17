@@ -1,11 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/motion.rs
-assertion_line: 583
+assertion_line: 578
 expression: "card.join(\"\\n\")"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ edit                                                            needs you  "
+"   ⏺ edit                                                            needs you  "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "
@@ -30,7 +30,7 @@ expression: "card.join(\"\\n\")"
 
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ edit                                                            needs you  "
+"   ⏺ edit                                                            needs you  "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "
@@ -55,7 +55,7 @@ expression: "card.join(\"\\n\")"
 
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ edit                                                            needs you  "
+"   ⏺ edit                                                            needs you  "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "
@@ -80,7 +80,7 @@ expression: "card.join(\"\\n\")"
 
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ edit                                                            needs you  "
+"   ⏺ edit                                                            needs you  "
 "                                                                                "
 "     Do you want to allow Edit src/lib.rs?                                      "
 "   ❯ 1  Yes                                                                     "

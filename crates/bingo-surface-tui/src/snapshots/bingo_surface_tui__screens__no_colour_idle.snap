@@ -1,16 +1,16 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 605
+assertion_line: 608
 expression: "in_look(no_colour(), || draw_tree(80, 24, &tree, &mut ui, now))"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › run the tests                                                                "
+"                                                                                "
 " ▍ All 33 pass.                                                                 "
 "                                                                                "
 "   • `wrap` is done                                                             "
 "   • `keys` is done                                                             "
-"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

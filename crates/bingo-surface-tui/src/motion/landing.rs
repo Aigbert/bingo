@@ -81,7 +81,7 @@ fn a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh() {
         assert_eq!(
             landed_runs(&done, &mut ui, later(now, 198)),
             vec![
-                (" ▍ ".to_string(), theme::as_drawn(theme::good())),
+                (" ⏺ ".to_string(), theme::as_drawn(theme::good())),
                 ("Bash".to_string(), theme::as_drawn(theme::bold())),
                 ("(cargo test)".to_string(), theme::as_drawn(theme::text())),
             ],
@@ -122,7 +122,7 @@ fn a_failure_flares_and_cools_into_the_words_behind_it() {
             "into the row's own words, twelve frames on"
         );
         assert_eq!(
-            style_of(&failed, &mut ui, later(now, 396), " ▍ "),
+            style_of(&failed, &mut ui, later(now, 396), " ⏺ "),
             theme::as_drawn(theme::bad()),
             "the bullet stays `bad`: what cooled is how fresh it is"
         );

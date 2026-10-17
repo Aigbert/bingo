@@ -1,13 +1,13 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
-assertion_line: 1381
+assertion_line: 1383
 expression: screen
 ---
 " bingo▍ /tmp/project                                      reviewer · session 2  "
 "                                                                                "
 " › review the diff                                                              "
-" ▍ Two nits, otherwise fine.                                                    "
 "                                                                                "
+" ▍ Two nits, otherwise fine.                                                    "
 "                                                                                "
 "                                                                                "
 "                                                                                "

@@ -64,8 +64,6 @@ pub const LANDING: Duration = match SWEEP.as_millis() > FLARE.as_millis() {
     true => SWEEP,
     false => FLARE,
 };
-/// One pulse of a live tool's bullet (§6).
-const PULSE: Duration = Duration::from_millis(1200);
 
 /// Output rows kept under a finished tool row before the rest folds away.
 const OUTPUT_ROWS: usize = 5;
@@ -666,8 +664,8 @@ fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> Vec<Line<'static>> {
 /// below the threshold at which a person reads it as something happening.
 fn live_bullet(status: ItemStatus, failed: bool, rows: &Rows<'_>) -> Style {
     let settled = bullet_style(status, failed);
-    match rows.now.motion && status == ItemStatus::Running {
-        true => theme::pulse(clock::breath(rows.now, PULSE)),
+    match status == ItemStatus::Running && !failed {
+        true => crate::breathing::style(rows.now),
         false => settled,
     }
 }
@@ -1014,7 +1012,7 @@ mod tests {
             .iter()
             .map(|c| c.symbol())
             .collect();
-        assert!(text.contains("✓ read Read note.md"), "{text}");
+        assert!(text.contains("⏺ read Read note.md"), "{text}");
         assert!(text.contains("hello"), "{text}");
     }
 
@@ -1208,7 +1206,7 @@ mod tests {
         assert!(
             board
                 .iter()
-                .any(|l| l.contains("✓ task create write the plan")),
+                .any(|l| l.contains("⏺ task create write the plan")),
             "{board:?}"
         );
 
@@ -1287,7 +1285,7 @@ mod tests {
                 Some("scout"),
                 "Two nits, else fine."
             )]),
-            vec![" ▍ scout: Two nits, else fine.".to_string()],
+            vec![" ⏺ scout: Two nits, else fine.".to_string()],
         );
         assert_eq!(
             drawn(vec![delivered(
@@ -1411,7 +1409,7 @@ mod tests {
         ] {
             assert_eq!(
                 drawn(vec![delivered("itm_1", surface, None, "it ended")]),
-                vec![" ▍ it ended".to_string()],
+                vec![" ⏺ it ended".to_string()],
                 "{surface} is quiet"
             );
         }
@@ -1467,7 +1465,7 @@ mod tests {
                  `BashOutput` with id \"ab12cd34\" reads what it wrote.",
             )]),
             vec![
-                " ▍ Background job ab12cd34 exited with code 1 after 2m.".to_string(),
+                " ⏺ Background job ab12cd34 exited with code 1 after 2m.".to_string(),
                 "  ⎿  `BashOutput` with id \"ab12cd34\" reads what it wrote.".to_string(),
             ],
         );
@@ -1511,7 +1509,7 @@ mod tests {
         assert_eq!(
             drawn(vec![skill_prompt()]),
             vec![
-                " ▍ /guide the wire format".to_string(),
+                " ⏺ /guide the wire format".to_string(),
                 "  ⎿  Base directory for this skill: /skills/guide".to_string(),
                 String::new(),
                 "     Read this before answering about bingo itself.".to_string(),
@@ -1575,7 +1573,7 @@ mod tests {
             None,
             ItemStatus::Completed,
         )]);
-        assert_eq!(lines[1..], ["   ✓ skill the wire format"], "{lines:?}");
+        assert_eq!(lines[1..], ["   ⏺ skill the wire format"], "{lines:?}");
     }
 
     /// A message from another session says who sent it, as a room's post does.
@@ -1588,7 +1586,7 @@ mod tests {
                 Some("reviewer"),
                 "done, two nits"
             )]),
-            vec![" ▍ reviewer: done, two nits".to_string()],
+            vec![" ⏺ reviewer: done, two nits".to_string()],
         );
     }
 
@@ -1604,7 +1602,7 @@ mod tests {
             &format!("the nightly run is in{body}"),
         )]);
         assert_eq!(drawn.len(), OUTPUT_ROWS + 2);
-        assert_eq!(drawn[0], " ▍ the nightly run is in");
+        assert_eq!(drawn[0], " ⏺ the nightly run is in");
         assert_eq!(drawn.last().map(String::as_str), Some("     … +4 lines"));
     }
 
@@ -1634,10 +1632,10 @@ mod tests {
             Some(output),
             ItemStatus::Completed,
         )]);
-        assert!(lines[0].starts_with("   ▾ 1 step · read"), "{lines:?}");
+        assert!(lines[0].starts_with("   ⏺ 1 step · read"), "{lines:?}");
         assert_eq!(
             lines[1..],
-            ["   ✓ read Cargo.toml", "     Read 3 lines"],
+            ["   ⏺ read Cargo.toml", "       Read 3 lines"],
             "the path is named from the session's own directory"
         );
     }
@@ -1656,7 +1654,7 @@ mod tests {
             ItemStatus::Completed,
         )]);
         assert_eq!(lines.len(), 2 + 9, "{lines:?}");
-        assert_eq!(lines.last().map(String::as_str), Some("     line 9"));
+        assert_eq!(lines.last().map(String::as_str), Some("       line 9"));
     }
 
     #[test]
@@ -1685,7 +1683,7 @@ mod tests {
         assert_eq!(
             rendered(&state),
             vec![
-                " ▍ Bash(cargo test)".to_string(),
+                " ⏺ Bash(cargo test)".to_string(),
                 "  ⎿  two".to_string(),
                 "     three".to_string(),
                 "     four".to_string(),
@@ -1788,8 +1786,8 @@ mod tests {
             lines[1..],
             [
                 "     The manifest first.",
-                "   ✓ read Cargo.toml",
-                "     Read 3 lines",
+                "   ⏺ read Cargo.toml",
+                "       Read 3 lines",
                 "     Then the crate map.",
             ],
             "{lines:?}"
@@ -2013,7 +2011,7 @@ mod tests {
         )]);
         assert_eq!(
             lines[1..],
-            ["   ✓ read Read src/lib.rs (1 - 50)", "     pub mod wire;"],
+            ["   ⏺ read Read src/lib.rs (1 - 50)", "       pub mod wire;"],
             "{lines:?}"
         );
     }
@@ -2066,7 +2064,7 @@ mod tests {
             "tool something",
             serde_json::json!({ "external": true }),
         )]);
-        assert_eq!(lines[1..], ["   ✓ other Tool"], "{lines:?}");
+        assert_eq!(lines[1..], ["   ⏺ other Tool"], "{lines:?}");
     }
 
     /// A call that failed says so where every other row says it: the bullet.
@@ -2091,8 +2089,8 @@ mod tests {
         assert_eq!(
             lines[1..],
             [
-                "   ✗ other toolu_04Bash                             failed",
-                "     no such file",
+                "   ⏺ other toolu_04Bash                             failed",
+                "       no such file",
             ],
             "{lines:?}"
         );
@@ -2142,7 +2140,7 @@ mod tests {
                 receipt_item("itm_2", "Edit", DecisionKind::Deny, Some("use cargo clean")),
             ]),
             vec![
-                " ▍ Edit(src/lib.rs)".to_string(),
+                " ⏺ Edit(src/lib.rs)".to_string(),
                 "  ⎿  you: no — use cargo clean".to_string(),
             ],
             "no blank line, and the tool is named once"
@@ -2181,7 +2179,7 @@ mod tests {
         ]);
         assert_eq!(
             rendered(&state).last().map(String::as_str),
-            Some(" ▍ no route to the provider")
+            Some(" ⏺ no route to the provider")
         );
     }
 

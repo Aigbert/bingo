@@ -20,19 +20,19 @@ fn an_answer_row_is_white_after_its_bullet() {
 }
 
 /// What a person reads off a batch: not one live row above a waiting one, but
-/// two spinners in `presence` on the same frame, turning side by side.
+/// two bullets in `presence` on the same frame, breathing side by side.
 #[test]
 fn every_row_of_a_batch_wears_the_live_mark_at_once() {
     let (mut ui, now) = mid_turn();
     let painted = painted(80, 24, &solo(&folded(running_together())), &mut ui, now);
-    let spinner = format!("{} ", crate::spinner::glyph(now));
+    let mark = format!("{} ", crate::theme::bullet());
     for command in ["cargo fmt --all -- --check", "cargo test --workspace"] {
         assert_row_styled(
             &painted,
             command,
             &[
                 ("   ", crate::theme::text()),
-                (&spinner, crate::theme::presence()),
+                (&mark, crate::breathing::style(now)),
                 (&format!("bash {command}"), crate::theme::text()),
             ],
         );
@@ -55,7 +55,10 @@ fn a_step_rows_mark_is_the_only_cell_a_colour_is_spent_on() {
     let (mut ui, now) = scene();
     open_the_turns(&mut ui, &state);
     let painted = painted(80, 24, &solo(&state), &mut ui, now);
-    assert_eq!(painted.coloured("read src/lib.rs"), vec!["✓".to_string()]);
+    assert_eq!(
+        painted.coloured("read src/lib.rs"),
+        vec![crate::theme::bullet().to_string()]
+    );
     assert!(
         painted.coloured("Read 3 lines").is_empty(),
         "a result spends none at all"
@@ -121,7 +124,7 @@ fn a_notice_is_marked_and_everybody_else_keeps_the_bar() {
             &painted,
             "Background job",
             &[
-                (" ▍ ", crate::theme::good()),
+                (" ⏺ ", crate::theme::good()),
                 (JOB.lines().next().unwrap_or_default(), crate::theme::text()),
             ],
         );

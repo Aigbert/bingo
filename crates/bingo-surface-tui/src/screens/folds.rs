@@ -2,14 +2,14 @@
 //! running, finished, stopped, opened, and a long run of them.
 //!
 //! One thing is decided here and nowhere else: the transcript's left edge.
-//! Nothing is drawn at column 0; a prompt's `›` and a reply's `▍` sit at
-//! column 1; a step, a turn's folded line and its stop line start at column 3;
+//! Nothing is drawn at column 0; a prompt's `›`, a reply's `▍` and a
+//! notice's `⏺` sit at column 1; a step, a turn's folded line and its stop line start at column 3;
 //! and whatever a row says at its right ends two cells before the edge.
 
 use super::*;
 
 /// What a part of a turn starts with at column 3, in either state of a fold.
-const PARTS: [char; 7] = ['✓', '◌', '◆', '✗', '▸', '▾', '■'];
+const PARTS: [char; 2] = ['⏺', '■'];
 
 /// The rows between the header and the composer's rule.
 fn transcript(screen: &str) -> Vec<Vec<char>> {
@@ -31,7 +31,7 @@ fn assert_aligned(screen: &str, width: usize) {
             continue;
         };
         match first {
-            1 => assert!(matches!(row[1], '›' | '▍'), "column 1: {text:?}"),
+            1 => assert!(matches!(row[1], '›' | '▍' | '⏺'), "column 1: {text:?}"),
             3 => assert!(PARTS.contains(&row[3]), "column 3: {text:?}"),
             _ => assert!(first >= 5, "under a step's words: {text:?}"),
         }
@@ -45,7 +45,7 @@ fn assert_flush(screen: &str, width: usize) {
     let lines = transcript(screen);
     let folded = lines
         .iter()
-        .find(|row| matches!(row.get(3), Some('▸' | '▾')));
+        .find(|row| row.get(3) == Some(&'⏺') && row.iter().collect::<String>().contains(" step"));
     let Some(row) = folded else {
         panic!("a folded line: {screen}");
     };
@@ -82,7 +82,7 @@ fn every_row_of_a_turn_keeps_the_same_left_edge() {
         ("stopped", stopped()),
         ("expanded", expanded()),
     ] {
-        for (width, height) in [(80, 24), (120, 40)] {
+        for (width, height) in [(80, 32), (120, 40)] {
             let screen = draw_tree(width, height, &tree, &mut ui, now);
             assert!(screen.contains(" › label the total"), "{scene}: {screen}");
             assert_aligned(&screen, usize::from(width));
@@ -93,20 +93,20 @@ fn every_row_of_a_turn_keeps_the_same_left_edge() {
     }
 }
 
-/// The steps one row each, the one running a still `◌`, no thought a row.
+/// The steps one row each, the one running a bullet that breathes, no
+/// thought a row.
 #[test]
 fn turn_running() {
     let (tree, mut ui, now) = running();
     let screen = draw_tree(80, 24, &tree, &mut ui, now);
     for row in [
-        "   ✓ read src/main.rs",
-        "   ✓ grep total",
-        "   ◌ bash cargo test -q",
+        "   ⏺ read src/main.rs",
+        "   ⏺ grep total",
+        "   ⏺ bash cargo test -q",
     ] {
         assert!(screen.contains(row), "{row}: {screen}");
     }
     assert!(!screen.contains("printed bare"), "no thought: {screen}");
-    assert!(!screen.contains('⏺'), "{screen}");
     both("turn_running", &tree, &mut ui, now);
 }
 
@@ -116,7 +116,7 @@ fn turn_finished() {
     let (tree, mut ui, now) = finished();
     let screen = draw_tree(80, 24, &tree, &mut ui, now);
     assert!(
-        screen.contains("   ▸ 4 steps · read · grep · edit +1 −1 · bash 3 passed"),
+        screen.contains("   ⏺ 4 steps · read · grep · edit +1 −1 · bash 3 passed"),
         "{screen}"
     );
     assert!(!screen.contains("One place prints it."), "{screen}");
@@ -143,8 +143,8 @@ fn turn_stopped() {
 fn turn_expanded() {
     let (tree, mut ui, now) = expanded();
     let screen = draw_tree(120, 40, &tree, &mut ui, now);
-    assert!(screen.contains("   ▾ 4 steps"), "{screen}");
-    assert!(screen.contains("   ✓ edit src/main.rs"), "{screen}");
+    assert!(screen.contains("   ⏺ 4 steps"), "{screen}");
+    assert!(screen.contains("   ⏺ edit src/main.rs"), "{screen}");
     assert!(
         screen.contains("     test result: ok. 3 passed"),
         "{screen}"
@@ -179,7 +179,7 @@ fn an_action_on_a_running_step_hangs_under_it() {
     let (_, mut ui, now) = running();
     let state = crate::transcript::slots::fixtures::with_promotions(folded(running_turn()));
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(screen.contains("   ◌ bash cargo test -q"), "{screen}");
+    assert!(screen.contains("   ⏺ bash cargo test -q"), "{screen}");
     assert!(screen.contains("     [ b background ]"), "{screen}");
     assert_aligned(&screen, 80);
 }
@@ -192,7 +192,7 @@ fn an_ended_step_hangs_no_action() {
     let state = crate::transcript::slots::fixtures::with_promotions(folded(finished_turn()));
     open_the_turns(&mut ui, &state);
     let screen = draw_tree(120, 40, &solo(&state), &mut ui, now);
-    assert!(screen.contains("   ✓ bash cargo test -q"), "{screen}");
+    assert!(screen.contains("   ⏺ bash cargo test -q"), "{screen}");
     assert!(!screen.contains("background"), "{screen}");
 }
 
@@ -200,11 +200,11 @@ fn an_ended_step_hangs_no_action() {
 #[test]
 fn ctrl_o_opens_the_latest_folded_turn() {
     let (tree, mut ui, now) = finished();
-    draw_tree(80, 24, &tree, &mut ui, now);
+    draw_tree(80, 32, &tree, &mut ui, now);
     crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
-    let screen = draw_tree(80, 24, &tree, &mut ui, now);
-    assert!(screen.contains("   ▾ 4 steps"), "{screen}");
-    assert!(screen.contains("   ✓ edit src/main.rs"), "{screen}");
+    let screen = draw_tree(80, 32, &tree, &mut ui, now);
+    assert!(screen.contains("   ⏺ 4 steps"), "{screen}");
+    assert!(screen.contains("   ⏺ edit src/main.rs"), "{screen}");
 }
 
 /// A click on the folded line opens it and a second folds it again; `⏎` on
@@ -213,23 +213,23 @@ fn ctrl_o_opens_the_latest_folded_turn() {
 fn a_click_or_enter_on_the_folded_line_opens_it() {
     let (tree, mut ui, now) = finished();
     let line = |ui: &mut Ui| {
-        let screen = draw_tree(80, 24, &tree, ui, now);
+        let screen = draw_tree(80, 32, &tree, ui, now);
         (row_carrying(&screen, "4 steps"), screen)
     };
     let (row, _) = line(&mut ui);
     crate::pointer::on_mouse(&mut ui, &tree, click(5, row), now);
     let (row, opened) = line(&mut ui);
-    assert!(opened.contains("   ▾ 4 steps"), "{opened}");
-    assert!(opened.contains("   ✓ edit src/main.rs"), "{opened}");
+    assert!(opened.contains("   ⏺ 4 steps"), "{opened}");
+    assert!(opened.contains("   ⏺ edit src/main.rs"), "{opened}");
 
     crate::pointer::on_mouse(&mut ui, &tree, click(5, row), now);
     let (_, shut) = line(&mut ui);
-    assert!(shut.contains("   ▸ 4 steps"), "{shut}");
-    assert!(!shut.contains("✓ edit src/main.rs"), "{shut}");
+    assert!(shut.contains("   ⏺ 4 steps"), "{shut}");
+    assert!(!shut.contains("⏺ edit src/main.rs"), "{shut}");
 
     crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now);
     let (_, again) = line(&mut ui);
-    assert!(again.contains("   ▾ 4 steps"), "{again}");
+    assert!(again.contains("   ⏺ 4 steps"), "{again}");
 }
 
 /// Under an opened turn a click is where a selection starts: only the line
@@ -237,22 +237,22 @@ fn a_click_or_enter_on_the_folded_line_opens_it() {
 #[test]
 fn a_click_under_an_opened_turn_leaves_it_open() {
     let (tree, mut ui, now) = finished();
-    let screen = draw_tree(80, 24, &tree, &mut ui, now);
+    let screen = draw_tree(80, 32, &tree, &mut ui, now);
     crate::pointer::on_mouse(
         &mut ui,
         &tree,
         click(5, row_carrying(&screen, "4 steps")),
         now,
     );
-    let opened = draw_tree(80, 24, &tree, &mut ui, now);
+    let opened = draw_tree(80, 32, &tree, &mut ui, now);
     for under in ["edit src/main.rs", "println!"] {
         let row = row_carrying(&opened, under);
         crate::pointer::on_mouse(&mut ui, &tree, click(8, row), now);
         crate::pointer::on_mouse(&mut ui, &tree, dragged(20, row), now);
         crate::pointer::on_mouse(&mut ui, &tree, released(20, row), now);
-        let still = draw_tree(80, 24, &tree, &mut ui, now);
+        let still = draw_tree(80, 32, &tree, &mut ui, now);
         assert!(
-            still.contains("   ▾ 4 steps"),
+            still.contains("   ⏺ 4 steps"),
             "a click on {under:?}: {still}"
         );
     }
@@ -266,7 +266,7 @@ fn the_builtin_ledger_draws_in_ascii_where_the_terminal_does() {
     let mut state = tree.viewed().clone();
     state.config.kernel["render"] = serde_json::json!({"Ledger": [{}], "TurnFold": [{}]});
     let tree = solo(&state);
-    let draw = |ui: &mut Ui| in_look(ascii(), || draw_tree(80, 24, &tree, ui, now));
+    let draw = |ui: &mut Ui| in_look(ascii(), || draw_tree(80, 32, &tree, ui, now));
     draw(&mut ui);
     let keys = ui.shown.pulls.clone();
     assert!(keys.len() > 1, "the line and its steps ask: {keys:?}");
@@ -287,9 +287,9 @@ fn the_builtin_ledger_draws_in_ascii_where_the_terminal_does() {
         ui.placed.pulled.answer(key, view);
     }
     let screen = draw(&mut ui);
-    assert!(screen.contains("   v 4 steps"), "{screen}");
-    assert!(screen.contains("   + read src/main.rs"), "{screen}");
-    for mark in ['✓', '◆', '◌', '✗', '▸', '▾'] {
+    assert!(screen.contains("   * 4 steps"), "{screen}");
+    assert!(screen.contains("   * read src/main.rs"), "{screen}");
+    for mark in ['⏺', '▍'] {
         assert!(!screen.contains(mark), "{mark} under ASCII: {screen}");
     }
 }

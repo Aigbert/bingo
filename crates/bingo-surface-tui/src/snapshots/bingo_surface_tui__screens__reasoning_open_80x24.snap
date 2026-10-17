@@ -1,12 +1,13 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 53
+assertion_line: 56
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › what is in this workspace?                                                   "
-"   ▾ thought                                                                4s  "
+"                                                                                "
+"   ⏺ thought                                                                4s  "
 "     The manifest first, because the lockfile only says what the manifest       "
 "     already asked for.                                                         "
 "     Then the crate map, which is the one place the layering is written down.   "
@@ -14,7 +15,6 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "     Only then the code, and only the file the plan names.                      "
 "     Anything else is a second reading of the same three facts.                 "
 "     So: manifest, map, plan.                                                   "
-"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

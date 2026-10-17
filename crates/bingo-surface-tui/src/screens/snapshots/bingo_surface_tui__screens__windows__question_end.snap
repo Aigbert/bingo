@@ -1,10 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/screens/windows.rs
+assertion_line: 14
 expression: screen.clone()
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ asks you · needs you                                                       "
+"   ⏺ asks you · needs you                                                       "
 "Auth                                                                            "
 "                                                                                "
 "     Which provider?                                                            "

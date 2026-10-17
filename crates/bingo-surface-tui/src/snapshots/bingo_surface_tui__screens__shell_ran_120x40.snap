@@ -1,22 +1,22 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 54
+assertion_line: 57
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
 " › run the tests in the background                                                                                      "
-"   ▾ 1 step · bash                                                                                                  1s  "
-"   ✓ bash cargo test --workspace                                                                                        "
-"     Started in the background as job_ab12cd34                                                                          "
+"                                                                                                                        "
+"   ⏺ 1 step · bash                                                                                                  1s  "
+"   ⏺ bash cargo test --workspace                                                                                        "
+"       Started in the background as job_ab12cd34                                                                        "
+"                                                                                                                        "
 " ▍ Started.                                                                                                             "
-" ▍ Background job job_ab12cd34 (`cargo test --workspace`) exited with code 0 after 45s.                                 "
+"                                                                                                                        "
+" ⏺ Background job job_ab12cd34 (`cargo test --workspace`) exited with code 0 after 45s.                                 "
 "  ⎿  `BashOutput` with id "job_ab12cd34" reads what it wrote.                                                           "
+"                                                                                                                        "
 " ▍ The tests passed.                                                                                                    "
-"                                                                                                                        "
-"                                                                                                                        "
-"                                                                                                                        "
-"                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "

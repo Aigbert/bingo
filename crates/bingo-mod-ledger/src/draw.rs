@@ -10,7 +10,7 @@ use bingo_sdk::{
 use unicode_width::UnicodeWidthStr;
 
 /// A step's row, in the marks the surface handed over. A running step is
-/// left to the surface, whose spinner turns with its clock; a still answer
+/// left to the surface, whose bullet breathes with its clock; a still answer
 /// could not.
 pub fn ledger(props: &LedgerProps, width: usize) -> View {
     if props.steps.iter().any(|s| s.state == StepState::Running) {

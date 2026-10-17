@@ -5652,27 +5652,27 @@
       "properties": {
         "done": {
           "type": "string",
-          "description": "A step that came back: `✓`."
+          "description": "A step that came back."
         },
         "asked": {
           "type": "string",
-          "description": "A step waiting on a person: `◆`."
+          "description": "A step waiting on a person."
         },
         "running": {
           "type": "string",
-          "description": "A running step when nothing turns it: `◌`."
+          "description": "A running step."
         },
         "failed": {
           "type": "string",
-          "description": "A step that failed or was stopped: `✗`."
+          "description": "A step that failed or was stopped."
         },
         "folded": {
           "type": "string",
-          "description": "A turn folded to its line: `▸`."
+          "description": "A turn folded to its line."
         },
         "open": {
           "type": "string",
-          "description": "A turn opened under its line: `▾`."
+          "description": "A turn opened under its line."
         }
       },
       "required": [

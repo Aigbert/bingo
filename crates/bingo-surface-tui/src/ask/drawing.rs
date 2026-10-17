@@ -70,7 +70,7 @@ pub fn splice(
 
 /// The row a card that no step asked for is headed with.
 fn asking() -> Line<'static> {
-    let mark = theme::glyphs().chrome.steps[1];
+    let mark = theme::bullet();
     Line::from(Span::styled(
         format!("   {mark} asks you · needs you"),
         theme::presence(),

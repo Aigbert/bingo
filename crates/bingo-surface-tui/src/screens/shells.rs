@@ -113,7 +113,7 @@ fn shell_ran() {
     let (mut ui, now) = scene();
     let state = ran();
     let shut = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(shut.contains("   ▸ 1 step · bash  "), "{shut}");
+    assert!(shut.contains("   ⏺ 1 step · bash  "), "{shut}");
     open_the_turns(&mut ui, &state);
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
@@ -123,7 +123,7 @@ fn shell_ran() {
     assert!(!screen.contains("Running in the background"), "{screen}");
     assert!(!screen.contains("1 shell"), "{screen}");
     assert!(
-        screen.contains(" ▍ Background job job_ab12cd34"),
+        screen.contains(" ⏺ Background job job_ab12cd34"),
         "{screen}"
     );
     both("shell_ran", &solo(&state), &mut ui, now);

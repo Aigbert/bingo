@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 71
+assertion_line: 74
 expression: "in_look(ascii(), || draw_tree(80, 24, tree, ui, now))"
 ---
 " bingo| /tmp/project                                                 session 1  "
@@ -12,8 +12,8 @@ expression: "in_look(ascii(), || draw_tree(80, 24, tree, ui, now))"
 "                                                                                "
 "     - the kernel is small, and everything else is a plugin                     "
 "     ... +5 lines                                                               "
-" | One `Event` enum, one ordered stream per session.                            "
 "                                                                                "
+" | One `Event` enum, one ordered stream per session.                            "
 "                                                                                "
 "                                                                                "
 "                                                                                "

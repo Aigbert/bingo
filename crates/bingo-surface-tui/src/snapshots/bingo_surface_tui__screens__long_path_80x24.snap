@@ -5,7 +5,7 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ◆ write                                                           needs you  "
+"   ⏺ write                                                           needs you  "
 "                                                                                "
 "     Do you want to allow Write some-directory/…/some-directory/note.txt?       "
 "   ❯ 1  Yes                                                                     "

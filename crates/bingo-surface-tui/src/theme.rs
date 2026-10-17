@@ -161,22 +161,15 @@ pub struct Glyphs {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChromeGlyphs {
     pub pause: &'static str,
-    /// A step of a turn: `[0]` done, `[1]` asks a person, `[2]` waits — what
-    /// a running step stands still as where nothing moves — `[3]` failed.
-    pub steps: [&'static str; 4],
-    /// A running step turns through these, one per `spin`, on the wall clock
-    /// so every running row is on the same frame.
-    pub spinner: &'static [&'static str],
-    pub spin: std::time::Duration,
-    /// A finished turn's line: `[0]` folded, `[1]` opened.
-    pub fold: [&'static str; 2],
+    /// What the status line says the crew is when bingo works alone.
+    pub solo: &'static str,
     pub stop: &'static str,
     pub receipts: [&'static str; 4],
     pub context: [&'static str; 2],
 }
 
 pub const UNICODE: Glyphs = Glyphs {
-    bullet: "▍",
+    bullet: "⏺",
     connector: "⎿",
     user: "›",
     cursor: "❯",
@@ -188,12 +181,7 @@ pub const UNICODE: Glyphs = Glyphs {
     mode: "⏵⏵",
     chrome: ChromeGlyphs {
         pause: "⏸",
-        // `◆` is East-Asian ambiguous: a CJK-width terminal draws it in two
-        // cells, and the row after it shifts by one there.
-        steps: ["✓", "◆", "◌", "✗"],
-        spinner: &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
-        spin: std::time::Duration::from_millis(80),
-        fold: ["▸", "▾"],
+        solo: "◆",
         stop: "■",
         receipts: ["⇄", "✎", "⟲", "⇣"],
         context: ["▰", "▱"],
@@ -226,10 +214,7 @@ pub const ASCII: Glyphs = Glyphs {
     mode: ">>",
     chrome: ChromeGlyphs {
         pause: "||",
-        steps: ["+", "*", "o", "!"],
-        spinner: &["-", "\\", "|", "/"],
-        spin: std::time::Duration::from_millis(130),
-        fold: [">", "v"],
+        solo: "*",
         stop: "x",
         receipts: ["=", "/", "<", "v"],
         context: ["#", "-"],
@@ -936,7 +921,8 @@ pub fn glyphs() -> &'static Glyphs {
     current().glyphs
 }
 
-/// What the model says and does: `▍` at column 1, its text at 3.
+/// What the model says and does, and every row of a turn: `⏺` at column 1,
+/// its text at 3. The ink says what state a row is in.
 pub fn bullet() -> &'static str {
     glyphs().bullet
 }
@@ -1281,6 +1267,7 @@ mod tests {
                     "search.rs",
                     "select.rs",
                     "transcript/said.rs",
+                    "transcript/steps.rs",
                     "views/code.rs",
                 ],
             ),
@@ -1289,6 +1276,7 @@ mod tests {
                 &[
                     "activity.rs",
                     "ask/drawing.rs",
+                    "breathing.rs",
                     "dialog.rs",
                     "form.rs",
                     "search.rs",
@@ -1342,7 +1330,7 @@ mod tests {
             ),
             ("mode", &["markdown/mentions.rs", "status.rs"]),
             ("breath", &["activity.rs"]),
-            ("pulse", &["transcript.rs", "views/progress.rs"]),
+            ("pulse", &["breathing.rs", "views/progress.rs"]),
             (
                 "comet",
                 &[

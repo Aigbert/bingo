@@ -36,7 +36,7 @@ fn a_running_turn_gives_each_step_a_row_and_no_thought_a_row() {
         &Role::Own,
         "words stay words"
     );
-    assert!(roles.spinning());
+    assert!(roles.running());
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn a_finished_turn_folds_onto_its_first_step_and_keeps_its_answer() {
     }
     assert_eq!(roles.of_item(&id("trn_1_7")), &Role::Own, "the answer");
     assert_eq!(roles.of_item(&id("trn_1_0")), &Role::Own, "the prompt");
-    assert!(!roles.spinning());
+    assert!(!roles.running());
 }
 
 #[test]
@@ -179,7 +179,7 @@ fn a_long_run_of_one_verb_folds_to_a_count() {
         .map(|piece| piece.text)
         .collect();
     assert!(
-        line.starts_with("   ▸ 21 steps · read ×18 · grep · edit +1 −1 · bash 3 passed"),
+        line.starts_with("   ⏺ 21 steps · read ×18 · grep · edit +1 −1 · bash 3 passed"),
         "{line:?}"
     );
 }

@@ -1,20 +1,20 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 54
+assertion_line: 57
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
 " › run the tests in the background                                                                                      "
+"                                                                                                                        "
 " ▍ Started. I will say.                                                                                                 "
-" ▍ Background job ab12cd34 (`cargo test --workspace`) exited with code 0 after 2m 4s.                                   "
+"                                                                                                                        "
+" ⏺ Background job ab12cd34 (`cargo test --workspace`) exited with code 0 after 2m 4s.                                   "
 "  ⎿  `BashOutput` with id "ab12cd34" reads what it wrote.                                                               "
-" ▍ reviewer: Two nits, else fine.                                                                                       "
+"                                                                                                                        "
+" ⏺ reviewer: Two nits, else fine.                                                                                       "
+"                                                                                                                        "
 " › mei: look at the deploy?                                                                                             "
-"                                                                                                                        "
-"                                                                                                                        "
-"                                                                                                                        "
-"                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "

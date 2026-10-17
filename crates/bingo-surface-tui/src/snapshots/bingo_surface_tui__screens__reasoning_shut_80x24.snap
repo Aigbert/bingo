@@ -1,13 +1,13 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 53
+assertion_line: 56
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › what is in this workspace?                                                   "
-"   ▸ thought                                                                4s  "
 "                                                                                "
+"   ⏺ thought                                                                4s  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
