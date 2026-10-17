@@ -21,11 +21,17 @@ impl Refusal {
             Self::Invalid => "COMMAND_FOLD_INVALID",
         }
     }
+}
 
-    fn from_code(code: &str) -> Option<Self> {
-        [Self::Conflict, Self::Invalid]
-            .into_iter()
-            .find(|refusal| refusal.code() == code)
+/// A refused fold, kept typed until it is told as a notice.
+pub(super) struct Refused {
+    refusal: Refusal,
+    text: String,
+}
+
+impl Refused {
+    pub(super) fn notice(&self) -> (String, String) {
+        (self.refusal.code().into(), self.text.clone())
     }
 }
 
@@ -53,7 +59,7 @@ impl Registry {
                     owned.plugin, owned.fold.into
                 );
                 tracing::warn!(plugin = owned.plugin, %text, "command fold refused");
-                self.notices.push((refusal.code().into(), text));
+                self.commands.refused.push(Refused { refusal, text });
             } else {
                 self.commands.folds.push(owned);
             }
@@ -145,17 +151,14 @@ fn refusal(
 }
 
 pub(super) async fn report(host: &Host, mailbox: &Mailbox) {
-    for (code, text) in &host.registry.notices {
-        if Refusal::from_code(code).is_none() {
-            continue;
-        }
+    for (code, text) in host.registry.commands.refused.iter().map(Refused::notice) {
         let body = ItemBody::Notice {
             level: Level::Warn,
-            code: code.clone(),
-            text: text.clone(),
+            code,
+            text,
         };
         if let Err(error) = mailbox.record(body).await {
-            tracing::debug!(%error, code, "a fold refusal reached no transcript");
+            tracing::debug!(%error, "a fold refusal reached no transcript");
         }
     }
 }
@@ -168,11 +171,6 @@ mod tests {
     fn refusal_codes_keep_their_notice_spelling() {
         assert_eq!(Refusal::Conflict.code(), "COMMAND_FOLD_CONFLICT");
         assert_eq!(Refusal::Invalid.code(), "COMMAND_FOLD_INVALID");
-        for refusal in [Refusal::Conflict, Refusal::Invalid] {
-            assert_eq!(Refusal::from_code(refusal.code()), Some(refusal));
-        }
-        assert_eq!(Refusal::from_code("COMMAND_FOLD_UNKNOWN"), None);
-        assert_eq!(Refusal::from_code("command_fold_invalid"), None);
     }
 
     #[test]

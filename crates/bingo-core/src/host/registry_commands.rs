@@ -10,6 +10,7 @@ use std::{
 pub struct RegisteredCommands {
     pub entries: Vec<OwnedCommand>,
     pub(super) folds: Vec<super::registry_folds::OwnedCommandFold>,
+    pub(super) refused: Vec<super::registry_folds::Refused>,
 }
 
 #[derive(Clone)]

@@ -235,6 +235,13 @@ impl Host {
         unknown
             .chain(self.settings.notices.iter().cloned())
             .chain(self.registry.notices.iter().cloned())
+            .chain(
+                self.registry
+                    .commands
+                    .refused
+                    .iter()
+                    .map(registry_folds::Refused::notice),
+            )
             .chain(self.registry.provider_state.instances.notices())
             .chain(self.registry.unavailable_notices())
             .collect()
