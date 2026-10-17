@@ -384,30 +384,35 @@ fn running_bash() -> Vec<bingo_sdk::Frame> {
 }
 
 /// The glyph a running step's row starts with, on the frame at `now`.
-fn mark_at(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> String {
+fn spinner_at(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> String {
     let drawn = row(tree, ui, now, "bash cargo test");
     drawn.trim_start().chars().take(1).collect()
 }
 
-/// A running step's bullet breathes in presence on the wall clock, so two
-/// rows running side by side breathe together; the glyph holds still.
+/// A running step turns in presence, one frame a beat of the wall clock, so
+/// two rows running side by side turn together.
 #[test]
-fn a_running_step_breathes_in_presence_on_the_wall_clock() {
+fn a_running_step_spins_in_presence_on_the_wall_clock() {
     let tree = solo(&folded(running_bash()));
     let (mut ui, now) = mid_turn();
-    let mark = mark_at(&tree, &mut ui, now);
-    assert_eq!(mark, theme::bullet());
-    assert_eq!(mark, mark_at(&tree, &mut ui, later(now, 600)));
+    let beat = i64::try_from(crate::spinner::beat().as_millis()).unwrap_or(80);
+    let frames = theme::glyphs().chrome.spinner.len() as i64;
+    let start = spinner_at(&tree, &mut ui, now);
+    assert_ne!(
+        start,
+        spinner_at(&tree, &mut ui, later(now, beat)),
+        "the next beat turns it"
+    );
+    assert_eq!(
+        start,
+        spinner_at(&tree, &mut ui, later(now, beat * frames)),
+        "and a whole turn brings it back"
+    );
     crate::theme::with(crate::painted::truecolor(), || {
         assert_eq!(
-            style_of(&tree, &mut ui, now, &mark),
-            theme::as_drawn(crate::breathing::style(now)),
-            "on this frame of its breath"
-        );
-        assert_ne!(
-            style_of(&tree, &mut ui, now, &mark),
-            style_of(&tree, &mut ui, later(now, 600), &mark),
-            "and half a breath on, another"
+            style_of(&tree, &mut ui, now, &start),
+            theme::as_drawn(theme::presence()),
+            "in presence"
         );
     });
 }
@@ -769,14 +774,13 @@ fn motion_off_holds_every_cue_at_its_resting_frame() {
         "and holds its first glyph: {drawn}"
     );
 
-    // A running step's bullet stands in presence, and a tail is absent
-    // rather than frozen.
+    // A spinner stands as the waiting glyph, and a tail is absent rather
+    // than frozen.
     let bash = solo(&folded(running_bash()));
-    let mark = mark_at(&bash, &mut ui, still);
     assert_eq!(
-        style_of(&bash, &mut ui, still, &mark),
-        theme::as_drawn(theme::presence()),
-        "a running step does not breathe"
+        spinner_at(&bash, &mut ui, still),
+        theme::glyphs().chrome.steps[2],
+        "a running step does not spin"
     );
     let tail = crate::painted::painted(80, 24, &streaming(), &mut ui, still);
     assert!(

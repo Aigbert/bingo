@@ -79,8 +79,8 @@ impl Roles {
         self.0.get(id).unwrap_or(&OWN)
     }
 
-    /// Whether a step is running: its bullet breathes on its own clock.
-    pub fn running(&self) -> bool {
+    /// Whether a step is running: its spinner turns on its own clock.
+    pub fn spinning(&self) -> bool {
         self.0
             .values()
             .any(|role| matches!(role, Role::Step { step, .. } if step.state == StepState::Running))
@@ -158,18 +158,19 @@ pub fn ledger(item: &Item, step: &Step) -> (String, Props) {
     (crate::component::items::id(item), props)
 }
 
-/// The marks a turn's rows start with: every one the transcript's bullet,
-/// its ink saying what state the row is in. Whoever draws the rows draws them
-/// with these.
+/// The marks a turn's rows start with, as this terminal's glyph table has
+/// them: whoever draws the rows draws them with these.
 fn marks() -> Marks {
-    let bullet = crate::theme::bullet().to_owned();
+    let chrome = crate::theme::glyphs().chrome;
+    let [done, asked, running, failed] = chrome.steps.map(str::to_owned);
+    let [folded, open] = chrome.fold.map(str::to_owned);
     Marks {
-        done: bullet.clone(),
-        asked: bullet.clone(),
-        running: bullet.clone(),
-        failed: bullet.clone(),
-        folded: bullet.clone(),
-        open: bullet,
+        done,
+        asked,
+        running,
+        failed,
+        folded,
+        open,
     }
 }
 

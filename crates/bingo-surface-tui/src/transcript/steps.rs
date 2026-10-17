@@ -1,10 +1,10 @@
 //! A turn's parts, every one at column 3 (ADR-0095 §6–§8): a step's row, the
 //! line a finished turn folds to, a thought of an opened turn, and the line
 //! where the person stopped it. What hangs under a step starts at column 5,
-//! under its words; what came back from it sits there on a raised band.
+//! under its words.
 
-use bingo_sdk::component::ledger::{STEP_INDENT, plural};
-use bingo_sdk::component::row::{Ink, MARGIN, Piece};
+use bingo_sdk::component::ledger::{Marks, STEP_INDENT, plural};
+use bingo_sdk::component::row::{Ink, Piece};
 use bingo_sdk::component::{Props, Step, StepState, TurnFoldProps};
 
 use super::*;
@@ -12,8 +12,6 @@ use crate::turns::Role;
 
 /// Where what hangs under a step starts: under the step's own words.
 const HANG: usize = 5;
-/// How far into its band what came back from a step starts.
-const INSET: usize = 2;
 
 /// The lines an item draws for the part it plays in its turn, or nothing at
 /// all when the part is its own drawing.
@@ -57,10 +55,8 @@ fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block 
 /// The row of a step that is asking, standing on its own: the head of the
 /// card it opens where its row was, in the row's own columns.
 pub(crate) fn asked(step: &Step, width: usize) -> Line<'static> {
-    line(
-        step.row(theme::bullet(), width, UnicodeWidthStr::width),
-        theme::presence(),
-    )
+    let glyph = theme::glyphs().chrome.steps[1];
+    line(step.row(glyph, width, UnicodeWidthStr::width))
 }
 
 /// The surface's own drawing of the ledger: one row a step.
@@ -72,13 +68,18 @@ fn ledger(props: &Props, width: usize, now: Now) -> Vec<Line<'static>> {
         .steps
         .iter()
         .map(|step| {
-            let glyph = ledger.marks.step(step.state);
-            line(
-                step.row(glyph, width, UnicodeWidthStr::width),
-                crate::breathing::style(now),
-            )
+            let glyph = glyph(step, &ledger.marks, now);
+            line(step.row(glyph, width, UnicodeWidthStr::width))
         })
         .collect()
+}
+
+/// What a step's row starts with: what state it is in, a running one turning.
+fn glyph<'a>(step: &Step, marks: &'a Marks, now: Now) -> &'a str {
+    match step.state {
+        StepState::Running => crate::spinner::glyph(now),
+        state => marks.step(state),
+    }
 }
 
 /// The line a finished turn folds to, through the site that owns it, and
@@ -107,7 +108,7 @@ fn folded_line(props: &Props, width: usize) -> Vec<Line<'static>> {
         return Vec::new();
     };
     fold.row(width, UnicodeWidthStr::width)
-        .map(|row| line(row, theme::presence()))
+        .map(line)
         .into_iter()
         .collect()
 }
@@ -139,78 +140,15 @@ fn result(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
     )
 }
 
-/// What came back from a step, on a band under its words, nothing of it
-/// folded: the turn was opened to be read. The band runs on to where the
-/// rows' right ends stop.
+/// What came back from a step, under its words, nothing of it folded: the
+/// turn was opened to be read.
 fn hung(output: &ToolOutput, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let band = rows.width.saturating_sub(HANG + MARGIN);
-    let inner = band.saturating_sub(INSET).max(1);
-    let body = dedented(
-        folded(output, Fold::Open, inner)
-            .into_iter()
-            .map(|line| shortened(line, rows))
-            .collect(),
-    );
-    crate::wrap::wrap_all(&body, inner)
+    let inner = rows.width.saturating_sub(HANG).max(1);
+    let body = folded(output, Fold::Open, inner)
         .into_iter()
-        .map(|line| banded(line, band))
-        .collect()
-}
-
-/// Output without the margin every line of it shares: a tool's own padding,
-/// a gutter of line numbers right-aligned to six, is not the band's.
-fn dedented(lines: Vec<Line<'static>>) -> Vec<Line<'static>> {
-    let shared = lines.iter().filter_map(margin).min().unwrap_or_default();
-    lines
-        .into_iter()
-        .map(|line| trimmed(line, shared))
-        .collect()
-}
-
-/// The spaces a line starts with; nothing for a blank line, which has no
-/// margin to share.
-fn margin(line: &Line<'_>) -> Option<usize> {
-    let text: String = line
-        .spans
-        .iter()
-        .map(|span| span.content.as_ref())
+        .map(|line| shortened(line, rows))
         .collect();
-    let words = text.trim_start_matches(' ');
-    (!words.trim().is_empty()).then(|| text.len() - words.len())
-}
-
-/// The line with its first `cut` spaces taken off, however its spans hold them.
-fn trimmed(mut line: Line<'static>, mut cut: usize) -> Line<'static> {
-    for span in &mut line.spans {
-        let spaces = span.content.len() - span.content.trim_start_matches(' ').len();
-        let take = spaces.min(cut);
-        span.content = span.content[take..].to_string().into();
-        cut -= take;
-        if cut == 0 || !span.content.is_empty() {
-            break;
-        }
-    }
-    line
-}
-
-/// A line of output on the raised band, [`INSET`] cells into it.
-fn banded(line: Line<'static>, band: usize) -> Line<'static> {
-    let ground = theme::raised().patch(line.style);
-    let used: usize = line.spans.iter().map(|span| span.content.width()).sum();
-    let mut spans = vec![
-        Span::raw(" ".repeat(HANG)),
-        Span::styled(" ".repeat(INSET), ground),
-    ];
-    spans.extend(
-        line.spans
-            .into_iter()
-            .map(|span| Span::styled(span.content, ground.patch(span.style))),
-    );
-    spans.push(Span::styled(
-        " ".repeat(band.saturating_sub(INSET + used)),
-        ground,
-    ));
-    Line::from(spans)
+    under(Span::raw(" ".repeat(HANG)), body, HANG, rows.width)
 }
 
 /// A line of output with the paths in it read from this session's directory.
@@ -279,17 +217,16 @@ fn stop_line(ran: usize, total: usize) -> Line<'static> {
     ])
 }
 
-/// A row of pieces in the theme's inks, bingo at work drawn in `presence`:
-/// still, or on this frame of its breath.
-fn line(pieces: Vec<Piece>, presence: Style) -> Line<'static> {
+/// A row of pieces in the theme's inks.
+fn line(pieces: Vec<Piece>) -> Line<'static> {
     let spans = pieces
         .into_iter()
-        .map(|piece| Span::styled(piece.text, ink(piece.ink, presence)))
+        .map(|piece| Span::styled(piece.text, ink(piece.ink)))
         .collect::<Vec<_>>();
     Line::from(spans)
 }
 
-fn ink(ink: Ink, presence: Style) -> Style {
+fn ink(ink: Ink) -> Style {
     match ink {
         Ink::Plain => theme::text(),
         Ink::Dim => theme::dim(),
@@ -297,7 +234,7 @@ fn ink(ink: Ink, presence: Style) -> Style {
         Ink::Good => theme::good(),
         Ink::Bad => theme::bad(),
         Ink::Glow => theme::glow(),
-        Ink::Presence => presence,
+        Ink::Presence => theme::presence(),
     }
 }
 

@@ -1,13 +1,13 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 56
+assertion_line: 53
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › plan it, ship it, and celebrate                                              "
-"                                                                                "
 " ▍ The plan is written; shipping next.                                          "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

@@ -1,11 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
-assertion_line: 871
+assertion_line: 869
 expression: "render(&state, &mut ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ⏺ bash cargo test                                                            "
+"   ◌ bash cargo test                                                            "
 "                                                                                "
 "                                                                                "
 "                                                                                "

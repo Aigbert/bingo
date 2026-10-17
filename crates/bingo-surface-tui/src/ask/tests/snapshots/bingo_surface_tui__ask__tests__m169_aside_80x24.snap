@@ -5,7 +5,7 @@ expression: "draw_tree(width, height, &tree, &mut ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ⏺ edit src/main.rs                                                needs you  "
+"   ◆ edit src/main.rs                                                needs you  "
 "     ╭                                                                          "
 "     │ -old                                                                     "
 "     │ +new                                                                     "

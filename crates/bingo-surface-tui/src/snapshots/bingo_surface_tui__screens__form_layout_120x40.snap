@@ -1,11 +1,10 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 57
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
-"   ⏺ asks you · needs you                                                                                               "
+"   ◆ asks you · needs you                                                                                               "
 "←  ☐ Layout  ☐ Library  ☐ Targets  ✔ Submit  →                                                                          "
 "Where should the sidebar sit?                                                                                           "
 "❯ 1. Sidebar left     ╭────────────────────────╮                                                                        "

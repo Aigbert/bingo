@@ -234,10 +234,8 @@ struct Entry {
     revision: Revision,
     /// A receipt hangs from the row above it: no blank row before it.
     joins: bool,
-    /// The turn it was said or done in: no blank row parts its steps' rows.
+    /// The turn it was said or done in: no blank row parts a turn's own rows.
     turn: Option<TurnId>,
-    /// One of the turn's steps, its folded line, or a line under them.
-    part: bool,
     lines: Vec<Line<'static>>,
     /// The pictures these lines stand for (§5). They are kept with the lines
     /// because they are the same rendering: a block drawn once and cloned
@@ -337,11 +335,11 @@ impl Blocks {
     }
 
     /// When the transcript next draws differently: the next frame while a
-    /// block moves, the breath's next beat while a step runs.
+    /// block moves, the spinner's next turn while a step runs.
     pub fn next_change(&self, now: Now) -> Option<Instant> {
         let frame = self.moving().then_some(now.instant + crate::clock::FRAME);
-        let breath = (self.roles.running() && now.motion).then(|| crate::breathing::next(now));
-        frame.into_iter().chain(breath).min()
+        let spin = (self.roles.spinning() && now.motion).then(|| crate::spinner::next(now));
+        frame.into_iter().chain(spin).min()
     }
 
     /// Keep the block at `at` when it is still this item's, else draw it.
@@ -387,7 +385,6 @@ impl Blocks {
             revision,
             joins: transcript::joins_the_row_above(item),
             turn: item.turn.clone(),
-            part: !matches!(place.role, crate::turns::Role::Own),
             lines: drawn.lines,
             pictures: drawn.pictures,
             wanted: drawn.wanted,
@@ -540,8 +537,8 @@ impl Blocks {
 
     /// Every segment in transcript order. A blank row separates a segment
     /// from whatever is above it — never from the top of the transcript, never
-    /// a receipt from the row it answers, and never one row of a turn's steps
-    /// from the next.
+    /// a receipt from the row it answers, and never one row of a turn from
+    /// another of the same turn.
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> {
         let mut above: Option<&Entry> = None;
         let blocks = self.blocks.iter().map(move |entry| {
@@ -563,11 +560,11 @@ impl Blocks {
     }
 }
 
-/// Whether a blank row goes between two blocks: the lower one does not
-/// answer the upper, and they are not two rows of one turn's steps.
+/// Whether a blank row goes between two blocks: they are not one turn's, and
+/// the lower one does not answer the upper.
 fn parted(above: &Entry, below: &Entry) -> bool {
-    let steps = below.turn.is_some() && below.turn == above.turn && above.part && below.part;
-    !(below.joins || steps)
+    let one_turn = below.turn.is_some() && below.turn == above.turn;
+    !below.joins && !one_turn
 }
 
 impl std::fmt::Debug for Blocks {

@@ -5,7 +5,7 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                                                         session 1  "
 "                                                                                                                        "
-"   ⏺ bash                                                                                                    needs you  "
+"   ◆ bash                                                                                                    needs you  "
 "     ╭                                                                                                                  "
 "     │ /tmp/project                                                                                                     "
 "     │ $ rm -rf build                                                                                                   "

@@ -55,17 +55,17 @@ pub enum TurnEnd {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Marks {
-    /// A step that came back.
+    /// A step that came back: `✓`.
     pub done: String,
-    /// A step waiting on a person.
+    /// A step waiting on a person: `◆`.
     pub asked: String,
-    /// A running step.
+    /// A running step when nothing turns it: `◌`.
     pub running: String,
-    /// A step that failed or was stopped.
+    /// A step that failed or was stopped: `✗`.
     pub failed: String,
-    /// A turn folded to its line.
+    /// A turn folded to its line: `▸`.
     pub folded: String,
-    /// A turn opened under its line.
+    /// A turn opened under its line: `▾`.
     pub open: String,
 }
 
@@ -136,7 +136,7 @@ impl Step {
         }
     }
 
-    /// The step's row: `   ⏺ read src/parse.rs` with the outcome
+    /// The step's row: `   ✓ read src/parse.rs` with the outcome
     /// right-aligned — or, where the person answered the step, the outcome
     /// after the words and the answer at the right.
     pub fn row(&self, glyph: &str, width: usize, cells: impl Fn(&str) -> usize) -> Vec<Piece> {
@@ -271,7 +271,7 @@ impl TurnFoldProps {
             .collect()
     }
 
-    /// The folded line, `⏺ 5 steps · read · edit +1 −1 … 7s`; nothing for a
+    /// The folded line, `▸ 5 steps · read · edit +1 −1 … 7s`; nothing for a
     /// turn that neither stepped nor thought.
     pub fn row(&self, width: usize, cells: impl Fn(&str) -> usize) -> Option<Vec<Piece>> {
         let left = self.fold_words()?;
@@ -279,9 +279,8 @@ impl TurnFoldProps {
         Some(laid(left, right, width, cells))
     }
 
-    /// `⏺ 5 steps · read · grep · edit +1 −1`, or `⏺ thought` for a turn
-    /// that only thought; nothing for a turn that did neither. The mark is
-    /// good for a turn that ended, bad for one the person stopped.
+    /// `▸ 5 steps · read · grep · edit +1 −1`, or `▸ thought` for a turn
+    /// that only thought; nothing for a turn that did neither.
     fn fold_words(&self) -> Option<Vec<Piece>> {
         if self.steps.is_empty() && !self.thought {
             return None;
@@ -290,13 +289,9 @@ impl TurnFoldProps {
             true => &self.marks.open,
             false => &self.marks.folded,
         };
-        let ink = match self.outcome {
-            TurnEnd::Done => Ink::Good,
-            TurnEnd::Stopped => Ink::Bad,
-        };
         let mut out = vec![
             Piece::new(STEP_INDENT, Ink::Plain),
-            Piece::new(format!("{glyph} "), ink),
+            Piece::new(format!("{glyph} "), Ink::Dim),
         ];
         out.push(Piece::new(count(self.steps.len()), Ink::Dim));
         for run in self.runs() {

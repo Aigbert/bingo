@@ -1,14 +1,13 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 74
 expression: "in_look(ascii(), || draw_tree(80, 24, tree, ui, now))"
 ---
 " bingo| /tmp/project                                                 session 1  "
 "                                                                                "
 " > label the total in main                                                      "
-"                                                                                "
-"   * 4 steps · read · grep · edit +1 −1 · bash · stopped                    7s  "
+"   > 4 steps · read · grep · edit +1 −1 · bash · stopped                    7s  "
 "   x you stopped the turn · 3 of 4 steps had run; nothing after them            "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

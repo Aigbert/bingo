@@ -32,7 +32,7 @@ pub fn components(
     let mut crew = crate::crew::spans(tree, width, width, now);
     if crew.is_empty() {
         crew = vec![
-            Span::styled(theme::glyphs().chrome.solo, theme::crew(0)),
+            Span::styled(theme::glyphs().chrome.steps[1], theme::crew(0)),
             dimmed(" solo".into()),
         ];
     }

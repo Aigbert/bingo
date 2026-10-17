@@ -50,8 +50,6 @@ mod actions;
 mod activity;
 mod ask;
 mod blocks;
-/// A running step's breathing bullet.
-mod breathing;
 mod browse;
 mod clipboard;
 mod clock;
@@ -108,6 +106,8 @@ mod sessions;
 /// What a person may set about this surface: the measure prose is drawn to,
 /// and the check the welcome box says the answer to.
 pub mod settings;
+/// A running step's spinner (M185).
+mod spinner;
 /// The shells the session has running in the background (M75): a word under
 /// the row that started one, a count on the status line, and no card.
 mod status;

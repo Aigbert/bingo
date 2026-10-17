@@ -1,12 +1,11 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 56
+assertion_line: 53
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › read the guide on the wire format                                            "
-"                                                                                "
 " ❖ Skill(guide) the wire format                                                 "
 "  ⎿  Base directory for this skill: ~/.bingo/skills/guide                       "
 "                                                                                "
@@ -14,8 +13,9 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "                                                                                "
 "     - the kernel is small, and everything else is a plugin                     "
 "     … +5 lines (ctrl+o to expand)                                              "
-"                                                                                "
 " ▍ One `Event` enum, one ordered stream per session.                            "
+"                                                                                "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

@@ -363,7 +363,7 @@ fn a_row_with_no_body_keeps_the_item_and_a_wide_mark_keeps_the_bullet() {
     ]);
     let screen = render(&state, &mut ui, now);
     assert!(
-        screen.contains("⏺ original words") && screen.contains("badge"),
+        screen.contains("▍ original words") && screen.contains("badge"),
         "{screen}"
     );
     assert!(!screen.contains('界'));

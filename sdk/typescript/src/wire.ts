@@ -818,17 +818,17 @@ export type Manifest = ({
  * gets ASCII whoever draws the rows.
  */
 export type Marks = {
-  /** A step waiting on a person. */
+  /** A step waiting on a person: `◆`. */
   "asked": string;
-  /** A step that came back. */
+  /** A step that came back: `✓`. */
   "done": string;
-  /** A step that failed or was stopped. */
+  /** A step that failed or was stopped: `✗`. */
   "failed": string;
-  /** A turn folded to its line. */
+  /** A turn folded to its line: `▸`. */
   "folded": string;
-  /** A turn opened under its line. */
+  /** A turn opened under its line: `▾`. */
   "open": string;
-  /** A running step. */
+  /** A running step when nothing turns it: `◌`. */
   "running": string;
   [key: string]: unknown;
 };

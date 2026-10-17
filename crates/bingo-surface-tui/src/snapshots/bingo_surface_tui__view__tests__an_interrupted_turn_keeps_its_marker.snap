@@ -1,13 +1,13 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
-assertion_line: 1246
+assertion_line: 1244
 expression: "render(&state, &mut ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 " › long job                                                                     "
-"                                                                                "
 "   ■ you stopped the turn                                                       "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "

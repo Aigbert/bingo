@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/browse/tests/mod.rs
-assertion_line: 266
+assertion_line: 264
 expression: screen
 ---
 " bingo▍ /tmp/project                                                                             session 1  "
@@ -8,19 +8,19 @@ expression: screen
 "browse · turn 2 of 2 · "hidden" 1/1                                                                         "
 " › inspect the fork                                                                                         "
 "   keep this second line                                                                                    "
-"                                                                                                            "
 " ▍ First reply                                                                                              "
 "                                                                                                            "
 " › read another file                                                                                        "
+"   ▾ 1 step · read                                                                                      1s  "
+"   ✓ read example.rs                                                                                        "
+"     one                                                                                                    "
+"     two                                                                                                    "
+"     three                                                                                                  "
+"     four                                                                                                   "
+"     five                                                                                                   "
+"     six                                                                                                    "
+"     hidden FORK                                                                                            "
 "                                                                                                            "
-"   ⏺ 1 step · read                                                                                      1s  "
-"   ⏺ read example.rs                                                                                        "
-"       one                                                                                                  "
-"       two                                                                                                  "
-"       three                                                                                                "
-"       four                                                                                                 "
-"       five                                                                                                 "
-"       six                                                                                                  "
 "┌──────────────────────────────────────────────────────────────────────────────────────────────────────────┐"
 "│ rewind to turn 2                                                                                         │"
 "│ undoes turn 2 · 2 items                                                                                  │"
