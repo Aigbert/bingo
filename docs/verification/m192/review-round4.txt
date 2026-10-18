@@ -1,0 +1,88 @@
+M192 round 4 verification
+
+Items 1 and 3: regression tests ran against the unfixed implementation.
+$ cargo test -p bingo-surface-tui --lib --locked round4_
+test blocks::refresh_tests::round4_refresh_growth_repositions_the_inline_ask ... FAILED
+test blocks::refresh_tests::round4_rowed_running_call_keeps_its_pulse_deadline ... FAILED
+  left: (3, 1)
+ right: (4, 1)
+replacement: Some(false)
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 1411 filtered out; finished in 0.16s
+
+With the fixes restored:
+$ cargo test -p bingo-surface-tui --lib --locked round4_
+test blocks::refresh_tests::round4_refresh_growth_repositions_the_inline_ask ... ok
+test blocks::refresh_tests::round4_rowed_running_call_keeps_its_pulse_deadline ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 1411 filtered out; finished in 0.02s
+
+The pulse test also covers a replacement body with and without a title,
+a turn-less call, changed ink after 500 ms, and motion off.
+$ cargo test -p bingo-surface-tui --lib --locked
+test result: ok. 1413 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.74s
+
+Item 2: removed toast::components' dead deadline argument and all callers.
+Item 4: moves returns Spin or a resolved Ink; period/depth eligibility is shared.
+Existing motion-depth, unknown-ink, still-form and toast tests pass in the TUI suite.
+Item 5 pins already-correct rejection, not a new deserializer change.
+$ cargo test -p bingo-sdk --locked --test ember_style
+test unknown_motion_is_not_an_authoring_variant ... ok
+test unknown_motion_keeps_the_view_readable ... ok
+test unknown_motion_round_trips_its_original_fields ... ok
+test malformed_known_motion_never_becomes_other ... ok
+test ember_styles_round_trip_without_losing_the_motion_contract ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+Item 6: audited both into_text_drawing callers in transcript/components.rs.
+They substitute lines/next and retain the original Block's pictures/wanted;
+the conversion now documents why the fallback payload is discarded.
+Item 7: drive.py masks the temporary directory suffix at equal width in both
+plain and ANSI captures; the captures below were regenerated once.
+No new departures, dependencies, generated contracts or prototype or scene-capture edits.
+
+Gates (sequential; provider credentials/base URLs removed from test environment):
+$ cargo fmt --all -- --check
+exit 0; no output
+$ cargo check --workspace --all-targets --locked
+Finished dev profile in 7.74s; exit 0
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished dev profile in 10.57s; exit 0
+$ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
+123 result lines; 6461 passed; 0 failed; 0 ignored; exit 0
+No wall-clock test failed; no retry needed.
+$ scripts/check_discipline.sh
+discipline ok; advisory warnings only; exit 0
+$ scripts/budget.sh
+dependencies (unique, normal): 423 (max 423)
+warm cargo check -p bingo-core: 1s (max 20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 23 GB (soft max 5); soft warning
+budget ok; exit 0
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok; exit 0
+
+$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+Finished dev profile in 0.39s; exit 0
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+aws-lc-sys: fatal error: 'stdlib.h' file not found; 'windows.h' file not found; exit 101
+Known host C-header blocker; CI's Windows job is the backstop.
+
+$ cargo build -p bingo --locked
+Finished dev profile in 8.62s; exit 0
+
+$ TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh
+tui-smoke ok; exit 0
+
+$ python3 docs/verification/m192/drive.py
+PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+CLEAN 100x32: owned tmux server stopped; temporary files removed
+PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+CLEAN 80x24: owned tmux server stopped; temporary files removed
+exit 0
+All four regenerated .txt/.ansi captures equal their previous contents after
+masking only the random directory suffix; every cell position is retained.
+
+$ python3 docs/verification/m192/check-snapshots.py
+PASS: four syntax snapshots retain every character after removing ink annotations
+PASS: the only other snapshot change is palette values
+PASS: Cargo.lock, prototype and all scene captures are unchanged
+exit 0
