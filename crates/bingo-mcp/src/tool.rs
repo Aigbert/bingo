@@ -266,16 +266,6 @@ mod tests {
         assert_eq!(meta("files")["server"], json!("files"));
     }
 
-    #[test]
-    fn every_server_tool_declares_the_server_look() {
-        assert_eq!(
-            serde_json::to_value(look("files")).unwrap(),
-            json!({
-                "mark":"◊", "ascii":"%", "verb":"files"
-            })
-        );
-    }
-
     /// A picture a server would answer with, base64 as the protocol carries it.
     fn served(width: u32, height: u32) -> ImageContent {
         let bytes = bingo_pictures::testing::png_bytes(width, height);

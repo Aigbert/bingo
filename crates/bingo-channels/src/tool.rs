@@ -421,16 +421,8 @@ mod look_tests {
     #[test]
     fn every_tool_declares_its_look() {
         assert_eq!(
-            SendFile::new(Directory::default()).spec().look,
-            Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "send".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "path".into(),
-                    reads: Reads::Path
-                }),
-            })
+            bingo_sdk::testing::checked_look(&SendFile::new(Directory::default()).spec()),
+            ToolLook::new('@', "send").target("path", Reads::Path)
         );
     }
 }

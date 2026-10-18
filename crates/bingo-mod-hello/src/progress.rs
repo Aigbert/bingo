@@ -61,6 +61,10 @@ mod look_tests {
     use super::*;
     #[test]
     fn every_tool_declares_its_look() {
-        assert_eq!(Progress.spec().look, Some(ToolLook::new('#', "progress")));
+        let looks = bingo_sdk::testing::tool_looks(&crate::Harness, serde_json::json!({})).unwrap();
+        assert_eq!(
+            looks,
+            [("HelloProgress".into(), ToolLook::new('#', "progress"))].into()
+        );
     }
 }

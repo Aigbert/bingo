@@ -324,7 +324,7 @@ async fn a_connected_server_s_tools_carry_its_name_and_its_schema() {
     assert_eq!(spec.description, "Return the text it was given.");
     assert_eq!(spec.meta["server"], json!("test"));
     assert_eq!(
-        serde_json::to_value(spec.look).unwrap(),
+        serde_json::to_value(bingo_sdk::testing::checked_look(&spec)).unwrap(),
         json!({"mark":"◊", "ascii":"%", "verb":"test"})
     );
     assert_eq!(spec.input_schema["type"], json!("object"));
