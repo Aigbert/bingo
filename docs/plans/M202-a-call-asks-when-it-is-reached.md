@@ -141,5 +141,6 @@ Round 3 details, audits, re-pins and departures: [round 3](../verification/m202/
 - [x] `bash docs/verification/m202/drive.sh`: 100×32/80×24 passed; `scripts/tui-smoke.sh`: `tui-smoke ok`.
 - [x] fmt/check/clippy/test/discipline/budget/deny: all passed; workspace `6567 passed`.
 - [x] Windows sdk/core/crew passed; TUI and other native stops are named in round 3.
+- [x] Per-commit workspace checks: 37 passed, folded helper Clippy passed, HEAD unchanged.
 - Departures: box optional output for enum size; missing-tool policy/message; RPC schema generator.
 - Tool-host/judge waits and mid-call recovery timing remain follow-ups; old unstamped stops hide.
