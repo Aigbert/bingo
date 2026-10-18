@@ -1,0 +1,24 @@
+ bingo▍ /var/…/T/tmp.jXgVXQpKnw/80/cwd            read note.txt · session 01M5
+
+ › read note.txt
+   ▸ 1 step · read                                                          3s
+ ▍ The look drive is done.
+
+ ▍ Worked for 3s · done 17:13
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────
+ ▍ ask anything
+     / commands · ? keys · ctrl+r sessions · shift+tab mode · alt+m next model
+ ⏵⏵ default   ◆ solo   ▰▱▱▱▱▱▱▱ 14k / 191k                              fake-1

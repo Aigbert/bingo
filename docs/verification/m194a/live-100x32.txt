@@ -1,0 +1,32 @@
+ bingo▍ /var/…/T/tmp.jXgVXQpKnw/100/cwd                               read note.txt · session 01M5
+
+ › read note.txt
+   ✓ read note.txt
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────
+ ▍
+                                                                      esc stop · ⏎ queue a message
+ ⏵⏵ default   ◆ solo   ▰▱▱▱▱▱▱▱ 14k / 191k                                                  fake-1

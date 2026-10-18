@@ -1,0 +1,58 @@
+Windows cross-checks for every changed Rust crate, plus the RPC schema owner.
+Command for each crate: cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc
+
+bingo: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-agents: Windows check passed
+bingo-channels: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-context: Windows check passed
+bingo-core: Windows check passed
+bingo-experience: Windows check passed
+bingo-mcp: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-mod-hello: Windows check passed
+bingo-mod-ledger: Windows check passed
+bingo-mods: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-plugin-rpc: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-provider-acp: Windows check passed
+bingo-provider-anthropic: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-provider-openai: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-rooms: Windows check passed
+bingo-schedule: Windows check passed
+bingo-sdk: Windows check passed
+bingo-skills: Windows check passed
+bingo-surface-rpc: Windows check passed
+bingo-surface-tui: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-tasks: Windows check passed
+bingo-tool-bash: Windows check passed
+bingo-tool-fs: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+bingo-tool-web: Windows check failed
+  aws-lc-sys v0.44.0
+  fatal error: 'stdlib.h' file not found
+  fatal error: 'windows.h' file not found
+Windows checks: 14 passed, 10 failed
