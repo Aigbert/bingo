@@ -19,17 +19,17 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
 
 ## Bricks
 
-1. **One colour per name** (`bingo-collab`, new `face.rs`).
-   - `slot(name, earlier) -> u8` is FNV-1a, `(h >> 8) % 6`. When a teammate listed earlier holds
-     that slot, the next free one is taken; past six, the hash slot. The list is the home tree's
-     named sessions by creation (`created_at`, then id), rooms excluded.
-   - It moves out of the TUI's `face.rs`, so the surface and the mods compute the same ink.
-     `fixtures/faces.json` moves with it, gains the sixth hue and the probing cases, and stays
-     the wire clients' contract. The sigils go: `◆` now means "waits for you".
-   - Inks: a teammate `crew0`–`crew5`, a room `plan`, home `glow`, you `fg`.
-   - The prototype's `ROSTER` drops its hand-picked colours for this rule. The crew, agent, room
-     and small-crew captures are re-exported before this milestone starts, and the person sees
-     them first.
+1. **One colour per teammate** (`bingo-collab`, new `face.rs`).
+   - The k-th teammate of the home tree takes the k-th ink of `crew1, crew2, crew0, crew3, crew4,
+     crew5` (teal, violet and lime first, the farthest apart), wrapping past six. Teammates are
+     ordered by creation (`created_at`, then id), live or stored, rooms excluded, so dismissing
+     one never moves another. The ink is derived at render time, never stored. (A name hash
+     too often gives two of three teammates one colour.) The prototype's `ROSTER` follows this
+     order, so fixtures creating teammates in that order reproduce every capture unchanged.
+   - It lives in `bingo-collab`, so the surface (from its tree) and `bingo-mod-crew` (from the
+     host's list) compute the same ink. It replaces the TUI's name hash, which only the TUI
+     read; `fixtures/faces.json` becomes cases of ordered teammates. The sigils go: `◆` now
+     means "waits for you". A room is `plan`, home `glow`, you `fg`.
 2. **Walking in** (`enterView`, `walkTo`).
    - A view is `Tree::show`. Each session keeps its draft, scroll and dock, and an ask waiting
      there re-arms its 400 ms guard (M197).
@@ -73,10 +73,12 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
    - Keys `↑↓ who`, `⏎ open`, `tab mention` (teammates only), `esc close`. ⏎ walks in; tab
      closes the sheet and writes `@name `.
    - Today's crew pane, its tabs and cards go. Tasks are M198's sheet.
-7. **Agent rows, drawn by the mod.** `bingo-mod-crew` answers `Ledger` for a step that started a
-   session, row by row (M194).
-   - The surface adds to `Step` the session it started, from `Tree::spawned_by`:
-     `spawned: Option<Spawned { name, ink, reported_at }>`. No tool is named.
+7. **Agent rows, drawn by the mod.** `bingo-mod-crew` answers `Ledger` for a step that started or
+   addressed a teammate, row by row (M194).
+   - `ToolLook` gains `who: Option<String>`, the input field naming a teammate (SendMessage's
+     `to`); a spawn's teammate comes from `Tree::spawned_by`. SpawnAgent's look targets `prompt`.
+     The surface adds to `Step` `teammate: Option<Teammate { name, ink, reported_at }>`, and
+     names no tool.
    - The row: `@` and its name as the verb, both in its ink; the task as the target; the
      spinner in its ink while the session works. Right: `started`, then `reported` once a post
      from that session follows the step, landing glow→ink over 420 ms from `reported_at`.
@@ -116,35 +118,33 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
 - `crates/bingo-collab/src/{face.rs,owed.rs,room.rs}`, and `fixtures/faces.json` (moved).
 - `crates/bingo-surface-tui/src/{tree.rs,face.rs,crew.rs,crew_contract.rs,seats.rs,keys.rs,
   keybar.rs,terminal.rs,turns.rs,dock.rs,transcript/}`.
-- `crates/bingo-sdk/src/component/ledger.rs` (`Spawned`), and the regenerated schemas.
+- `crates/bingo-sdk/src/{model.rs,component/ledger.rs}` (`who`, `Teammate`), the regenerated
+  schemas, and the agents tools' looks in `crates/bingo-agents`.
 - `crates/bingo-mod-crew/src/{draw.rs,cards.rs,keys.rs,command.rs,state.rs}`, and new `rows.rs`.
-- `crates/bingo-rooms/src/command.rs`, `crates/bingo-mod-palette/src/rows.rs`, `p4d-crew.js`.
+- `crates/bingo-rooms/src/command.rs`, `crates/bingo-mod-palette/src/rows.rs`.
 
 ## Exit criteria
 
 - [ ] Full frame through the harness: `crew`, `crew-reviewer`, `crew-allowed`, `crew-home`,
       `agent`, `agent-reviewer`, `agent-allowed`, `agent-home`, `room`, `room-mention`,
       `room-waiting`, `room-answered`, `room-home` and `small-crew`.
-- [ ] Unit tests: the face fixture (slots, probing, past six); ctrl+g's order and wrap; esc away
+- [ ] Unit tests: the face fixture (order, rooms excluded, past six); ctrl+g's order and wrap; esc away
       from home never interrupts; what is owed clears when the named member posts and when they
       are unseated; room commands only in an open room; posts join by voice.
 - [ ] The agent row is drawn by `bingo-mod-crew` when it is on, and by mod-ledger when it is off.
-- [ ] RPC and `--print` are unchanged except the additive `Step.spawned`.
+- [ ] RPC and `--print` are unchanged except the additive `who` and `Step.teammate`.
 - [ ] Gates and checks as in M192. tmux drive with the fake provider: hire two teammates, walk
       in from the crew sheet, ctrl+g to an ask, answer it, esc home; in a room, seat, post with
       an @, read the answer, unseat, and close.
 
 ## Non-goals
 
-Defining or hiring agents; room storage and delivery; teams beyond their members appearing as
-teammates; a colour chosen by the person.
+Defining or hiring agents; room storage and delivery; teams beyond their members; a colour the
+person picks.
 
 ## Risks
 
-- **Colours change.** A name hashed `% 5` today reads in another hue. The fixture is the
-  contract, and wire clients take the new one.
-- **Probing depends on the list.** When a teammate created earlier leaves the tree, its slot
-  goes back to the pool. Accepted.
+- **Colours follow arrival, not names**, so one name can differ between home sessions. Accepted.
 - **A Ledger interception that fails** falls back to mod-ledger's row, never a blank one.
 - **IM messages become posts.** A channel's input names its sender as `principal`, so it reads
   as a post in that sender's ink. This is intended, and the Feishu tests pin it.
