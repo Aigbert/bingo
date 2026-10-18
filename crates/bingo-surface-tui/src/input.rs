@@ -465,9 +465,10 @@ fn split_return(ui: &Ui, tree: &Tree, key: KeyEvent) -> bool {
         crate::focus::Owner::Interaction => tree
             .open_interaction()
             .is_some_and(|(_, ask)| crate::ask::handler(ui, ask, key).is_some()),
+        crate::focus::Owner::Composer | crate::focus::Owner::Menu => !ui.dialog.aside,
         _ => false,
     };
-    keys::split_return(owner, ui.dialog.aside, bound)
+    keys::split_return(bound)
 }
 
 fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {

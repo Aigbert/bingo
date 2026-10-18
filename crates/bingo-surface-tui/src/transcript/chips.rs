@@ -10,6 +10,9 @@ pub(super) fn text(item: &Item, text: &str) -> String {
     for (range, _) in pictures::spans(text).into_iter().take(count) {
         out.push_str(&text[from..range.start]);
         from = range.end;
+        if out.ends_with(' ') && text[from..].starts_with(' ') {
+            from += 1;
+        }
     }
     out.push_str(&text[from..]);
     out.trim_start().to_owned()
@@ -40,5 +43,23 @@ fn count(item: &Item) -> usize {
             .filter(|part| matches!(part, ContentPart::Image { .. }))
             .count(),
         _ => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_mid_line_image_token_leaves_one_space() {
+        let mut item = crate::test_support::user("picture", "before [image 1] after");
+        if let ItemBody::User { parts, .. } = &mut item.body {
+            parts.push(ContentPart::Image(
+                bingo_sdk::Image::from_bytes("image/png", b"fixture").unwrap(),
+            ));
+        }
+        assert_eq!(text(&item, "before [image 1] after"), "before after");
+        assert_eq!(text(&item, "before  [image 1] after"), "before  after");
+        assert_eq!(text(&item, "[image 1] after"), "after");
     }
 }

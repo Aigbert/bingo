@@ -1,12 +1,13 @@
-//! Waiting, plugin activity placements and queued input beneath the stream.
+//! Background waits and plugin activity placements; queue rows live in `queue_rows`.
 use ratatui::text::{Line, Span};
 
 use crate::clock::Now;
+use crate::layout::grid;
 use crate::tree::{self, Scope, Tree, Wants};
 use crate::ui::Ui;
 use crate::{theme, views};
 
-/// Background waits, placed activity, queued input and embers in the dock.
+/// Background waits and embers above the dock.
 /// The stream owns the live turn's row.
 pub(crate) fn components(tree: &Tree, ui: &Ui, width: usize, now: Now) -> views::Drawing {
     crate::layout::count::band(2);
@@ -38,12 +39,14 @@ pub(crate) fn dock(tree: &Tree, ui: &Ui, width: usize, now: Now) -> views::Drawi
                     _ => view,
                 };
                 out.append(
-                    activity_view(view, width.saturating_sub(5), now).map_lines(|lines| {
-                        lines
-                            .into_iter()
-                            .map(|line| views::indent(line, 3))
-                            .collect()
-                    }),
+                    activity_view(view, width.saturating_sub(grid::TX + grid::RM), now).map_lines(
+                        |lines| {
+                            lines
+                                .into_iter()
+                                .map(|line| views::indent(line, grid::TX))
+                                .collect()
+                        },
+                    ),
                 );
             }
         }

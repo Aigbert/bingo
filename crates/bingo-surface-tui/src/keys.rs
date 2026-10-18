@@ -144,11 +144,15 @@ pub enum Escape {
     Dropdown,
     /// Nothing is open, so the turn is what `esc` stops.
     Interrupt,
+    /// Save the draft in history and empty the input.
     Clear,
+    /// Return the transcript to its newest row.
     Latest,
     /// An idle sub-session with an empty composer returns to its parent.
     Back,
+    /// The second empty escape opens the rewind picker.
     Rewind,
+    /// The first empty escape says how to rewind.
     Arm,
 }
 
@@ -323,13 +327,8 @@ pub fn interrupt(at: Pressed) -> Interrupt {
 }
 
 /// Legacy terminals fold ESC CR into alt+Enter. A real binding keeps it.
-pub fn split_return(owner: crate::focus::Owner, aside: bool, bound: bool) -> bool {
+pub fn split_return(bound: bool) -> bool {
     !bound
-        && (aside
-            || !matches!(
-                owner,
-                crate::focus::Owner::Composer | crate::focus::Owner::Menu
-            ))
 }
 
 #[cfg(test)]

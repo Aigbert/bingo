@@ -54,6 +54,9 @@ pub fn draw(state: &SessionState, arrivals: &Arrivals, width: usize, now: Now) -
     let entries: Vec<_> = state
         .queue
         .iter()
+        // A subsystem's steer is not the person's pending line (ADR-0028).
+        // Its turn shows it as a quiet notice; unknown surfaces fail to the
+        // person's side through the transcript's same voice boundary.
         .filter(|entry| {
             matches!(
                 transcript::voice(&entry.origin),
