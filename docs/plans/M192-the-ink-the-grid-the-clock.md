@@ -181,6 +181,7 @@ Any screen's layout or keys; the characters of today's snapshots; node or playwr
 - `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: `bingo-sdk`: `Finished dev profile ... in 0.39s`, exit 0; `bingo-surface-rpc` passed at rebase (untouched this round).
 - `cargo build -p bingo --locked`: `Finished dev profile ... in 8.62s`; `TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`.
 - `python3 docs/verification/m192/drive.py`: `PASS 100x32` / `PASS 80x24`, fake provider and private HOME/data/cwd; both `CLEAN` lines confirm owned server and temporary-file cleanup; captures in `docs/verification/m192/`.
+- At merge, rebased onto dev 9897694f without conflicts: all seven gates again, `6467 passed, 0 failed`; a hands-on tmux drive (dark and light, motion on) saw a running step's spinner advance in all 8 frames taken 250 ms apart.
 
 ### Departures and owed
 
