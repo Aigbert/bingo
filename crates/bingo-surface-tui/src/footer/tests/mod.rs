@@ -234,12 +234,13 @@ fn m193_narrow_footer_drops_keys_then_facts_and_keeps_the_model() {
 }
 
 #[test]
-fn m193_hidden_footer_animation_never_schedules() {
+fn ambient_deadlines_survive_clipping_but_not_toast_replacement() {
     let tree = folded_tree(busy_child("reviewer"));
     let (mut ui, now) = scene();
     let draw = |ui: &Ui, width, now| super::draw(&tree, ui, &mut Default::default(), width, now);
-    assert!(draw(&ui, 80, now).next.is_some());
-    assert!(draw(&ui, 12, now).next.is_none());
+    let next = Some(now.instant + crate::clock::FRAME);
+    assert_eq!(draw(&ui, 80, now).next, next);
+    assert_eq!(draw(&ui, 12, now).next, next);
     ui.notify(Level::Info, "saved", now.instant);
     assert_eq!(
         draw(&ui, 80, later(now, 200)).next,

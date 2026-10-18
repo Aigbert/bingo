@@ -13,9 +13,6 @@ pub fn draw(
     width: usize,
     now: Now,
 ) -> crate::views::Drawing {
-    if width == 0 {
-        return crate::views::Drawing::default();
-    }
     let pairs = if let Some((_, ask)) = tree.open_interaction() {
         sealed::pairs(ui, ask, question_focus(ui, frame, ask))
     } else {
@@ -39,6 +36,7 @@ pub fn draw(
         frame.pulls.push(key);
     }
     crate::component::draw_marked(&props, answer, width, &crate::views::Marks::at(now), own)
+        .map_lines(|lines| if width == 0 { Vec::new() } else { lines })
 }
 
 fn resting(tree: &Tree, ui: &Ui, now: Now) -> Vec<KeyPair> {

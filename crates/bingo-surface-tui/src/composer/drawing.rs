@@ -59,6 +59,7 @@ pub fn draw(
     }
     Drawing {
         lines,
+        // Without an input row there is no visible caret whose ink can change.
         next: (active && now.motion && layout.cursor.0 >= start && count > 0)
             .then_some((now.instant + clock::FRAME).min(rest)),
     }

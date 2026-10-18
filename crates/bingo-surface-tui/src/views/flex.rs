@@ -14,9 +14,26 @@ pub fn lines(
     marks: &Marks,
     engine: &Engine<'_>,
 ) -> Drawing {
-    if style.display.as_deref() == Some("none") || width == 0 {
+    if style.display.as_deref() == Some("none") {
         return Drawing::default();
     }
+    if width == 0 {
+        return children
+            .iter()
+            .map(|child| marked_with(child, width, marks, engine))
+            .collect::<Drawing>()
+            .map_lines(|_| Vec::new());
+    }
+    layout(children, style, width, marks, engine)
+}
+
+fn layout(
+    children: &[View],
+    style: &BoxStyle,
+    width: usize,
+    marks: &Marks,
+    engine: &Engine<'_>,
+) -> Drawing {
     let mx = space(style.spacing.margin_x.or(style.spacing.margin)).min(width / 2);
     let my = space(style.spacing.margin_y.or(style.spacing.margin));
     let available = width.saturating_sub(mx * 2);

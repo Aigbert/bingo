@@ -14,9 +14,6 @@ use std::time::Duration;
 mod toast;
 
 pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, width: usize, now: Now) -> Drawing {
-    if width == 0 {
-        return Drawing::default();
-    }
     let available = width.saturating_sub(grid::TX + grid::RM);
     let is_toast = crate::toast::current(ui, tree.viewed(), now).is_some();
     let ambient = if is_toast {
@@ -64,9 +61,6 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, width: usize, now: Now) ->
 
 fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> Drawing {
     crate::layout::count::band(3);
-    if room == 0 {
-        return Drawing::default();
-    }
     let mut site = Site {
         state: tree.viewed(),
         memo: &ui.placed.pulled,
@@ -270,7 +264,10 @@ fn slots(state: &bingo_sdk::SessionState, now: Now) -> Vec<Drawing> {
 }
 
 fn fit(parts: Vec<Drawing>, width: usize) -> Drawing {
-    let mut out = Drawing::default();
+    let mut out = Drawing {
+        next: parts.iter().filter_map(|part| part.next).min(),
+        ..Default::default()
+    };
     let mut line = Line::default();
     for part in parts {
         let Some(next) = part.lines.into_iter().next().filter(|l| l.width() > 0) else {
@@ -280,7 +277,6 @@ fn fit(parts: Vec<Drawing>, width: usize) -> Drawing {
         if line.width() + gap + next.width() > width {
             if line.width() == 0 {
                 line = grid::fit(next, width);
-                out.next = part.next;
             }
             break;
         }
@@ -289,7 +285,6 @@ fn fit(parts: Vec<Drawing>, width: usize) -> Drawing {
                 .push(Span::styled(theme::glyphs::get("sep"), ink("faint")));
         }
         line.spans.extend(next.spans);
-        out.next = out.next.into_iter().chain(part.next).min();
     }
     out.lines.push(line);
     out

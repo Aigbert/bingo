@@ -16,9 +16,6 @@ pub(super) fn draw(
     width: usize,
     now: Now,
 ) -> Option<Drawing> {
-    if width == 0 {
-        return None;
-    }
     let notice = crate::toast::components(ui, state, now, width, &mut frame.pulls)?;
     let age = now.since(notice.said());
     let hold = notice.kind.hold();

@@ -14,6 +14,7 @@ use crate::clock::{self, Anim};
 
 /// How long the transcript takes to reach where a key sent it (§6).
 pub const EASE: Duration = Duration::from_millis(100);
+/// How long the scrollbar stays lit after a scroll key or gesture.
 pub const FLASH: Duration = Duration::from_millis(900);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -16,9 +16,6 @@ impl Drawing {
 
     pub fn map_lines(mut self, map: impl FnOnce(Vec<Line<'static>>) -> Vec<Line<'static>>) -> Self {
         self.lines = map(self.lines);
-        if self.lines.is_empty() {
-            self.next = None;
-        }
         self
     }
 

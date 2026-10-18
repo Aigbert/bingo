@@ -9,9 +9,6 @@ use ratatui::text::{Line, Span};
 use std::time::Duration;
 
 pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
-    if width == 0 {
-        return Drawing::default();
-    }
     let state = tree.viewed();
     if !state.interactions.is_empty() {
         let ink = theme::blended(
