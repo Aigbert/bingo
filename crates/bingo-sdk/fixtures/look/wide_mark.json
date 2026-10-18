@@ -1,0 +1,14 @@
+{
+  "name": "Wide",
+  "input": {},
+  "declared": {
+    "mark": "界",
+    "verb": "wide"
+  },
+  "ascii": false,
+  "expected": {
+    "mark": "•",
+    "verb": "wide",
+    "target": null
+  }
+}

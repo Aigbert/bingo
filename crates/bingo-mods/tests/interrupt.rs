@@ -58,6 +58,7 @@ impl Provider for Offline {
 impl Tool for Offline {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Read".into(),
             description: "offline".into(),
             input_schema: json!({"type":"object"}),

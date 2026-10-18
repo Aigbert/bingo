@@ -1,0 +1,14 @@
+{
+  "name": "Find",
+  "input": {},
+  "declared": {
+    "mark": "*",
+    "verb": "find"
+  },
+  "ascii": true,
+  "expected": {
+    "mark": "*",
+    "verb": "find",
+    "target": null
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "Unknown",
+  "input": {
+    "a": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "b": "one\ntwo",
+    "c": "short"
+  },
+  "declared": null,
+  "ascii": false,
+  "expected": {
+    "mark": "•",
+    "verb": "unknown",
+    "target": [
+      "short",
+      "text"
+    ]
+  }
+}

@@ -264,10 +264,51 @@ pub struct SystemBlock {
     pub cache: bool,
 }
 
+/// How a tool reads on a surface; never sent to a model.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ToolLook {
+    pub mark: char,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ascii: Option<char>,
+    #[serde(deserialize_with = "look_verb")]
+    #[schemars(length(min = 1))]
+    pub verb: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<Target>,
+}
+
+fn look_verb<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
+    let verb = String::deserialize(deserializer)?;
+    if verb.trim().is_empty() {
+        return Err(serde::de::Error::custom("tool look verb must not be empty"));
+    }
+    Ok(verb)
+}
+
+/// The top-level input field a tool's row names.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Target {
+    pub field: String,
+    pub reads: Reads,
+}
+
+/// How a surface reads a row's target.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Reads {
+    Path,
+    Command,
+    Text,
+}
+
 /// A tool as the model sees it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ToolSpec {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub look: Option<ToolLook>,
     pub name: String,
     pub description: String,
     pub input_schema: Value,

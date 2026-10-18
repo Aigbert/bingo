@@ -1,0 +1,14 @@
+{
+  "name": "Zero",
+  "input": {},
+  "declared": {
+    "mark": "́",
+    "verb": "zero"
+  },
+  "ascii": false,
+  "expected": {
+    "mark": "•",
+    "verb": "zero",
+    "target": null
+  }
+}

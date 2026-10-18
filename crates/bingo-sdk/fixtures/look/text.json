@@ -1,0 +1,23 @@
+{
+  "name": "Search",
+  "input": {
+    "query": "needle"
+  },
+  "declared": {
+    "mark": "/",
+    "verb": "search",
+    "target": {
+      "field": "query",
+      "reads": "text"
+    }
+  },
+  "ascii": false,
+  "expected": {
+    "mark": "/",
+    "verb": "search",
+    "target": [
+      "needle",
+      "text"
+    ]
+  }
+}

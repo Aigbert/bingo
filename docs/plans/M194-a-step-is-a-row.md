@@ -114,6 +114,7 @@ says how its row reads, and no surface names a tool.
   the specs of `crates/bingo-tool-{fs,bash,web}` and `bingo-{tasks,skills,schedule,experience,
   mcp,rooms,agents}`; `crates/bingo-core/src/host/catalog.rs`; `crates/bingo-plugin-rpc`;
   `sdk/typescript`; the provider request tests.
+- bingo-sdk takes the workspace's unicode-width for the one-cell test of a declared mark; no new package.
 - **B:** `crates/bingo-surface-tui/src/{turns.rs,turns/,blocks.rs,transcript.rs,transcript/,
   activity.rs,fold.rs,input/turn.rs,pointer.rs,markdown.rs,views/code.rs,component/closing.rs}`;
   `crates/bingo-mod-ledger`; `crates/bingo-sdk/src/{render.rs,component/ledger.rs,

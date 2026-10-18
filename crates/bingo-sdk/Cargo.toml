@@ -30,6 +30,8 @@ jiff.workspace = true
 # dependency, no new crate in the lockfile.
 base64.workspace = true
 
+unicode-width.workspace = true
+
 [dev-dependencies]
 insta.workspace = true
 tempfile.workspace = true

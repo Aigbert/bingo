@@ -1,0 +1,18 @@
+{
+  "name": "agent:edit",
+  "input": {
+    "title": "Edit note.md",
+    "locations": [],
+    "raw": {}
+  },
+  "declared": null,
+  "ascii": true,
+  "expected": {
+    "mark": "~",
+    "verb": "edit",
+    "target": [
+      "Edit note.md",
+      "text"
+    ]
+  }
+}

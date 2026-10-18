@@ -1,0 +1,25 @@
+{
+  "name": "Read",
+  "input": {
+    "file_path": 12,
+    "other": "hello"
+  },
+  "declared": {
+    "mark": "¶",
+    "ascii": "<",
+    "verb": "read",
+    "target": {
+      "field": "file_path",
+      "reads": "path"
+    }
+  },
+  "ascii": false,
+  "expected": {
+    "mark": "¶",
+    "verb": "read",
+    "target": [
+      "hello",
+      "text"
+    ]
+  }
+}

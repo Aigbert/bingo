@@ -133,6 +133,7 @@ mod tests {
 
     fn read_tool() -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Read".into(),
             description: "Read a file from the filesystem.".into(),
             input_schema: json!({
@@ -142,6 +143,20 @@ mod tests {
             }),
             meta: Default::default(),
         }
+    }
+
+    #[test]
+    fn a_tool_look_never_reaches_the_model() {
+        let mut request = request(vec![]);
+        request.tools = vec![read_tool()];
+        let without = encode(&request, Variant::Default);
+        request.tools[0].look = Some(bingo_sdk::ToolLook {
+            mark: '¶',
+            ascii: Some('<'),
+            verb: "read".into(),
+            target: None,
+        });
+        assert_eq!(encode(&request, Variant::Default), without);
     }
 
     #[test]

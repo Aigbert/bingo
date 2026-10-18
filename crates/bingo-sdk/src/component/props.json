@@ -427,7 +427,10 @@
             "kind": "words",
             "text": "3 passed",
             "tone": "good"
-          }
+          },
+          "mark": "•",
+          "reads": "text",
+          "tier": "change"
         }
       ],
       "marks": {
@@ -452,12 +455,18 @@
             "kind": "diff",
             "added": 1,
             "removed": 1
-          }
+          },
+          "mark": "•",
+          "reads": "text",
+          "tier": "change"
         },
         {
           "verb": "bash",
           "target": "cargo test",
-          "state": "stopped"
+          "state": "stopped",
+          "mark": "•",
+          "reads": "text",
+          "tier": "change"
         }
       ],
       "outcome": "stopped",

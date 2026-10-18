@@ -22,10 +22,21 @@ pub enum StepState {
     Stopped,
 }
 
+/// The catalogue's baseline: only a trusted read-only tool is a lookup.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Tier {
+    Lookup,
+    Change,
+}
+
 /// One tool call of a turn, in the words a row shows.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Step {
+    pub mark: char,
+    pub reads: Option<crate::Reads>,
+    pub tier: Tier,
     /// What the step does, one lowercase word: `read`, `bash`.
     pub verb: String,
     /// What it does it to, shortened for one row.
@@ -353,6 +364,9 @@ mod tests {
 
     fn step(verb: &str, target: &str, state: StepState, upshot: Option<Upshot>) -> Step {
         Step {
+            mark: '•',
+            reads: None,
+            tier: Tier::Change,
             verb: verb.into(),
             target: target.into(),
             state,

@@ -1,0 +1,1 @@
+{"name":"Read","description":"Read a file","inputSchema":{},"look":{"mark":"¶","ascii":"<","verb":"read","target":{"field":"file_path","reads":"path"}}}

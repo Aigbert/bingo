@@ -1,0 +1,23 @@
+{
+  "name": "Bash",
+  "input": {
+    "command": "ls"
+  },
+  "declared": {
+    "mark": "$",
+    "verb": "run",
+    "target": {
+      "field": "command",
+      "reads": "command"
+    }
+  },
+  "ascii": false,
+  "expected": {
+    "mark": "$",
+    "verb": "run",
+    "target": [
+      "ls",
+      "command"
+    ]
+  }
+}

@@ -41,6 +41,7 @@ struct Echo {
 impl Doors for Echo {
     async fn offer(&self) -> Vec<ToolSpec> {
         vec![ToolSpec {
+            look: None,
             name: "Shout".into(),
             description: "Say something out loud.".into(),
             input_schema: json!({

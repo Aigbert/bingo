@@ -1,0 +1,11 @@
+{
+  "name": "SomeTool",
+  "input": null,
+  "declared": null,
+  "ascii": true,
+  "expected": {
+    "mark": "-",
+    "verb": "sometool",
+    "target": null
+  }
+}

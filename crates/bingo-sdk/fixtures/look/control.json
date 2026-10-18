@@ -1,0 +1,14 @@
+{
+  "name": "Control",
+  "input": {},
+  "declared": {
+    "mark": "\n",
+    "verb": "control"
+  },
+  "ascii": false,
+  "expected": {
+    "mark": "•",
+    "verb": "control",
+    "target": null
+  }
+}

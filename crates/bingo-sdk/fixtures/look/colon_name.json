@@ -1,0 +1,16 @@
+{
+  "name": "server:read",
+  "input": {
+    "query": "hello"
+  },
+  "declared": null,
+  "ascii": false,
+  "expected": {
+    "mark": "•",
+    "verb": "server:read",
+    "target": [
+      "hello",
+      "text"
+    ]
+  }
+}

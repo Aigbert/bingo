@@ -1,0 +1,14 @@
+{
+  "name": "Read",
+  "input": {},
+  "declared": {
+    "mark": "¶",
+    "verb": "read"
+  },
+  "ascii": true,
+  "expected": {
+    "mark": "-",
+    "verb": "read",
+    "target": null
+  }
+}

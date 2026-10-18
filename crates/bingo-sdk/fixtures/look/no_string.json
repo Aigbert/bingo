@@ -1,0 +1,13 @@
+{
+  "name": "Unknown",
+  "input": {
+    "a": 42
+  },
+  "declared": null,
+  "ascii": false,
+  "expected": {
+    "mark": "•",
+    "verb": "unknown",
+    "target": null
+  }
+}

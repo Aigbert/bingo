@@ -1,0 +1,15 @@
+{
+  "name": "Read",
+  "input": {},
+  "declared": {
+    "mark": "¶",
+    "ascii": "界",
+    "verb": "read"
+  },
+  "ascii": true,
+  "expected": {
+    "mark": "-",
+    "verb": "read",
+    "target": null
+  }
+}

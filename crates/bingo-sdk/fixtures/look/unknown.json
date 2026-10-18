@@ -1,0 +1,16 @@
+{
+  "name": "SomeTool",
+  "input": {
+    "value": "hello"
+  },
+  "declared": null,
+  "ascii": false,
+  "expected": {
+    "mark": "•",
+    "verb": "sometool",
+    "target": [
+      "hello",
+      "text"
+    ]
+  }
+}

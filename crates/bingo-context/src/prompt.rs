@@ -119,6 +119,7 @@ mod tests {
                 Message::text(Role::User, "new"),
             ],
             tools: vec![bingo_sdk::ToolSpec {
+                look: None,
                 name: "Read".into(),
                 description: "Read source".into(),
                 input_schema: serde_json::json!({"type":"object"}),

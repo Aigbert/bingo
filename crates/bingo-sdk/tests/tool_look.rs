@@ -1,0 +1,43 @@
+use bingo_sdk::{Reads, ToolLook, ToolSpec};
+use serde_json::{Value, json};
+
+#[test]
+fn a_tool_look_round_trips_its_fixture() {
+    let fixture: Value = serde_json::from_str(include_str!("../fixtures/tool-look.json")).unwrap();
+    let spec: ToolSpec = serde_json::from_value(fixture.clone()).unwrap();
+    let look = spec.look.as_ref().unwrap();
+    assert_eq!(look.mark, '¶');
+    assert_eq!(look.ascii, Some('<'));
+    assert_eq!(look.target.as_ref().unwrap().reads, Reads::Path);
+    assert_eq!(serde_json::to_value(spec).unwrap(), fixture);
+}
+
+#[test]
+fn an_old_spec_has_no_look_on_the_wire() {
+    let fixture = json!({"name":"Old", "description":"Old tool", "inputSchema":{}});
+    let spec: ToolSpec = serde_json::from_value(fixture.clone()).unwrap();
+    assert!(spec.look.is_none());
+    assert_eq!(serde_json::to_value(spec).unwrap(), fixture);
+}
+
+#[test]
+fn the_look_schema_requires_one_character_and_a_verb() {
+    let schema = serde_json::to_value(schemars::schema_for!(ToolLook)).unwrap();
+    assert_eq!(schema["required"], json!(["mark", "verb"]));
+    assert_eq!(schema["properties"]["mark"]["minLength"], 1);
+    assert_eq!(schema["properties"]["mark"]["maxLength"], 1);
+    assert_eq!(schema["properties"]["verb"]["minLength"], 1);
+}
+
+#[test]
+fn malformed_looks_are_refused_with_a_message() {
+    for (look, message) in [
+        (json!({"mark":"xx", "verb":"read"}), "character"),
+        (json!({"mark":"", "verb":"read"}), "character"),
+        (json!({"mark":"¶", "verb":""}), "verb"),
+        (json!({"mark":"¶", "verb":"   "}), "verb"),
+    ] {
+        let error = serde_json::from_value::<ToolLook>(look).unwrap_err();
+        assert!(error.to_string().contains(message), "{error}");
+    }
+}

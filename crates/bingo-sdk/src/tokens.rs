@@ -158,6 +158,7 @@ mod tests {
         }];
         let messages = [Message::text(crate::model::Role::User, "abcd")];
         let tools = [ToolSpec {
+            look: None,
             name: "Read".into(),
             description: "read".into(),
             input_schema: serde_json::json!({}),

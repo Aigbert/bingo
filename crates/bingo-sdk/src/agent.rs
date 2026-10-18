@@ -90,6 +90,29 @@ impl CallKind {
         }
     }
 
+    pub fn look(self) -> crate::ToolLook {
+        let (mark, ascii) = match self {
+            Self::Read => ('¶', Some('<')),
+            Self::Edit => ('±', Some('~')),
+            Self::Delete => ('×', Some('x')),
+            Self::Move => ('→', Some('>')),
+            Self::Search => ('/', None),
+            Self::Execute => ('$', None),
+            Self::Think => ('•', Some('-')),
+            Self::Fetch => ('↓', Some('v')),
+            Self::Other => ('•', Some('-')),
+        };
+        crate::ToolLook {
+            mark,
+            ascii,
+            verb: self.as_str().into(),
+            target: Some(crate::Target {
+                field: "title".into(),
+                reads: crate::Reads::Text,
+            }),
+        }
+    }
+
     pub fn writes(self) -> bool {
         matches!(self, Self::Edit | Self::Delete | Self::Move)
     }
@@ -124,6 +147,31 @@ impl ExternalCall {
 mod tests {
     use super::*;
     use crate::ToolCall;
+
+    #[test]
+    fn each_call_kind_declares_its_row() {
+        for (kind, mark, ascii, verb) in [
+            (CallKind::Read, '¶', '<', "read"),
+            (CallKind::Edit, '±', '~', "edit"),
+            (CallKind::Delete, '×', 'x', "delete"),
+            (CallKind::Move, '→', '>', "move"),
+            (CallKind::Search, '/', '/', "search"),
+            (CallKind::Execute, '$', '$', "execute"),
+            (CallKind::Think, '•', '-', "think"),
+            (CallKind::Fetch, '↓', 'v', "fetch"),
+            (CallKind::Other, '•', '-', "other"),
+        ] {
+            let look = kind.look();
+            let input = serde_json::json!({"title":"a call"});
+            let row = crate::look::row("agent:kind", &input, Some(&look), false);
+            assert_eq!((row.mark, row.verb.as_str()), (mark, verb));
+            assert_eq!(row.target, Some(("a call".into(), crate::Reads::Text)));
+            assert_eq!(
+                crate::look::row("agent:kind", &input, Some(&look), true).mark,
+                ascii
+            );
+        }
+    }
 
     #[test]
     fn external_call_round_trips_the_journal_fixture() {
