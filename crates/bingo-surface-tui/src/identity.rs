@@ -6,10 +6,10 @@ use ratatui::style::Color;
 
 #[test]
 fn ember_palette() {
-    assert_eq!(theme::DARK.presence, Color::Rgb(0xf0, 0x88, 0x3e));
-    assert_eq!(theme::DARK.glow, Color::Rgb(0xff, 0xc2, 0x78));
-    assert_eq!(theme::LIGHT.presence, Color::Rgb(0xa8, 0x4d, 0x12));
-    assert_eq!(theme::LIGHT.glow, Color::Rgb(0xe0, 0x7a, 0x2a));
+    assert_eq!(theme::DARK.ember, Color::Rgb(0xf3, 0x90, 0x50));
+    assert_eq!(theme::DARK.glow, Color::Rgb(0xff, 0x9b, 0x4a));
+    assert_eq!(theme::LIGHT.ember, Color::Rgb(0xb0, 0x4c, 0x14));
+    assert_eq!(theme::LIGHT.glow, Color::Rgb(0xef, 0x7a, 0x2c));
 }
 
 #[test]
@@ -56,7 +56,7 @@ fn code_language_shares_the_raised_band() {
         let rows = crate::views::code::lines(Some("rust"), "fn main() {}\n// end", 40);
         assert_eq!(rows.len(), 2);
         assert!(rows[0].to_string().ends_with("rust"));
-        assert_eq!(rows[0].style.bg, Some(theme::DARK.raised));
+        assert_eq!(rows[0].style.bg, Some(theme::DARK.you));
     });
 }
 

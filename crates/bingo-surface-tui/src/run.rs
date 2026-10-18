@@ -2609,10 +2609,10 @@ mod tests {
             let crate::theme::Colors::True(palette) = light else {
                 panic!("truecolour")
             };
-            assert_eq!(palette.presence, crate::theme::LIGHT.presence);
+            assert_eq!(palette.ember, crate::theme::LIGHT.ember);
             assert_ne!(
-                palette.rule,
-                crate::theme::LIGHT.rule,
+                palette.faint,
+                crate::theme::LIGHT.faint,
                 "the tint follows the measured ground"
             );
             run.answered_late(b"\x1b_Gi=31;OK\x1b\\");

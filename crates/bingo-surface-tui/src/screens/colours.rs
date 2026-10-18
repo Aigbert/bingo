@@ -234,16 +234,16 @@ fn a_terminal_that_turns_light_under_a_drawn_screen_is_followed() {
         };
         let before = band(&painted(80, 24, &tree, &mut ui, now));
         assert!(
-            before.contains(&crate::theme::DARK.raised),
+            before.contains(&crate::theme::DARK.you),
             "the line is banded in the dark palette's tint: {before:?}"
         );
         let after = crate::theme::with(daylight(), || band(&painted(80, 24, &tree, &mut ui, now)));
         assert!(
-            after.contains(&crate::theme::LIGHT.raised),
+            after.contains(&crate::theme::LIGHT.you),
             "the next frame wears the light one: {after:?}"
         );
         assert!(
-            !after.contains(&crate::theme::DARK.raised),
+            !after.contains(&crate::theme::DARK.you),
             "and nothing on the row kept yesterday's ground: {after:?}"
         );
     });

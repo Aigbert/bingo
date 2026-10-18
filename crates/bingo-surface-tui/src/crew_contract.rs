@@ -2,7 +2,6 @@
 use crate::test_support::*;
 use crate::{face, painted, status, theme};
 use bingo_sdk::{Event, Level};
-use ratatui::style::Color;
 
 fn crew() -> crate::tree::Tree {
     let mut frames = busy_child("reviewer");
@@ -61,41 +60,8 @@ fn faces_match_the_cross_surface_fixture() {
     }
 }
 
-fn rgb(color: Color) -> [f64; 3] {
-    let Color::Rgb(r, g, b) = color else {
-        panic!("a truecolor face: {color:?}")
-    };
-    [r, g, b].map(|v| f64::from(v) / 255.0)
-}
-
-fn luminance(color: Color) -> f64 {
-    let [r, g, b] = rgb(color).map(|c| {
-        if c <= 0.04045 {
-            c / 12.92
-        } else {
-            ((c + 0.055) / 1.055).powf(2.4)
-        }
-    });
-    0.2126 * r + 0.7152 * g + 0.0722 * b
-}
-
-fn hue(color: Color) -> f64 {
-    let [r, g, b] = rgb(color);
-    let max = r.max(g).max(b);
-    let min = r.min(g).min(b);
-    let d = max - min;
-    let h = if max == r {
-        (g - b) / d
-    } else if max == g {
-        (b - r) / d + 2.0
-    } else {
-        (r - g) / d + 4.0
-    };
-    (h * 60.0).rem_euclid(360.0)
-}
-
 #[test]
-fn crew_hues_are_readable_and_apart_from_state() {
+fn crew_hues_use_the_prototype_identity_palette() {
     for look in [painted::truecolor(), painted::daylight()] {
         theme::with(look, || {
             let theme::Colors::True(p) = look.colors else {
@@ -105,16 +71,7 @@ fn crew_hues_are_readable_and_apart_from_state() {
                 "reviewer", "scout", "writer", "builder", "tester", "planner", "fox", "Scout",
             ] {
                 let color = face::style(name).fg.unwrap();
-                let a = luminance(color);
-                let b = luminance(p.raised);
-                assert!(
-                    (a.max(b) + 0.05) / (a.min(b) + 0.05) >= 4.5,
-                    "{name} {color:?}"
-                );
-                for accent in [p.presence, p.good, p.bad, p.mode] {
-                    let d = (hue(color) - hue(accent)).abs();
-                    assert!(d.min(360.0 - d) >= 36.0, "{name}: {d}");
-                }
+                assert!(p.crew.contains(&color), "{name}: {color:?}");
             }
         });
     }

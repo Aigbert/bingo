@@ -1,12 +1,12 @@
 ---
-source: crates/bingo-surface-tui/src/theme.rs
+source: crates/bingo-surface-tui/src/theme/tests.rs
 expression: rows
 ---
-raised     dark #211d17   light #eee8dd
-presence   dark #f0883e   light #a84d12
-glow       dark #ffc278   light #e07a2a
-good       dark #8fcf8a   light #357230
-bad        dark #e0655a   light #b02f24
-mode       dark #8fb4de   light #2f5f99
-good_tint  dark #1b2a1c   light #e0efdd
-bad_tint   dark #2d1a19   light #f7e2df
+raised     dark #383639   light #efeae8
+presence   dark #f39050   light #b04c14
+glow       dark #ff9b4a   light #ef7a2c
+good       dark #7fd38a   light #2b7d3c
+bad        dark #f0706a   light #b3261e
+mode       dark #8ab4f0   light #2f62a8
+good_tint  dark #38423b   light #e0e6dc
+bad_tint   dark #473436   light #f2dfdd

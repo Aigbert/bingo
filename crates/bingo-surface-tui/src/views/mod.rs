@@ -20,6 +20,7 @@ mod keyvalue;
 mod link;
 mod list;
 mod markdown;
+pub(crate) mod motion;
 mod panel;
 mod progress;
 mod raster;
@@ -52,9 +53,8 @@ pub struct Marks {
     pub pending: Option<Action>,
     pub sealed: Option<std::rc::Rc<std::cell::RefCell<Vec<usize>>>>,
     pub targets: Option<std::rc::Rc<std::cell::RefCell<Vec<bingo_sdk::ActionItem>>>>,
-    /// Where an unbounded bar's sheen is in its turn: 0 at the head, which is
-    /// where a frame that says nothing about it leaves it (§6's rest).
-    pub beat: f32,
+    /// The frame clock; a record drawn outside a frame uses the still form.
+    pub now: Option<Now>,
 }
 
 impl Marks {
@@ -64,7 +64,7 @@ impl Marks {
             pending: None,
             targets: None,
             sealed: None,
-            beat: progress::walk(now),
+            now: Some(now),
         }
     }
 }
@@ -81,6 +81,7 @@ pub fn next_change(view: &View, now: Now) -> Option<std::time::Instant> {
             .filter_map(|child| next_change(child, now))
             .min(),
         View::Panel { child, .. } => next_change(child, now),
+        View::Text { children, style } => text::next(children, style, now),
         _ => None,
     }
 }
@@ -105,19 +106,15 @@ pub fn marked_with(
     marks: &Marks,
     engine: &Engine<'_>,
 ) -> Vec<Line<'static>> {
+    let marks = Marks {
+        now: marks.now.or_else(motion::now),
+        ..marks.clone()
+    };
+    let marks = &marks;
+    motion::observe(view, marks.now);
     let lines = match view {
-        View::Text { children, style } => text::styled(children, style, width),
-        View::Markdown { text, dim_color } => {
-            let mut lines = markdown::lines(text, width);
-            if *dim_color {
-                for line in &mut lines {
-                    for span in &mut line.spans {
-                        span.style = span.style.patch(theme::dim());
-                    }
-                }
-            }
-            lines
-        }
+        View::Text { children, style } => text::animated(children, style, width, marks.now),
+        View::Markdown { text, dim_color } => markdown::lines(text, width, *dim_color),
         View::Code { language, source } => code::lines(language.as_deref(), source, width),
         View::Diff { unified } => diff::lines(unified),
         View::List { items } => list::lines(items),
@@ -127,7 +124,13 @@ pub fn marked_with(
             value,
             total,
             label,
-        } => progress::lines(*value, *total, label.as_deref(), width, marks.beat),
+        } => progress::lines(
+            *value,
+            *total,
+            label.as_deref(),
+            width,
+            marks.now.map_or(0.0, progress::walk),
+        ),
         View::Badge { text, tone } => badge::lines(text, *tone),
         View::Tree { nodes } => tree::lines(nodes),
         View::Box { children, layout } => flex::lines(children, layout, width, marks, engine),
@@ -215,3 +218,6 @@ pub fn fit(line: Line<'static>, width: usize) -> Line<'static> {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod ember_tests;

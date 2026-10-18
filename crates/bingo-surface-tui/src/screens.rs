@@ -879,7 +879,12 @@ fn inked(lang: &str, code: &str) -> String {
 fn token(style: ratatui::style::Style) -> &'static str {
     use crate::theme;
     for (name, spent) in [
-        ("keyword", theme::mode()),
+        ("kw", theme::ink(theme::Ink::Keyword)),
+        ("str", theme::ink(theme::Ink::String)),
+        ("num", theme::ink(theme::Ink::Number)),
+        ("fn", theme::ink(theme::Ink::Function)),
+        ("ty", theme::ink(theme::Ink::Type)),
+        ("comment", theme::ink(theme::Ink::Comment)),
         ("dim", theme::dim()),
         ("added·moved", theme::added().patch(theme::bold())),
         ("removed·moved", theme::removed().patch(theme::bold())),

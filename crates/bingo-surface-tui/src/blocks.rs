@@ -245,6 +245,7 @@ struct Entry {
     /// The destinations these words named (M51), for the same reason.
     wanted: Vec<String>,
     motion: Motion,
+    view_deadline: Option<Instant>,
 }
 
 /// One run of lines in the stacked transcript: the welcome box, an item's
@@ -339,7 +340,11 @@ impl Blocks {
     pub fn next_change(&self, now: Now) -> Option<Instant> {
         let frame = self.moving().then_some(now.instant + crate::clock::FRAME);
         let spin = (self.roles.spinning() && now.motion).then(|| crate::spinner::next(now));
-        frame.into_iter().chain(spin).min()
+        frame
+            .into_iter()
+            .chain(spin)
+            .chain(self.blocks.iter().filter_map(|entry| entry.view_deadline))
+            .min()
     }
 
     /// Keep the block at `at` when it is still this item's, else draw it.
@@ -362,12 +367,19 @@ impl Blocks {
         // An item that has only just finished is not yet terminal for this
         // cache: it has a frame of flashing left to do, and a frame after that
         // to settle into.
-        if same && item.is_terminal() && !held.is_some_and(|e| e.motion.redraw(now)) {
+        if same
+            && item.is_terminal()
+            && !held.is_some_and(|e| {
+                e.motion.redraw(now) || e.view_deadline.is_some_and(|at| now >= at)
+            })
+        {
             return 1;
         }
         let motion = self.motion(held, item, &revision, rows.now);
         self.renders += 1;
-        let drawn = transcript::item_block(item, place, agents, rows, motion.cue(now));
+        let (drawn, view_deadline) = crate::views::motion::track(rows.now, || {
+            transcript::item_block(item, place, agents, rows, motion.cue(now))
+        });
         if drawn.lines.is_empty() {
             // An item with nothing to say is not a block at all — and one that
             // said something until this frame gives its slot back with its
@@ -389,6 +401,7 @@ impl Blocks {
             pictures: drawn.pictures,
             wanted: drawn.wanted,
             motion,
+            view_deadline,
         };
         match self.blocks.get_mut(at) {
             Some(slot) if slot.id == item.id => *slot = entry,

@@ -12,6 +12,7 @@ use std::time::Instant;
 mod canvas;
 pub(crate) mod count;
 mod deadline;
+pub mod grid;
 pub use canvas::Canvas;
 
 #[derive(Debug, Default)]
@@ -144,7 +145,9 @@ fn compose(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> Layo
         ..Layout::default()
     };
     count::begin();
-    crate::view::compose(tree, ui, &mut next, now);
+    let (_, view_deadline) =
+        crate::views::motion::track(now, || crate::view::compose(tree, ui, &mut next, now));
+    next.next_frame = next.next_frame.into_iter().chain(view_deadline).min();
     count::finish(&mut next);
     next.next_frame = deadline::next(tree, ui, &next, now);
     next

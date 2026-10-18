@@ -2,6 +2,6 @@
 source: crates/bingo-surface-tui/src/screens.rs
 expression: "inked(\"python\",\n\"# read it first\\ndef run(path):\\n    return open(path).read()\\n\")"
 ---
-    ⟨dim⟩# read it first⟨dim⟩               ⟨?⟩python⟨dim⟩
-    ⟨dim⟩def⟨keyword⟩ run(path):⟨text⟩                      ⟨?⟩
-    ⟨dim⟩    ⟨text⟩return⟨keyword⟩ open(path).read()⟨text⟩        ⟨?⟩
+    ⟨dim⟩# read it first⟨comment⟩               ⟨?⟩python⟨dim⟩
+    ⟨dim⟩def⟨kw⟩ ⟨text⟩run⟨fn⟩(path):⟨text⟩                      ⟨?⟩
+    ⟨dim⟩    ⟨text⟩return⟨kw⟩ ⟨text⟩open⟨fn⟩(path).read()⟨text⟩        ⟨?⟩

@@ -1,145 +1,122 @@
-//! Word wrapping for styled lines. The transcript is measured, not predicted:
-//! every view that needs to know how tall a block is wraps it first and counts.
-
+//! Styled line breaking, ported from Ember's units/wrapSegs.
 use ratatui::text::{Line, Span};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
+mod units;
+use units::{Unit, units};
 
-/// The width prose is wrapped to inside a region `width` columns wide: the
-/// whole of it, or the narrower line a person asked for (`tui.measure`,
-/// [`crate::settings`]; design §7). The number is theirs — this crate names
-/// none of its own.
 pub fn measure(width: usize, cap: Option<usize>) -> usize {
     cap.map_or(width, |cap| width.min(cap))
 }
 
-/// Wrap one styled line to `width` columns, keeping each span's style. An empty
-/// line stays one empty line, so blank separators survive.
 pub fn wrap(line: &Line<'static>, width: usize) -> Vec<Line<'static>> {
-    if width == 0 {
+    if width < 2 {
         return vec![line.clone()];
     }
-    let mut out: Vec<Line<'static>> = Vec::new();
-    let mut current: Vec<Span<'static>> = Vec::new();
-    let mut used = 0usize;
-    for span in &line.spans {
-        for token in tokens(&span.content) {
-            place(token, span, width, &mut out, &mut current, &mut used);
+    let mut rows = Rows {
+        out: Vec::new(),
+        current: Vec::new(),
+        used: 0,
+        soft: false,
+        width,
+    };
+    for unit in units(line) {
+        rows.place(unit);
+    }
+    trim_end(&mut rows.current);
+    rows.out.push(Line::from(rows.current));
+    rows.out
+        .into_iter()
+        .map(|row| row.style(line.style))
+        .collect()
+}
+
+pub fn wrap_all(lines: &[Line<'static>], width: usize) -> Vec<Line<'static>> {
+    lines.iter().flat_map(|line| wrap(line, width)).collect()
+}
+
+struct Rows {
+    out: Vec<Line<'static>>,
+    current: Vec<Span<'static>>,
+    used: usize,
+    soft: bool,
+    width: usize,
+}
+
+impl Rows {
+    fn place(&mut self, unit: Unit) {
+        match unit {
+            Unit::Space(span) => self.space(span),
+            Unit::Word(parts) => {
+                let width: usize = parts.iter().map(Span::width).sum();
+                if width > self.width - self.used && self.used > 0 && width <= self.width {
+                    self.brk(true);
+                }
+                for part in parts {
+                    self.cut(part);
+                }
+            }
         }
     }
-    out.push(Line::from(current));
-    out
-}
 
-/// Wrap every line of a block and flatten the result.
-pub fn wrap_all(lines: &[Line<'static>], width: usize) -> Vec<Line<'static>> {
-    lines.iter().flat_map(|l| wrap(l, width)).collect()
-}
-
-/// Put one token on the current line, breaking to the next when it will not fit.
-fn place(
-    token: &str,
-    span: &Span<'static>,
-    width: usize,
-    out: &mut Vec<Line<'static>>,
-    current: &mut Vec<Span<'static>>,
-    used: &mut usize,
-) {
-    let token_width = token.width();
-    if token.chars().all(char::is_whitespace) {
-        // Whitespace is dropped where a break put it, but the line's own
-        // leading indent — a result gutter, a list marker — is content.
-        if *used == 0 && !out.is_empty() {
+    fn space(&mut self, span: Span<'static>) {
+        if span.content == "\n" {
+            self.brk(false);
             return;
         }
-        if *used + token_width <= width {
-            push(current, token, span);
-            *used += token_width;
-        } else {
-            break_line(out, current, used);
+        if self.used == 0 && self.soft {
+            return;
         }
-        return;
-    }
-    if *used + token_width > width && *used > 0 && token_width <= width {
-        break_line(out, current, used);
-    }
-    if token_width <= width {
-        push(current, token, span);
-        *used += token_width;
-        return;
-    }
-    // Wider than any line: it is cut anyway, so its first piece fills what
-    // is left of this one — prose with no spaces in it, a long path — and
-    // the mark or word before it keeps its company.
-    for piece in split_wide(token, width, width - *used) {
-        if *used + piece.width() > width && *used > 0 {
-            break_line(out, current, used);
+        if self.used + span.width() > self.width {
+            self.brk(true);
+            return;
         }
-        push(current, &piece, span);
-        *used += piece.width();
+        self.push(span);
     }
-}
 
-fn push(current: &mut Vec<Span<'static>>, text: &str, span: &Span<'static>) {
-    current.push(Span::styled(text.to_string(), span.style));
-}
-
-/// Break here, leaving no trailing whitespace at the end of the row.
-fn break_line(out: &mut Vec<Line<'static>>, current: &mut Vec<Span<'static>>, used: &mut usize) {
-    while current
-        .last()
-        .is_some_and(|s| s.content.chars().all(char::is_whitespace))
-    {
-        current.pop();
-    }
-    out.push(Line::from(std::mem::take(current)));
-    *used = 0;
-}
-
-/// A word longer than the whole line is cut on grapheme boundaries: the
-/// first piece to `first` columns, the room left on the line it starts on,
-/// and the rest to the width.
-fn split_wide(token: &str, width: usize, first: usize) -> Vec<String> {
-    let mut pieces = Vec::new();
-    let mut piece = String::new();
-    let mut used = 0usize;
-    let mut limit = if first == 0 { width } else { first };
-    for grapheme in token.graphemes(true) {
-        let w = grapheme.width();
-        if used + w > limit && !piece.is_empty() {
-            pieces.push(std::mem::take(&mut piece));
-            used = 0;
-            limit = width;
-        }
-        piece.push_str(grapheme);
-        used += w;
-    }
-    if !piece.is_empty() {
-        pieces.push(piece);
-    }
-    pieces
-}
-
-/// Split into alternating runs of whitespace and non-whitespace.
-fn tokens(text: &str) -> Vec<&str> {
-    let mut out = Vec::new();
-    let mut start = 0;
-    let mut space: Option<bool> = None;
-    for (i, c) in text.char_indices() {
-        let is_space = c.is_whitespace();
-        match space {
-            Some(previous) if previous != is_space => {
-                out.push(&text[start..i]);
-                start = i;
+    fn cut(&mut self, span: Span<'static>) {
+        let mut text = String::new();
+        for grapheme in span.content.graphemes(true) {
+            if self.used + text.width() + grapheme.width() > self.width {
+                if !text.is_empty() {
+                    self.push(Span::styled(std::mem::take(&mut text), span.style));
+                }
+                if self.used > 0 {
+                    self.brk(true);
+                }
             }
-            _ => {}
+            text.push_str(grapheme);
         }
-        space = Some(is_space);
+        if !text.is_empty() {
+            self.push(Span::styled(text, span.style));
+        }
     }
-    if start < text.len() {
-        out.push(&text[start..]);
+
+    fn push(&mut self, span: Span<'static>) {
+        self.used += span.width();
+        self.current.push(span);
     }
-    out
+
+    fn brk(&mut self, soft: bool) {
+        trim_end(&mut self.current);
+        self.out.push(Line::from(std::mem::take(&mut self.current)));
+        self.used = 0;
+        self.soft = soft;
+    }
+}
+
+fn trim_end(spans: &mut Vec<Span<'static>>) {
+    while let Some(last) = spans.last_mut() {
+        last.content = last
+            .content
+            .trim_end_matches([' ', '\t'])
+            .to_string()
+            .into();
+        if !last.content.is_empty() {
+            break;
+        }
+        spans.pop();
+    }
 }
 
 #[cfg(test)]
@@ -214,3 +191,6 @@ mod tests {
         assert_eq!(text(&wrap(&line, 4)), vec!["你好", "世界"]);
     }
 }
+
+#[cfg(test)]
+mod prototype_tests;

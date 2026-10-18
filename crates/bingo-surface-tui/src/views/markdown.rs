@@ -3,6 +3,14 @@
 
 use ratatui::text::Line;
 
-pub fn lines(text: &str, width: usize) -> Vec<Line<'static>> {
-    crate::markdown::render(text, width)
+pub fn lines(text: &str, width: usize, dim: bool) -> Vec<Line<'static>> {
+    let mut lines = crate::markdown::render(text, width);
+    if dim {
+        for line in &mut lines {
+            for span in &mut line.spans {
+                span.style = span.style.patch(crate::theme::dim());
+            }
+        }
+    }
+    lines
 }

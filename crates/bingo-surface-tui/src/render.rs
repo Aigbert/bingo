@@ -51,6 +51,7 @@ pub fn current() -> Render {
 pub struct Detection {
     pub ask: theme::Ask,
     pub ground: Option<(u16, u16, u16)>,
+    pub foreground: Option<(u16, u16, u16)>,
     pub heard: Option<crate::graphics::Heard>,
     pub motion: bool,
 }
@@ -60,6 +61,7 @@ impl Default for Detection {
         Self {
             ask: theme::Ask::default(),
             ground: None,
+            foreground: None,
             heard: None,
             motion: true,
         }
@@ -78,6 +80,7 @@ impl From<Render> for Detection {
                 ascii: render.look.glyphs == &theme::ASCII,
                 look: theme::Look::Terminal,
             },
+            foreground: None,
             ground: Some(theme::reference_ground(
                 matches!(render.look.colors, theme::Colors::True(palette) | theme::Colors::Indexed(palette) if palette == theme::LIGHT),
             )),
@@ -105,7 +108,7 @@ impl From<Render> for Detection {
 impl Detection {
     pub fn render(&self) -> Render {
         Render {
-            look: theme::detect(self.ask, self.ground),
+            look: theme::detect_palette(self.ask, self.foreground, self.ground),
             graphics: crate::graphics::detect(self.heard.as_ref()).graphics,
             motion: self.motion,
         }
@@ -114,6 +117,9 @@ impl Detection {
         crate::graphics::detect(self.heard.as_ref()).notice
     }
     pub fn reply(&mut self, reply: &[u8]) {
+        if let Some(foreground) = theme::answered_foreground(reply) {
+            self.foreground = Some(foreground);
+        }
         if let Some(ground) = theme::answered_ground(reply) {
             self.ground = Some(ground);
         }
@@ -166,6 +172,7 @@ mod tests {
             ),
         ] {
             let detection = Detection {
+                foreground: None,
                 ask,
                 ground: light.map(theme::reference_ground),
                 motion: false,
@@ -203,7 +210,7 @@ mod tests {
         detection.reply(b"\x1b]11;rgb:ffff/ffff/ffff\x07");
         assert_eq!(
             detection.render().look.colors,
-            theme::Colors::True(theme::LIGHT)
+            theme::detect(detection.ask, Some((65535, 65535, 65535))).colors
         );
         assert_eq!(detection.render().look.glyphs, &theme::ASCII);
         detection.reply(b"\x1b]11;rgb:0000/0000/0000\x07");
@@ -244,7 +251,7 @@ mod tests {
                         assert_eq!(
                             terminal.backend().buffer()[(0, 0)].bg,
                             match look.colors {
-                                theme::Colors::True(palette) => palette.raised,
+                                theme::Colors::True(palette) => palette.you,
                                 _ => unreachable!(),
                             }
                         );
@@ -259,5 +266,50 @@ mod tests {
         };
         let _ = std::panic::catch_unwind(|| look.scope(|| panic!("leave the pass")));
         assert_eq!(current(), Render::default());
+    }
+}
+
+#[cfg(test)]
+mod ember_tests {
+    use super::*;
+    #[test]
+    fn late_foreground_and_background_answers_reblend_and_overrides_stay_fixed() {
+        let mut detection = Detection {
+            ask: theme::Ask {
+                truecolor: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        detection.reply(b"\x1b]11;rgb:f9/f4/f2\x07");
+        detection.reply(b"\x1b]10;rgb:3a/34/2e\x1b\\");
+        assert_eq!(
+            detection.render().look.colors,
+            theme::Colors::True(theme::LIGHT)
+        );
+        detection.reply(b"\x1b]10;rgb:20/20/20\x07");
+        let theme::Colors::True(palette) = detection.render().look.colors else {
+            panic!("truecolor");
+        };
+        assert_ne!(palette.muted, theme::LIGHT.muted);
+        assert_ne!(palette.pick, theme::LIGHT.pick);
+        assert_eq!(palette.glow, theme::LIGHT.glow);
+        for (look, palette) in [
+            (theme::Look::Light, theme::LIGHT),
+            (theme::Look::Dark, theme::DARK),
+        ] {
+            detection.ask.look = look;
+            assert_eq!(detection.render().look.colors, theme::Colors::True(palette));
+        }
+        assert!(
+            theme::QUESTION
+                .windows(6)
+                .any(|bytes| bytes == b"\x1b]10;?")
+        );
+        assert!(
+            theme::QUESTION
+                .windows(6)
+                .any(|bytes| bytes == b"\x1b]11;?")
+        );
     }
 }

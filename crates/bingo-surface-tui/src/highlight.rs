@@ -1,7 +1,7 @@
 //! Code, highlighted.
 //!
-//! syntect parses and [`crate::theme`] paints: a scope becomes one of three
-//! inks (design §5), never a colour of its own. The regex engine is
+//! syntect parses and [`crate::theme`] paints: a scope becomes one of Ember's
+//! inks, never a colour of its own. The regex engine is
 //! `fancy-regex`, so nothing here links a C library; `onig` is banned in
 //! `deny.toml`.
 //!
@@ -233,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn a_line_of_rust_wears_the_three_inks_and_nothing_else() {
+    fn a_line_of_rust_wears_ember_syntax_inks() {
         fresh();
         let drawn = lines("rust", "let x = 1; // one\n");
         assert_eq!(text(&drawn), vec!["let x = 1; // one"]);
@@ -243,21 +243,38 @@ mod tests {
             .collect();
         for style in &spent {
             assert!(
-                [theme::mode(), theme::dim(), theme::text()].contains(style),
+                [
+                    theme::ink(Ink::Keyword),
+                    theme::ink(Ink::Comment),
+                    theme::ink(Ink::Number),
+                    theme::text()
+                ]
+                .contains(style),
                 "an ink outside the three: {style:?}"
             );
         }
-        assert!(spent.contains(&theme::mode()), "`let` is a keyword");
-        assert!(spent.contains(&theme::dim()), "the comment recedes");
+        assert!(
+            spent.contains(&theme::ink(Ink::Keyword)),
+            "`let` is a keyword"
+        );
+        assert!(
+            spent.contains(&theme::ink(Ink::Comment)),
+            "the comment recedes"
+        );
     }
 
     #[test]
     fn a_comment_is_dim_and_a_keyword_is_the_cool_colour() {
         fresh();
         let drawn = lines("python", "# a note\ndef run():\n");
-        assert_eq!(runs(&drawn[0])[0].1, theme::dim(), "{:?}", runs(&drawn[0]));
+        assert_eq!(
+            runs(&drawn[0])[0].1,
+            theme::ink(Ink::Comment),
+            "{:?}",
+            runs(&drawn[0])
+        );
         assert_eq!(runs(&drawn[1])[0].0, "def");
-        assert_eq!(runs(&drawn[1])[0].1, theme::mode());
+        assert_eq!(runs(&drawn[1])[0].1, theme::ink(Ink::Keyword));
     }
 
     #[test]
@@ -267,7 +284,7 @@ mod tests {
         assert_eq!(text(&drawn), vec!["{\"live\": true, \"name\": \"bingo\"}"]);
         let coloured: Vec<String> = runs(&drawn[0])
             .into_iter()
-            .filter(|(_, style)| *style == theme::mode())
+            .filter(|(_, style)| *style == theme::ink(Ink::Keyword))
             .map(|(text, _)| text)
             .collect();
         assert_eq!(coloured, vec!["true".to_string()]);

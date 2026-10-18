@@ -4,5 +4,5 @@ expression: "inked(\"diff\", \"@@ -1,2 +1,2 @@\\n-let a = 1;\\n+let a = 2;\\n ok
 ---
 @@ -1,2 +1,2 @@⟨dim⟩
 -let a = ⟨removed⟩1;⟨removed·moved⟩
-+let a = ⟨added⟩2;⟨added·moved⟩
++let a = ⟨str⟩2;⟨added·moved⟩
  ok⟨dim⟩

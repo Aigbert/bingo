@@ -171,3 +171,61 @@ pub fn assert_row_styled(painted: &Painted, needle: &str, expected: &[(&str, Sty
         .collect();
     assert_eq!(drawn, want, "the row carrying {needle:?}");
 }
+
+#[test]
+fn existing_screen_uses_ember_inks_and_respects_terminal_depth() {
+    use crate::test_support::*;
+    use ratatui::style::Color;
+    let state = folded(vec![frame(
+        1,
+        bingo_sdk::Event::ItemStarted {
+            item: user("u1", "hello"),
+        },
+    )]);
+    for look in [
+        daylight(),
+        no_colour(),
+        Theme {
+            colors: Colors::Indexed(theme::LIGHT),
+            glyphs: &theme::UNICODE,
+        },
+    ] {
+        theme::with(look, || {
+            let (mut ui, now) = scene();
+            let drawing = painted(100, 32, &solo(&state), &mut ui, now);
+            match look.colors {
+                Colors::Plain => assert!(
+                    drawing
+                        .0
+                        .content
+                        .iter()
+                        .all(|cell| cell.fg == Color::Reset && cell.bg == Color::Reset)
+                ),
+                Colors::Indexed(_) => assert!(drawing.0.content.iter().all(|cell| matches!(
+                    cell.fg,
+                    Color::Reset | Color::Indexed(_)
+                ) && matches!(
+                    cell.bg,
+                    Color::Reset | Color::Indexed(_)
+                ))),
+                _ => {
+                    assert!(
+                        drawing
+                            .0
+                            .content
+                            .iter()
+                            .any(|cell| cell.bg == theme::LIGHT.you)
+                    );
+                    assert!(
+                        drawing
+                            .0
+                            .content
+                            .iter()
+                            .any(|cell| cell.fg == theme::LIGHT.ember)
+                    );
+                    assert_eq!(theme::LIGHT.you, Color::Rgb(0xef, 0xea, 0xe8));
+                }
+            }
+        });
+    }
+}

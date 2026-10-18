@@ -30,7 +30,7 @@ pub fn zone() -> TimeZone {
 /// One frame of motion: thirty a second (§6).
 pub const FRAME: Duration = Duration::from_millis(33);
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Now {
     pub instant: Instant,
     pub wall: Timestamp,
@@ -231,6 +231,38 @@ pub fn breath(now: Now, period: Duration) -> f32 {
 pub fn alternating(now: Now, period: Duration) -> bool {
     let period = i128::try_from(period.as_nanos()).unwrap_or(i128::MAX);
     period > 0 && now.wall.as_nanosecond().div_euclid(period) % 2 == 1
+}
+
+/// Ember's cosine breath; a still frame rests at its own ink.
+pub fn breathe(now: Now, period: Duration) -> f64 {
+    if !now.motion || period.is_zero() {
+        return 0.0;
+    }
+    let phase = cycle(now, period).as_secs_f64() / period.as_secs_f64();
+    (1.0 - (phase * std::f64::consts::TAU).cos()) / 2.0
+}
+
+pub fn prog(now: Now, at_ms: i64, ms: u64) -> f64 {
+    if !now.motion || ms == 0 {
+        return 1.0;
+    }
+    ((now.wall.as_millisecond() as f64 - at_ms as f64) / ms as f64).clamp(0.0, 1.0)
+}
+
+// These weights are shared by the next screen milestones.
+#[allow(dead_code)]
+pub fn shimmer(now: Now, column: usize, columns: usize) -> f64 {
+    if !now.motion {
+        return 0.0;
+    }
+    let phase = cycle(now, Duration::from_millis(2400)).as_secs_f64() / 2.4;
+    let pos = phase * (columns as f64 + 8.0) - 4.0;
+    (1.0 - (column as f64 - pos).abs() / 3.0).max(0.0)
+}
+
+#[allow(dead_code)]
+pub fn caret_fade(now: Now) -> f64 {
+    0.78 * breathe(now, Duration::from_millis(1200))
 }
 
 #[cfg(test)]
@@ -436,5 +468,31 @@ mod tests {
             "and it comes back round"
         );
         assert_eq!(phase(later(now, 600), period), phase(now, period));
+    }
+}
+
+#[cfg(test)]
+mod ember_tests {
+    use super::*;
+    use crate::test_support::{later, scene, still};
+    #[test]
+    fn prototype_motion_is_pure_and_reduced_motion_is_still() {
+        let now = Now {
+            wall: jiff::Timestamp::UNIX_EPOCH,
+            ..scene().1
+        };
+        let ms = Duration::from_millis;
+        assert_eq!(breathe(now, ms(1800)), 0.0);
+        assert!((breathe(later(now, 450), ms(1800)) - 0.5).abs() < 1e-12);
+        assert_eq!(breathe(later(now, 900), ms(1800)), 1.0);
+        assert_eq!(breathe(still(later(now, 900)), ms(1800)), 0.0);
+        assert_eq!(prog(now, 100, 420), 0.0);
+        assert_eq!(prog(later(now, 310), 100, 420), 0.5);
+        assert_eq!(prog(later(now, 900), 100, 420), 1.0);
+        assert_eq!(prog(still(now), 100, 420), 1.0);
+        assert_eq!(caret_fade(later(now, 600)), 0.78);
+        assert_eq!(caret_fade(still(later(now, 600))), 0.0);
+        assert_eq!(shimmer(later(now, 1200), 4, 8), 1.0);
+        assert_eq!(shimmer(still(later(now, 1200)), 4, 8), 0.0);
     }
 }

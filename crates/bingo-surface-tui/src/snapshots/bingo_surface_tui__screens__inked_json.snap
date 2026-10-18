@@ -3,6 +3,6 @@ source: crates/bingo-surface-tui/src/screens.rs
 expression: "inked(\"json\", \"{\\n  \\\"model\\\": \\\"gpt-5.4\\\",\\n  \\\"stream\\\": true\\n}\\n\")"
 ---
     ⟨dim⟩{⟨text⟩                      ⟨?⟩json⟨dim⟩
-    ⟨dim⟩  "model": "gpt-5.4",⟨text⟩      ⟨?⟩
-    ⟨dim⟩  "stream": ⟨text⟩true⟨keyword⟩           ⟨?⟩
+    ⟨dim⟩  ⟨text⟩"model"⟨str⟩: ⟨text⟩"gpt-5.4"⟨str⟩,⟨text⟩      ⟨?⟩
+    ⟨dim⟩  ⟨text⟩"stream"⟨str⟩: ⟨text⟩true⟨kw⟩           ⟨?⟩
     ⟨dim⟩}⟨text⟩                          ⟨?⟩

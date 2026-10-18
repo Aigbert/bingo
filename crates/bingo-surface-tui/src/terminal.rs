@@ -402,21 +402,24 @@ fn detect() -> Detection {
         ascii: std::env::var_os("BINGO_ASCII").is_some_and(|v| v == "1"),
         look: crate::theme::look(std::env::var("BINGO_THEME").ok().as_deref()),
     };
-    let ground = crate::theme::follows(ask).then(background).flatten();
+    let palette = crate::theme::follows(ask).then(terminal_palette).flatten();
     Detection {
         ask,
-        ground,
+        foreground: palette
+            .as_ref()
+            .map(|p| (p.foreground.r, p.foreground.g, p.foreground.b)),
+        ground: palette
+            .as_ref()
+            .map(|p| (p.background.r, p.background.g, p.background.b)),
         heard: graphics_probe(),
         motion: crate::clock::moves(std::env::var("BINGO_MOTION").ok().as_deref()),
     }
 }
 
-fn background() -> Option<(u16, u16, u16)> {
+fn terminal_palette() -> Option<terminal_colorsaurus::ColorPalette> {
     let mut options = terminal_colorsaurus::QueryOptions::default();
     options.timeout = crate::theme::PROBE;
-    terminal_colorsaurus::background_color(options)
-        .ok()
-        .map(|color| (color.r, color.g, color.b))
+    terminal_colorsaurus::color_palette(options).ok()
 }
 
 fn graphics_probe() -> Option<crate::graphics::Heard> {

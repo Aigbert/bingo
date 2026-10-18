@@ -61,7 +61,20 @@ pub fn lines(
     if border > 0 {
         out = bordered(out, width, style);
     }
-    out = out.into_iter().map(|line| indent(line, mx)).collect();
+    margins(out, width, mx, my, style.ground.as_deref())
+}
+
+fn margins(
+    lines: Vec<Line<'static>>,
+    width: usize,
+    mx: usize,
+    my: usize,
+    ground: Option<&str>,
+) -> Vec<Line<'static>> {
+    let mut out: Vec<_> = lines
+        .into_iter()
+        .map(|line| indent(text::fill(line, ground, width), mx))
+        .collect();
     out.splice(0..0, vec![Line::default(); my]);
     out.extend(vec![Line::default(); my]);
     out

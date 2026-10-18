@@ -20,7 +20,7 @@
 //! thrown away as an error. A report would cost a person their keyboard, so
 //! bingo never sets the mode (`crates/bingo/tests/pty/look.rs` measures it).
 //!
-//! **`OSC 11`**, where bingo asks, is the open one — the same question the
+//! **`OSC 10` and `OSC 11`**, where bingo asks, is the open one — the same question the
 //! probe asks before the first frame ([`theme::QUESTION`]), put again on
 //! [`Term::FocusGained`] and on a slow clock while the run is idle. The answer
 //! lands in crossterm's key stream, where [`crate::late`] already hears an
@@ -43,7 +43,7 @@ use crate::theme;
 use super::Run;
 
 /// How long an idle run leaves the terminal alone between questions. The
-/// question is six bytes and the reply is read whole by [`crate::late`], so
+/// replies are read whole by [`crate::late`], so
 /// the clock is set by the eye and not by the wire: a person whose system
 /// turned light under a window they never left should see the tints follow
 /// before they wonder — the ink already has, on its own (M73). Two seconds is

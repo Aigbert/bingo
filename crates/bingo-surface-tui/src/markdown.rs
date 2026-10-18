@@ -564,12 +564,12 @@ mod tests {
         );
         assert_eq!(
             lines[0].spans[1].style,
-            theme::raised().patch(theme::mode()),
+            theme::raised().patch(theme::ink(theme::Ink::Keyword)),
             "`fn` is a keyword"
         );
         assert_eq!(
             lines[1].spans[1].style,
-            theme::raised().patch(theme::dim()),
+            theme::raised().patch(theme::ink(theme::Ink::Comment)),
             "the comment"
         );
     }
