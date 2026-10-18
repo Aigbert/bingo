@@ -339,6 +339,7 @@ fn permission_with_the_feedback_row_open() {
         Some(Preview::Command {
             command: "rm -rf build".into(),
             description: None,
+            stakes: None,
             cwd: "/tmp/project".into(),
         }),
     );

@@ -206,7 +206,7 @@ impl PermissionPolicy for PermissionsPolicy {
         MANIFEST.id
     }
 
-    fn caution(&self, input: PolicyInput<'_>) -> Option<String> {
+    fn caution(&self, input: PolicyInput<'_>) -> Option<bingo_sdk::Caution> {
         caution::subjects(input.subjects)
     }
 

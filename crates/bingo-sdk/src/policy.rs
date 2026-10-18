@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::event::Caution;
 use crate::ids::SessionId;
 use crate::tool::{Subject, ToolCall, ToolTraits};
 use serde_json::Value;
@@ -81,7 +82,7 @@ pub trait PermissionPolicy: Send + Sync {
     async fn decide(&self, input: PolicyInput<'_>) -> Decision;
 
     /// A warning attached to an ask; a warned call never offers a session rule.
-    fn caution(&self, _input: PolicyInput<'_>) -> Option<String> {
+    fn caution(&self, _input: PolicyInput<'_>) -> Option<Caution> {
         None
     }
 

@@ -135,8 +135,12 @@ pub enum InteractionKind {
         /// The rule `AllowSession` would install, when one would silence the prompt.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session_scope: Option<String>,
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        caution: Option<String>,
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "read_caution"
+        )]
+        caution: Option<Caution>,
     },
     /// One question on its own. It holds [`Question`] flattened, so the frame
     /// it makes is the one it always was.
@@ -240,6 +244,38 @@ pub enum AnswerRole {
     Refusing,
 }
 
+/// Why a call needs care, and the act its one-time approval names.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Caution {
+    pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub act: Option<String>,
+}
+
+fn read_caution<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Caution>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Read {
+        Legacy(String),
+        Named(Caution),
+    }
+    Ok(
+        Option::<Read>::deserialize(deserializer)?.map(|value| match value {
+            Read::Legacy(reason) => Caution { reason, act: None },
+            Read::Named(caution) => caution,
+        }),
+    )
+}
+
+/// The local consequences a command preview can establish before it runs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct Stakes {
+    pub line: String,
+    pub items: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Preview {
@@ -251,6 +287,8 @@ pub enum Preview {
         cwd: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         description: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        stakes: Option<Stakes>,
     },
     Url {
         url: String,

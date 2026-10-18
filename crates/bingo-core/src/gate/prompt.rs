@@ -14,10 +14,10 @@ pub(super) async fn ask_person(
     prompter: &dyn Prompter,
 ) -> Reply {
     let caution = policy.caution(input).or_else(|| {
-        input
-            .traits
-            .destructive
-            .then(|| "this call can irreversibly destroy data".into())
+        input.traits.destructive.then(|| Caution {
+            reason: "this call can irreversibly destroy data".into(),
+            act: None,
+        })
     });
     let scope = scope.filter(|_| caution.is_none() && blocked.is_none());
     let answers = answers(
@@ -34,7 +34,9 @@ pub(super) async fn ask_person(
             .unwrap_or_else(|| summarize(input.call, input.subjects)),
         preview: tool.preview(&input.call.input, input.cwd),
         session_scope: scope.clone(),
-        caution: blocked.or(caution),
+        caution: blocked
+            .map(|reason| Caution { reason, act: None })
+            .or(caution),
     };
     let answer = prompter
         .ask(kind, answers.clone())

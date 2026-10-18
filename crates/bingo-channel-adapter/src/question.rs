@@ -355,6 +355,7 @@ mod tests {
                 preview: Some(Preview::Command {
                     command: "cargo test".into(),
                     description: None,
+                    stakes: None,
                     cwd: "/tmp".into(),
                 }),
                 session_scope: scope.map(str::to_owned),

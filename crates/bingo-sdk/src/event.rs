@@ -9,8 +9,8 @@ mod raw;
 mod record;
 
 pub use interaction::{
-    Activation, Answer, AnswerRole, AnswerSpec, CancelReason, Interaction, InteractionKind,
-    LoginFlow, Preview, Question, QuestionOption, ResolvedBy, Rung,
+    Activation, Answer, AnswerRole, AnswerSpec, CancelReason, Caution, Interaction,
+    InteractionKind, LoginFlow, Preview, Question, QuestionOption, ResolvedBy, Rung, Stakes,
 };
 pub use record::UnknownRecord;
 

@@ -30,6 +30,7 @@ impl Tool for Shell {
             command: input["command"].as_str().unwrap_or_default().into(),
             cwd: "/work".into(),
             description: None,
+            stakes: None,
         })
     }
     async fn call(&self, _: Value, _: &ToolContext) -> Result<ToolOutput, ToolError> {
@@ -44,6 +45,12 @@ impl PermissionPolicy for Policy {
     }
     fn id(&self) -> &str {
         "fixture"
+    }
+    fn caution(&self, input: PolicyInput<'_>) -> Option<Caution> {
+        (input.call.input["command"] == "git push --force origin dev").then(|| Caution {
+            reason: "rewrites remote history".into(),
+            act: Some("force-push".into()),
+        })
     }
     async fn decide(&self, input: PolicyInput<'_>) -> Decision {
         match input.call.input["command"].as_str().unwrap_or_default() {
@@ -184,12 +191,12 @@ async fn destructive_input_has_caution_and_no_session_answer() {
     .await;
     let asks = person.asks.lock().unwrap();
     assert!(matches!(
-        asks[0].0,
+        &asks[0].0,
         InteractionKind::Permission {
-            caution: Some(_),
+            caution: Some(Caution { reason, act: None }),
             session_scope: None,
             ..
-        }
+        } if reason == "this call can irreversibly destroy data"
     ));
     assert!(!asks[0].1.contains(&AnswerSpec::AllowSession));
 }
@@ -237,4 +244,21 @@ async fn permission_input_is_the_call_after_pre_tool_hooks() {
     };
     assert_eq!(input, &json!({"command":"cargo check"}));
     assert_eq!(input, &result.call.input);
+}
+
+#[tokio::test]
+async fn a_policy_caution_keeps_its_act_and_drops_the_session_scope() {
+    let (result, person) = run(
+        "git push --force origin dev",
+        vec![Answer::AllowSession {
+            scope: "Bash(cargo:*)".into(),
+        }],
+    )
+    .await;
+    assert!(matches!(result.gate, Gate::Denied { .. }));
+    let asks = person.asks.lock().unwrap();
+    assert!(matches!(&asks[0].0, InteractionKind::Permission {
+        caution: Some(Caution { reason, act: Some(act) }), session_scope: None, ..
+    } if reason == "rewrites remote history" && act == "force-push"));
+    assert!(!asks[0].1.contains(&AnswerSpec::AllowSession));
 }

@@ -26,6 +26,7 @@ pub fn lines(preview: &Preview, expanded: bool) -> (Vec<Line<'static>>, usize) {
             command,
             cwd,
             description,
+            ..
         } => {
             let mut rows = vec![Line::from(Span::styled(cwd.clone(), theme::dim()))];
             if let Some(description) = description {
@@ -182,6 +183,7 @@ mod tests {
                 command: "echo hi".into(),
                 cwd: "/work".into(),
                 description: Some("Print a greeting".into()),
+                stakes: None,
             },
             false,
         );
@@ -302,6 +304,7 @@ mod tests {
             &Preview::Command {
                 command: "ls -la".into(),
                 description: None,
+                stakes: None,
                 cwd: "/tmp".into(),
             },
             false,

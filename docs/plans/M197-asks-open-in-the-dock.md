@@ -100,7 +100,11 @@ When bingo needs a yes, the dock asks in the input's place:
 - `crates/bingo-sdk/src/event/interaction.rs` (`Caution`, `Stakes`), its fixtures and the
   regenerated schemas.
 - `crates/bingo-core/src/gate/prompt.rs`, `crates/bingo-permissions/src/caution.rs` and
-  `crates/bingo-tool-bash/src/lib.rs` (`preview`).
+  `crates/bingo-tool-bash/src/lib.rs` (`preview`) and `src/stakes{.rs,/tests.rs}`.
+- Data side also adapts the SDK policy trait and existing preview consumers, tests old
+  journals in `bingo-store-jsonl`, and records wire compatibility in `docs/guide/rpc.md`.
+  No dependencies are added; the synchronous preview uses the existing process-tree helper
+  on a scoped thread with a Tokio runtime and one 500 ms deadline.
 
 ## Exit criteria
 

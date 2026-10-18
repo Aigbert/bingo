@@ -82,3 +82,15 @@ fn version_one_opaque_payloads_keep_their_bytes_across_the_identity_step() {
         raw
     );
 }
+
+#[test]
+fn an_old_string_caution_journal_loads() {
+    let frames = replay_fixture("string-caution.jsonl");
+    assert_eq!(frames.len(), 2);
+    let Event::InteractionOpened { interaction } = &frames[1].event else {
+        panic!("known interaction");
+    };
+    assert!(matches!(&interaction.kind, InteractionKind::Permission {
+        caution: Some(bingo_sdk::Caution { reason, act: None }), ..
+    } if reason == "rewrites remote history"));
+}

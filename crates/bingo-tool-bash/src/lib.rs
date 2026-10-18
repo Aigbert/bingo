@@ -385,6 +385,7 @@ impl Tool for BashTool {
             command: args.command,
             cwd: cwd.display().to_string(),
             description: args.description,
+            stakes: None,
         })
     }
 

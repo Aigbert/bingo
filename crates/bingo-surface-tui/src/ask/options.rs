@@ -163,7 +163,10 @@ mod tests {
             ..
         } = &mut open.kind
         {
-            *caution = Some("destructive".into());
+            *caution = Some(bingo_sdk::Caution {
+                reason: "destructive".into(),
+                act: None,
+            });
             *session_scope = None;
         }
         assert_eq!(initial(&open), 1);

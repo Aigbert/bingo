@@ -78,7 +78,7 @@ fn prototype_scenarios_at_both_sizes() {
             let mut open = match scenario {
                 "question" | "multi" | "crew" => question(scenario == "multi", true),
                 "form" => interaction(InteractionKind::Form { title: Some("repository".into()), questions: vec![serde_json::from_value(json!({"question":"Title","options":[],"freeText":true,"multi":false})).unwrap(), serde_json::from_value(json!({"question":"Draft","options":[{"id":"yes","label":"yes"}],"multi":true})).unwrap()] }, vec![AnswerSpec::Form, AnswerSpec::Cancel]),
-                "bash" | "danger" => permission(Some("Bash(cargo:*)"), Some(Preview::Command { command: if scenario == "danger" { "rm -rf build" } else { "cargo test" }.into(), cwd:"/work".into(),description:None })),
+                "bash" | "danger" => permission(Some("Bash(cargo:*)"), Some(Preview::Command { command: if scenario == "danger" { "rm -rf build" } else { "cargo test" }.into(), cwd:"/work".into(),description:None,stakes:None })),
                 _ => permission(Some("Edit(src/)"), Some(Preview::Diff { unified:"-old\n+new".into() })),
             };
             if let InteractionKind::Permission {
@@ -92,7 +92,10 @@ fn prototype_scenarios_at_both_sizes() {
                     *tool = "Bash".into();
                 }
                 if scenario == "danger" {
-                    *caution = Some("recursive deletion can permanently remove files".into());
+                    *caution = Some(bingo_sdk::Caution {
+                        reason: "recursive deletion can permanently remove files".into(),
+                        act: None,
+                    });
                     *session_scope = None;
                 }
             }
@@ -165,7 +168,10 @@ fn caution_starts_on_no_and_escape_denies_and_stops() {
     let mut open = permission(None, None);
     open.guard_until = Some(ts() + jiff::SignedDuration::from_secs(60));
     if let InteractionKind::Permission { caution, .. } = &mut open.kind {
-        *caution = Some("destructive".into());
+        *caution = Some(bingo_sdk::Caution {
+            reason: "destructive".into(),
+            act: None,
+        });
     }
     let (tree, mut ui, now) = scene_for(open, false);
     let screen = draw_tree(80, 24, &tree, &mut ui, now);

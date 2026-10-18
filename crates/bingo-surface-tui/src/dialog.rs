@@ -354,7 +354,7 @@ fn caution_rows(interaction: &Interaction) -> Vec<(Line<'static>, Option<usize>)
     {
         out.push((
             Line::from(Span::styled(
-                format!("     no allow this session here: {caution}"),
+                format!("     no allow this session here: {}", caution.reason),
                 theme::presence(),
             )),
             None,

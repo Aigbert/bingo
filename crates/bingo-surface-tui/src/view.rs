@@ -947,6 +947,7 @@ mod tests {
                 Some(Preview::Command {
                     command: "rm -rf build".into(),
                     description: None,
+                    stakes: None,
                     cwd: "/tmp/project".into(),
                 }),
             )),
