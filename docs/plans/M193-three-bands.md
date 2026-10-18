@@ -124,13 +124,9 @@ wordmark and the exit receipt (M199).
 - [x] Growth — same command: `growth_samples_each_fourteen_ms_step_and_shrinks_at_once ... ok` (3→14, every 14 ms, immediate shrink).
 - [x] Smoke — `TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`; readiness now waits for footer `fake-1`.
 - [x] Drive — `python3 docs/verification/m193/drive.py`: `PASS 100x32` / `PASS 80x24`, each followed by `CLEAN`; idle/live/done, four modes, toast expiry and moving edge; private fake-provider HOME/data/cwd. Text and ANSI captures in `docs/verification/m193/`.
-- [x] `cargo fmt --all -- --check`: exit 0, no output.
-- [x] `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 36.00s`.
-- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 50.88s`.
-- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6452 passed; 0 failed; 0 ignored**; TUI 1396, PTY 19. `cargo build -p bingo --locked`: exit 0.
-- [x] `scripts/check_discipline.sh`: `discipline ok` (advisory warnings only).
-- [x] `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `1s`, TUI relink `0 crates`; `target/debug: 14 GB (soft max 5)` warning; `budget ok`.
-- [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked` and `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile` each.
+- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6455 passed; 0 failed; 0 ignored**; TUI 1399, PTY 19. `cargo build -p bingo --locked`: exit 0.
+- [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`, `budget ok` (disk warning); `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
 - [x] Windows — `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: SDK, core, mod-hello, mod-keybar and tool-bash each `Finished dev profile`, exit 0.
 - [ ] Same Windows check for permissions/TUI/bingo: exit 101. Permissions' tree-sitter lacks `stdio.h`/`stdlib.h`; TUI's aws-lc-sys lacks `stdlib.h`/`windows.h`; bingo's rquickjs-sys rejects `/std:c11`. Native-toolchain checks remain owed; no bypass.
 - [ ] Full frames: explicitly deferred by the task until the reviewer assigns the second-to-land criterion; M194's stream rows/fold retirement remain untouched.
@@ -139,11 +135,8 @@ wordmark and the exit receipt (M199).
 - Harness fix: M192 omitted snapshot/capture's `T0 = 10_000_000`; `Capture::now` now includes that origin, needed for the exact `mode-later` caret ink. Scene captures and prototype are unchanged.
 - Smoke found the retired opening's invisible focus swallowing the first character after a pane closed; removed it and pinned `the_first_key_is_typed ... ok`. Two PTY expectations changed for the embedded caret and footer clipping; no unrelated test failures remained.
 - Snapshots: sampled before bulk re-pin; 408 updated for removed header/notice/key/status/crew rows, bottom anchoring, embedded caret and footer ink. Twelve deleted because the old opening animation is gone; M199 owns the replacement wordmark.
-- Deleted under `crates/bingo-surface-tui/src/opening/snapshots/`, each with prefix `bingo_surface_tui__opening__storyboard__`:
-  `shot_0_0_80.snap`, `shot_0_5_80.snap`, `shot_1_2_80.snap`, `shot_2_0_80.snap`, `shot_2_4_80.snap`.
-- Deleted under `crates/bingo-surface-tui/src/screens/snapshots/`, each with prefix `bingo_surface_tui__screens__opening__`:
-  `opening_line_120x40.snap`, `opening_line_80x24.snap`, `opening_rest_120x40.snap`, `opening_rest_80x24.snap`,
-  `opening_words_120x40.snap`, `opening_words_80x24.snap`, `opening_words_daylight.snap`.
+- Deleted under `crates/bingo-surface-tui/src/opening/snapshots/`, prefix `bingo_surface_tui__opening__storyboard__`: `shot_0_0_80.snap`, `shot_0_5_80.snap`, `shot_1_2_80.snap`, `shot_2_0_80.snap`, `shot_2_4_80.snap`.
+- Deleted under `crates/bingo-surface-tui/src/screens/snapshots/`, prefix `bingo_surface_tui__screens__opening__`: `opening_line_120x40.snap`, `opening_line_80x24.snap`, `opening_rest_120x40.snap`, `opening_rest_80x24.snap`, `opening_words_120x40.snap`, `opening_words_80x24.snap`, `opening_words_daylight.snap`.
 - Shared files: `pointer.rs` removes retired Intro/crew targets; `transcript.rs` drops the opening adapter/height; `transcript/said.rs` uses `grid::fit`; `transcript/slots.rs` supplies optional meanings. `blocks.rs`/`worked.rs` only adjust tests. No M194 merge attempted.
 - No dependency additions. Site/footer/activity clocks return `Drawing` deadlines; Layout collects them. Mode flash reuses the existing acknowledgement timestamp; end flash reads `last_turn`.
 - Round 2 — typed mode notices, 10 s caret rest, delayed wakes, deadline fold, cleanup and four prototype fixes; contracts and ten regressions fail without fixes and pass with them. [Evidence and final gates](../verification/m193/review-round2.txt). Four needs-you snapshots updated; none deleted this round.
@@ -153,4 +146,5 @@ wordmark and the exit receipt (M199).
 - The title's attention mark: the prototype says “waiting on you” once, with the edge (`p8-page.js`).
 - `ctrl+c again to exit` as a right pair: it becomes a toast in M196.
 - M198 handoff: with the stream bottom-anchored, ui.block/view-table, rewind, plugins and pager overlays cover its newest rows; M198 makes them dock sheets that push the stream up. Unchanged this round.
-- Round 3 — send/end scrollbar regressions and zero-height footer/edge/ask wakes fail before and pass after; local notice lifetime/payload, shared submissions, all needs-you paths and review cleanups verified. [Evidence and gates](../verification/m193/review-round3.txt). No Ember capture or .snap changes; no wall-clock retries.
+- Round 3 — send-scrollbar and zero-height footer/edge/ask regressions fail before and pass after; local notice lifetime/payload, shared submissions, all needs-you paths and review cleanups verified. [Evidence and gates](../verification/m193/review-round3.txt). No Ember capture or .snap changes; no wall-clock retries.
+- Round 4 — welcome/inline-ask collection precedes clipping; Scroll owns flash expiry; four regressions fail without fixes and pass with them, including heights 1–60. Matching rows and all nits fixed; [evidence and gates](../verification/m193/review-round4.txt).

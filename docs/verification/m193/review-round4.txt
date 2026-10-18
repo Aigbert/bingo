@@ -1,0 +1,123 @@
+M193 round 4
+
+Regression command:
+cargo test -p bingo-surface-tui --lib --locked view::part_deadlines
+
+Before: restored HEAD production view.rs, ask/drawing.rs and scroll.rs while
+retaining the final tests (including truecolor and motion). All four fail:
+  test view::part_deadlines::end_and_page_keys_schedule_the_scroll_flash_without_overflow ... FAILED
+  test view::part_deadlines::part_deadlines_do_not_depend_on_terminal_height ... FAILED
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_welcomes_entrance ... FAILED
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_inline_asks_entrance ... FAILED
+  test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 1396 filtered out; finished in 0.21s
+
+After:
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_welcomes_entrance ... ok
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_inline_asks_entrance ... ok
+  test view::part_deadlines::end_and_page_keys_schedule_the_scroll_flash_without_overflow ... ok
+  test view::part_deadlines::part_deadlines_do_not_depend_on_terminal_height ... ok
+  test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1395 filtered out; finished in 0.34s
+
+- The inline question's sealed drawing and the Welcome hook return an entrance
+  starting 10 ms later. The folded session/config and accepted render responses
+  travel through the normal frame path at 80x4 (transcript height zero).
+  These run with motion and truecolor: their only deadline is TextMotion::Fade.
+  The fixture asserts a +10 ms deadline and no deadline under reduced motion.
+- End and PageDown on a stream with no overflow both schedule +900 ms, still
+  return that end at 899 ms, and return none at 900 ms. A held scroll selects
+  the ease frame first, then the flash's end once the ease has finished.
+- The sweep renders all heights 1 through 60 at three moments. It combines a
+  Welcome entrance, a toast, a completed-turn edge flash and a stamped scroll
+  flash, with no animated transcript rows. The expected wake is respectively
+  the welcome (+10 ms), scroll (+800 ms), then toast (+2200 ms). Each geometry
+  starts settled so resizing does not introduce a separate growth deadline.
+- The existing send/PageUp/End visibility guard is unchanged. The direct
+  scrollbar ink guard still checks 0/899/900 ms; its old assertion that drawing
+  schedules a frame is removed because Scroll now owns the wake.
+- The synthetic place-only ask test is replaced by the full-frame regression:
+  splice collects before fitting, while place only places.
+
+Implementation and nits:
+- view::render_transcript runs Welcome and splice before its zero-height guard.
+  splice collects its drawing immediately. Visible transcript row refresh and
+  next_change folding still use visible_lines; transcript.rs/clock.rs untouched.
+- scroll::FLASH names 900 ms once. Scroll::next_change folds flash and ease;
+  scrollbar reads FLASH and no longer calls wake.
+- Removed the duplicate NOTICE assertion and dead-code allowances on fit/dock_cap.
+- tree::matching owns scope/wants filtering. count uses its length; footer uses
+  those same rows for count and names. Activity still calls the same count API.
+- The needs-you test requires the "3" span before checking amber ink.
+- Both requested doc comments say footer. Verified alone was tightened: plan
+  body unchanged this round, all prior round lines and deleted snapshot names
+  retained, with the round 4 line the plan is exactly 150 lines.
+- Initial fixture debugging: ANSI disables fades; final tests explicitly use
+  truecolor. The sweep also excludes resize-growth wakes by starting each
+  geometry settled. Final tests were rerun against unmodified production code.
+- The first TUI run found the token-source audit splitting at an early cfg(test)
+  module declaration. Moving the new test module declaration after production
+  code fixed it; no token allow-list changes. This was not a wall-clock failure.
+
+Gates (one at a time, all exit 0):
+cargo fmt --all -- --check
+  no output
+cargo check --workspace --all-targets --locked
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.32s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.21s
+cargo test --workspace --locked (provider credentials unset)
+  123 result lines: 6455 passed; 0 failed; 0 ignored
+  TUI: 1399 passed; PTY: 19 passed; no wall-clock retries
+  All four part_deadlines tests ... ok
+  a_breathing_row_off_screen_neither_redraws_nor_schedules ... ok
+  m193_capture_dock_and_footer_bands ... ok (11 captures)
+  sending_while_following_does_not_flash_the_scrollbar ... ok (unchanged end-key guard)
+  the_scrollbar_stays_for_nine_hundred_ms_at_the_end ... ok
+  needs_you_names_one_two_or_many_with_their_inks ... ok
+scripts/check_discipline.sh
+  discipline ok (existing advisory warnings only; no M193 plan-length warning)
+scripts/budget.sh
+  dependencies (unique, normal): 423 (max  423)
+  warm cargo check -p bingo-core: 0s (max  20s)
+  relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+  target/debug: 14 GB (soft max  5); disk warning retained; budget ok
+cargo deny check
+  advisories ok, bans ok, licenses ok, sources ok
+
+Windows (all crates touched by M193, one at a time):
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s; exit 0
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s; exit 0
+cargo check -p bingo-mod-hello --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s; exit 0
+cargo check -p bingo-mod-keybar --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.11s; exit 0
+cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s; exit 0
+cargo check -p bingo-permissions --all-targets --target x86_64-pc-windows-msvc
+  exit 101: tree-sitter lacks stdio.h; tree-sitter-bash lacks stdlib.h
+cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+  exit 101: aws-lc-sys lacks stdlib.h/windows.h
+cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc
+  exit 101: rquickjs-sys clang rejects '/std:c11'
+The known native cross-toolchain stops remain owed; no bypass.
+
+Terminal verification:
+cargo build -p bingo --locked
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.07s; exit 0
+TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh
+  tui-smoke ok; exit 0
+python3 docs/verification/m193/drive.py
+  PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+  CLEAN 100x32: owned tmux server stopped; temporary files removed
+  PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+  CLEAN 80x24: owned tmux server stopped; temporary files removed
+  exit 0; idle/live/done, four modes, toast expiry and moving edge checked.
+  Text/ANSI drive captures refreshed for this run's clock and sampled ink.
+
+wc -l docs/plans/M193-three-bands.md
+  150 docs/plans/M193-three-bands.md
+No Ember captures or .snap files changed; no deleted snapshots this round.
+No dependency additions, no rebase/merge/push, no other worktree changes.
+Full-frame verification remains deferred to the second-to-land review.
+The M198 overlay-to-dock-sheet handoff remains recorded and unchanged.
