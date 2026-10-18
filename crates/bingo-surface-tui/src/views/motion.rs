@@ -25,7 +25,7 @@ pub fn style(style: Style, motion: Option<&TextMotion>, now: Option<Now>) -> Sty
         TextMotion::Fade { from, at_ms, ms } => {
             theme::blend_style(style, from, 1.0 - clock::prog(now, *at_ms, *ms)).unwrap_or(style)
         }
-        TextMotion::Spin => style,
+        TextMotion::Spin | TextMotion::Unknown => style,
     }
 }
 

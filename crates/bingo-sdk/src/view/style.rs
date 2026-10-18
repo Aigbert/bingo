@@ -9,7 +9,11 @@ pub struct TextStyle {
     /// A surface-clock animation; the author never needs to redraw it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub motion: Option<Box<TextMotion>>,
-    /// A colour name or `#rrggbb`; the surface may adjust it to its theme.
+    /// An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,
+    /// good, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.
+    /// Ground inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,
+    /// addWord, delWord, badTint, amberTint, glowTint.
+    /// Legacy ash, presence and attention are accepted; unknown names draw plain.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
     /// Draw the text dimmed.
@@ -239,4 +243,7 @@ pub enum TextMotion {
         at_ms: i64,
         ms: u64,
     },
+    #[serde(other)]
+    #[schemars(skip)]
+    Unknown,
 }

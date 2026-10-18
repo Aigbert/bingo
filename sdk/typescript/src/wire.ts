@@ -1515,7 +1515,13 @@ export type View = ({
   "bold"?: (boolean | null);
   /** Strings and nested `Text` nodes, drawn in order. */
   "children": Array<TextChild>;
-  /** A colour name or `#rrggbb`; the surface may adjust it to its theme. */
+  /**
+   * An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,
+   * good, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.
+   * Ground inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,
+   * addWord, delWord, badTint, amberTint, glowTint.
+   * Legacy ash, presence and attention are accepted; unknown names draw plain.
+   */
   "color"?: (string | null);
   /** Draw the text dimmed. */
   "dimColor"?: (boolean | null);

@@ -375,7 +375,7 @@
                 }
               },
               "color": {
-                "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
+                "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                 "type": [
                   "string",
                   "null"
@@ -2778,7 +2778,7 @@
                     }
                   },
                   "color": {
-                    "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
+                    "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                     "type": [
                       "string",
                       "null"
@@ -7348,7 +7348,7 @@
                     }
                   },
                   "color": {
-                    "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
+                    "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                     "type": [
                       "string",
                       "null"
@@ -10933,7 +10933,7 @@
                     }
                   },
                   "color": {
-                    "description": "A colour name or `#rrggbb`; the surface may adjust it to its theme.",
+                    "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                     "type": [
                       "string",
                       "null"

@@ -17,3 +17,24 @@ fn ember_styles_round_trip_without_losing_the_motion_contract() {
         assert_eq!(serde_json::to_value(view).unwrap(), value);
     }
 }
+
+#[test]
+fn unknown_motion_keeps_the_view_readable() {
+    let view: View = serde_json::from_value(json!({
+        "kind":"Text", "motion":{"kind":"shimmer"}, "children":["hello"]
+    }))
+    .unwrap();
+    assert_eq!(view.fold(), "hello");
+}
+
+#[test]
+fn unknown_motion_is_not_an_authoring_variant() {
+    let schema = serde_json::to_value(schemars::schema_for!(bingo_sdk::view::TextMotion)).unwrap();
+    let kinds: Vec<_> = schema["oneOf"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|variant| variant["properties"]["kind"]["const"].as_str().unwrap())
+        .collect();
+    assert_eq!(kinds, ["breathe", "spin", "fade"]);
+}
