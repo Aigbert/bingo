@@ -692,3 +692,6 @@ mod runtime_contract {
 
 #[cfg(test)]
 mod inspection_tests;
+
+#[cfg(test)]
+mod legacy_time_tests;
