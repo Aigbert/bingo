@@ -635,6 +635,7 @@ fn a_person_who_turned_wakes_off_is_offered_no_wake_tool() {
         said.contains("tool not found: Wake"),
         "the call found no such tool: {said}"
     );
+    assert_missing_call(&out, "Wake");
     assert!(
         !said.contains("`schedule.wakes` is false"),
         "and there is no description left to explain itself with: {said}"

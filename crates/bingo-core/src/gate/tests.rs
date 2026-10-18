@@ -293,3 +293,5 @@ async fn a_failed_prompter_closes_the_call_without_a_receipt() {
     );
     assert!(result.receipt.is_none());
 }
+
+mod missing;

@@ -747,6 +747,33 @@ fn openai_without_credentials_names_the_variable_before_any_turn() {
     assert_eq!(err.lines().count(), 1, "{err}");
 }
 
+/// A missing call is never asked and never begins.
+fn assert_missing_call(out: &Output, tool: &str) {
+    let frames = frames_of(out);
+    let call = frames
+        .iter()
+        .find_map(|frame| match &frame.event {
+            Event::ItemCompleted { item }
+                if matches!(&item.body,
+            bingo_sdk::ItemBody::ToolCall { name, .. } if name == tool) =>
+            {
+                Some(item)
+            }
+            _ => None,
+        })
+        .expect("missing tool has a completed call");
+    assert_eq!(call.status, bingo_sdk::ItemStatus::Failed);
+    let bingo_sdk::ItemBody::ToolCall {
+        asked_at, began_at, ..
+    } = &call.body
+    else {
+        unreachable!()
+    };
+    assert_eq!((*asked_at, *began_at), (None, None));
+    assert!(!frames.iter().any(|frame| matches!(&frame.event,
+        Event::InteractionOpened { interaction } if interaction.item.as_ref() == Some(&call.id))));
+}
+
 /// The frames a `--output-format json` run wrote to stdout.
 fn frames_of(out: &Output) -> Vec<Frame> {
     stdout(out)

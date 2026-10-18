@@ -101,10 +101,11 @@ pub(crate) async fn check_kernel(
             });
         }
     };
+    // resolve_check settles a missing tool, so the policy is not asked.
     let Some(tool) = &input.tool else {
         return Ok(CheckResult {
             call,
-            decision: Decision::Allow {
+            decision: Decision::Deny {
                 reason: Reason::Default,
             },
         });

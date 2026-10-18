@@ -132,6 +132,7 @@ pub(crate) enum Decided {
 }
 
 pub(crate) struct Waiting {
+    tool: Arc<dyn Tool>,
     call: ToolCall,
     traits: ToolTraits,
     scope: Option<String>,
@@ -263,11 +264,20 @@ fn changed_decision(receipt: Option<&ItemBody>) -> DecisionKind {
 
 fn resolve_check(checked: CheckResult, input: &GateInput<'_>, changed: bool) -> Decided {
     let CheckResult { call, decision } = checked;
-    let traits = input
-        .tool
-        .as_ref()
-        .map(|tool| tool.traits(&call.input))
-        .unwrap_or_default();
+    let Some(tool) = input.tool.clone() else {
+        let message = match decision {
+            Decision::Deny {
+                reason: Reason::Hook { hook },
+            } => hook,
+            _ => crate::executor::tool_not_found(&call.name),
+        };
+        return Decided::Settled(Box::new(Gated::denied(
+            call,
+            ToolTraits::default(),
+            message,
+        )));
+    };
+    let traits = tool.traits(&call.input);
     let (scope, reason, blocked) = match decision {
         Decision::Allow { reason } => {
             let mut result = Gated::allowed(call, traits, reason);
@@ -289,6 +299,7 @@ fn resolve_check(checked: CheckResult, input: &GateInput<'_>, changed: bool) -> 
         Decision::Ask { scope, reason } => (scope, reason, None),
     };
     Decided::Ask(Box::new(Waiting {
+        tool,
         call,
         traits,
         scope,
@@ -305,6 +316,7 @@ async fn ask_waiting(
     asked: &mut Option<Asked>,
 ) -> Result<Gated, ToolCall> {
     let Waiting {
+        tool,
         call,
         traits,
         scope,
@@ -312,9 +324,6 @@ async fn ask_waiting(
         blocked,
         ..
     } = waiting;
-    let Some(tool) = &input.tool else {
-        return Ok(Gated::denied(call, traits, "tool not found".into()));
-    };
     let subjects = tool.subjects(&call.input, input.cwd);
     let confirm = match reason {
         Reason::Confirm { detail } => Some(detail),

@@ -116,6 +116,10 @@ pub(crate) fn interrupted(pc: &PendingCall) -> ToolOutcome {
     }
 }
 
+pub(crate) fn tool_not_found(name: &str) -> String {
+    format!("tool not found: {name}")
+}
+
 async fn run_one(
     pc: &PendingCall,
     cx: ToolContext,
@@ -136,7 +140,7 @@ async fn run_one(
     }
     let Some(tool) = &pc.tool else {
         return finish(
-            ToolOutput::error(format!("tool not found: {}", pc.call.name)),
+            ToolOutput::error(tool_not_found(&pc.call.name)),
             ItemStatus::Failed,
         );
     };

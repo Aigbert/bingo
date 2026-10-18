@@ -100,6 +100,7 @@ fn a_tool_plugin_switched_off_is_written_listed_and_gone_from_the_model_s_tools(
         "the model reached for a tool this run does not have: {}",
         stdout(&after)
     );
+    assert_missing_call(&after, "WebFetch");
 
     let unused = script(UNUSED);
     let table = run(bingo()
@@ -204,6 +205,7 @@ fn an_external_plugin_is_listed_switched_and_never_spawned() {
         "the process was never spawned, so it contributed nothing: {}",
         stdout(&out)
     );
+    assert_missing_call(&out, "plugin__wordcount__count");
 
     let unused = script(UNUSED);
     let table = run(bingo()
