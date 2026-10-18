@@ -2,7 +2,7 @@
 
 ADR-0002 (one stream), ADR-0074 (every dispatch is a chain), AGENTS.md (one esc ends the turn).
 Spec: `docs/design/ember/` (`p4-model.js` `askBeat`, `pauseFor`, `resume`, `stopTurn`;
-`p4b-data.js` `answeredBy`). After: M201 for bricks 1-5, and M194 part B for brick 6.
+`p4b-data.js` `answeredBy`). After: M201 for bricks 1-5 and 7, and M194 part B for brick 6.
 This changes when bingo asks; the person left that call to the plan (2026-10-18).
 
 ## Goal
@@ -31,8 +31,18 @@ person is asked about a call whose turn has not come.
 1. **The round's order** (a pure brick, tests first).
    - Input: the calls in order, and for each reached call its gate outcome: allowed and
      concurrency-safe, allowed and not, denied, or needs a person. Also what is in flight.
-   - Output: the next action. One of: start it beside what is in flight; wait for what is in
-     flight to land, then start it alone; wait, then ask; record the denial.
+   - Output: the next action: start the call now, wait for the next landing, record the denial
+     now, ask a person now, or the round is done.
+   - A call is reached when the walk gets to it. That means the call before it has started or
+     been denied, and no call that is not concurrency-safe is in flight. A reached call that
+     waits holds the walk. It is decided (hooks, then the policy) when it is reached.
+   - The table, by the reached call's outcome:
+     - allowed, concurrency-safe: start it while everything in flight is concurrency-safe and
+       fewer than `MAX_CONCURRENCY` are in flight, else wait for a landing;
+     - allowed, not concurrency-safe: start it when nothing is in flight, else wait;
+     - denied with nobody asked: record the denial now;
+     - needs a person: ask when nothing is in flight, else wait;
+     - none left: wait for each landing, then the round is done.
    - The table of cases is the test, written before the loop that uses it.
 2. **The gate decides before it asks.**
    - `gate.rs` returns the decision (hooks and the policy, `check`) before anyone is asked.
@@ -64,11 +74,18 @@ person is asked about a call whose turn has not come.
      It appears when its ask opens (`◆ needs you`) or when it starts (the spinner), as a
      prototype step appears when it begins.
    - `--print`, the RPC, ACP and the channels change only in frame order.
+7. **A stop says once when the person was asked** (handed on by M201's review).
+   - Today the turn builds its Interruption with no `asked_at`, and `emit` stamps the journal's
+     copy on its way in. The turn's outcome and the turn-end hooks hold `None`; the journal holds
+     the time.
+   - The actor sets that time before it cancels the turn's token, as the door's `completed` is
+     set. The turn reads it when it builds its Interruption, and nothing rewrites an item on its
+     way to the journal. A stop during a re-asked call's second ask still counts from that ask.
 
 ## Files
 
 - `crates/bingo-core/src/{turn.rs,gate.rs,executor.rs}`, and the pure brick in a module of its
-  own beside them (`round.rs`).
+  own beside them (`round.rs`). For brick 7, `session.rs` and `session/{inputs,running}.rs`.
 - `crates/bingo-surface-tui/src/turns.rs`, for the unreached call.
 - Core turn and executor tests. RPC, print and ACP black-box tests where they pin frame order.
 
@@ -86,7 +103,9 @@ person is asked about a call whose turn has not come.
   - esc during an ask: the ask closes, the unreached calls are `Interrupted`, and they have no
     receipt;
   - esc during a parallel batch: as today;
-  - the after-tool hooks see the whole round once.
+  - the after-tool hooks see the whole round once;
+  - a stop during a permission ask, and one during a question: the turn's outcome, the
+    turn-end hooks and the journal hold the ask's `opened_at`; with no ask open, none does.
 - [ ] TUI: three calls where the second asks. The first row has landed, the second reads
       `needs you`, and the third is not drawn until it starts.
 - [ ] RPC, print and ACP black-box tests pass. Each test re-pinned for frame order is named in
