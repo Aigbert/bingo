@@ -104,7 +104,7 @@ fn a_card_spends_its_colour_on_the_row_the_keyboard_is_on() {
 fn a_notice_is_marked_and_everybody_else_keeps_the_bar() {
     let (mut ui, now) = scene();
     crate::theme::with(truecolor(), || {
-        let painted = painted(120, 40, &solo(&folded(reported())), &mut ui, now);
+        let painted = painted(120, 40, &solo(&folded(reported())), &mut ui, still(now));
         let row = painted.row("finished in the background");
         assert!(row.iter().any(|(text, style)| text.contains('✓')
             && style.fg == crate::theme::as_drawn(crate::theme::good()).fg));

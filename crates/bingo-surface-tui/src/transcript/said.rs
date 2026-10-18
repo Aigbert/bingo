@@ -36,14 +36,14 @@ pub fn lines(
     place: &super::Place<'_>,
     fold: Fold,
     rows: &Rows<'_>,
-) -> Vec<Line<'static>> {
+) -> crate::views::Drawing {
     if rows.state.summary.driver == Driver::Log {
-        return post(item, place, rows);
+        return post(item, place, rows).into();
     }
     match voice(origin) {
-        bingo_sdk::Voice::Aside => Vec::new(),
+        bingo_sdk::Voice::Aside => Default::default(),
         bingo_sdk::Voice::Quiet => notice(item, parts, origin, fold, rows),
-        bingo_sdk::Voice::Said | bingo_sdk::Voice::Note => super::band::draw(item, rows).lines,
+        bingo_sdk::Voice::Said | bingo_sdk::Voice::Note => super::band::draw(item, rows),
     }
 }
 
@@ -171,21 +171,18 @@ fn notice(
     origin: &Origin,
     fold: Fold,
     rows: &Rows<'_>,
-) -> Vec<Line<'static>> {
+) -> crate::views::Drawing {
     let text = said(parts);
     let text = text.trim();
     if text.is_empty() {
-        return Vec::new();
+        return Default::default();
     }
     let (head, rest) = text.split_once('\n').unwrap_or((text, ""));
     // A blank line between the headline and the rest is a separator in the
     // text — a command's prompt puts one there — and under a `⎿` it would be
     // a row spent on nothing.
     if head.starts_with(['✓', '×']) {
-        return vec![crate::views::indent(
-            quiet_head(head),
-            crate::layout::grid::TX,
-        )];
+        return super::notice::draw(head, item.started_at.as_millisecond(), rows.width, rows.now);
     }
     let rest = rest.trim_start_matches('\n');
     let mut out = speaks(
@@ -200,33 +197,7 @@ fn notice(
     if !rest.trim().is_empty() {
         out.extend(returns(kept(plain(rest), fold, OUTPUT_ROWS, None), rows));
     }
-    out
-}
-
-fn quiet_head(head: &str) -> Line<'static> {
-    let mark = head
-        .strip_prefix("✓ ")
-        .map(|text| (text, theme::glyphs::get("ok"), theme::good()))
-        .or_else(|| {
-            head.strip_prefix("× ")
-                .map(|text| (text, theme::glyphs::get("times"), theme::bad()))
-        });
-    let (text, mark, ink) = mark.unwrap_or((head, "", theme::ash()));
-    let mut line = Line::default();
-    for (index, part) in text.split(" · ").enumerate() {
-        if index > 0 {
-            line.spans.push(Span::styled(
-                theme::glyphs::get("sep"),
-                theme::foreground("faint").unwrap_or_default(),
-            ));
-        }
-        line.spans
-            .extend(crate::markdown::inline(part, theme::ash()).spans);
-    }
-    if !mark.is_empty() {
-        line.spans.insert(0, Span::styled(format!("{mark} "), ink));
-    }
-    line
+    out.into()
 }
 
 /// The conversation a delivery says it came from, where saying it tells a

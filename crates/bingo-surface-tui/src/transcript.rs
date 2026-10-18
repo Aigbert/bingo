@@ -26,6 +26,7 @@ use components::item_lines;
 
 pub(crate) mod band;
 mod chips;
+mod notice;
 use crate::component::live;
 /// Producer replacements for individual transcript rows.
 pub(crate) mod slots;
