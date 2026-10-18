@@ -80,6 +80,14 @@ unknown. The traits that pick a row's tier (`read_only`, `edit`) already belong 
 10. **Motion has a budget.** While working, only the side light, the comet and the spinner
     move. Each animation is a pure function of the clock with a still form under reduced motion,
     and each mark has an ASCII twin. The caret rests after 10 s without a key.
+    - A frame is drawn only when something it shows changes: a part's drawing carries its next
+      deadline, and the scheduler wakes at the earliest (M192).
+    - A part keeps its deadline whatever room it gets, because the deadline may be when it
+      appears, ends or changes size; a toast's end gives the footer back. Transcript rows
+      outside the visible window and the caret wake only while on screen (M193).
+    - Accepted cost: a part clipped to no room still wakes at its animation's pace, as the crew
+      lamp does in a footer too narrow to show it, and a mod's clipped part is still pulled.
+      Telling a deadline that changes a part's size from one that only changes its ink is M199's.
 11. **Colour.** M73 holds for prose: body text is the terminal's foreground, and
     muted/dim/faint are blends of the detected foreground and background. Chrome takes Ember's
     hex pairs (ember, glow, amber, good, bad, plan, auto, code and six crew colours), chosen by

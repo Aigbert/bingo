@@ -79,6 +79,9 @@ Then every one of the 105 captures passes, and what the old look left behind is 
    - Delete what nothing calls any more: old theme and glyph accessors, `motion.rs`'s cues that
      Ember's motion replaced, `activity.rs`'s leftovers, `fold.rs` where only turns used it,
      and snapshots no test reads. Each deletion is listed in Verified.
+   - A deadline says whether it changes a part's size or only its ink, and a part clipped to no
+     room keeps only the former (ADR-0097 §10). Tested: the crew lamp in a footer too narrow
+     for it schedules nothing; a clipped countdown still wakes when its text shrinks.
    - `docs/design/ember/README.md` says the shipped TUI follows the captures, and how to
      re-export them.
 
