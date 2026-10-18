@@ -178,7 +178,7 @@ keys '/model' Enter
 await '↑↓ pick'
 await 'own place ▾'
 keys Escape
-vanish '↑↓ pick'
+vanish 'own place ▾'
 finish
 
 step 'login opens one pane and one escape closes it'
@@ -187,7 +187,7 @@ keys '/login' Enter
 # The palette's KeyBar says `↑↓ pick` too: wait for the pane itself.
 await 'own place ▾'
 keys Escape
-vanish '↑↓ pick'
+vanish 'own place ▾'
 keys 'composer returned'
 await 'composer returned▍'
 finish
@@ -197,7 +197,7 @@ start '{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"too late"}]}]}'
 keys 'wait for it' Enter
 await 'esc stop'
 keys Escape
-await 'you stopped the turn'
+await 'stopped'
 finish
 
 # The same keypress before a single byte has come back: the request is still
@@ -207,7 +207,7 @@ start '{"responses":[{"steps":[{"delayBeforeStream":{"ms":60000}},{"text":"too l
 keys 'wait for the first byte' Enter
 await 'esc stop'
 keys Escape
-await 'you stopped the turn'
+await 'stopped'
 finish
 
 step 'a page up releases the tail, and the foot takes it back'
@@ -370,8 +370,9 @@ start '{"responses":[
   {"steps":[{"toolCall":{"name":"Read","input":{"file_path":"shot.png"}}}]},
   {"steps":[{"text":"That is the picture."}]}]}'
 keys 'look at it' Enter
-# A finished turn folds to one line; its picture shows with it opened.
-await '▸ 1 step'
+# Each step keeps its row; its picture shows when that output is opened.
+await '¶ read    shot.png'
+await 'That is the picture.'
 keys C-o
 await '[image: image/png]'
 await 'That is the picture.'
@@ -388,8 +389,9 @@ start '{"responses":[
   {"steps":[{"toolCall":{"name":"Read","input":{"file_path":"shot.png"}}}]},
   {"steps":[{"text":"That is the picture."}]}]}' 'BINGO_GRAPHICS=off'
 keys 'look at it' Enter
-# A finished turn folds to one line; its picture shows with it opened.
-await '▸ 1 step'
+# Each step keeps its row; its picture shows when that output is opened.
+await '¶ read    shot.png'
+await 'That is the picture.'
 keys C-o
 await '[image: image/png]'
 finish
@@ -397,7 +399,7 @@ finish
 step 'BINGO_ASCII=1 and NO_COLOR leave a terminal nothing it cannot draw'
 start '{"responses":[{"steps":[{"text":"Hello in ascii."}]}]}' 'BINGO_ASCII=1 NO_COLOR=1'
 keys 'say hello' Enter
-await '| Hello in ascii.'
+await 'Hello in ascii.'
 if pane | grep -q '⏺'; then
   echo 'tui-smoke: a glyph outside the ascii table survived BINGO_ASCII=1' >&2
   pane >&2
@@ -521,7 +523,8 @@ sealed_card() {
   esac
   if [ "$answer" = Escape ]; then
     keys Escape
-    await '0 of 1 step had run'
+    await 'said no'
+    await 'stopped'
   else
     press_until "$answer" 'Sealed done.'
   fi
@@ -560,7 +563,7 @@ keys 'echo after' Enter
 await '$ echo after'
 if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 press_until 'y' 'Changed done.'
-await 'you changed it first'
+await 'changed by you'
 pane
 finish
 
@@ -576,7 +579,12 @@ press_until x 'esc back to the ask'
 pane
 keys C-g
 press_until '2' 'Question done.'
-await 'you: Route: Beta'
+await 'Beta'
+if ! pane | grep -qE '^[[:space:]]+\? ask[[:space:]]+Beta[[:space:]]*$'; then
+  echo 'tui-smoke: the question step must end in the answer alone' >&2
+  pane >&2
+  exit 1
+fi
 if pane | grep -qF '⏺ Form'; then
   echo 'tui-smoke: question answer has a second Form receipt' >&2
   exit 1
@@ -595,7 +603,7 @@ await 'something else'
 keys -l "$(printf '\033[27u')"
 await 'Skipped question; continued.'
 await 'skipped · it decides'
-if pane | grep -qF 'you stopped the turn'; then
+if pane | grep -qE 'stopped · [0-9]+(s|m [0-9]{2}s|h [0-9]{2}m)'; then
   echo 'tui-smoke: skipping the question interrupted its turn' >&2
   exit 1
 fi
