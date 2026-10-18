@@ -36,6 +36,7 @@ pub fn rows(
             &state.summary.cwd,
             width,
             room,
+            &crate::tool_rows::Looks::in_ui(ui),
         )
     };
     let original = own(interaction, width);

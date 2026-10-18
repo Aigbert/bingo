@@ -68,10 +68,15 @@ impl Pager {
         }
     }
 
-    pub fn content(&self, tree: &Tree, width: usize) -> (String, Vec<Line<'static>>) {
+    pub fn content(
+        &self,
+        tree: &Tree,
+        width: usize,
+        tools: &crate::tool_rows::Looks,
+    ) -> (String, Vec<Line<'static>>) {
         match &self.source {
             Source::Item(id) => source(tree, id)
-                .map(|(state, item)| (title(item, state), content(state, item, width, self)))
+                .map(|(state, item)| (title(item, state, tools), content(state, item, width, self)))
                 .unwrap_or_default(),
             Source::Text { title, text } => (title.clone(), markdown::render(text, width)),
         }
@@ -206,7 +211,7 @@ fn reasoning(state: &SessionState, item: &Item, width: usize) -> Vec<Line<'stati
 
 /// What the sheet is of, on its first row: the row's own signature, a call
 /// on a memory file included (M84).
-pub fn title(item: &Item, state: &SessionState) -> String {
+pub fn title(item: &Item, state: &SessionState, tools: &crate::tool_rows::Looks) -> String {
     if let Some((title, badge)) =
         bingo_sdk::slot::placed(state)
             .into_iter()
@@ -244,7 +249,8 @@ pub fn title(item: &Item, state: &SessionState) -> String {
             {
                 return call.title;
             }
-            let about = transcript::summarize(input);
+            let about =
+                crate::tool_rows::resolve(name, input, tools, theme::bullet().is_ascii()).target;
             format!("{name}({about})")
         }
         ItemBody::Shell { command, .. } => format!("$ {command}"),
@@ -326,7 +332,8 @@ fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
         return Vec::new();
     };
     let width = width_of(ui);
-    open.content(tree, width).1
+    open.content(tree, width, &crate::tool_rows::Looks::in_ui(ui))
+        .1
 }
 
 /// The pager owns the keyboard while it is up: `j/k` and the page keys move
@@ -450,6 +457,15 @@ mod tests {
     use crate::test_support::*;
     use bingo_sdk::{ItemStatus, ToolOutput};
 
+    #[test]
+    fn pager_titles_keep_declared_targets() {
+        for (name, input, look, target, _) in crate::tool_rows::cases() {
+            let tools = crate::tool_rows::declared(name, look);
+            let item = tool("itm_look", name, input, None, ItemStatus::Completed);
+            assert_eq!(title(&item, &state(), &tools), format!("{name}({target})"));
+        }
+    }
+
     fn window(height: usize) -> Window {
         Window { height, rows: 10 }
     }
@@ -496,7 +512,10 @@ mod tests {
         let content = sheet_of(&item, 60);
         assert_eq!(content.len(), 40);
         assert_eq!(content[39].to_string(), "line 40");
-        assert_eq!(title(&item, &state()), "Read(src/lib.rs)");
+        assert_eq!(
+            title(&item, &state(), &Default::default()),
+            "Read(src/lib.rs)"
+        );
     }
 
     #[test]
@@ -516,7 +535,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["The manifest first, then the lockfile.".to_string()],
         );
-        assert_eq!(title(&item, &state()), "Thinking");
+        assert_eq!(title(&item, &state(), &Default::default()), "Thinking");
     }
 
     /// A run of thoughts draws as one block (M79), so it opens as one sheet:
@@ -546,7 +565,7 @@ mod tests {
             ],
         );
         assert_eq!(shown("itm_1"), shown("itm_3"), "one run, one sheet");
-        assert_eq!(title(&run[2], &state()), "Thinking");
+        assert_eq!(title(&run[2], &state(), &Default::default()), "Thinking");
     }
 
     fn thought(id: &str, text: &str) -> Item {
@@ -587,7 +606,7 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec!["42 passed".to_string()],
         );
-        assert_eq!(title(&call, &state()), "npm test");
+        assert_eq!(title(&call, &state(), &Default::default()), "npm test");
     }
 
     /// And a call that said nothing shows everything it has on its row, so
@@ -603,7 +622,7 @@ mod tests {
             }),
         );
         assert!(sheet_of(&call, 60).is_empty());
-        assert_eq!(title(&call, &state()), "plan");
+        assert_eq!(title(&call, &state(), &Default::default()), "plan");
     }
 
     /// A table never wraps: it folds to the width it is laid out in (design

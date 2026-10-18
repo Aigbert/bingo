@@ -10319,7 +10319,8 @@
         "mark": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 1
+          "maxLength": 1,
+          "description": "The declared one-cell mark, resolved for the surface character set."
         },
         "reads": {
           "anyOf": [
@@ -10329,14 +10330,16 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "How to render the target, absent when the call has no target."
         },
         "tier": {
-          "$ref": "#/$defs/Tier2"
+          "$ref": "#/$defs/Tier2",
+          "description": "The catalogue baseline: only trusted read-only tools are lookups."
         },
         "verb": {
           "type": "string",
-          "description": "What the step does, one lowercase word: `read`, `bash`."
+          "description": "What the step does, one lowercase word: `read`, `run`."
         },
         "target": {
           "type": "string",

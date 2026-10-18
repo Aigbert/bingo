@@ -885,6 +885,9 @@ impl Run {
             Reply::Stored(request, sessions) => palette::fill_palette(self, &request, sessions),
             Reply::Commands(fetch, result) => catalogues::received(self, fetch, result),
             Reply::Catalogue(source, ids) => {
+                if source == "tools" {
+                    self.ui.shown.blocks = Default::default();
+                }
                 if source == "plugins" {
                     self.ui.catalogs.plugins = ids;
                 } else {

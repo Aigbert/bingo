@@ -297,6 +297,7 @@ pub fn rows(
     cwd: &str,
     width: usize,
     room: usize,
+    tools: &crate::tool_rows::Looks,
 ) -> Vec<(Line<'static>, Option<usize>)> {
     if let InteractionKind::Form { questions, title } = &interaction.kind {
         let mut out = form::rows(
@@ -313,7 +314,7 @@ pub fn rows(
         out.extend(answering(dialog));
         return out;
     }
-    let mut out = vec![(title(interaction, agent, cwd, width), None)];
+    let mut out = vec![(title(interaction, agent, cwd, width, tools), None)];
     let mut preview = body(dialog, interaction);
     let limit = room.saturating_sub(options(interaction).len() + 5).max(3);
     if preview.len() > limit {
@@ -381,31 +382,36 @@ fn answering(dialog: &Dialog) -> Vec<(Line<'static>, Option<usize>)> {
 /// What kind of card this is, in the words a person reads first. A
 /// permission is the row of the step that asks, which is where it opened; a
 /// form draws its own head, which is the tab row (see [`form::rows`]).
-fn title(interaction: &Interaction, agent: Option<&str>, cwd: &str, width: usize) -> Line<'static> {
+fn title(
+    interaction: &Interaction,
+    agent: Option<&str>,
+    cwd: &str,
+    width: usize,
+    tools: &crate::tool_rows::Looks,
+) -> Line<'static> {
     if let InteractionKind::Permission { tool, input, .. } = &interaction.kind {
-        return crate::transcript::asked(&asking(tool, input, agent, cwd), width);
+        return crate::transcript::asked(&asking(tool, input, agent, cwd, tools), width);
     }
     Line::from(form::head(&named(interaction), agent))
 }
 
 /// The step a permission asks about, in its row's words.
-fn asking(tool: &str, input: &serde_json::Value, agent: Option<&str>, cwd: &str) -> Step {
-    let target = crate::transcript::summarize(input);
-    let target = shorten(target.lines().next().unwrap_or_default(), cwd);
-    Step {
-        mark: crate::theme::bullet().chars().next().unwrap_or('•'),
-        reads: Some(bingo_sdk::Reads::Text),
-        tier: bingo_sdk::component::Tier::Change,
-        verb: bingo_sdk::look::row(tool, input, None, crate::theme::bullet().is_ascii()).verb,
-        target: match agent {
-            Some(name) if target.is_empty() => format!("\u{b7} {name}"),
-            Some(name) => format!("{target} \u{b7} {name}"),
-            None => target,
-        },
-        state: StepState::Asked,
-        upshot: None,
-        answer: None,
-    }
+fn asking(
+    tool: &str,
+    input: &serde_json::Value,
+    agent: Option<&str>,
+    cwd: &str,
+    tools: &crate::tool_rows::Looks,
+) -> Step {
+    let mut step = crate::tool_rows::resolve(tool, input, tools, theme::bullet().is_ascii());
+    let target = shorten(step.target.lines().next().unwrap_or_default(), cwd);
+    step.target = match agent {
+        Some(name) if target.is_empty() => format!("· {name}"),
+        Some(name) => format!("{target} · {name}"),
+        None => target,
+    };
+    step.state = StepState::Asked;
+    step
 }
 
 fn named(interaction: &Interaction) -> String {
@@ -561,6 +567,20 @@ fn link(url: &str) -> Line<'static> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn permission_steps_keep_the_declared_look_and_target() {
+        for (name, input, look, _, target) in crate::tool_rows::cases() {
+            let tools = crate::tool_rows::declared(name, look.clone());
+            let step = asking(name, &input, None, "/work", &tools);
+            assert_eq!(step.target, target);
+            assert_eq!(step.verb, look.verb);
+            assert_eq!(step.mark, look.mark);
+            assert_eq!(step.reads, look.target.map(|t| t.reads));
+            assert_eq!(step.tier, bingo_sdk::component::Tier::Lookup);
+            assert_eq!(step.state, StepState::Asked);
+        }
+    }
 
     #[test]
     fn rough_edges_questions_are_sentences_for_the_preview() {

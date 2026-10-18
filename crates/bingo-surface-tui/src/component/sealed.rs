@@ -135,6 +135,7 @@ impl Site<'_> {
             &self.state.summary.cwd,
             width,
             self.room,
+            &crate::tool_rows::Looks::in_ui(self.ui),
         );
         if let Props::Permission(props) = props {
             let input = serde_json::to_string_pretty(&props.input).unwrap_or_default();
@@ -162,6 +163,7 @@ impl Site<'_> {
             &self.state.summary.cwd,
             self.width,
             self.room,
+            &crate::tool_rows::Looks::in_ui(self.ui),
         );
         rows.push((
             Line::from("mod drawing cannot show the sealed card whole; showing host card"),

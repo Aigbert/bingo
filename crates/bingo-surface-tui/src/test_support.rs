@@ -316,7 +316,13 @@ pub fn open_the_turns(ui: &mut Ui, state: &SessionState) {
 /// `folds` with every finished turn's line opened.
 pub fn turns_opened(state: &SessionState, folds: &crate::fold::Folds) -> crate::fold::Folds {
     let answers = crate::ask::receipts::Answers::of(state);
-    let roles = crate::turns::Roles::of(state, &Default::default(), folds, &answers, &[]);
+    let roles = crate::turns::Roles::of(
+        state,
+        &Default::default(),
+        folds,
+        &answers,
+        &Default::default(),
+    );
     let mut opened = folds.clone();
     for item in state.transcript.items() {
         if matches!(roles.of_item(&item.id), crate::turns::Role::Fold { .. }) {

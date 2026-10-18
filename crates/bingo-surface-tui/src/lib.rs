@@ -119,6 +119,7 @@ mod theme;
 /// transcript draws as one thought.
 mod thoughts;
 mod toast;
+mod tool_rows;
 mod transcript;
 mod tree;
 /// Which part each item plays in its turn: a step, a folded line, a stop

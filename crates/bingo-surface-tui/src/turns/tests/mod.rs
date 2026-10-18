@@ -2,7 +2,13 @@ use super::*;
 use crate::test_support::{finished_turn, folded, running_turn, stopped_turn, tool, worked};
 
 fn roles(state: &SessionState, folds: &Folds) -> Roles {
-    Roles::of(state, &Agents::new(), folds, &Answers::of(state), &[])
+    Roles::of(
+        state,
+        &Agents::new(),
+        folds,
+        &Answers::of(state),
+        &Default::default(),
+    )
 }
 
 fn id(raw: &str) -> ItemId {
@@ -273,9 +279,14 @@ fn a_step_reads_the_catalogue_and_uses_only_trusted_baseline_traits() {
         label: "Read".into(),
         meta: json!({"look":{"mark":"¶","ascii":"<","verb":"inspect",
             "target":{"field":"file_path","reads":"path"}},
-            "traits":{"trusted":true,"readOnly":true}}),
+            "traits":bingo_sdk::ToolTraits::read_only()}),
     };
-    let resolved = step(item, &state, &answers, &[entry.clone()]);
+    let resolved = step(
+        item,
+        &state,
+        &answers,
+        &crate::tool_rows::Looks::of(&[entry.clone()]),
+    );
     assert_eq!(resolved.verb, "inspect");
     assert_eq!(resolved.reads, Some(bingo_sdk::Reads::Path));
     assert_eq!(resolved.tier, Tier::Lookup);
@@ -288,12 +299,51 @@ fn a_step_reads_the_catalogue_and_uses_only_trusted_baseline_traits() {
     ] {
         entry.meta["traits"] = traits;
         assert_eq!(
-            step(item, &state, &answers, &[entry.clone()]).tier,
+            step(
+                item,
+                &state,
+                &answers,
+                &crate::tool_rows::Looks::of(&[entry.clone()])
+            )
+            .tier,
             Tier::Change
         );
     }
-    let unknown = step(item, &state, &answers, &[]);
+    let unknown = step(item, &state, &answers, &Default::default());
     assert_eq!(unknown.tier, Tier::Change);
     assert_eq!(unknown.verb, "read");
     assert_eq!(unknown.reads, Some(bingo_sdk::Reads::Text));
+}
+
+#[test]
+fn transcript_steps_keep_declared_targets() {
+    let state = folded(running_turn());
+    for (name, input, look, _, target) in crate::tool_rows::cases() {
+        let tools = crate::tool_rows::declared(name, look.clone());
+        let item = tool("itm_look", name, input, None, ItemStatus::Completed);
+        let step = step(&item, &state, &Answers::of(&state), &tools);
+        assert_eq!(step.target, target);
+        assert_eq!(step.verb, look.verb);
+    }
+}
+
+#[test]
+fn a_non_call_step_resolves_the_ascii_fallback() {
+    let state = folded(running_turn());
+    let item = state
+        .transcript
+        .items()
+        .iter()
+        .find(|i| !matches!(i.body, ItemBody::ToolCall { .. }))
+        .unwrap();
+    let theme = crate::theme::Theme {
+        colors: crate::theme::Colors::Ansi,
+        glyphs: &crate::theme::ASCII,
+    };
+    crate::theme::with(theme, || {
+        assert_eq!(
+            step(item, &state, &Answers::of(&state), &Default::default()).mark,
+            '-'
+        );
+    });
 }

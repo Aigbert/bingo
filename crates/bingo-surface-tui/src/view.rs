@@ -256,7 +256,7 @@ fn layer(
         }
         // Drawn under the box, in its own rows (ADR-0095 §1).
         Open::Palette(_) => {}
-        Open::Pager(open) => paged(tree, frame, above, open, reveal),
+        Open::Pager(open) => paged(tree, ui, frame, above, open, reveal),
         // Rewind shares the space above the input box.
         Open::Rewind(card) => over(
             frame,
@@ -275,12 +275,17 @@ fn layer(
 /// into it.
 fn paged(
     tree: &Tree,
+    ui: &Ui,
     frame: &mut Layout,
     above: Rect,
     open: &crate::pager::Pager,
     reveal: layers::Reveal,
 ) {
-    let (title, content) = open.content(tree, above.width as usize);
+    let (title, content) = open.content(
+        tree,
+        above.width as usize,
+        &crate::tool_rows::Looks::in_ui(ui),
+    );
     let window = pager::Window {
         height: content.len(),
         rows: usize::from(above.height).saturating_sub(pager::HEAD),
@@ -507,12 +512,7 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     .saying(ui.welcome.update.as_deref())
     .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
     .measuring(ui.measure);
-    rows_config.tools = ui
-        .catalogs
-        .values
-        .get("tools")
-        .map(Vec::as_slice)
-        .unwrap_or_default();
+    rows_config.tools = crate::tool_rows::Looks::in_ui(ui);
     frame.height = frame.blocks.sync(state, &tree.agents(), &rows_config);
     let inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
     if let Some((_, removed, drawing)) = &inline {

@@ -103,13 +103,12 @@ pub fn from_catalog(entries: Vec<CatalogEntry>) -> Vec<ToolSpec> {
 }
 
 fn spec(entry: CatalogEntry) -> ToolSpec {
+    let look = entry.look();
     let mut meta = match entry.meta {
         Value::Object(map) => map,
         _ => serde_json::Map::new(),
     };
-    let look = meta
-        .remove("look")
-        .and_then(|look| serde_json::from_value(look).ok());
+    meta.remove("look");
     let description = meta.remove("description");
     let input_schema = meta.remove("inputSchema");
     for catalogued in CATALOGUED {

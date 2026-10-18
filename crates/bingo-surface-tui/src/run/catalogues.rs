@@ -1,7 +1,7 @@
 use super::*;
 
 /// The catalogues whose ids a command's argument may name, by the source name
-/// its `ArgSpec::Catalog` gives.
+/// its `ArgSpec::Catalog` gives. Tools also supplies each step's look.
 const CATALOGUES: &[(&str, CatalogKind)] = &[
     ("tools", CatalogKind::Tools),
     ("models", CatalogKind::Models),

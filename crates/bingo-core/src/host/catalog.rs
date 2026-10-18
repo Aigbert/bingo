@@ -479,12 +479,7 @@ mod tests {
     impl Tool for Declared {
         fn spec(&self) -> ToolSpec {
             ToolSpec {
-                look: Some(bingo_sdk::ToolLook {
-                    mark: '/',
-                    ascii: None,
-                    verb: "search".into(),
-                    target: None,
-                }),
+                look: Some(bingo_sdk::ToolLook::new('/', "search")),
                 name: self.name.into(),
                 description: "what it does".into(),
                 input_schema: json!({"type": "object", "properties": {"v": {"type": "string"}}}),
@@ -524,7 +519,7 @@ mod tests {
             keys(&reads),
             ["description", "inputSchema", "look", "traits"]
         );
-        assert_eq!(reads.meta["look"], json!({"mark":"/", "verb":"search"}));
+        assert_eq!(reads.look(), Some(ToolLook::new('/', "search")));
         assert_eq!(reads.meta["description"], json!("what it does"));
         assert_eq!(reads.meta["inputSchema"]["type"], json!("object"));
         assert_eq!(
@@ -542,8 +537,8 @@ mod tests {
         );
 
         let writes = entry(&entries, "Writes");
-        assert_eq!(writes.meta["traits"]["edit"], json!(true));
-        assert_eq!(writes.meta["traits"]["readOnly"], json!(false));
+        assert!(writes.traits().unwrap().edit);
+        assert!(!writes.traits().unwrap().read_only);
         assert_eq!(
             writes.meta["inputSchema"], reads.meta["inputSchema"],
             "every tool is described as fully, whatever it does"

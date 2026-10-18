@@ -51,7 +51,7 @@ impl Roles {
         agents: &Agents<'_>,
         folds: &Folds,
         answers: &Answers<'_>,
-        tools: &[bingo_sdk::CatalogEntry],
+        tools: &crate::tool_rows::Looks,
     ) -> Self {
         let items: Vec<&Item> = state.transcript.items().iter().map(AsRef::as_ref).collect();
         let replaced = rowed(state);
@@ -216,7 +216,7 @@ struct Turn<'a> {
     agents: &'a Agents<'a>,
     replaced: &'a [ItemId],
     answers: &'a Answers<'a>,
-    tools: &'a [bingo_sdk::CatalogEntry],
+    tools: &'a crate::tool_rows::Looks,
 }
 
 impl Turn<'_> {
@@ -406,7 +406,7 @@ pub fn step(
     item: &Item,
     state: &SessionState,
     answers: &Answers<'_>,
-    tools: &[bingo_sdk::CatalogEntry],
+    tools: &crate::tool_rows::Looks,
 ) -> Step {
     let ItemBody::ToolCall {
         name,
@@ -415,52 +415,23 @@ pub fn step(
         ..
     } = &item.body
     else {
-        return Step {
-            mark: '•',
-            reads: None,
-            tier: bingo_sdk::component::Tier::Change,
-            verb: String::new(),
-            target: String::new(),
-            state: StepState::Done,
-            upshot: None,
-            answer: None,
-        };
+        return crate::tool_rows::resolve(
+            "",
+            &serde_json::Value::Null,
+            tools,
+            crate::theme::bullet().is_ascii(),
+        );
     };
-    let entry = tools.iter().find(|entry| entry.id == *name);
-    let declared = entry
-        .and_then(|entry| entry.meta.get("look"))
-        .and_then(|look| serde_json::from_value::<bingo_sdk::ToolLook>(look.clone()).ok());
-    let row = bingo_sdk::look::row(
-        name,
-        input,
-        declared.as_ref(),
-        crate::theme::bullet().is_ascii(),
+    let mut step = crate::tool_rows::resolve(name, input, tools, crate::theme::bullet().is_ascii());
+    step.target = paths::shorten_in(
+        step.target.lines().next().unwrap_or_default(),
+        &state.summary.cwd,
+        paths::home(),
     );
-    let (target, reads) = match row.target {
-        Some((target, reads)) => (target, Some(reads)),
-        None => (String::new(), None),
-    };
-    let target = target.lines().next().unwrap_or_default();
-    Step {
-        mark: row.mark,
-        verb: row.verb,
-        reads,
-        tier: tier(entry),
-        target: paths::shorten_in(target, &state.summary.cwd, paths::home()),
-        state: step_state(item, state),
-        upshot: output.as_ref().and_then(bingo_sdk::ToolOutput::outcome),
-        answer: answer(answers.to(&item.id)),
-    }
-}
-
-fn tier(entry: Option<&bingo_sdk::CatalogEntry>) -> bingo_sdk::component::Tier {
-    let traits = entry.and_then(|entry| entry.meta.get("traits"));
-    match traits.is_some_and(|traits| {
-        traits["trusted"].as_bool() == Some(true) && traits["readOnly"].as_bool() == Some(true)
-    }) {
-        true => bingo_sdk::component::Tier::Lookup,
-        false => bingo_sdk::component::Tier::Change,
-    }
+    step.state = step_state(item, state);
+    step.upshot = output.as_ref().and_then(bingo_sdk::ToolOutput::outcome);
+    step.answer = answer(answers.to(&item.id));
+    step
 }
 
 fn step_state(item: &Item, state: &SessionState) -> StepState {

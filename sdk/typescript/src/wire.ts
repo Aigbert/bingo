@@ -1334,15 +1334,18 @@ export type StatusProps = { "config"?: ConfigView; "context"?: (ContextUsage | n
 export type Step = {
   /** What the person answered when the step asked: `you: yes`. */
   "answer"?: (Upshot | null);
+  /** The declared one-cell mark, resolved for the surface character set. */
   "mark": string;
+  /** How to render the target, absent when the call has no target. */
   "reads"?: (Reads | null);
   "state": StepState;
   /** What it does it to, shortened for one row. */
   "target": string;
+  /** The catalogue baseline: only trusted read-only tools are lookups. */
   "tier": Tier2;
   /** What the tool said the call came to. */
   "upshot"?: (Upshot | null);
-  /** What the step does, one lowercase word: `read`, `bash`. */
+  /** What the step does, one lowercase word: `read`, `run`. */
   "verb": string;
   [key: string]: unknown;
 };

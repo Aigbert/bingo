@@ -87,7 +87,7 @@ const EXPAND: &str = "ctrl+o to expand";
 /// What every row of one transcript needs to know about where it is.
 #[derive(Clone)]
 pub struct Rows<'a> {
-    pub tools: &'a [bingo_sdk::CatalogEntry],
+    pub tools: crate::tool_rows::Looks,
     pub pulled: Option<&'a crate::pulled::Memo>,
     pub state: &'a SessionState,
     pub names: Vec<markdown::mentions::Name>,
@@ -139,7 +139,7 @@ impl<'a> Rows<'a> {
         now: Now,
     ) -> Self {
         Self {
-            tools: &[],
+            tools: Default::default(),
             pulled: None,
             state,
             names: Vec::new(),
@@ -496,17 +496,20 @@ fn called(
             })
         })
         .flatten();
-    let (name, about) = match &external {
+    let (label, about) = match &external {
         Some(call) => (call.title.as_str(), String::new()),
-        None => (name.as_str(), summarize(input)),
+        None => (
+            name.as_str(),
+            crate::tool_rows::resolve(name, input, &rows.tools, theme::bullet().is_ascii()).target,
+        ),
     };
     match agents.get(&item.id) {
-        Some(child) => child_row(child, input, rows),
+        Some(child) => child_row(child, name, input, rows),
         None => component_call(
             item,
             Call {
                 status: item.status,
-                name,
+                name: label,
                 about,
                 output: output.as_ref(),
                 progress: progress.as_deref(),
@@ -639,7 +642,7 @@ struct Call<'a> {
     status: ItemStatus,
     name: &'a str,
     /// What the row says the call is about, in the words whoever built it
-    /// reads the call in: a tool's input as [`summarize`] spells it, an ACP
+    /// reads the call in: a tool's input as its declared look spells it, an ACP
     /// agent's own title.
     about: String,
     output: Option<&'a ToolOutput>,
@@ -745,9 +748,15 @@ fn result(call: &Call<'_>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 
 /// A sub-session is a row where it began: what it is, what it was asked, and
 /// what it is doing — read from its own state, never copied into this one.
-fn child_row(child: &SessionState, input: &Value, rows: &Rows<'_>) -> Vec<Line<'static>> {
+fn child_row(
+    child: &SessionState,
+    tool: &str,
+    input: &Value,
+    rows: &Rows<'_>,
+) -> Vec<Line<'static>> {
     let name = tree::name(child);
-    let mut heading = signature(&name, &summarize(input), rows, Landing::Settled);
+    let step = crate::tool_rows::resolve(tool, input, &rows.tools, theme::bullet().is_ascii());
+    let mut heading = signature(&name, &step.target, rows, Landing::Settled);
     if let Some(span) = heading.spans.first_mut() {
         span.style = crate::face::style(&name).patch(theme::bold());
     }
@@ -777,14 +786,6 @@ fn child_row(child: &SessionState, input: &Value, rows: &Rows<'_>) -> Vec<Line<'
         ));
     }
     out
-}
-
-/// What the call is about, from the field a person would recognise.
-pub fn summarize(input: &Value) -> String {
-    bingo_sdk::look::row("", input, None, false)
-        .target
-        .map(|(value, _)| value)
-        .unwrap_or_default()
 }
 
 /// A long-running operation of the surface's own: login, reconnect, a team
@@ -1059,6 +1060,22 @@ mod tests {
                 .map(|(i, item)| frame(i as u64 + 1, Event::ItemCompleted { item }))
                 .collect(),
         ))
+    }
+
+    #[test]
+    fn child_rows_keep_the_declared_target() {
+        let state = folded(Vec::new());
+        let folds = Folds::new();
+        let pictures = Decoded::default();
+        let linked = Linked::default();
+        let mut rows = Rows::of(&state, 400, &folds, &[], &pictures, &linked, Now::real());
+        for (name, input, look, _, target) in crate::tool_rows::cases() {
+            rows.tools = crate::tool_rows::declared(name, look);
+            let lines = child_row(&state, name, &input, &rows);
+            let text = lines.iter().map(ToString::to_string).collect::<String>();
+            assert!(text.contains(target), "{text}");
+            assert!(!text.contains("wrong"), "{text}");
+        }
     }
 
     fn catalogue() -> Vec<CommandSpec> {
