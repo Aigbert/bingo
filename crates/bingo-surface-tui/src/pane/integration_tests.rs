@@ -23,7 +23,7 @@ fn seated_pulls_change_place_width_and_height_and_collapse_without_a_request() {
     let state = state_with(json!(["side", "above"]));
     let (mut ui, now) = scene();
     for (width, height, place, columns, rows) in
-        [(200, 50, "side", 64, 43), (100, 30, "above", 100, 9)]
+        [(200, 50, "side", 64, 45), (100, 30, "above", 100, 9)]
     {
         draw_sized(width, height, &state, &mut ui, now);
         let viewport = serde_json::to_value(&ui.shown.pulls[0].request.viewport).unwrap();

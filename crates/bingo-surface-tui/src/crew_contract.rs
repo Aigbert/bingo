@@ -92,29 +92,18 @@ fn child_row_has_a_face_and_keeps_lifecycle_words() {
 fn strip_names_the_work_and_yields_to_notices() {
     let tree = crew();
     let (mut ui, now) = scene();
-    let wide = status::line(&tree, &ui, 120, now).to_string();
-    assert!(
-        wide.contains("reviewer") && wide.contains("scout owes #design"),
-        "{wide}"
-    );
-    assert!(!wide.contains("running"));
-    let narrow = status::line(&tree, &ui, 80, now).to_string();
-    assert!(
-        !narrow.contains("reviewer") && narrow.contains(face::face("reviewer").sigil()),
-        "{narrow}"
-    );
+    for width in [80, 120] {
+        let wide = status::line(&tree, &ui, width, now).to_string();
+        assert!(wide.contains("●● 2 agents"), "{wide}");
+        assert!(!wide.contains("reviewer"));
+    }
     ui.notify(Level::Info, "saved", now.instant);
-    let notice =
-        crate::keybar::hints(&tree, &ui, 120, later(now, 1000), &mut Vec::new()).to_string();
-    assert!(
-        notice.contains("saved") && !notice.contains("reviewer"),
-        "{notice}"
-    );
-    ui.expire(later(now, 4133));
+    let notice = status::line(&tree, &ui, 120, later(now, 1000)).to_string();
+    assert!(notice.contains("saved") && !notice.contains("2 agents"));
     assert!(
         status::line(&tree, &ui, 120, later(now, 4133))
             .to_string()
-            .contains("reviewer")
+            .contains("2 agents")
     );
 }
 
@@ -163,10 +152,7 @@ fn a_child_permission_and_room_posts_keep_the_selected_room_in_front() {
             .focus_on(tree.open_interaction().map(|(_, ask)| ask));
         assert_eq!(tree.view(), &log_id(), "step {step}");
         let screen = draw_tree(120, 40, &tree, &mut ui, now);
-        assert!(
-            screen.contains("#design · session"),
-            "step {step}: {screen}"
-        );
+        assert!(screen.contains("Post to #design"), "step {step}: {screen}");
         assert_eq!(tree.open_interaction().is_some(), step == 0);
         assert_eq!(
             crate::focus::owner(&ui, &tree),
@@ -251,34 +237,8 @@ fn strip_scopes_overflows_finishes_and_clicks() {
             hidden: false,
             family: "session".into(),
         }));
-    let tiny = crate::crew::spans(&tree, 120, 14, now);
-    assert_eq!(
-        tiny.iter()
-            .map(|span| span.content.as_ref())
-            .collect::<String>(),
-        "◗ reviewer  +1"
-    );
     draw_tree(120, 40, &tree, &mut ui, now);
-    let hit = ui.shown.crew.expect("the strip has a target");
-    let effects = crate::pointer::on_mouse(
-        &mut ui,
-        &tree,
-        crossterm::event::MouseEvent {
-            kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
-            column: hit.x,
-            row: hit.y,
-            modifiers: crossterm::event::KeyModifiers::NONE,
-        },
-        now,
-    );
-    assert!(
-        !effects.is_empty(),
-        "opening the list requests stored sessions"
-    );
-    assert!(
-        ui.focus.captures(),
-        "the crew strip opens this conversation immediately"
-    );
+    assert!(ui.shown.crew.is_none(), "the old strip has no click target");
     tree.fold.apply(&child_frame(
         20,
         completed("trn_9", bingo_sdk::TurnStatus::Completed),
@@ -314,14 +274,14 @@ fn a_placed_status_outranks_crew_until_it_expires() {
             ),
         ),
     ));
-    let placed = crate::keybar::hints(&tree, &ui, 120, now, &mut Vec::new()).to_string();
+    let placed = status::line(&tree, &ui, 120, now).to_string();
     assert!(placed.contains("scheduled") && !placed.contains("reviewer"));
     draw_tree(120, 40, &tree, &mut ui, now);
-    assert!(ui.shown.crew.is_some(), "the footer retains the crew");
+    assert!(ui.shown.crew.is_none(), "the old strip has no click target");
     assert!(
         status::line(&tree, &ui, 120, later(now, 2001))
             .to_string()
-            .contains("reviewer")
+            .contains("2 agents")
     );
 }
 

@@ -158,6 +158,6 @@ fn landmarks(screen: &str, width: usize) -> Vec<(&'static str, usize)> {
         ("the band closes", rules.get(1).copied().unwrap_or_default()),
         ("the way out", at("Chat about this")),
         ("the key line", at("Enter to select")),
-        ("the composer", at("answer above")),
+        ("the composer", at("Answer above")),
     ]
 }

@@ -1,0 +1,246 @@
+use crate::test_support::ember::{Band, Capture, assert_regions, moved};
+use crate::test_support::*;
+use crate::ui::Ui;
+use bingo_sdk::{Event, ItemStatus, Level, SessionState, TurnStatus};
+use serde_json::json;
+
+fn apply(state: &mut SessionState, at: i64, event: Event) {
+    let mut frame = frame(state.seq.0 + 1, event);
+    frame.ts = jiff::Timestamp::from_millisecond(crate::test_support::ember::CLOCK_ORIGIN_MS + at)
+        .unwrap();
+    state.apply(&frame);
+}
+
+/// The prompt and step sequence from p4b-data.js, independent of stream drawing.
+fn past(state: &mut SessionState) {
+    for (turn, prompt, answer) in [
+        (
+            "t1",
+            "看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉",
+            "问题不在 drain()，在 reset()：每一轮开始时，它把 queue 整个清空了。",
+        ),
+        (
+            "t2",
+            "修好它，加一个回归测试",
+            "修好了。reset() 只重置 steer，排队的消息留给下一轮。",
+        ),
+    ] {
+        apply(state, -10_000_000, started(turn));
+        apply(
+            state,
+            -10_000_000,
+            Event::ItemCompleted {
+                item: user(&format!("{turn}-prompt"), prompt),
+            },
+        );
+        apply(
+            state,
+            -9_990_000,
+            Event::ItemCompleted {
+                item: assistant(&format!("{turn}-answer"), answer, ItemStatus::Completed),
+            },
+        );
+        apply(state, -9_990_000, completed(turn, TurnStatus::Completed));
+    }
+}
+
+fn fixture(capture: &Capture) -> (SessionState, Ui) {
+    let (mut ui, _) = scene();
+    let mut state = state();
+    let mut summary = summary();
+    summary.model = Some("opus-5.5".into());
+    summary.effort = Some(bingo_sdk::Effort::High);
+    summary.title = Some("steer 吞掉排队消息".into());
+    apply(&mut state, -10_000_001, Event::SessionUpdated { summary });
+    if capture.entry.scene == "welcome" {
+        ui.welcome.resume = Some(state.summary.clone());
+        return (state, ui);
+    }
+    past(&mut state);
+    if capture.entry.scene == "live" || capture.entry.scene == "narrow" {
+        apply(&mut state, -2600, permission_view("acceptEdits"));
+        apply(&mut state, -2600, started("live"));
+        apply(
+            &mut state,
+            -2600,
+            Event::ItemCompleted {
+                item: user("live-prompt", "修好它，加一个回归测试"),
+            },
+        );
+        for (id, name, path, at) in [
+            (
+                "read",
+                "Read",
+                "crates/bingo-core/src/session/queue.rs",
+                -1700,
+            ),
+            ("find", "Glob", "crates/bingo-core/tests/*.rs", -1400),
+            (
+                "edit",
+                "Edit",
+                "crates/bingo-core/src/session/queue.rs",
+                -1100,
+            ),
+            (
+                "write",
+                "Write",
+                "crates/bingo-core/tests/queue_steer.rs",
+                -550,
+            ),
+        ] {
+            apply(
+                &mut state,
+                at,
+                Event::ItemCompleted {
+                    item: tool(id, name, json!({"path":path}), None, ItemStatus::Completed),
+                },
+            );
+        }
+        apply(
+            &mut state,
+            0,
+            Event::ItemStarted {
+                item: running_tool(
+                    "bash",
+                    "Bash",
+                    "Compiling bingo-core v0.6.3 (crates/bingo-core)",
+                ),
+            },
+        );
+        let row: bingo_sdk::slot::Slot = serde_json::from_value(json!({"kind":"row","item":"bash","mark":null,"title":null,"badge":null,"body":null,"actions":[{"label":"background","key":"b","action":{"name":"bash.promote","args":{}}}]})).unwrap();
+        apply(
+            &mut state,
+            0,
+            extended(
+                "bingo.bash",
+                "running",
+                bingo_sdk::slot::with(json!({}), [row]),
+            ),
+        );
+    }
+    if capture.entry.scene == "mode" {
+        let (value, label, at) = if capture.entry.file == "mode-later" {
+            ("bypassPermissions", "bypass permissions", 3400)
+        } else {
+            ("plan", "plan", 2000)
+        };
+        apply(&mut state, at, permission_view(value));
+        let now = capture.now();
+        ui.notify(
+            Level::Info,
+            format!("permission mode: {label}"),
+            now.instant - std::time::Duration::from_millis((capture.entry.moment_ms - at) as u64),
+        );
+    }
+    (state, ui)
+}
+
+#[test]
+fn m193_capture_dock_and_footer_bands() {
+    for name in [
+        "live",
+        "done",
+        "mode",
+        "mode-later",
+        "reduced-mode",
+        "reduced-live",
+        "ascii-live",
+        "ascii-done",
+        "narrow",
+        "small-done",
+        "welcome",
+    ] {
+        let capture = Capture::load(name);
+        let (state, mut ui) = fixture(&capture);
+        capture.render(|| {
+            let size = capture.size();
+            let screen = drawn(
+                size.width,
+                size.height,
+                &solo(&state),
+                &mut ui,
+                capture.now(),
+            );
+            assert_regions(&capture, Band::Dock, screen.buffer(), &ui.shown.regions);
+            assert_regions(&capture, Band::Footer, screen.buffer(), &ui.shown.regions);
+        });
+    }
+}
+
+fn edge(
+    state: &SessionState,
+    ui: &Ui,
+    now: crate::clock::Now,
+) -> (ratatui::buffer::Buffer, Option<std::time::Instant>) {
+    use ratatui::{
+        buffer::Buffer,
+        layout::Rect,
+        widgets::{Paragraph, Widget},
+    };
+    let drawing = crate::dock::edge(&solo(state), ui, 100, now);
+    let mut buffer = Buffer::empty(Rect::new(0, 0, 100, 1));
+    Paragraph::new(drawing.lines).render(buffer.area, &mut buffer);
+    (buffer, drawing.next)
+}
+
+#[test]
+fn m193_edge_comet_end_mode_and_reduced_have_deadlines() {
+    let capture = Capture::load("live");
+    let (mut state, ui) = fixture(&capture);
+    capture.render(|| {
+        let now = capture.now();
+        let a = edge(&state, &ui, now);
+        let b = edge(&state, &ui, later(now, 550));
+        let c = edge(&state, &ui, later(now, 1100));
+        assert!(!moved(&a.0, &b.0).is_empty());
+        assert!(!moved(&b.0, &c.0).is_empty());
+        assert!(a.1.is_some());
+        let reduced = edge(&state, &ui, still(now));
+        assert!(reduced.1.is_none());
+        assert!(moved(&reduced.0, &edge(&state, &ui, still(later(now, 550))).0).is_empty());
+        apply(
+            &mut state,
+            capture.entry.moment_ms,
+            completed("live", TurnStatus::Completed),
+        );
+        let a = edge(&state, &ui, now);
+        let b = edge(&state, &ui, later(now, 550));
+        let c = edge(&state, &ui, later(now, 1100));
+        assert!(!moved(&a.0, &b.0).is_empty());
+        assert!(c.0.content().iter().all(|cell| cell.symbol() == " "));
+        assert!(c.1.is_none());
+    });
+    let capture = Capture::load("mode");
+    let (state, ui) = fixture(&capture);
+    assert!(edge(&state, &ui, capture.now()).1.is_some());
+    assert!(edge(&state, &ui, later(capture.now(), 900)).1.is_none());
+}
+
+#[test]
+fn m193_narrow_footer_drops_keys_then_facts_and_keeps_the_model() {
+    let (ui, now) = scene();
+    let state = folded(vec![frame(1, permission_view("plan"))]);
+    let tree = solo(&state);
+    let at = |width| {
+        super::draw(&tree, &ui, &mut Default::default(), width, still(now)).lines[0].to_string()
+    };
+    assert!(at(80).contains("/ commands"));
+    assert!(!at(25).contains("? keys"));
+    assert!(at(25).contains("plan"));
+    assert!(at(12).contains("fake-1"));
+    assert!(!at(12).contains("plan"));
+}
+
+#[test]
+fn m193_hidden_footer_animation_never_schedules() {
+    let tree = folded_tree(busy_child("reviewer"));
+    let (mut ui, now) = scene();
+    let draw = |ui: &Ui, width, now| super::draw(&tree, ui, &mut Default::default(), width, now);
+    assert!(draw(&ui, 80, now).next.is_some());
+    assert!(draw(&ui, 12, now).next.is_none());
+    ui.notify(Level::Info, "saved", now.instant);
+    assert_eq!(
+        draw(&ui, 80, later(now, 200)).next,
+        Some(now.instant + std::time::Duration::from_millis(2400))
+    );
+}

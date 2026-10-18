@@ -45,9 +45,10 @@ fn caret_phase_styles() {
 #[test]
 fn opening_wordmark_and_frames() {
     let rows = welcome::lines(&state(), 80, None);
-    assert_eq!(rows.len(), 1);
-    assert!(rows[0].to_string().starts_with(" bingo▍ /tmp/project"));
-    assert!(rows[0].to_string().contains("session 1"));
+    assert!(
+        rows.is_empty(),
+        "the header wordmark is retired; M199 owns Welcome"
+    );
 }
 
 #[test]

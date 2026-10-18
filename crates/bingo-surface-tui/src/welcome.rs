@@ -81,8 +81,8 @@ pub fn draw(
     update: Option<&str>,
     now: Timestamp,
 ) -> Vec<Line<'static>> {
-    let _ = (entrance.height, update, now);
-    vec![crate::view::header::welcome(state, width)]
+    let _ = (state, width, entrance.height, update, now);
+    Vec::new()
 }
 
 #[cfg(test)]
@@ -103,25 +103,19 @@ mod tests {
     #[test]
     fn compact_height_and_resume_hold_their_rows() {
         let state = state();
-        let at = Entrance {
-            height: 14,
-            resume: None,
-        };
-        let empty = draw(&state, 80, at, None, state.summary.updated_at);
-        assert_eq!(empty.len(), 1);
-        assert!(empty[0].to_string().contains("bingo▍"));
-        let filled = draw(
-            &state,
-            80,
-            Entrance {
-                resume: Some(&state.summary),
-                ..at
-            },
-            None,
-            state.summary.updated_at,
+        assert!(
+            draw(
+                &state,
+                80,
+                Entrance {
+                    height: 14,
+                    resume: Some(&state.summary)
+                },
+                None,
+                state.summary.updated_at
+            )
+            .is_empty()
         );
-        assert_eq!(empty.len(), filled.len());
-        assert!(filled[0].to_string().contains("session"));
     }
     /// The table of §11: every reason the opening does not play.
     #[test]
@@ -210,11 +204,11 @@ mod tests {
         let mut child = state();
         child.summary = child_summary("reviewer");
         assert!(!wanted(&child), "a sub-session joins");
-        assert_eq!(lines(&child, 60, None).len(), 1);
+        assert_eq!(lines(&child, 60, None).len(), 0);
 
         let mut room = folded(vec![]);
         room.summary = log_summary("#design");
         assert!(!wanted(&room), "a room is not a session of ours");
-        assert_eq!(lines(&room, 60, Some("0.5.0")).len(), 1);
+        assert_eq!(lines(&room, 60, Some("0.5.0")).len(), 0);
     }
 }

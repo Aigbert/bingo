@@ -162,12 +162,10 @@ fn your_own_line_sits_on_a_bar_the_width_of_the_transcript() {
 fn the_status_line_spends_no_colour_but_the_mode() {
     let state = with_permission_mode("acceptEdits");
     let (mut ui, now) = scene();
-    let painted = painted(80, 24, &solo(&state), &mut ui, now);
-    assert_eq!(
-        painted.coloured("/ commands"),
-        ["/", "·", "?", "·", "ctrl+r", "·", "shift+tab"],
-        "keys glow and separators use ash; actions stay dim"
-    );
+    let drawn = painted(80, 24, &solo(&state), &mut ui, now);
+    let row = drawn.row("accept edits");
+    assert!(row.iter().any(|(text, style)| text == "accept edits"
+        && style.fg == crate::theme::foreground("auto").unwrap().fg));
 }
 
 /// The line the person typed is on their own bar, under a `$`; the code a
@@ -257,11 +255,20 @@ fn a_terminal_that_turns_light_under_a_drawn_screen_is_followed() {
 #[test]
 fn no_screen_paints_prose_in_a_colour_of_its_own() {
     let (mut idle, now) = scene();
+    let now = still(now);
     let (mut busy, live) = mid_turn();
+    let live = still(live);
     let (card, mut asking, asked_now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
     for look in [truecolor(), daylight()] {
         crate::theme::with(look, || {
-            let allowed = crate::theme::spendable();
+            let mut allowed = crate::theme::spendable();
+            allowed.insert(crate::theme::foreground("amberGlow").unwrap().fg.unwrap());
+            allowed.insert(
+                crate::theme::blended("faint", "glow", 0.4)
+                    .unwrap()
+                    .fg
+                    .unwrap(),
+            );
             let scenes: Vec<(&str, crate::painted::Painted)> = vec![
                 (
                     "an answered question",
@@ -273,7 +280,7 @@ fn no_screen_paints_prose_in_a_colour_of_its_own() {
                 ),
                 (
                     "a card over a diff",
-                    painted(80, 24, &card, &mut asking, asked_now),
+                    painted(80, 24, &card, &mut asking, still(asked_now)),
                 ),
                 (
                     "a shell line the person ran",
@@ -314,17 +321,16 @@ fn the_foot_row_is_a_bar_with_the_count_in_text_and_the_hint_in_dim() {
         let settled = later(now, 100);
         let painted = painted(80, 24, &tree, &mut ui, settled);
         let below = crate::foot::below(&ui, settled).expect("held");
-        let count = format!(" ↓ {below} lines below");
-        let hint = " · end or click to follow ";
+        let count = format!(" ↓ {below} lines below ");
+        let hint = "";
         let air = " ".repeat((80 - count.width() - hint.width()) / 2);
-        let bar = crate::theme::raised();
+        let bar = crate::dock::ground();
         assert_row_styled(
             &painted,
             "lines below",
             &[
                 (&air, ratatui::style::Style::default()),
                 (&count, crate::theme::text().patch(bar)),
-                (hint, crate::theme::dim().patch(bar)),
             ],
         );
     });

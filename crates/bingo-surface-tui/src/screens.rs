@@ -30,7 +30,6 @@ mod forms;
 /// The screen a transcript held back from its foot is read through (M95).
 mod held;
 /// The welcome box with the opening playing in it (§11, M70).
-mod opening;
 /// The band above a line somebody sent with pictures (§5's image row, M62).
 mod pictures;
 /// A question alone (M43).

@@ -923,19 +923,12 @@ impl Run {
 }
 
 /// `bingo — <directory>`, and the session in view when it is not the root.
-/// The mark is the whole tree's: a child that asks is one a person must come
-/// back to.
 fn title(tree: &Tree) -> String {
-    let cwd = tree::directory(&tree.root().summary.cwd);
-    let mark = match tree.attention() {
-        true => format!("{} ", crate::theme::mark()),
-        false => String::new(),
-    };
-    let child = match tree.viewing() {
-        Some(child) => format!(" — in {}", tree::name(child)),
-        None => String::new(),
-    };
-    format!("{mark}bingo — {cwd}{child}")
+    let title = tree.root().summary.title.as_deref().unwrap_or("bingo");
+    match tree.viewing() {
+        Some(child) => format!("{title} › {}", tree::name(child)),
+        None => format!("{title} — {}", tree::directory(&tree.root().summary.cwd)),
+    }
 }
 
 fn stdio(e: std::io::Error) -> KernelError {
@@ -1089,7 +1082,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_title_marks_a_session_that_needs_a_person() {
+    async fn the_title_keeps_the_session_and_directory() {
         let mut harness = Harness::new();
         let frames = vec![
             frame(1, started("trn_1")),
@@ -1111,7 +1104,7 @@ mod tests {
                 .recorder
                 .titles
                 .iter()
-                .any(|t| t == "▍ bingo — project"),
+                .all(|t| t == "bingo — project"),
             "{:?}",
             harness.recorder.titles
         );
@@ -1294,6 +1287,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn an_idle_surface_draws_nothing_at_all() {
         let mut harness = Harness::new();
+        harness.recorder.motion = Some(false);
         let (host, _) = TestHost::with(vec![]);
         // A minute passes before each key, on the runtime's virtual clock.
         let script = vec![key(KeyCode::Right), ctrl('d')];
@@ -1319,6 +1313,7 @@ mod tests {
     /// ctrl+d. Answers with how many frames the run drew.
     async fn frames_of_a_flash(wait: Duration) -> usize {
         let mut harness = Harness::new();
+        harness.recorder.motion = Some(false);
         let frames = vec![
             frame(1, started("trn_1")),
             frame(
@@ -1361,8 +1356,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn the_seconds_after_a_flash_cost_no_frames_at_all() {
         assert_eq!(
-            frames_of_a_flash(Duration::from_secs(1)).await,
-            frames_of_a_flash(Duration::from_secs(3)).await,
+            frames_of_a_flash(Duration::from_secs(2)).await,
+            frames_of_a_flash(Duration::from_secs(4)).await,
             "two more seconds of waiting drew two more seconds of frames"
         );
     }
@@ -1534,7 +1529,7 @@ mod tests {
             "a second of notches is about thirty frames, not a thousand: {drawn}"
         );
         assert!(
-            !harness.recorder.last().contains("answer 30"),
+            harness.recorder.last().contains("end latest"),
             "and the transcript is somewhere else than the foot it started at: \
              {}",
             harness.recorder.last()
@@ -2498,7 +2493,7 @@ mod tests {
 
     #[test]
     fn a_notice_created_after_painting_owes_a_frame() {
-        let (_, now) = scene();
+        let now = still(scene().1);
         let mut run = idle(now.instant);
         run.ui.shown = crate::layout::layout(
             crate::layout::Layout::default(),

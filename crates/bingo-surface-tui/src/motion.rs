@@ -16,8 +16,8 @@ use ratatui::style::Style;
 
 use crate::clock::{FRAME, Now};
 use crate::test_support::*;
+use crate::theme;
 use crate::tree::Tree;
-use crate::{keys, theme};
 
 /// The style of the run of cells carrying `needle` on a drawn frame.
 fn style_of(tree: &Tree, ui: &mut crate::ui::Ui, now: Now, needle: &str) -> Style {
@@ -32,7 +32,7 @@ fn style_of(tree: &Tree, ui: &mut crate::ui::Ui, now: Now, needle: &str) -> Styl
 
 fn composer_style(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> Style {
     let backend = drawn(80, 24, tree, ui, now);
-    backend.buffer()[(1, ui.shown.regions.composer.y + 1)].style()
+    backend.buffer()[(3, ui.shown.regions.composer.y + 1)].style()
 }
 
 /// A screen at one instant, as text.
@@ -173,21 +173,22 @@ fn arriving_words_hold_the_caret_steady_while_tools_breathe() {
 
 #[test]
 fn the_input_box_glows_on_the_same_breath_and_is_dim_when_idle() {
-    let (mut ui, now) = mid_turn();
-    // The box is found by what it offers, and a busy box offers the two keys
-    // that send (M68).
-    let working = composer_style(&turning(), &mut ui, now);
-    assert_eq!(
-        working,
-        theme::as_drawn(crate::activity::breathing(turning().viewed(), now))
-    );
-
-    let idle = solo(&state());
-    assert_eq!(
-        composer_style(&idle, &mut ui, now),
-        theme::as_drawn(theme::glow()),
-        "the idle prompt keeps its glow"
-    );
+    let (mut ui, now) = scene();
+    theme::with(crate::painted::truecolor(), || {
+        let idle = solo(&state());
+        assert_eq!(
+            composer_style(&idle, &mut ui, now),
+            composer_style(&turning(), &mut ui, now)
+        );
+        assert_ne!(
+            composer_style(&idle, &mut ui, now),
+            composer_style(&idle, &mut ui, later(now, 300))
+        );
+        assert_eq!(
+            composer_style(&idle, &mut ui, still(now)),
+            composer_style(&idle, &mut ui, still(later(now, 300)))
+        );
+    });
 }
 
 /// The wait row has no turn to read a pace from, so it takes the one that
@@ -208,8 +209,8 @@ fn the_wait_breathes_at_the_pace_a_tool_holds_a_turn_and_leaves_the_box_dim() {
         );
     });
     assert_eq!(
-        leading_style(&tree, &mut ui, at, keys::PLACEHOLDER),
-        theme::as_drawn(theme::glow()),
+        composer_style(&tree, &mut ui, still(at)),
+        theme::as_drawn(theme::glow().patch(crate::dock::ground())),
         "the idle prompt keeps its glow"
     );
 }
@@ -220,7 +221,7 @@ fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
     let screen = screen(&solo(&state()), &mut ui, now);
     assert!(!screen.contains("burrowing"), "{screen}");
     assert!(
-        screen.contains("bingo▍") && screen.contains(" ▍ ask anything"),
+        !screen.contains("bingo▍") && screen.contains("   ▍Ask anything"),
         "{screen}"
     );
 }
@@ -231,7 +232,7 @@ fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
 /// told from the one style it rests in.
 fn border_runs(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> Vec<Style> {
     crate::painted::painted(80, 24, tree, ui, now)
-        .row(keys::PLACEHOLDER)
+        .at(ui.shown.regions.composer.y)
         .into_iter()
         .map(|(_, style)| style)
         .collect()
@@ -617,13 +618,14 @@ fn a_toast_keeps_its_colour_until_expiry() {
     let tree = solo(&state());
     let (mut ui, now) = scene();
     ui.notify(bingo_sdk::Level::Error, "unknown command: /x", now.instant);
-    for ms in [0, 33, 66, 2799] {
-        assert_eq!(
-            style_of(&tree, &mut ui, later(now, ms), "unknown command"),
-            theme::as_drawn(theme::bad())
-        );
-    }
-    assert!(!screen(&tree, &mut ui, later(now, 2800)).contains("unknown command"));
+    theme::with(crate::painted::truecolor(), || {
+        let at =
+            |ui: &mut crate::ui::Ui, ms| style_of(&tree, ui, later(now, ms), "unknown command");
+        assert_ne!(at(&mut ui, 0), at(&mut ui, 160));
+        assert_eq!(at(&mut ui, 160), at(&mut ui, 2399));
+        assert_ne!(at(&mut ui, 2400), at(&mut ui, 2550));
+    });
+    assert!(!screen(&tree, &mut ui, later(now, 2700)).contains("unknown command"));
 }
 
 #[test]
@@ -656,21 +658,13 @@ fn what_wants_a_person_alternates_on_the_second() {
         child_frame(1, announced("reviewer")),
         child_frame(2, opened(child_permission())),
     ]);
-    // The beat is the wall clock's own second, so the samples start on one.
     let (ui, now) = scene();
-    // The status line itself: a card is up over the screen, and everything
-    // behind it is dim by then (§3), so the slot is read where it is written.
-    let at = |ms| {
-        crate::status::styles(&crate::status::line(&tree, &ui, 80, later(now, ms)))
-            .into_iter()
-            .find(|(text, _)| text.contains(crate::face::face("reviewer").sigil()))
-            .map(|(_, style)| style)
-            .expect("the notice")
-    };
-    assert_eq!(at(0), crate::face::style("reviewer"));
-    assert_eq!(at(999), at(0));
-    assert_ne!(at(1_000), at(0), "on the second");
-    assert_eq!(at(2_000), at(0));
+    let first = crate::status::line(&tree, &ui, 80, now);
+    assert_eq!(first, crate::status::line(&tree, &ui, 80, later(now, 1000)));
+    assert!(
+        !first.to_string().contains("reviewer"),
+        "the needs-you lead belongs to M200"
+    );
 }
 
 /// The card's border is the fourth place that beat is said, and no longer
@@ -713,21 +707,17 @@ fn context(share: u64) -> Tree {
 #[test]
 fn the_context_count_is_always_there_and_warms_across_the_last_fifth() {
     let (mut ui, now) = scene();
-    assert!(
-        screen(&context(41), &mut ui, now).contains("41k / 200k"),
-        "the count is on the line as soon as a turn has run"
-    );
+    assert!(!screen(&context(139), &mut ui, now).contains("context"));
     for look in [crate::painted::truecolor(), crate::painted::ascii()] {
-        crate::theme::with(look, || {
-            let mut at = |share| style_of(&context(share), &mut ui, now, "/ 200k");
-            assert_eq!(at(79), theme::as_drawn(theme::dim()), "{:?}", look.colors);
-            assert_eq!(at(89), theme::as_drawn(theme::dim()), "{:?}", look.colors);
+        theme::with(look, || {
             assert_eq!(
-                at(90),
-                theme::as_drawn(theme::dim()),
-                "the way out joins it, and so does the colour"
+                style_of(&context(140), &mut ui, now, "context 70%"),
+                theme::as_drawn(theme::foreground("muted").unwrap())
             );
-            assert_eq!(at(100), theme::as_drawn(theme::dim()), "{:?}", look.colors);
+            assert_eq!(
+                style_of(&context(160), &mut ui, now, "context 80%"),
+                theme::as_drawn(theme::foreground("amber").unwrap())
+            );
         });
     }
 }
@@ -839,8 +829,8 @@ fn a_finished_turn_takes_the_whole_of_the_presence_with_it() {
     let screen = screen(&solo(&state), &mut ui, now);
     assert!(!screen.contains("burrowing"), "{screen}");
     assert_eq!(
-        leading_style(&solo(&state), &mut ui, now, keys::PLACEHOLDER),
-        theme::as_drawn(theme::glow()),
+        composer_style(&solo(&state), &mut ui, still(now)),
+        theme::as_drawn(theme::glow().patch(crate::dock::ground())),
         "the idle prompt keeps its glow"
     );
 }
@@ -870,7 +860,7 @@ fn the_rhythms_are_the_ones_the_design_names() {
     assert_eq!(FRAME, Duration::from_millis(33));
     assert_eq!(crate::transcript::COMET, Duration::from_millis(180));
     assert_eq!(theme::PULSE, Duration::from_secs(1));
-    assert_eq!(crate::ui::NOTICE, Duration::from_millis(2800));
-    assert_eq!(crate::ui::NOTICE, std::time::Duration::from_millis(2800));
+    assert_eq!(crate::ui::NOTICE, Duration::from_millis(2700));
+    assert_eq!(crate::ui::NOTICE, std::time::Duration::from_millis(2700));
     assert_eq!(crate::ui::SWITCH, FRAME * 2);
 }

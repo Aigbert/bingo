@@ -7,6 +7,9 @@ use std::path::PathBuf;
 mod compare;
 mod parse;
 
+/// The private clock origin in prototype/p8-page.js (snapshot and capture).
+pub const CLOCK_ORIGIN_MS: i64 = 10_000_000;
+
 #[derive(Clone, Copy, Debug)]
 pub enum Band {
     Stream,
@@ -108,7 +111,8 @@ impl Capture {
 
     pub fn now(&self) -> Now {
         Now {
-            wall: jiff::Timestamp::from_millisecond(self.entry.moment_ms).unwrap(),
+            wall: jiff::Timestamp::from_millisecond(CLOCK_ORIGIN_MS + self.entry.moment_ms)
+                .unwrap(),
             motion: self.entry.flags["reduced"] != true,
             ..super::scene().1
         }
@@ -149,7 +153,7 @@ pub fn assert_regions(
         Band::Frame => buffer.area,
         Band::Stream => regions.above(),
         Band::Footer => regions.status,
-        Band::Dock => [regions.composer, regions.hints, regions.palette]
+        Band::Dock => [regions.composer, regions.palette]
             .into_iter()
             .filter(|rect| rect.height > 0)
             .reduce(|a, b| a.union(b))

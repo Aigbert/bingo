@@ -591,7 +591,15 @@ async fn pending_queries_keep_the_accepted_drawing_and_its_height() {
     assert!(!waiting(&ui, &tree, now));
     let moved = crate::input::on_key(&mut ui, &tree, key(KeyCode::Left), now);
     assert!(moved.is_empty());
-    assert_eq!(draw_tree(80, 24, &tree, &mut ui, now), current);
+    let moved = draw_tree(80, 24, &tree, &mut ui, now);
+    let palette_rows = |screen: &str| {
+        screen
+            .lines()
+            .skip(header)
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(palette_rows(&moved), palette_rows(&current));
 }
 
 #[tokio::test]

@@ -19,7 +19,6 @@ pub(super) fn receipt(run: &mut Run, result: &Value) {
     if result.get("surface").is_none()
         && result.get("item").is_none()
         && let Some(message) = result.get("message").and_then(Value::as_str)
-        && (!message.starts_with("permission mode: ") || message.contains('\n'))
     {
         run.ui
             .notify(Level::Info, message.to_string(), Instant::now());
@@ -167,7 +166,10 @@ mod tests {
                 &mut run,
                 &serde_json::json!({"message":format!("permission mode: {mode}")}),
             );
-            assert!(run.ui.notice().is_none());
+            assert_eq!(
+                run.ui.notice().unwrap().text,
+                format!("permission mode: {mode}")
+            );
         }
         receipt(&mut run, &serde_json::json!({"message":"saved"}));
         assert_eq!(run.ui.notice().unwrap().text, "saved");

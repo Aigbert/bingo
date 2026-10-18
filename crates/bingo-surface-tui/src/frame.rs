@@ -1,17 +1,9 @@
-//! Where each region of the screen is, and nothing about what goes in them.
-//!
-//! A header and spacer sit above the transcript. The rule, prompt, hint row
-//! and footer are cut from the bottom, so typing keeps a fixed baseline. An
-//! open palette sits under the prompt in place of the hint row and the
-//! footer, and the transcript gives up the rest of its rows (ADR-0095 §1).
-//!
-//! It is pure geometry over a [`Demand`], so every size is a table row in a
-//! test rather than a screen someone has to look at.
+//! Three bands: stream, dock, footer; geometry contains no session facts.
 
 use ratatui::layout::Rect;
 
 /// The rule and one row to type in.
-pub const COMPOSER_MIN: u16 = 2;
+pub const COMPOSER_MIN: u16 = 3;
 /// The rule and ten rows of draft.
 pub const COMPOSER_MAX: u16 = 11;
 
@@ -35,8 +27,6 @@ pub struct Demand {
 /// line's and the hint row's place.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Regions {
-    pub header: Rect,
-    pub hints: Rect,
     pub transcript: Rect,
     pub activity: Rect,
     /// The thumbnails' rows, directly on the box's top border.
@@ -64,27 +54,17 @@ impl Regions {
 /// Cut the frame into its regions from the bottom up.
 pub fn regions(size: Rect, demand: Demand) -> Regions {
     let mut rest = size;
+    let status = take_bottom(&mut rest, 1);
     let rows = palette_rows(demand.palette, rest.height);
     let palette = take_bottom(&mut rest, rows);
-    let open = palette.height > 0;
-    let status = take_bottom(&mut rest, u16::from(!open));
-    let hint_rows = u16::from(!open && rest.height > COMPOSER_MIN);
-    let hints = take_bottom(&mut rest, hint_rows);
-    let rows = composer_rows(demand.composer, rest.height);
+    let rows = composer_rows(demand.composer, rest.height)
+        .min(crate::layout::grid::dock_cap(usize::from(size.height)) as u16 + 2);
     let composer = take_bottom(&mut rest, rows);
-    let header = Rect {
-        height: if rest.height >= 3 { 2 } else { 0 },
-        ..rest
-    };
-    rest.y += header.height;
-    rest.height -= header.height;
     let rows = strip_rows(demand.strip, rest.height);
     let strip = take_bottom(&mut rest, rows);
     let rows = activity_rows(demand.activity, rest.height);
     let activity = take_bottom(&mut rest, rows);
     Regions {
-        header,
-        hints,
         transcript: rest,
         activity,
         strip,
@@ -102,7 +82,7 @@ fn palette_rows(want: u16, room: u16) -> u16 {
 /// The box grows with the draft and stops at ten rows; it never shrinks below
 /// one row, and it takes what is left when even that does not fit.
 fn composer_rows(text: u16, room: u16) -> u16 {
-    text.saturating_add(1)
+    text.saturating_add(2)
         .clamp(COMPOSER_MIN, COMPOSER_MAX)
         .min(room)
 }
@@ -134,183 +114,58 @@ fn take_bottom(rest: &mut Rect, height: u16) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn demand() -> Demand {
-        Demand {
+    #[test]
+    fn three_bands_stack_at_every_size() {
+        for width in [1, 20, 80, 100] {
+            for height in 1..50 {
+                let size = Rect::new(0, 0, width, height);
+                let r = regions(
+                    size,
+                    Demand {
+                        composer: 1,
+                        ..Demand::default()
+                    },
+                );
+                assert_eq!(r.status.bottom(), height);
+                assert_eq!(r.status.height, 1);
+                assert_eq!(r.composer.bottom(), r.status.y);
+                assert_eq!(r.transcript.bottom(), r.composer.y);
+                assert_eq!(r.composer.height, COMPOSER_MIN.min(height - 1));
+            }
+        }
+    }
+    #[test]
+    fn the_dock_caps_its_body_and_palette_keeps_its_place() {
+        let at = |demand| regions(Rect::new(0, 0, 80, 24), demand);
+        let r = at(Demand {
+            composer: 40,
+            ..Demand::default()
+        });
+        assert_eq!(r.composer.height, COMPOSER_MAX);
+        let r = at(Demand {
             composer: 1,
-            strip: 0,
-            activity: 0,
-            palette: 0,
-        }
+            palette: 8,
+            ..Demand::default()
+        });
+        assert_eq!(r.composer.bottom(), r.palette.y);
+        assert_eq!(r.palette.bottom(), r.status.y);
+        assert_eq!(r.status.height, 1);
     }
-
-    fn at(width: u16, height: u16, demand: Demand) -> Regions {
-        regions(Rect::new(0, 0, width, height), demand)
-    }
-
     #[test]
-    fn the_composer_and_the_status_line_survive_the_smallest_screens() {
-        for (width, height) in [(20u16, 5u16), (10, 3), (4, 2), (1, 1)] {
-            let r = at(width, height, demand());
-            assert_eq!(r.status.height, 1, "{width}x{height}");
-            assert_eq!(
-                r.composer.height,
-                (height - 1).min(COMPOSER_MIN),
-                "{width}x{height}"
-            );
-            let used = r.header.height
-                + r.hints.height
-                + r.transcript.height
-                + r.activity.height
-                + r.composer.height
-                + r.status.height;
-            assert_eq!(used, height, "{width}x{height} leaves no gap");
-        }
-    }
-
-    #[test]
-    fn the_box_grows_with_the_draft_and_stops_at_ten_rows() {
-        let rows = |text| {
-            at(
-                80,
-                40,
+    fn thumbnails_stand_above_the_dock_and_yield_whole() {
+        let at = |height| {
+            regions(
+                Rect::new(0, 0, 80, height),
                 Demand {
-                    composer: text,
-                    ..demand()
-                },
-            )
-            .composer
-            .height
-        };
-        assert_eq!(rows(0), COMPOSER_MIN);
-        assert_eq!(rows(1), COMPOSER_MIN);
-        assert_eq!(rows(4), 5);
-        assert_eq!(rows(10), COMPOSER_MAX);
-        assert_eq!(rows(40), COMPOSER_MAX, "it never eats the transcript");
-    }
-
-    /// The palette sits under the box where the hint row and the footer
-    /// were; the box moves up with it and the transcript pays the rest.
-    #[test]
-    fn an_open_palette_takes_the_footer_s_place_under_the_box() {
-        let closed = at(80, 24, demand());
-        let r = at(
-            80,
-            24,
-            Demand {
-                palette: 12,
-                ..demand()
-            },
-        );
-        assert_eq!(r.palette, Rect::new(0, 12, 80, 12));
-        assert_eq!(r.composer.bottom(), r.palette.y, "on the palette");
-        assert_eq!(r.composer.height, closed.composer.height);
-        assert_eq!((r.status.height, r.hints.height), (0, 0));
-        assert_eq!(r.transcript.height, closed.transcript.height + 2 - 12);
-        let tiny = at(
-            20,
-            5,
-            Demand {
-                palette: 12,
-                ..demand()
-            },
-        );
-        assert_eq!(tiny.palette.height, 3, "the box keeps its two rows");
-        assert_eq!(tiny.composer.height, COMPOSER_MIN);
-    }
-
-    /// A strip of thumbnails is rows of its own standing on the box: a
-    /// picture pasted into a full draft costs the transcript, never the
-    /// draft, and the box is exactly the height it was.
-    #[test]
-    fn a_strip_stands_on_the_box_without_changing_it() {
-        let with = |text, strip| {
-            at(
-                80,
-                40,
-                Demand {
-                    composer: text,
-                    strip,
-                    ..demand()
-                },
-            )
-        };
-        for text in [1, 10, 40] {
-            let plain = with(text, 0);
-            let r = with(text, 3);
-            assert_eq!(r.composer, plain.composer, "{text} rows of draft");
-            assert_eq!(r.strip.height, 3);
-            assert_eq!(r.strip.bottom(), r.composer.y, "on the box's border");
-            assert_eq!(r.strip.width, r.composer.width);
-            assert_eq!(r.transcript.height, plain.transcript.height - 3);
-        }
-        assert_eq!(with(1, 0).strip.height, 0, "and none when there is none");
-    }
-
-    /// A screen with rows for the box but not for the whole strip gets the
-    /// box and none of the strip: a thumbnail cut short is not a thumbnail.
-    #[test]
-    fn the_strip_is_all_there_or_not_there() {
-        let at_height = |height| {
-            at(
-                80,
-                height,
-                Demand {
+                    composer: 1,
                     strip: 3,
-                    ..demand()
+                    ..Demand::default()
                 },
             )
         };
-        assert_eq!(at_height(9).strip.height, 0, "three rows are not spare");
-        assert_eq!(at_height(9).composer.height, COMPOSER_MIN);
-        assert_eq!(at_height(10).strip.height, 3, "the transcript keeps a row");
-        assert_eq!(at_height(10).transcript.height, 1);
-        assert!(at_height(9).above().height > 0, "the band still has rows");
-    }
-
-    #[test]
-    fn the_activity_rows_give_way_before_the_transcript_does() {
-        let r = at(
-            80,
-            24,
-            Demand {
-                activity: 3,
-                ..demand()
-            },
-        );
-        assert_eq!(r.activity.height, 3);
-        assert_eq!(r.transcript.height, 15);
-
-        let tight = at(
-            80,
-            6,
-            Demand {
-                activity: 3,
-                ..demand()
-            },
-        );
-        assert_eq!(tight.activity.height, 1, "one row was all there was");
-        assert_eq!(tight.transcript.height, 1);
-    }
-
-    #[test]
-    fn every_region_stacks_without_overlapping() {
-        let r = at(
-            120,
-            40,
-            Demand {
-                composer: 2,
-                activity: 2,
-                ..demand()
-            },
-        );
-        assert_eq!(r.transcript.bottom(), r.activity.y);
-        assert_eq!(r.activity.bottom(), r.composer.y);
-        assert_eq!(r.composer.bottom(), r.hints.y);
-        assert_eq!(
-            r.above(),
-            Rect::new(0, 2, 120, r.transcript.height + r.activity.height)
-        );
+        assert_eq!(at(8).strip.height, 3);
+        assert_eq!(at(7).strip.height, 0);
+        assert_eq!(at(8).strip.bottom(), at(8).composer.y);
     }
 }
 

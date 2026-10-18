@@ -1,5 +1,6 @@
 //! Engine nodes return to the asking site's own typed drawing.
 use bingo_sdk::{View, component::Props};
+#[cfg(test)]
 use ratatui::text::Line;
 pub mod band;
 pub mod closing;
@@ -218,29 +219,26 @@ pub struct Site<'a> {
     pub width: usize,
     pub pulls: &'a mut Vec<crate::pulled::Key>,
     pub now: crate::clock::Now,
-    pub next: &'a mut Option<std::time::Instant>,
 }
 impl Site<'_> {
-    pub fn draw(
+    pub fn draw<R: Into<crate::views::Drawing>>(
         &mut self,
         id: &str,
         props: &Props,
-        own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
-    ) -> Vec<Line<'static>> {
+        own: impl Fn(&Props, usize) -> R,
+    ) -> crate::views::Drawing {
         let Some(key) = key(self.state, id, props, self.width as u16, 0) else {
-            return own(props, self.width);
+            return own(props, self.width).into();
         };
         let answer = self.memo.display(&key);
         self.pulls.push(key);
-        let drawing = draw_marked(
+        draw_marked(
             props,
             answer,
             self.width,
             &crate::views::Marks::at(self.now),
             own,
-        );
-        *self.next = (*self.next).into_iter().chain(drawing.next).min();
-        drawing.lines
+        )
     }
 }
 

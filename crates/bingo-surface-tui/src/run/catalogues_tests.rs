@@ -54,7 +54,7 @@ async fn a_slow_catalogue_releases_first_paint_and_keeps_the_first_shortcut() {
     let start = tokio::time::Instant::now();
     fetch_all(&mut run).await;
     assert_eq!(start.elapsed(), INITIAL_WAIT);
-    assert!(draw_tree(80, 24, &run.session.tree, &mut run.ui, scene().1).contains("ask anything"));
+    assert!(draw_tree(80, 24, &run.session.tree, &mut run.ui, scene().1).contains("Ask anything"));
     run.terminal_event(Term::Key(typed('a')));
     assert_eq!(run.ui.composer.text(), "a");
     run.terminal_event(Term::Key(ctrl('n')));

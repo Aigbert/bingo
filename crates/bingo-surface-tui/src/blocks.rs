@@ -1120,13 +1120,25 @@ mod refresh_tests {
         assert_eq!((at, removed), (expected.0, expected.1 - expected.0));
         let area = ui.shown.regions.transcript;
         let card = ui.shown.card.as_ref().unwrap();
-        assert_eq!(usize::from(card.area.y - area.y) + ui.shown.top, at);
+        assert_eq!(
+            usize::from(card.area.y - area.y) + ui.shown.top - ui.shown.padding,
+            at
+        );
         let end = ui.shown.blocks.span(&ItemId::from_raw("itm_1")).unwrap().1;
         let above: String = (area.x..area.right())
-            .map(|x| ui.shown.canvas.buffer[(x, area.y + (end - ui.shown.top - 1) as u16)].symbol())
+            .map(|x| {
+                ui.shown.canvas.buffer[(
+                    x,
+                    area.y + (end - ui.shown.top - 1 + ui.shown.padding) as u16,
+                )]
+                    .symbol()
+            })
             .collect();
         assert!(above.contains("last line"), "{above:?}");
-        assert_eq!(ui.shown.line_at(at - ui.shown.top - 1), Some(at - 1));
+        assert_eq!(
+            ui.shown.line_at(at - ui.shown.top - 1 + ui.shown.padding),
+            Some(at - 1)
+        );
     }
 
     #[test]
@@ -1198,15 +1210,15 @@ mod refresh_tests {
         ui.shown.blocks.height = ui.shown.blocks.measure();
         draw_tree(80, 24, &tree, &mut ui, later(now, 40));
         assert_eq!(ui.shown.blocks.height(), expected_height);
-        assert_eq!(ui.shown.height, expected_height);
+        assert_eq!(ui.shown.height, expected_height + 1);
         let area = ui.shown.regions.transcript;
-        assert_eq!(ui.shown.top + usize::from(area.height), expected_height);
+        assert_eq!(ui.shown.top + usize::from(area.height), expected_height + 1);
         let bottom: String = (area.x..area.right())
-            .map(|x| ui.shown.canvas.buffer[(x, area.bottom() - 1)].symbol())
+            .map(|x| ui.shown.canvas.buffer[(x, area.bottom() - 2)].symbol())
             .collect();
         assert!(bottom.contains("last line"), "{bottom:?}");
         assert_eq!(
-            ui.shown.line_at(usize::from(area.height) - 1),
+            ui.shown.line_at(usize::from(area.height) - 2),
             Some(expected_height - 1)
         );
     }

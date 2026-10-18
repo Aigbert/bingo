@@ -160,6 +160,7 @@ pub fn sweep(t: f32, column: usize, width: usize) -> f32 {
 /// brightly ([`sweep`]). It answers for the cell's near edge rather than its
 /// middle, so the first cell is revealed on the first frame, which is the
 /// frame `sweep` already lights it in.
+#[cfg(test)]
 pub fn swept(t: f32, column: usize, width: usize) -> bool {
     width > 0 && column as f32 / width as f32 <= head(t)
 }

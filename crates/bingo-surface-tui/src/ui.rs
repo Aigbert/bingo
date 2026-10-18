@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use bingo_sdk::{CommandSpec, Level, View};
 
-use crate::clock::{Anim, FRAME, Now};
+use crate::clock::{FRAME, Now};
 use crate::commands::{self, Suggestion};
 use crate::complete;
 use crate::fold::Folds;
@@ -37,7 +37,7 @@ impl std::ops::DerefMut for Ui {
 }
 
 /// A toast has one wall-clock window, whether the surface draws it or not.
-pub const NOTICE: Duration = Duration::from_millis(2800);
+pub const NOTICE: Duration = Duration::from_millis(2700);
 /// A second ctrl+c within this window leaves.
 pub const EXIT_WINDOW: Duration = Duration::from_secs(2);
 /// A transcript that has just been stepped into crossfades through dim over
@@ -46,6 +46,7 @@ pub const SWITCH: Duration = Duration::from_millis(2 * FRAME.as_millis() as u64)
 /// One light along the input box's border when a line is sent: six frames
 /// (§6). The most repeated gesture in the surface, and the only motion that
 /// answers a person rather than reporting the model.
+#[cfg(test)]
 pub const IGNITION: Duration = Duration::from_millis(6 * FRAME.as_millis() as u64);
 
 /// A message that is not transcript: an ack, a warning, a hint.
@@ -63,15 +64,19 @@ pub struct Notice {
 }
 
 impl Notice {
-    pub fn next_change(&self, now: Now) -> Option<Instant> {
-        let expiry = self.said + NOTICE;
-        (expiry > now.instant).then_some(expiry)
+    fn lifetime(&self) -> Duration {
+        if self.text.starts_with("permission mode: ") {
+            Duration::from_millis(3100)
+        } else {
+            NOTICE
+        }
     }
+
     pub(crate) fn said(&self) -> Instant {
         self.said
     }
     pub(crate) fn gone(&self, now: Instant) -> bool {
-        now.saturating_duration_since(self.said) >= NOTICE
+        now.saturating_duration_since(self.said) >= self.lifetime()
     }
     #[cfg(test)]
     pub fn strength(&self, now: Now) -> f32 {
@@ -374,9 +379,10 @@ impl Ui {
     /// How far the light along the box's border has come since a line was
     /// sent, or nothing at all once it has passed — and nothing where nothing
     /// may move (§6).
+    #[cfg(test)]
     pub fn sending(&self, now: Now) -> Option<f32> {
         let sent = self.sent.filter(|_| now.motion)?;
-        match Anim::new(sent, IGNITION).progress(now.instant) {
+        match crate::clock::Anim::new(sent, IGNITION).progress(now.instant) {
             done if done >= 1.0 => None,
             come => Some(come),
         }
@@ -393,10 +399,6 @@ impl Ui {
             .armed
             .map(|at| at + EXIT_WINDOW)
             .filter(|at| *at > now.instant);
-        let send = self
-            .sent
-            .filter(|_| self.sending(now).is_some())
-            .map(|at| (now.instant + FRAME).min(at + IGNITION));
         let crossfade = self
             .switched
             .filter(|_| self.crossfading(now))
@@ -406,15 +408,7 @@ impl Ui {
             .dragging
             .filter(|_| self.focus.selection().is_some())
             .map(|held| held.stepped + select::EDGE_PACE);
-        let intro = self
-            .focus
-            .intro()
-            .filter(|intro| !intro.over(now))
-            .map(|_| now.instant + FRAME);
-        [exit, send, crossfade, drag, intro]
-            .into_iter()
-            .flatten()
-            .min()
+        [exit, crossfade, drag].into_iter().flatten().min()
     }
 
     /// Every command the dropdown may offer: the surface's own and the
@@ -594,13 +588,13 @@ mod tests {
     }
 
     #[test]
-    fn a_toast_is_whole_for_exactly_2800_milliseconds() {
+    fn a_toast_expires_after_2700_milliseconds() {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "careful", now.instant);
-        for ms in [0, 33, 66, 2000, 2799] {
+        for ms in [0, 33, 66, 2000, 2699] {
             assert_eq!(ui.notice().map(|n| n.strength(later(now, ms))), Some(1.0));
         }
-        assert_eq!(ui.notice().map(|n| n.strength(later(now, 2800))), Some(0.0));
+        assert_eq!(ui.notice().map(|n| n.strength(later(now, 2700))), Some(0.0));
     }
 
     #[test]

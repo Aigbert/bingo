@@ -86,6 +86,7 @@ impl State {
         let toast = placed(state).into_iter().find(|toast| &toast.key == key)?;
         (now.instant < *said + NOTICE && toast.until > now.wall).then_some((toast, *said))
     }
+    #[cfg(test)]
     pub fn next(&self, state: &SessionState, now: Now) -> Option<Instant> {
         let (toast, said) = self.active(state, now)?;
         Some((said + NOTICE).min(now.instant + remaining(toast.until, now)))
@@ -126,6 +127,16 @@ pub fn current(ui: &Ui, state: &SessionState, now: Now) -> Option<bingo_sdk::com
         level: notice.level,
         about: notice.about.clone(),
     })
+}
+
+pub fn age(ui: &Ui, state: &SessionState, now: Now) -> Option<Duration> {
+    let notice = ui.notice().filter(|notice| !notice.gone(now.instant));
+    if let Some((_, said)) = ui.placed.toasts.active(state, now)
+        && notice.is_none_or(|notice| said > notice.said())
+    {
+        return Some(now.since(said));
+    }
+    notice.map(|notice| now.since(notice.said()))
 }
 
 pub fn components(

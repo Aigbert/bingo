@@ -17,6 +17,8 @@ pub use canvas::Canvas;
 
 #[derive(Debug, Default)]
 pub struct Layout {
+    pub growth: Option<crate::dock::Growth>,
+    pub padding: usize,
     pub inline: Option<(usize, usize, usize)>,
     pub palette_height: Option<(String, usize)>,
     pub card_actions: Vec<crate::views::targets::Target>,
@@ -81,7 +83,7 @@ impl Layout {
     /// row carries one. The one mapping from the screen back into the
     /// transcript: a click, a drag and a mark are all answered by it.
     pub fn line_at(&self, row: usize) -> Option<usize> {
-        let line = self.top + row;
+        let line = self.top + row.checked_sub(self.padding)?;
         if line >= self.height {
             return None;
         }
@@ -114,7 +116,7 @@ impl Layout {
             Some((at, removed, count)) if line >= at + removed => line + count - removed,
             _ => line,
         };
-        let row = u16::try_from(line.checked_sub(self.top)?).ok()?;
+        let row = u16::try_from(line.checked_sub(self.top)? + self.padding).ok()?;
         (row < self.regions.transcript.height).then_some(row)
     }
 }
@@ -156,6 +158,7 @@ pub fn layout(
 
 fn compose(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> Layout {
     let mut next = Layout {
+        growth: previous.growth,
         palette_height: previous
             .palette_height
             .filter(|(id, _)| crate::palette::request(ui) == Some(id.as_str())),

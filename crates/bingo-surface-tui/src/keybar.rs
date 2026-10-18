@@ -1,139 +1,111 @@
 //! One fixed row, projected from the current owner and the live keymap.
 mod sealed;
 mod site;
-use crate::{
-    clock::Now,
-    layout::Layout,
-    theme,
-    tree::{Scope, Tree, Wants},
-    ui::Ui,
-};
+use crate::{clock::Now, layout::Layout, theme, tree::Tree, ui::Ui};
 use bingo_sdk::component::{KeyBarProps, KeyPair, Props};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
-pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Line<'static> {
-    let width = usize::from(frame.area().width);
-    let mut pairs = if let Some((_, ask)) = tree.open_interaction() {
+pub fn draw(
+    tree: &Tree,
+    ui: &Ui,
+    frame: &mut Layout,
+    width: usize,
+    now: Now,
+) -> crate::views::Drawing {
+    if width == 0 {
+        return crate::views::Drawing::default();
+    }
+    let pairs = if let Some((_, ask)) = tree.open_interaction() {
         sealed::pairs(ui, ask, question_focus(ui, frame, ask))
     } else {
         site::hints(tree.viewed(), ui, frame)
             .map_or_else(|| resting(tree, ui, now), |hints| hints.pairs)
     };
-    attention(tree, ui, now, &mut pairs);
-    let props = Props::KeyBar(KeyBarProps {
-        pairs,
-        toast: crate::toast::components(ui, tree.viewed(), now, width, &mut frame.pulls),
-    });
+    let pairs = pairs
+        .into_iter()
+        .map(|mut pair| {
+            pair.keys = theme::glyphs::key_text(&pair.keys);
+            pair
+        })
+        .collect();
+    let props = Props::KeyBar(KeyBarProps { pairs, toast: None });
     if tree.open_interaction().is_some() {
-        return own(&props, width).remove(0);
+        return own(&props, width).into();
     }
     let key = crate::component::key(tree.viewed(), "KeyBar", &props, width as u16, 1);
     let answer = key.as_ref().and_then(|key| ui.placed.pulled.get(key));
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    let drawing =
-        crate::component::draw_marked(&props, answer, width, &crate::views::Marks::at(now), own);
-    frame
-        .collect(drawing)
-        .into_iter()
-        .next()
-        .unwrap_or_default()
+    crate::component::draw_marked(&props, answer, width, &crate::views::Marks::at(now), own)
 }
 
 fn resting(tree: &Tree, ui: &Ui, now: Now) -> Vec<KeyPair> {
     if ui.exit_armed(now.instant) {
         return vec![KeyPair::new("ctrl+c", "again to exit")];
     }
+    if !ui.scroll.following() {
+        return vec![
+            KeyPair::new("end", "latest"),
+            KeyPair::new("ctrl+f", "find"),
+        ];
+    }
     if tree.viewed().busy() {
-        vec![
-            KeyPair::new("esc", "stop"),
-            KeyPair::new("⏎", "queue a message"),
-        ]
-    } else {
-        let mut pairs = vec![KeyPair::new("/", "commands"), KeyPair::new("?", "keys")];
-        let bindings = crate::keys::commands::bindings(ui, tree.viewed());
-        let sessions = bindings
-            .commands
-            .iter()
-            .find(|(_, line)| line.as_str() == "/sessions" || line.as_str() == "/resume");
-        pairs.push(KeyPair::new(
-            sessions.map_or("ctrl+r", |(key, _)| key),
-            "sessions",
-        ));
-        pairs.push(KeyPair::new("shift+tab", "mode"));
-        if let Some((key, _)) = bindings
-            .commands
-            .iter()
-            .find(|(_, line)| line.as_str() == "/model next")
-        {
-            pairs.push(KeyPair::new(key, "next model"));
+        if !ui.composer.is_empty() {
+            return vec![
+                KeyPair::new("⏎", "steer"),
+                KeyPair::new("tab", "queue"),
+                KeyPair::new("esc", "stop"),
+            ];
         }
-        pairs
-    }
-}
-
-fn attention(tree: &Tree, ui: &Ui, now: Now, pairs: &mut Vec<KeyPair>) {
-    for placed in bingo_sdk::slot::placed(tree.viewed()) {
-        if let bingo_sdk::slot::Slot::Status { text, until, .. } = placed.slot {
-            let text = match until {
-                Some(at) if at > now.wall => format!(
-                    "{text} in {}",
-                    crate::clock::span(at.duration_since(now.wall).unsigned_abs())
-                ),
-                Some(_) => continue,
-                None => text,
-            };
-            pairs.push(KeyPair::new("", text));
+        let mut pairs = Vec::new();
+        if !tree.viewed().queue.is_empty() {
+            pairs.push(KeyPair::new("↑", "edit queued"));
         }
+        if crate::input::placed_action(tree.viewed(), 'b').is_some() {
+            pairs.push(KeyPair::new("ctrl+b", "background"));
+        }
+        pairs.push(KeyPair::new("esc", "stop"));
+        return pairs;
     }
-    let waiting = ui
-        .catalogs
-        .plugins
-        .iter()
-        .filter(|entry| entry.meta["state"]["kind"] == "waiting")
-        .count();
-    if waiting > 0 {
-        pairs.push(KeyPair::new(
-            "/plugins",
-            format!("{waiting} from this repo waiting"),
-        ));
+    if !ui.composer.is_empty() {
+        return vec![KeyPair::new("⏎", "send"), KeyPair::new("⇧⏎", "newline")];
     }
-    if let Some(count) = crate::tree::count(tree, Wants::Attention, Scope::Others) {
-        pairs.push(KeyPair {
-            emphasis: true,
-            ..KeyPair::new("ctrl+g", format!("{count} need you"))
-        });
+    if !tree.viewed().transcript.items().is_empty() {
+        return vec![
+            KeyPair::new("ctrl+o", "details"),
+            KeyPair::new("/", "commands"),
+            KeyPair::new("?", "keys"),
+        ];
     }
+    if ui.welcome.resume.is_some() {
+        return vec![
+            KeyPair::new("↑", "recent"),
+            KeyPair::new("/", "commands"),
+            KeyPair::new("?", "keys"),
+        ];
+    }
+    vec![
+        KeyPair::new("/", "commands"),
+        KeyPair::new("@", "files"),
+        KeyPair::new("?", "keys"),
+    ]
 }
 
 pub(super) fn own(props: &Props, width: usize) -> Vec<Line<'static>> {
     let Props::KeyBar(props) = props else {
         return vec![Line::default()];
     };
-    if let Some(toast) = &props.toast {
-        let mut spans = vec![Span::styled(
-            format!(" {}", toast.text.lines().collect::<Vec<_>>().join(" · ")),
-            theme::level(toast.level),
-        )];
-        if let Some(about) = &toast.about {
-            spans.push(Span::styled(format!(" · {about}"), theme::dim()));
-        }
-        return vec![Line::from(crate::status::clip(
-            spans,
-            width.saturating_sub(1),
-        ))];
-    }
-    let (pairs, used) = props.fitting(width.saturating_sub(3), UnicodeWidthStr::width);
-    let mut spans = vec![Span::raw(" ".repeat(width.saturating_sub(used + 2)))];
+    let (pairs, _) = props.fitting(width, UnicodeWidthStr::width);
+    let mut spans = Vec::new();
     for (index, pair) in pairs.iter().enumerate() {
         if index > 0 {
-            spans.push(Span::styled(" · ", theme::ash()));
+            spans.push(Span::raw("   "));
         }
         spans.push(Span::styled(
             pair.keys.clone(),
-            theme::glow().patch(theme::bold()),
+            theme::foreground("muted").unwrap_or_default(),
         ));
         spans.push(Span::styled(
             format!(
@@ -142,9 +114,11 @@ pub(super) fn own(props: &Props, width: usize) -> Vec<Line<'static>> {
                 pair.action
             ),
             if pair.emphasis {
-                theme::dim().patch(theme::bold())
+                theme::foreground("dim")
+                    .unwrap_or_default()
+                    .patch(theme::bold())
             } else {
-                theme::dim()
+                theme::foreground("dim").unwrap_or_default()
             },
         ));
     }
@@ -156,28 +130,45 @@ fn composer_props(
     ui: &Ui,
     frame: &Layout,
 ) -> bingo_sdk::component::ComposerProps {
-    if ui.dialog.current().is_some() && !ui.dialog.aside {
-        return bingo_sdk::component::ComposerProps {
-            tag: String::new(),
-            placeholder: "answer above · typing here leaves it for later".into(),
-        };
-    }
     site::hints(state, ui, frame)
         .and_then(|hints| hints.composer)
         .unwrap_or_else(|| bingo_sdk::component::ComposerProps {
             tag: String::new(),
-            placeholder: if ui.dialog.aside {
-                "your message waits until the ask is answered"
-            } else if state.summary.driver == bingo_sdk::Driver::Log {
-                "post to the room"
-            } else if state.busy() {
-                // The KeyBar says what ⏎ does while a turn runs (M183).
-                ""
-            } else {
-                crate::keys::PLACEHOLDER
-            }
-            .into(),
+            placeholder: placeholder(state),
         })
+}
+fn placeholder(state: &bingo_sdk::SessionState) -> String {
+    let name = crate::tree::name(state);
+    if state.summary.driver == bingo_sdk::Driver::Log {
+        return if state.closed {
+            "This room is closed".into()
+        } else {
+            format!("Post to {name}, @ to call on someone")
+        };
+    }
+    if !state.interactions.is_empty() {
+        let who = if state.summary.parent.is_some() {
+            name.as_str()
+        } else {
+            "bingo"
+        };
+        return format!("Answer above, or type to tell {who} something else");
+    }
+    if state.summary.parent.is_some() {
+        return if state.busy() {
+            format!("Steer {name}, or queue what comes next")
+        } else {
+            format!("Message {name}")
+        };
+    }
+    if state.busy() {
+        "Steer, or queue what comes next"
+    } else if state.transcript.items().is_empty() {
+        "Ask anything, or / for commands"
+    } else {
+        "Reply, or / for commands"
+    }
+    .into()
 }
 
 #[cfg(test)]
@@ -188,8 +179,7 @@ pub fn hints(
     now: Now,
     _: &mut Vec<crate::pulled::Key>,
 ) -> Line<'static> {
-    let mut pairs = resting(tree, ui, now);
-    attention(tree, ui, now, &mut pairs);
+    let pairs = resting(tree, ui, now);
     own(
         &Props::KeyBar(KeyBarProps {
             pairs,

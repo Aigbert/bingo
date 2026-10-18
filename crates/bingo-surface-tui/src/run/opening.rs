@@ -157,8 +157,8 @@ mod tests {
         run.painted = crate::run::older_than_a_frame();
         run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
         assert!(
-            recorder.last().contains("bingo▍"),
-            "and by the last beat the box is whole:\n{}",
+            recorder.last().contains("Ask anything"),
+            "the composer is present without the retired header:\n{}",
             recorder.last()
         );
     }

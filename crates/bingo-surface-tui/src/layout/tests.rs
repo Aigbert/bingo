@@ -27,6 +27,7 @@ const SIZE: Rect = Rect::new(0, 0, 120, 40);
 #[test]
 fn layout_is_pure_and_idle_has_no_deadline() {
     let (ui, now) = scene();
+    let now = still(now);
     let tree = solo(&state());
     let a = layout(Layout::default(), &tree, &ui, SIZE, now);
     let b = layout(Layout::default(), &tree, &ui, SIZE, now);
@@ -63,6 +64,7 @@ fn layout_renders_each_band_once_and_reuses_unchanged_blocks() {
 #[test]
 fn layout_schedules_exit_at_its_deadline() {
     let (mut ui, now) = scene();
+    let now = still(now);
     ui.armed = Some(now.instant);
     let frame = layout(Layout::default(), &solo(&state()), &ui, SIZE, now);
     assert_eq!(frame.next_frame, Some(now.instant + crate::ui::EXIT_WINDOW));
@@ -140,6 +142,7 @@ fn layout_finds_the_foot_in_the_current_transcript() {
 #[test]
 fn layout_countdown_changes_at_the_deadline_it_reports() {
     let (ui, now) = scene();
+    let now = still(now);
     let until = now.wall + jiff::SignedDuration::from_millis(5250);
     let state = folded(vec![frame(
         1,
@@ -178,6 +181,7 @@ fn layout_countdown_changes_at_the_deadline_it_reports() {
 #[test]
 fn layout_notice_sleeps_through_its_hold_and_expires() {
     let (mut ui, now) = scene();
+    let now = still(now);
     ui.notify(bingo_sdk::Level::Info, "hello", now.instant);
     let tree = solo(&state());
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
@@ -219,8 +223,8 @@ fn layout_layer_send_and_drag_report_their_own_deadlines() {
     ui.sent = Some(arrived.instant);
     let first = layout(Layout::default(), &tree, &ui, SIZE, arrived);
     assert_eq!(
-        first.next_frame,
-        Some(arrived.instant + crate::clock::FRAME)
+        first.next_frame, None,
+        "the retired send border has no deadline"
     );
     ui.sent = None;
     ui.start_selection(crate::select::Cell::default());
@@ -274,6 +278,10 @@ fn round3_idle_nonterminal_item_schedules_nothing() {
             crate::clock::Now { motion, ..now },
         );
         assert!(drawn.blocks.height() > 0);
-        assert_eq!(drawn.next_frame, None, "motion={motion}");
+        assert_eq!(
+            drawn.next_frame,
+            motion.then_some(now.instant + crate::clock::FRAME),
+            "only the visible caret schedules, motion={motion}"
+        );
     }
 }

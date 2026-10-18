@@ -270,7 +270,7 @@ fn background(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 
 /// The newest unfinished item owns a key only when its producer places it,
 /// and the press is signed as that producer's drawing.
-fn placed_action(state: &SessionState, key: char) -> Option<bingo_sdk::Input> {
+pub(crate) fn placed_action(state: &SessionState, key: char) -> Option<bingo_sdk::Input> {
     let slots = bingo_sdk::slot::placed(state);
     state
         .transcript
@@ -2137,7 +2137,7 @@ mod tests {
         render(&state, &mut ui, now);
         // Row 17 is the transcript's last: the reserved activity band holds
         // the two rows beneath it (view.rs's demand).
-        let last = ui.shown.regions.transcript.bottom() - 1;
+        let last = ui.shown.regions.transcript.bottom() - 2;
         on_mouse(&mut ui, &solo(&state), click(4, last), now);
         assert_eq!(
             ui.select.block,
@@ -2167,11 +2167,7 @@ mod tests {
 
     /// The last row the transcript drew, which is the row a fold sits on.
     fn last_row(ui: &Ui) -> u16 {
-        ui.shown.regions.transcript.y
-            + ui.shown
-                .height
-                .min(usize::from(ui.shown.regions.transcript.height)) as u16
-            - 1
+        ui.shown.regions.transcript.bottom() - 2
     }
 
     /// A click on a fold is one gesture that opens it and folds it again — the
@@ -2717,11 +2713,7 @@ mod tests {
         ]);
         let (mut ui, now) = scene();
         render_tree(&tree, &mut ui, now);
-        let row = ui.shown.regions.transcript.y
-            + ui.shown
-                .height
-                .min(usize::from(ui.shown.regions.transcript.height)) as u16
-            - 1;
+        let row = last_row(&ui);
         assert_eq!(
             on_mouse(&mut ui, &tree, click(4, row), now),
             vec![Effect::View(child_id())],

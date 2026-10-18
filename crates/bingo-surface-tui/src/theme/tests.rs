@@ -65,7 +65,7 @@ fn read(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
             continue;
         }
         let text = std::fs::read_to_string(&path).expect("a readable source");
-        let code = text.split("#[cfg(test)]").next().unwrap_or_default();
+        let code = text.split("#[cfg(test)]\nmod ").next().unwrap_or_default();
         out.push((name, code.to_string()));
     }
 }
@@ -155,17 +155,15 @@ fn every_token_is_spent_where_the_design_says() {
             "text",
             &[
                 "activity.rs",
-                "composer.rs",
+                "composer/drawing.rs",
                 "dialog.rs",
                 "foot.rs",
                 "form.rs",
                 "markdown.rs",
-                "opening/frame.rs",
                 "pager.rs",
                 "preview.rs",
                 "rewind.rs",
                 "search.rs",
-                "status.rs",
                 "transcript.rs",
                 "transcript/ran.rs",
                 "transcript/said.rs",
@@ -190,14 +188,9 @@ fn every_token_is_spent_where_the_design_says() {
                 "activity.rs",
                 "ask/drawing.rs",
                 "ask/receipts.rs",
-                "composer.rs",
-                "crew.rs",
                 "dialog.rs",
-                "foot.rs",
                 "form.rs",
                 "graphics/band.rs",
-                "keybar.rs",
-                "keybar/tests.rs",
                 "layers.rs",
                 "layout/grid.rs",
                 "markdown.rs",
@@ -215,7 +208,6 @@ fn every_token_is_spent_where_the_design_says() {
                 "transcript/steps.rs",
                 "transcript/thinking.rs",
                 "view.rs",
-                "view/header.rs",
                 "views/actions.rs",
                 "views/badge.rs",
                 "views/button.rs",
@@ -236,7 +228,6 @@ fn every_token_is_spent_where_the_design_says() {
         (
             "raised",
             &[
-                "foot.rs",
                 "layers.rs",
                 "search.rs",
                 "select.rs",
@@ -253,32 +244,17 @@ fn every_token_is_spent_where_the_design_says() {
                 "form.rs",
                 "search.rs",
                 "select.rs",
-                "status.rs",
                 "transcript.rs",
                 "transcript/steps.rs",
-                "view/header.rs",
                 "views/actions.rs",
                 "views/badge.rs",
             ],
         ),
-        (
-            "glow",
-            &[
-                "activity.rs",
-                "composer.rs",
-                "keybar.rs",
-                "keybar/tests.rs",
-                "opening/frame.rs",
-                "status.rs",
-                "transcript/steps.rs",
-                "view.rs",
-            ],
-        ),
+        ("glow", &["activity.rs", "transcript/steps.rs"]),
         (
             "good",
             &[
                 "activity.rs",
-                "status.rs",
                 "transcript.rs",
                 "transcript/steps.rs",
                 "views/badge.rs",
@@ -288,7 +264,6 @@ fn every_token_is_spent_where_the_design_says() {
             "bad",
             &[
                 "activity.rs",
-                "status.rs",
                 "transcript.rs",
                 "transcript/ran.rs",
                 "transcript/steps.rs",
@@ -296,24 +271,19 @@ fn every_token_is_spent_where_the_design_says() {
                 "views/button.rs",
             ],
         ),
-        ("mode", &["markdown/mentions.rs", "status.rs"]),
+        ("mode", &["markdown/mentions.rs"]),
         ("breath", &["activity.rs"]),
         ("pulse", &["transcript.rs", "views/progress.rs"]),
         (
             "comet",
-            &[
-                "activity.rs",
-                "embers.rs",
-                "opening/frame.rs",
-                "transcript/comet.rs",
-            ],
+            &["activity.rs", "embers.rs", "transcript/comet.rs"],
         ),
         ("landing", &["transcript.rs"]),
         ("cooling", &["transcript.rs"]),
         ("fading", &[]),
         ("warming", &[]),
         ("ink", &["highlight.rs"]),
-        ("crew", &["face.rs", "status.rs"]),
+        ("crew", &["face.rs"]),
     ];
     for (token, files) in allowed {
         let mut seen: Vec<String> = sources()

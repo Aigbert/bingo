@@ -331,34 +331,15 @@ async fn the_palette_roster_starts_on_the_viewed_room_and_returns_to_the_root() 
 
 #[tokio::test]
 async fn the_palette_roster_has_identical_keyboard_and_crew_doors() {
-    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
     let tree = palette_team();
     let fixture = crate::palette::tests::Fixture::new();
     let (mut keyboard, now) = scene();
-    let (mut pointer, _) = scene();
     let now = still(now);
     crate::input::on_key(&mut keyboard, &tree, ctrl('r'), now);
-    draw_tree(120, 40, &tree, &mut pointer, now);
-    let area = pointer.shown.crew.unwrap();
-    crate::pointer::on_mouse(
-        &mut pointer,
-        &tree,
-        MouseEvent {
-            kind: MouseEventKind::Down(MouseButton::Left),
-            column: area.x,
-            row: area.y,
-            modifiers: KeyModifiers::NONE,
-        },
-        now,
+    let screen = fixture.paint_tree(&mut keyboard, &tree, now, 80, 24).await;
+    assert!(screen.contains("reviewer"), "{screen}");
+    assert!(
+        keyboard.shown.crew.is_none(),
+        "crew-strip click targets are retired"
     );
-    for (width, height) in [(80, 24), (120, 40)] {
-        assert_eq!(
-            fixture
-                .paint_tree(&mut keyboard, &tree, now, width, height)
-                .await,
-            fixture
-                .paint_tree(&mut pointer, &tree, now, width, height)
-                .await
-        );
-    }
 }

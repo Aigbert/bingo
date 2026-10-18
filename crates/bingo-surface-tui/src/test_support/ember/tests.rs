@@ -69,7 +69,10 @@ fn every_capture_loads_its_geometry_metadata_and_ink_runs() {
                 + capture.area(Band::Footer).height,
             capture.size().height
         );
-        assert_eq!(capture.now().wall.as_millisecond(), entry.moment_ms);
+        assert_eq!(
+            capture.now().wall.as_millisecond(),
+            CLOCK_ORIGIN_MS + entry.moment_ms
+        );
     }
 }
 

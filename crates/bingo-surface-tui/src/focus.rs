@@ -55,6 +55,7 @@ fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
 }
 
 impl Focus {
+    #[cfg(test)]
     pub fn intro(&self) -> Option<&Playing> {
         if let Self::Intro(value) = self {
             Some(value)

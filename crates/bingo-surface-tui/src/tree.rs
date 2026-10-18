@@ -122,6 +122,7 @@ impl Tree {
     }
 
     /// Something, anywhere in the tree, needs a person.
+    #[cfg(test)]
     pub fn attention(&self) -> bool {
         self.sessions().any(SessionState::attention)
     }
@@ -167,6 +168,7 @@ impl Tree {
 
 /// What a counted session is doing.
 pub enum Wants {
+    #[allow(dead_code)] // M200 restores the needs-you lead.
     Attention,
     Running,
 }
@@ -178,6 +180,7 @@ pub enum Scope<'a> {
     /// Every session but the one on screen — the status line's sense. The
     /// session in view speaks for itself: its turn is the activity row and
     /// its card is the brightest thing on the screen.
+    #[allow(dead_code)] // M200 restores navigation among other sessions.
     Others,
     /// The sessions hanging under this one, however deep — the activity
     /// row's sense. A child looking up at a running parent is not waiting on

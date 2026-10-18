@@ -31,7 +31,7 @@ fn asked_panes_are_inline_at_both_widths_and_unasked_panes_wait_for_a_click() {
         let (mut ui, now) = scene();
         let tree = solo(&with(pane(true)));
         let screen = draw_tree(width, 24, &tree, &mut ui, now);
-        assert_eq!(ui.shown.seating.panes[0].area.height, 10);
+        assert_eq!(ui.shown.seating.panes[0].area.height, 12);
         assert_eq!(
             ui.shown.seating.panes[0].area.bottom(),
             ui.shown.regions.activity.y

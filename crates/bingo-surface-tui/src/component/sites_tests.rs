@@ -644,7 +644,7 @@ fn session_status_replacement_owns_the_child_identity() {
     tree.show(&child_id());
     let (mut ui, now) = scene();
     let original = draw_tree(80, 30, &tree, &mut ui, now);
-    assert!(original.contains("reviewer · session"));
+    assert!(original.contains("Message reviewer"));
     let key = ui
         .shown
         .pulls
@@ -660,7 +660,7 @@ fn session_status_replacement_owns_the_child_identity() {
         .answer(key, bingo_sdk::View::text("replacement status"));
     let screen = draw_tree(80, 30, &tree, &mut ui, now);
     assert!(screen.contains("replacement status"));
-    assert!(screen.contains("reviewer · session"));
+    assert!(screen.contains("Message reviewer"));
     assert!(!screen.contains("fake/fake-1"));
 }
 

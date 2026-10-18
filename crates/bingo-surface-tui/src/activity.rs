@@ -25,8 +25,10 @@ const ACTIVITY_AFTER: std::time::Duration = std::time::Duration::from_millis(300
 pub const STOPPING: &str = "Stopping";
 /// One breath of bingo's presence while it is thinking: the pace between the
 /// other two, and the one a turn starts at (§6).
+#[cfg(test)]
 const BREATH: std::time::Duration = std::time::Duration::from_millis(1600);
 /// The breath while words are arriving: quicker, because something is.
+#[cfg(test)]
 const BREATH_ARRIVING: std::time::Duration = std::time::Duration::from_millis(900);
 /// The breath while a tool holds the turn: slower, because the waiting is
 /// somebody else's and the row says so.
@@ -46,16 +48,6 @@ const VERBS: [&str; 10] = [
     "sifting",
     "tinkering",
 ];
-
-pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
-    tree.sessions().any(SessionState::busy).then(|| {
-        if now.motion {
-            now.instant + clock::FRAME
-        } else {
-            clock::next_tick(now, std::time::Duration::from_secs(1))
-        }
-    })
-}
 
 /// The rows between the transcript and the input box: what the turn is doing
 /// — or, between turns, what it is waiting on — the session's task list, and
@@ -103,25 +95,25 @@ fn band(
         bingo_sdk::slot::Slot::Activity { verb, .. } => verb.as_deref(),
         _ => None,
     });
-    let mut next = None;
     let mut site = crate::component::Site {
         state: tree.viewed(),
         memo: &ui.placed.pulled,
         width,
         pulls,
         now,
-        next: &mut next,
     };
     let mut out = if let Some(line) = crate::ask::drawing::activity(tree, ui) {
-        vec![line]
+        views::Drawing::still(vec![line])
     } else {
         working(tree.viewed(), ui, verb, now, &mut site)
     };
-    if out.is_empty() {
-        out.extend(waiting(tree, now));
+    if out.lines.is_empty() {
+        out.lines.extend(waiting(tree, now));
+        if !out.lines.is_empty() && now.motion {
+            out.next = Some(now.instant + clock::FRAME);
+        }
     }
-    let running = !out.is_empty();
-    let mut out = views::Drawing { lines: out, next };
+    let running = !out.lines.is_empty();
     if !ui.activity_hidden {
         for placed in slots {
             if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
@@ -288,16 +280,19 @@ fn working(
     placed_verb: Option<&str>,
     now: Now,
     site: &mut crate::component::Site<'_>,
-) -> Vec<Line<'static>> {
+) -> views::Drawing {
     let Some(turn) = state.turn.as_ref() else {
-        return Vec::new();
+        return views::Drawing::default();
     };
     let elapsed = now.past(turn.started_at);
     let stopping = ui.stop_asked.as_ref() == Some(&turn.id);
     // A row that answers a key is never held back by the delay that spares a
     // fast turn its flash.
     if elapsed < ACTIVITY_AFTER && !stopping {
-        return Vec::new();
+        return views::Drawing {
+            lines: Vec::new(),
+            next: Some(now.instant + ACTIVITY_AFTER - elapsed),
+        };
     }
     let props = bingo_sdk::component::Props::Spinner(bingo_sdk::component::SpinnerProps {
         word: placed_verb.unwrap_or_else(|| verb(&turn.id)).into(),
@@ -305,8 +300,13 @@ fn working(
         suffix: String::new(),
         mode: if stopping { "stopping" } else { "working" }.into(),
     });
-    let mut lines = site.draw("Spinner", &props, |props, _| {
-        spinner(props, state, stopping, now)
+    let mut lines = site.draw("Spinner", &props, |props, _| views::Drawing {
+        lines: spinner(props, state, stopping, now),
+        next: Some(if now.motion {
+            now.instant + clock::FRAME
+        } else {
+            clock::next_tick(now, std::time::Duration::from_secs(1))
+        }),
     });
     let facts =
         bingo_sdk::component::Props::TurnProgress(bingo_sdk::component::TurnProgressProps {
@@ -316,9 +316,10 @@ fn working(
             stopping,
         });
     let tail = site.draw(&format!("TurnProgress:{}", turn.id), &facts, progress);
-    append_tail(&mut lines, tail);
+    lines.next = lines.next.into_iter().chain(tail.next).min();
+    append_tail(&mut lines.lines, tail.lines);
     if let Some(retry) = turn.retrying
-        && let Some(last) = lines.last_mut()
+        && let Some(last) = lines.lines.last_mut()
     {
         last.spans.push(Span::styled(
             format!(" retrying {}/{}", retry.attempt, retry.max),
@@ -480,11 +481,6 @@ pub(crate) fn caret_style(state: &SessionState, stopping: bool, now: Now) -> rat
     }
 }
 
-/// The input border keeps its breath while the caret names the turn phase.
-pub(crate) fn breathing(state: &SessionState, now: Now) -> ratatui::style::Style {
-    breathing_at(breath_of(state), now)
-}
-
 /// The same breath at a pace the caller names — what the wait row takes,
 /// having no turn to read one from. Still, it rests at `presence`: what
 /// breathes is the brightness, not the fact that something is at work.
@@ -504,6 +500,7 @@ fn breathing_at(period: std::time::Duration, now: Now) -> ratatui::style::Style 
 /// so a change of period changes where in the breath this frame lands. That
 /// step is the state change itself, which is the one moment §6 allows a cue
 /// to move — and it happens at most twice in a turn.
+#[cfg(test)]
 pub(crate) fn breath_of(state: &SessionState) -> std::time::Duration {
     if state.transcript.items().iter().any(|item| arriving(item)) {
         return BREATH_ARRIVING;

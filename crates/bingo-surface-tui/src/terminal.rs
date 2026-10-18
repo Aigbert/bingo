@@ -10,7 +10,7 @@
 //! arrive as its own key instead of as a bare `\r`; the other flags would
 //! change what every existing binding sees.
 
-use std::io::{self, Stdout, Write};
+use std::io::{self, IsTerminal, Stdout, Write};
 use std::sync::Once;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -113,9 +113,11 @@ impl Tui {
         // reads the other's answer.
         let detection = detect();
         let mut out = io::stdout();
-        out.write_all(SAVE_TITLE)?;
         enable_raw_mode()?;
         ENTERED.store(true, Ordering::SeqCst);
+        if out.is_terminal() {
+            out.write_all(SAVE_TITLE)?;
+        }
         install_hook();
         crossterm::execute!(
             out,
@@ -169,7 +171,10 @@ impl Screen for Tui {
     }
 
     fn title(&mut self, text: &str) -> io::Result<()> {
-        if self.title.as_deref() == Some(text) {
+        if !io::stdout().is_terminal()
+            || !ENTERED.load(Ordering::SeqCst)
+            || self.title.as_deref() == Some(text)
+        {
             return Ok(());
         }
         self.title = Some(text.to_string());
@@ -386,7 +391,9 @@ pub fn restore() {
         crossterm::cursor::Show
     );
     let _ = disable_raw_mode();
-    let _ = out.write_all(RESTORE_TITLE);
+    if out.is_terminal() {
+        let _ = out.write_all(RESTORE_TITLE);
+    }
     let _ = out.flush();
 }
 

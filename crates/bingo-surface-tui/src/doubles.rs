@@ -321,6 +321,7 @@ impl TestHost {
 /// A screen that keeps what it was asked to paint.
 #[derive(Debug, Default)]
 pub struct Recorder {
+    pub motion: Option<bool>,
     pub frames: Vec<String>,
     pub titles: Vec<String>,
     pub bells: usize,
@@ -341,6 +342,13 @@ impl Recorder {
 }
 
 impl Screen for Recorder {
+    fn detection(&mut self) -> crate::render::Detection {
+        let mut detection = crate::render::Detection::default();
+        if let Some(motion) = self.motion {
+            detection.motion = motion;
+        }
+        detection
+    }
     fn draw(
         &mut self,
         layout: &crate::layout::Layout,

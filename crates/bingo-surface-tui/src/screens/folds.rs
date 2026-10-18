@@ -15,8 +15,7 @@ const PARTS: [char; 7] = ['✓', '◌', '◆', '✗', '▸', '▾', '■'];
 fn transcript(screen: &str) -> Vec<Vec<char>> {
     screen
         .lines()
-        .skip(1)
-        .take_while(|row| !row.contains('─'))
+        .take(screen.lines().count().saturating_sub(4))
         .map(|row| row.trim_matches('"').chars().collect())
         .collect()
 }

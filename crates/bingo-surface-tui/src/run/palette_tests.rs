@@ -368,5 +368,6 @@ async fn an_applied_plugins_reload_refreshes_the_waiting_count() {
         }]
     ));
     let screen = draw_tree(120, 40, &run.session.tree, &mut run.ui, now);
-    assert!(screen.contains("1 from this repo waiting"), "{screen}");
+    assert!(screen.contains("fake-1"), "{screen}");
+    assert_eq!(run.ui.catalogs.plugins.len(), 1);
 }

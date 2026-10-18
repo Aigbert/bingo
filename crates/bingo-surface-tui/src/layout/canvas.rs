@@ -26,7 +26,4 @@ impl Canvas {
     pub fn render_widget(&mut self, widget: impl Widget, area: Rect) {
         widget.render(area, &mut self.buffer);
     }
-    pub fn set_cursor_position(&mut self, position: impl Into<Position>) {
-        self.cursor = Some(position.into());
-    }
 }

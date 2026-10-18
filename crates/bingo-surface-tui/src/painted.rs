@@ -192,7 +192,7 @@ fn existing_screen_uses_ember_inks_and_respects_terminal_depth() {
     ] {
         theme::with(look, || {
             let (mut ui, now) = scene();
-            let drawing = painted(100, 32, &solo(&state), &mut ui, now);
+            let drawing = painted(100, 32, &solo(&state), &mut ui, still(now));
             match look.colors {
                 Colors::Plain => assert!(
                     drawing
@@ -221,7 +221,7 @@ fn existing_screen_uses_ember_inks_and_respects_terminal_depth() {
                             .0
                             .content
                             .iter()
-                            .any(|cell| cell.fg == theme::LIGHT.ember())
+                            .any(|cell| cell.fg == theme::LIGHT.glow())
                     );
                     assert_eq!(theme::LIGHT.you(), Color::Rgb(0xef, 0xea, 0xe8));
                 }

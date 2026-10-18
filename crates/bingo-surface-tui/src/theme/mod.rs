@@ -256,6 +256,7 @@ fn tinted(fg: Style, tint: fn(Palette) -> Color) -> Style {
     }
 }
 
+#[cfg(test)]
 pub fn rule_style() -> Style {
     foreground("faint").unwrap_or_default()
 }

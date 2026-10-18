@@ -358,7 +358,7 @@ async fn listings_stay_cached_until_forgetting_refreshes_them() {
         fixture.press(key(KeyCode::Enter)).await;
         let screen = fixture.paint(width, height).await;
         assert!(screen.contains("second"));
-        assert!(screen.contains("Forgotten. Prompt refreshes later; say not to relearn it."));
+        assert!(screen.contains("Forgotten."));
     }
 }
 #[tokio::test]

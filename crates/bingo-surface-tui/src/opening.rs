@@ -1,17 +1,10 @@
 //! The wordmark entrance, a pure function of elapsed seconds.
-mod cells;
-mod frame;
 
 use std::time::Instant;
 
 use crate::clock::Now;
 
 pub const END: f32 = 2.4;
-pub use frame::frame;
-
-/// The frames the beats are reviewed from.
-#[cfg(test)]
-mod storyboard;
 
 /// The opening as the surface holds it while it plays: the instant it started,
 /// and nothing else.

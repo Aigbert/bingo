@@ -238,7 +238,7 @@ mod tests {
             .expect("the worked row");
         let composer = rows
             .iter()
-            .position(|l| l.contains("ask anything"))
+            .position(|l| l.contains("Ask anything"))
             .expect("the composer");
         assert!(worked < composer, "{drawn}");
         assert!(

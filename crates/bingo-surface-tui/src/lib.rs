@@ -60,11 +60,13 @@ mod composer;
 mod count;
 mod crew;
 mod dialog;
+mod dock;
 mod effect;
 mod face;
 mod focus;
 mod fold;
 mod foot;
+mod footer;
 mod form;
 mod frame;
 mod graphics;
@@ -83,6 +85,7 @@ mod lifecycle;
 mod markdown;
 mod matching;
 mod mentions;
+mod mode;
 /// The opening (M149): the wordmark arriving, out of the motions the
 /// product already has.
 mod opening;

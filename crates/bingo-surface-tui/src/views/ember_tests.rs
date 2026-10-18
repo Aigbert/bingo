@@ -437,11 +437,14 @@ fn a_breathing_row_off_screen_neither_redraws_nor_schedules() {
             .span(&bingo_sdk::ItemId::from_raw("user"))
             .unwrap();
         assert!(end <= ui.shown.top);
-        assert_eq!(ui.shown.next_frame, None);
+        assert_eq!(ui.shown.next_frame, Some(now.instant + crate::clock::FRAME));
         let renders = ui.shown.blocks.renders();
         draw_tree(80, 24, &tree, &mut ui, later(now, 900));
         assert_eq!(ui.shown.blocks.renders(), renders);
-        assert_eq!(ui.shown.next_frame, None);
+        assert_eq!(
+            ui.shown.next_frame,
+            Some(later(now, 900).instant + crate::clock::FRAME)
+        );
         ui.scroll.home(
             ui.shown.height,
             ui.shown.regions.transcript.height as usize,

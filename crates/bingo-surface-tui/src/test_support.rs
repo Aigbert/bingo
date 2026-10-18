@@ -721,15 +721,6 @@ pub fn pending_wake(at: &str) -> Event {
     }
 }
 
-/// The same kind, taken back: what a wake that fired or was ended leaves.
-pub fn wake_taken_back() -> Event {
-    Event::Extension {
-        plugin: "bingo.schedule".into(),
-        kind: "wake".into(),
-        payload: Value::Null,
-    }
-}
-
 /// What the permission policy publishes for a session: the mode, the list
 /// it may be cycled through, the rules it accepted.
 pub fn permission_view(mode: &str) -> Event {
@@ -746,17 +737,6 @@ pub fn permission_view(mode: &str) -> Event {
 /// A session whose policy has published this mode and nothing else.
 pub fn with_permission_mode(mode: &str) -> SessionState {
     folded(vec![frame(1, permission_view(mode))])
-}
-
-/// What the kernel publishes about the reasoning effort in force: the one
-/// place a client reads the level (ADR-0008 §4). `None` is off.
-pub fn thinking_view(level: Option<bingo_sdk::Effort>) -> Event {
-    Event::ConfigChanged {
-        config: bingo_sdk::ConfigView {
-            kernel: json!({ "thinking": level }),
-            ..Default::default()
-        },
-    }
 }
 
 pub fn notice(level: Level, text: &str) -> Event {

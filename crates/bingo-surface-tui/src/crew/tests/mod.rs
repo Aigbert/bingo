@@ -260,7 +260,7 @@ fn room_enter_steps_into_its_chat_and_escape_returns() {
     ui.focus = crate::focus::Focus::Composer;
     for (width, height) in [(108, 30), (80, 24)] {
         let screen = draw_tree(width, height, &tree, &mut ui, now);
-        assert!(screen.contains("#design · session"), "{screen}");
+        assert!(screen.contains("Post to #design"), "{screen}");
         assert!(
             screen.contains("Keep the room conversation reachable."),
             "{screen}"
