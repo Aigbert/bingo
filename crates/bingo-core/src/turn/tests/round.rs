@@ -48,7 +48,7 @@ impl TurnHost for StopAtAsk {
 }
 
 #[tokio::test]
-async fn esc_during_an_ask_currently_decides_and_receipts_a_later_call() {
+async fn esc_during_an_ask_never_decides_or_receipts_a_later_call() {
     let provider = ScriptedProvider::new(vec![Script::Events(calls(&["Echo", "Echo"]))]);
     let mut cfg = config(provider, vec![Arc::new(EchoTool { read_only: false })]);
     let seen = Arc::new(Mutex::new(Vec::new()));
@@ -80,13 +80,13 @@ async fn esc_during_an_ask_currently_decides_and_receipts_a_later_call() {
         cancel.cancel();
     });
     assert!(matches!(out.status, TurnStatus::Interrupted { .. }));
-    assert_eq!(seen.lock().unwrap().len(), 2);
+    assert_eq!(seen.lock().unwrap().len(), 1);
     assert_eq!(
         out.items
             .iter()
             .filter(|i| matches!(i.body, ItemBody::PermissionReceipt { .. }))
             .count(),
-        1
+        0
     );
     let tools: Vec<_> = out
         .items
@@ -96,3 +96,7 @@ async fn esc_during_an_ask_currently_decides_and_receipts_a_later_call() {
     assert_eq!(tools.len(), 2);
     assert!(tools.iter().all(|i| i.status == ItemStatus::Interrupted));
 }
+
+mod walk;
+
+mod cancel;

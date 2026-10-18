@@ -140,6 +140,20 @@ pub(crate) struct Waiting {
     notices: Vec<ItemBody>,
 }
 
+impl Decided {
+    pub(crate) fn action(&self) -> crate::round::Decision {
+        match self {
+            Self::Settled(gated) => match gated.gate {
+                Gate::Allowed => crate::round::Decision::Allowed {
+                    safe: gated.traits.concurrency_safe,
+                },
+                Gate::Denied { .. } => crate::round::Decision::Denied,
+            },
+            Self::Ask(_) => crate::round::Decision::Ask,
+        }
+    }
+}
+
 /// The standalone gate uses the same decision and asking steps as a round.
 pub async fn gate_call(input: GateInput<'_>, prompter: &dyn GatePrompter) -> Gated {
     let decided = decide(&input).await;

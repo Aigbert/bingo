@@ -17,7 +17,6 @@ pub mod models;
 pub mod plugins;
 pub mod prompt;
 pub mod rewind;
-#[cfg(test)]
 mod round;
 pub mod session;
 pub mod settings;

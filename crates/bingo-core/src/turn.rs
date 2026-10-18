@@ -3,7 +3,7 @@
 //! reminders, no roster. Those are contributors and hooks a plugin registers.
 //!
 //! ```text
-//! Assembling → Streaming → Deciding → Gating → Executing → Barrier → Assembling
+//! Assembling → Streaming → Deciding → Acting → Barrier → Assembling
 //!                 │  overflow → Compacting → Streaming      └ stop / interrupt → Closing
 //!                 └ cancel → Closing
 //! ```
@@ -18,6 +18,7 @@ mod host;
 mod late;
 mod measure;
 mod resting;
+mod round;
 mod ruler;
 mod stream;
 
@@ -39,7 +40,7 @@ use crate::accumulator::Finished;
 use crate::chain::tool::AskVia;
 use crate::context::{ContextView, KERNEL_SURFACE, budget, elide, estimate_tokens};
 use crate::executor::{self, Gate, PendingCall};
-use crate::gate::{GateInput, gate_call};
+use crate::gate::GateInput;
 use crate::models::vision;
 
 pub const INTERRUPTED_MARKER: &str = "[Request interrupted by user]";
@@ -678,10 +679,10 @@ impl Turn<'_> {
         }
     }
 
-    /// Gate the calls, run them, then hold the barrier before the next round.
+    /// Walk the calls, then hold the barrier before the next round.
     async fn act(&mut self, finished: &Finished) -> Step {
-        let calls = self.gate(finished).await;
-        let stop_after = self.execute(calls).await;
+        let outcomes = self.run_tools(finished).await;
+        let stop_after = self.after_tool_hooks(&outcomes).await;
         if self.cancel.is_cancelled() {
             return self.interrupted();
         }
@@ -840,144 +841,12 @@ impl Turn<'_> {
             return true;
         };
         let item = self.fresh(body, ItemStatus::Completed);
-        let Ok(item) = self.host.receipt(item).await else {
+        let Some(Ok(item)) = self.racing(self.host.receipt(item)).await else {
             self.cancel.cancel();
             return false;
         };
         self.transcript.apply(&Event::ItemCompleted { item });
         true
-    }
-
-    async fn gate(&mut self, finished: &Finished) -> Vec<PendingCall> {
-        let mut calls = Vec::with_capacity(finished.tool_calls.len());
-        // Asked once for the round: the gate does the per-tool matching, and
-        // a source is read no more often than the hooks it answers with.
-        let hooks = self.hooks.gather().await;
-        for (item_id, call) in &finished.tool_calls {
-            let tool = self
-                .late
-                .tools
-                .iter()
-                .find(|t| t.spec().name == call.name)
-                .cloned();
-            let prompter = AskVia {
-                host: self.host,
-                item: item_id.clone(),
-            };
-            let mut gated = gate_call(
-                GateInput {
-                    links: &self.hooks.links.clone(),
-                    session: &self.cfg.session.id,
-                    cwd: &self.cfg.cwd,
-                    item: item_id,
-                    call: call.clone(),
-                    tool: tool.clone(),
-                    policy: self.cfg.policy.as_ref(),
-                    hooks: &hooks,
-                    hook_cx: &self.hook_cx,
-                },
-                &prompter,
-            )
-            .await;
-            for notice in gated.notices.drain(..) {
-                self.record(notice);
-            }
-            if !self.record_receipt(gated.receipt.take()).await {
-                return Vec::new();
-            }
-            self.mark_gated(item_id, &mut gated);
-            calls.push(PendingCall {
-                item: item_id.clone(),
-                call: gated.call,
-                tool,
-                traits: gated.traits,
-                gate: gated.gate,
-            });
-        }
-        calls
-    }
-
-    fn mark_gated(&mut self, item_id: &ItemId, gated: &mut crate::gate::Gated) {
-        if let Some(mut item) = self.transcript.get(item_id).cloned()
-            && (gated.gate == Gate::Allowed
-                || matches!(&item.body, ItemBody::ToolCall { input, .. } if *input != gated.call.input))
-        {
-            if gated.gate == Gate::Allowed {
-                item.status = ItemStatus::Running;
-            }
-            if let ItemBody::ToolCall {
-                input, allowed_by, ..
-            } = &mut item.body
-            {
-                *input = gated.call.input.clone();
-                *allowed_by = gated.allowed_by.take().map(Box::new);
-            }
-            emit_and_fold(&mut self.transcript, self.host, Event::ItemUpdated { item });
-        }
-    }
-
-    /// Returns whether an `after_tool` hook asked to end the turn after this round.
-    async fn execute(&mut self, calls: Vec<PendingCall>) -> bool {
-        let outcomes = self.run_tools(calls).await;
-        self.after_tool_hooks(&outcomes).await
-    }
-
-    /// Run the gated calls and fold each result back into the item that made it.
-    async fn run_tools(&mut self, calls: Vec<PendingCall>) -> Vec<ToolOutcome> {
-        let cfg = self.cfg;
-        let session = cfg.session.id.clone();
-        let turn = self.id.clone();
-        let cancel = self.cancel.clone();
-
-        let report = crate::chain::Report::default();
-        let dispatch = executor::Dispatch {
-            links: &self.hooks.links,
-            cx: &self.hook_cx.clone(),
-            report: report.clone(),
-        };
-        let outcomes = executor::execute_chain(
-            calls,
-            &cancel,
-            |pc| ToolContext {
-                call_id: pc.call.call_id.clone(),
-                session: session.clone(),
-                turn: turn.clone(),
-                item: pc.item.clone(),
-                cwd: cfg.cwd.clone(),
-                cancel: cancel.child_token(),
-                env: cfg.env.clone(),
-                host: cfg.host.clone(),
-                call: cfg.call_host.tool.clone(),
-            },
-            |o| {
-                if let Some(mut item) = self.transcript.get(&o.item).cloned() {
-                    item.status = o.status;
-                    item.completed_at = Some(Timestamp::now());
-                    if let ItemBody::ToolCall {
-                        output,
-                        duration_ms,
-                        progress,
-                        ..
-                    } = &mut item.body
-                    {
-                        *output = Some(o.output.clone());
-                        *duration_ms = Some(o.duration_ms);
-                        *progress = None;
-                    }
-                    emit_and_fold(
-                        &mut self.transcript,
-                        self.host,
-                        Event::ItemCompleted { item },
-                    );
-                }
-            },
-            Some(&dispatch),
-        )
-        .await;
-        for notice in report.take() {
-            self.record(notice);
-        }
-        outcomes
     }
 
     /// Let the adapters observe the whole round before honoring a block.

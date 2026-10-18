@@ -107,6 +107,11 @@ async fn with_hooks(
         replies: Mutex::new(replies.into()),
         ..Default::default()
     };
+    let result = through_gate(command, hooks, &person).await;
+    (result, person)
+}
+
+async fn through_gate(command: &str, hooks: &[Arc<dyn Hook>], person: &dyn GatePrompter) -> Gated {
     let cx = HookContext {
         item: None,
         session: SessionId::from_raw("s"),
@@ -116,7 +121,7 @@ async fn with_hooks(
         model: None,
         host: bingo_sdk::testing::NoHost::handle(),
     };
-    let result = gate_call(
+    gate_call(
         GateInput {
             session: &cx.session,
             cwd: &cx.cwd,
@@ -132,10 +137,9 @@ async fn with_hooks(
             hooks,
             hook_cx: &cx,
         },
-        &person,
+        person,
     )
-    .await;
-    (result, person)
+    .await
 }
 fn changed(command: &str) -> Answer {
     Answer::AllowChanged {
@@ -268,4 +272,24 @@ async fn a_policy_caution_keeps_its_act_and_drops_the_session_scope() {
         caution: Some(Caution { reason, act: Some(act) }), session_scope: None, ..
     } if reason == "rewrites remote history" && act == "force-push"));
     assert!(!asks[0].1.contains(&AnswerSpec::AllowSession));
+}
+
+struct Closed;
+#[async_trait]
+impl GatePrompter for Closed {
+    async fn ask(&self, _: InteractionKind, _: Vec<AnswerSpec>) -> Result<Answered, KernelError> {
+        Err(KernelError::new(ErrorCode::InteractionClosed, "gone"))
+    }
+}
+
+#[tokio::test]
+async fn a_failed_prompter_closes_the_call_without_a_receipt() {
+    let result = through_gate("cargo build", &[], &Closed).await;
+    assert_eq!(
+        result.gate,
+        Gate::Denied {
+            message: "Permission interaction closed".into()
+        }
+    );
+    assert!(result.receipt.is_none());
 }
