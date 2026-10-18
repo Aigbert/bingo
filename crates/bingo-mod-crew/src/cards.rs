@@ -81,9 +81,13 @@ fn current_tool(state: &SessionState) -> Option<String> {
         .iter()
         .rev()
         .find_map(|item| match &item.body {
-            ItemBody::ToolCall {
-                name, output: None, ..
-            } if state.busy() => Some(name.clone()),
+            ItemBody::ToolCall { name, .. }
+                if item.status == ItemStatus::Running
+                    || bingo_sdk::transcript::call_wait(item)
+                        .is_some_and(|(_, end)| end.is_none()) =>
+            {
+                Some(name.clone())
+            }
             _ => None,
         })
 }

@@ -63,3 +63,33 @@ fn team_cards_include_seated_and_unseated_roles() {
     assert_eq!(card.line, "scout   not seated");
     assert_eq!(card.details, ["agent    -", "session  -"]);
 }
+
+#[test]
+fn a_card_names_only_a_running_or_waiting_call() {
+    let row = row("reviewer", "working");
+    let mut state = SessionState::new(row.summary.clone());
+    for (status, asked, expected) in [
+        ("pending", false, None),
+        ("pending", true, Some("Edit")),
+        ("running", false, Some("Edit")),
+        ("interrupted", true, None),
+    ] {
+        let mut value = serde_json::json!({"id":"call","status":status,
+            "startedAt":"2026-10-15T00:00:00Z","body":{"kind":"toolCall","callId":"c","name":"Edit","input":{}}});
+        if asked {
+            value["body"]["askedAt"] = serde_json::json!("2026-10-15T00:00:01Z");
+        }
+        if status == "interrupted" {
+            value["completedAt"] = serde_json::json!("2026-10-15T00:00:02Z");
+        }
+        state.transcript.apply(&Event::ItemUpdated {
+            item: serde_json::from_value(value).unwrap(),
+        });
+        let card = agent_card(&row, Some(&state), None);
+        let tool = card
+            .details
+            .iter()
+            .find_map(|line| line.strip_prefix("tool   "));
+        assert_eq!(tool, expected, "{status}/{asked}");
+    }
+}
