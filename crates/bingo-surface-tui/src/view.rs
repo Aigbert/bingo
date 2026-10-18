@@ -134,13 +134,9 @@ fn strip(ui: &Ui, measured: &graphics::Decoded, width: u16) -> graphics::Band {
 
 /// Persistent session facts keep their row in every focus state.
 fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
-    if area.height == 0 {
-        return;
-    }
     let area = crate::pane::status(ui, tree.viewed(), frame, area);
     let drawing = crate::footer::draw(tree, ui, frame, area.width as usize, now);
-    let lines = frame.collect(drawing);
-    frame.render_widget(Paragraph::new(lines), area);
+    frame.place(drawing, area);
 }
 
 /// The activity row and whatever is queued behind it. It takes the tree
@@ -376,7 +372,7 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     // The shape's own rows and the title it keeps: what is left is what the
     // answers have to be walked in, and what a card lays itself out within.
     let room = usize::from(above.height).saturating_sub(usize::from(shape.chrome()) + 1);
-    let mut drawing = crate::component::sealed::Site {
+    let drawing = crate::component::sealed::Site {
         state: owner,
         ui,
         now,
@@ -386,7 +382,7 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
         room: room + 1,
     }
     .rows(&mut frame.pulls, opening(interaction, now).moving());
-    frame.wake(drawing.next);
+    let mut drawing = frame.collect(drawing);
     let rows = wrapped_card_rows(std::mem::take(&mut drawing.rows), width);
     let rows = fitted_answers(rows, ui.dialog.focus, room);
     let lines: Vec<Line<'static>> = rows.iter().map(|(line, _)| line.clone()).collect();
@@ -755,21 +751,20 @@ fn render_composer(
     now: Now,
     draft: prompt::Layout,
 ) {
-    if area.height == 0 {
-        return;
-    }
     frame.render_widget(Paragraph::new("").style(crate::dock::ground()), area);
     let drawing = crate::dock::draw(tree, ui, area.width as usize, now);
-    let edge = frame.collect(drawing);
-    frame.render_widget(Paragraph::new(edge), Rect { height: 1, ..area });
+    frame.place(
+        drawing,
+        Rect {
+            height: area.height.min(1),
+            ..area
+        },
+    );
     let inner = Rect {
         y: area.y + 1,
         height: area.height.saturating_sub(2),
         ..area
     };
-    if inner.height == 0 {
-        return;
-    }
     if let Some(search) = ui.focus.search() {
         frame.render_widget(Paragraph::new(search::row(search)), inner);
     } else {
@@ -829,8 +824,7 @@ fn render_draft(
             ..now
         },
     );
-    let lines = frame.collect(drawing);
-    frame.render_widget(Paragraph::new(lines), area);
+    frame.place(drawing, area);
 }
 
 /// The `/` and `@` dropdown: what the line being typed ranks, in `rows` of
@@ -897,7 +891,6 @@ fn suggestion_line(row: &Suggestion, column: usize, focused: bool) -> Line<'stat
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::keys;
     use crate::test_support::*;
     use bingo_sdk::{
         ContentPart, ContextUsage, Event, InterruptReason, ItemBody, ItemStatus, KernelError,
@@ -1268,9 +1261,12 @@ mod tests {
         assert!(waits.contains("› and then the docs (waits)"), "{waits}");
 
         assert!(waits.contains("Steer, or queue what comes next"), "{waits}");
-        assert!(!waits.contains(keys::PLACEHOLDER), "{waits}");
+        assert!(
+            !waits.contains("Ask anything, or / for commands"),
+            "{waits}"
+        );
         let idle = render(&state(), &mut scene().0, scene().1);
-        assert!(idle.contains(keys::PLACEHOLDER), "{idle}");
+        assert!(idle.contains("Ask anything, or / for commands"), "{idle}");
         assert!(idle.contains("   ▍Ask anything"), "{idle}");
     }
 
@@ -2132,12 +2128,12 @@ mod tests {
 }
 
 #[cfg(test)]
-mod review_tests {
+mod placement_tests {
     use super::*;
     use crate::test_support::{later, scene, still};
 
     #[test]
-    fn round2_the_scrollbar_stays_for_nine_hundred_ms_at_the_end() {
+    fn the_scrollbar_stays_for_nine_hundred_ms_at_the_end() {
         let (mut ui, now) = scene();
         ui.scroll.end(now.instant);
         let area = Rect::new(0, 0, 80, 10);
@@ -2153,5 +2149,124 @@ mod review_tests {
             );
             assert_eq!(frame.deadline().is_some(), ms < 900);
         }
+    }
+    #[test]
+    fn sending_while_following_does_not_flash_the_scrollbar() {
+        use crate::test_support::*;
+        let (mut ui, now) = scene();
+        let state = folded(
+            (1..=60)
+                .map(|i| {
+                    frame(
+                        i,
+                        bingo_sdk::Event::ItemCompleted {
+                            item: user(&format!("line-{i}"), &format!("line {i}")),
+                        },
+                    )
+                })
+                .collect(),
+        );
+        let tree = solo(&state);
+        draw_tree(80, 24, &tree, &mut ui, still(now));
+        assert!(ui.shown.height > usize::from(ui.shown.regions.transcript.height));
+        ui.composer.set("next");
+        crate::input::on_key(
+            &mut ui,
+            &tree,
+            key(crossterm::event::KeyCode::Enter),
+            still(now),
+        );
+        assert!(!draw_tree(80, 24, &tree, &mut ui, still(now)).contains('▕'));
+        crate::input::on_key(
+            &mut ui,
+            &tree,
+            key(crossterm::event::KeyCode::PageUp),
+            still(now),
+        );
+        draw_tree(80, 24, &tree, &mut ui, still(later(now, 100)));
+        crate::input::on_key(
+            &mut ui,
+            &tree,
+            key(crossterm::event::KeyCode::End),
+            still(later(now, 100)),
+        );
+        for ms in [100, 999, 1000] {
+            assert_eq!(
+                draw_tree(80, 24, &tree, &mut ui, still(later(now, ms))).contains('▕'),
+                ms < 1000
+            );
+        }
+    }
+
+    #[test]
+    fn a_zero_height_footer_keeps_its_countdown_deadline() {
+        use crate::test_support::*;
+        let (ui, now) = scene();
+        let state = folded(vec![frame(
+            1,
+            extended(
+                "clock",
+                "wake",
+                bingo_sdk::slot::with(
+                    serde_json::json!({}),
+                    [bingo_sdk::slot::Slot::Status {
+                        text: "wakes".into(),
+                        until: Some(later(now, 125_000).wall),
+                        tone: bingo_sdk::Tone::Neutral,
+                    }],
+                ),
+            ),
+        )]);
+        let mut layout = Layout::default();
+        render_status(
+            &solo(&state),
+            &ui,
+            &mut layout,
+            Rect::new(0, 0, 120, 0),
+            still(now),
+        );
+        assert_eq!(
+            layout.deadline(),
+            Some(later(now, 5000).instant + std::time::Duration::from_nanos(1))
+        );
+    }
+
+    #[test]
+    fn a_zero_height_edge_keeps_its_flash_deadline() {
+        use crate::test_support::*;
+        let (ui, now) = scene();
+        let state = folded(vec![
+            frame(1, started("turn")),
+            frame(2, completed("turn", bingo_sdk::TurnStatus::Completed)),
+        ]);
+        let mut layout = Layout::default();
+        render_composer(
+            &solo(&state),
+            &ui,
+            &mut layout,
+            Rect::new(0, 0, 80, 0),
+            still(now),
+            ui.composer.layout(74),
+        );
+        assert_eq!(layout.deadline(), Some(later(now, 1100).instant));
+    }
+
+    #[test]
+    fn a_zero_height_ask_keeps_its_deadline() {
+        let now = scene().1;
+        let mut layout = Layout::default();
+        let next = Some(later(now, 100).instant);
+        crate::ask::drawing::place(
+            &mut layout,
+            crate::component::sealed::Drawing {
+                next,
+                rows: vec![(Line::raw("ask"), None)],
+                options: vec![],
+                actions: vec![],
+            },
+            0,
+            Rect::new(0, 0, 80, 0),
+        );
+        assert_eq!(layout.deadline(), next);
     }
 }

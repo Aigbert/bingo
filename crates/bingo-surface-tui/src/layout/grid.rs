@@ -6,13 +6,11 @@ use unicode_width::UnicodeWidthStr;
 
 #[allow(dead_code)] // M193 draws with this grid primitive.
 pub const SIDE: usize = 0;
-#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const TX: usize = 3;
 #[allow(dead_code)] // M193 draws with this grid primitive.
 pub const VX: usize = 5;
 #[allow(dead_code)] // M193 draws with this grid primitive.
 pub const AX: usize = 13;
-#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const RM: usize = 2;
 #[allow(dead_code)] // M193 draws with this grid primitive.
 pub const MEASURE: usize = 100;

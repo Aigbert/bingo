@@ -5,12 +5,13 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::pictures;
 
+pub const CARET_COLUMNS: usize = 1;
 pub const COLUMN: usize = crate::layout::grid::TX;
 pub const CARET_REST: std::time::Duration = std::time::Duration::from_secs(10);
 
 pub fn width(width: usize) -> usize {
     width
-        .saturating_sub(COLUMN + crate::layout::grid::RM + 1)
+        .saturating_sub(COLUMN + crate::layout::grid::RM + CARET_COLUMNS)
         .max(1)
 }
 

@@ -40,7 +40,6 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if key.kind == KeyEventKind::Release {
         return Vec::new();
     }
-    ui.keyed_at = now.instant;
     ui.prepare(&tree.viewed().summary.cwd);
     if key == KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL) && ui.composer.is_empty() {
         return vec![Effect::Exit];
@@ -896,7 +895,7 @@ fn send(
 ) -> Vec<Effect> {
     // The gesture is answered on its own frame, whatever the line turns out
     // to be and whatever the kernel makes of it (§6).
-    ui.scroll.end(now.instant);
+    ui.scroll = Default::default();
     if let Some(effects) = crate::palette::command(ui, &text, now) {
         return effects;
     }

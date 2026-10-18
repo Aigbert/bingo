@@ -129,8 +129,6 @@ pub const BINDINGS: &[Binding] = &[
     },
 ];
 
-#[cfg(test)]
-pub const PLACEHOLDER: &str = "Ask anything, or / for commands";
 // ---- the three ordered stacks (design §7) -------------------------------
 
 /// What `esc` closes, innermost first. It is a table rather than a chain of

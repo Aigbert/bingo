@@ -15,11 +15,7 @@ pub fn draw(
     keyed_at: std::time::Instant,
     now: clock::Now,
 ) -> Drawing {
-    let rest = keyed_at + super::CARET_REST;
-    let now = clock::Now {
-        motion: now.motion && now.instant < rest,
-        ..now
-    };
+    let (now, rest) = rested(now, keyed_at);
     let overflow = usize::from(layout.lines.len() > 8 && rows >= 9);
     let count = rows.saturating_sub(overflow).min(8);
     let start = layout.lines.len().saturating_sub(count);
@@ -66,6 +62,17 @@ pub fn draw(
         next: (active && now.motion && layout.cursor.0 >= start && count > 0)
             .then_some((now.instant + clock::FRAME).min(rest)),
     }
+}
+
+fn rested(now: clock::Now, keyed_at: std::time::Instant) -> (clock::Now, std::time::Instant) {
+    let rest = keyed_at + super::CARET_REST;
+    (
+        clock::Now {
+            motion: now.motion && now.instant < rest,
+            ..now
+        },
+        rest,
+    )
 }
 
 fn input(text: &str, cursor: Option<usize>, caret: &Span<'static>) -> Vec<Span<'static>> {

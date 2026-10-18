@@ -12,6 +12,7 @@ use std::time::Instant;
 mod canvas;
 pub(crate) mod count;
 mod deadline;
+mod drawing;
 pub mod grid;
 pub use canvas::Canvas;
 
@@ -60,9 +61,15 @@ impl Layout {
         self.next_frame
     }
 
-    pub fn collect(&mut self, drawing: crate::views::Drawing) -> Vec<ratatui::text::Line<'static>> {
-        self.wake(drawing.next);
-        drawing.lines
+    pub fn collect<P: drawing::Part>(&mut self, drawing: P) -> P::Content {
+        let (content, next) = drawing.split();
+        self.wake(next);
+        content
+    }
+
+    pub fn place(&mut self, drawing: crate::views::Drawing, area: Rect) {
+        let lines = self.collect(drawing);
+        self.render_widget(ratatui::widgets::Paragraph::new(lines), area);
     }
 
     /// The picture a pointer is on, when it is on one. The cells under it say

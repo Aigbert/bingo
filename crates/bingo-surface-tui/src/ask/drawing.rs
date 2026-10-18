@@ -93,7 +93,8 @@ fn dim(drawing: &mut Drawing) {
     }
 }
 
-pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
+pub fn place(frame: &mut Layout, drawing: Drawing, at: usize, area: Rect) {
+    let mut drawing = frame.collect(drawing);
     let Some(row) = at.checked_sub(frame.top) else {
         return;
     };
@@ -102,7 +103,6 @@ pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
     if height == 0 {
         return;
     }
-    frame.wake(drawing.next);
     let rect = Rect::new(area.x, y, area.width, height);
     drawing.place(rect);
     frame.card_actions = drawing.actions;
