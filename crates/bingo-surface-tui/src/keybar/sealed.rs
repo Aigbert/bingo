@@ -87,13 +87,9 @@ fn question_pairs(
 }
 fn permission(ui: &Ui, ask: &Interaction) -> Vec<Pair> {
     let mut pairs = vec![Pair::new("↑↓", "pick"), Pair::new("⏎", "answer")];
-    if matches!(
-        ask.kind,
-        InteractionKind::Permission {
-            preview: Some(Preview::Diff { .. }),
-            ..
-        }
-    ) {
+    if let InteractionKind::Permission { preview, .. } = &ask.kind
+        && matches!(preview.as_deref(), Some(Preview::Diff { .. }))
+    {
         pairs.push(Pair::new(
             "ctrl+o",
             if ui.dialog.expanded {

@@ -423,7 +423,7 @@ fn question(interaction: &Interaction, cwd: &str) -> Option<Line<'static>> {
     let text = match &interaction.kind {
         InteractionKind::Permission {
             summary, preview, ..
-        } => match preview {
+        } => match preview.as_deref() {
             Some(Preview::Command { .. }) => "Do you want to run this command?".into(),
             Some(Preview::Url { .. }) => "Do you want to fetch this page?".into(),
             Some(Preview::Diff { .. }) => format!("Do you want to {}?", shorten(summary, cwd)),

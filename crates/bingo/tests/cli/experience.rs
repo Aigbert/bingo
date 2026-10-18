@@ -157,7 +157,7 @@ fn a_commit_is_proposed_as_the_file_it_would_write() {
             _ => None,
         })
         .expect("the gate asked before writing an experience");
-    let Some(Preview::Diff { unified }) = preview else {
+    let Some(Preview::Diff { unified }) = preview.as_deref() else {
         panic!("the card shows the file, not {preview:?}");
     };
     assert!(unified.contains("<new>.md"), "{unified}");

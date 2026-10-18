@@ -131,7 +131,7 @@ pub enum InteractionKind {
         input: serde_json::Value,
         summary: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        preview: Option<Preview>,
+        preview: Option<Box<Preview>>,
         /// The rule `AllowSession` would install, when one would silence the prompt.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         session_scope: Option<String>,

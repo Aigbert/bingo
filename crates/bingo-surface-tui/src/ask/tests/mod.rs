@@ -5,12 +5,22 @@ use bingo_sdk::{
 };
 use serde_json::json;
 
+fn preview_command(kind: &InteractionKind) -> &str {
+    if let InteractionKind::Permission { preview, .. } = kind
+        && let Some(Preview::Command { command, .. }) = preview.as_deref()
+    {
+        command
+    } else {
+        "cargo test"
+    }
+}
+
 fn scene_for(mut open: Interaction, command: bool) -> (crate::tree::Tree, Ui, crate::clock::Now) {
     if matches!(open.kind, InteractionKind::Permission { .. }) {
         open.answers.push(AnswerSpec::AllowChanged);
     }
     let input = if command {
-        json!({"command": match &open.kind { InteractionKind::Permission { preview: Some(Preview::Command { command,.. }), .. } => command.as_str(), _ => "cargo test" }})
+        json!({"command": preview_command(&open.kind)})
     } else {
         json!({"file_path":"src/main.rs","old_string":"old","new_string":"new"})
     };

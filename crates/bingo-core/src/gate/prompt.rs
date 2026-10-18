@@ -32,7 +32,7 @@ pub(super) async fn ask_person(
             .clone()
             .or_else(|| input.confirm.map(str::to_owned))
             .unwrap_or_else(|| summarize(input.call, input.subjects)),
-        preview: tool.preview(&input.call.input, input.cwd),
+        preview: tool.preview(&input.call.input, input.cwd).map(Box::new),
         session_scope: scope.clone(),
         caution: blocked
             .map(|reason| Caution { reason, act: None })

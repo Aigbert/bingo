@@ -527,7 +527,7 @@ pub fn permission(scope: Option<&str>, preview: Option<Preview>) -> Interaction 
         InteractionKind::Permission {
             tool: "Edit".into(),
             summary: "Edit src/lib.rs".into(),
-            preview,
+            preview: preview.map(Box::new),
             session_scope: scope.map(str::to_owned),
             caution: None,
             input: Default::default(),

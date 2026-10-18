@@ -352,12 +352,12 @@ mod tests {
             InteractionKind::Permission {
                 tool: "Bash".into(),
                 summary: "run `cargo test`".into(),
-                preview: Some(Preview::Command {
+                preview: Some(Box::new(Preview::Command {
                     command: "cargo test".into(),
                     description: None,
                     stakes: None,
                     cwd: "/tmp".into(),
-                }),
+                })),
                 session_scope: scope.map(str::to_owned),
                 caution: None,
                 input: Default::default(),
