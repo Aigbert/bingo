@@ -1,0 +1,109 @@
+Before the TUI fixes
+$ cargo test -p bingo-surface-tui --lib --locked round3_
+test views::ember_tests::round3_unknown_motion_ink_has_no_deadline ... FAILED
+test transcript::output::tests::round3_styled_and_nested_text_displays_keep_plain_layout ... FAILED
+test component::sites_tests::round3_flattened_toast_has_no_motion_deadline ... FAILED
+test layout::tests::round3_idle_nonterminal_item_schedules_nothing ... FAILED
+test blocks::refresh_tests::round3_refresh_can_remove_the_first_of_two_expiring_entries ... FAILED
+test blocks::refresh_tests::round3_refresh_growth_updates_height_and_followed_bottom ... FAILED
+test result: FAILED. 0 passed; 6 failed; 0 ignored; 0 measured; 1397 filtered out; finished in 0.13s
+
+After the TUI fixes
+$ cargo test -p bingo-surface-tui --lib --locked round3_
+test views::ember_tests::round3_unknown_motion_ink_has_no_deadline ... ok
+test transcript::output::tests::round3_styled_and_nested_text_displays_keep_plain_layout ... ok
+test component::sites_tests::round3_flattened_toast_has_no_motion_deadline ... ok
+test blocks::refresh_tests::round3_refresh_can_remove_the_first_of_two_expiring_entries ... ok
+test layout::tests::round3_idle_nonterminal_item_schedules_nothing ... ok
+test blocks::refresh_tests::round3_refresh_growth_updates_height_and_followed_bottom ... ok
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1397 filtered out; finished in 0.02s
+
+Before the SDK fix
+$ cargo test -p bingo-sdk --locked --test ember_style unknown_motion_round_trips_its_original_fields -- --exact
+test unknown_motion_round_trips_its_original_fields ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.06s
+
+After the SDK fix
+$ cargo test -p bingo-sdk --locked
+test catalogue::tests::the_committed_catalogue_is_generated ... ok
+test unknown_motion_is_not_an_authoring_variant ... ok
+test unknown_motion_keeps_the_view_readable ... ok
+test unknown_motion_round_trips_its_original_fields ... ok
+
+Formatting
+$ cargo fmt --all -- --check
+exit 0
+
+Workspace check
+$ cargo check --workspace --all-targets --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 43.15s
+exit 0
+
+Clippy
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 43.04s
+exit 0
+
+Discipline
+$ scripts/check_discipline.sh
+discipline ok
+exit 0
+
+Budget
+$ scripts/budget.sh
+dependencies (unique, normal): 423 (max  423)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 14 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+test binaries: 155
+budget ok
+exit 0
+
+Dependency policy
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+exit 0
+
+Windows SDK
+$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.36s
+exit 0
+
+Binary build
+$ cargo build -p bingo --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 36.28s
+exit 0
+
+Workspace tests
+$ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
+120 test result lines: 6394 passed; 0 failed; 0 ignored
+test result: ok. 1403 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.74s
+exit 0
+
+Windows TUI
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+fatal error: 'stdlib.h' file not found
+fatal error: 'windows.h' file not found
+exit 101
+
+Terminal smoke
+$ TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh
+tui-smoke ok
+exit 0
+
+Terminal drives
+$ python3 docs/verification/m192/drive.py
+PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+CLEAN 100x32: owned tmux server stopped; temporary files removed
+PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+CLEAN 80x24: owned tmux server stopped; temporary files removed
+exit 0
+
+Snapshot characters
+$ python3 docs/verification/m192/check-snapshots.py
+PASS: four syntax snapshots retain every character after removing ink annotations
+PASS: the only other snapshot change is palette values
+PASS: Cargo.lock, prototype and all scene captures are unchanged
+exit 0

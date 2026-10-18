@@ -1,4 +1,4 @@
- bingo▍ /var/…/T/m192-drive-vxx0wdh2/cwd                          session 01M5
+ bingo▍ /var/…/T/m192-drive-65lr3xhq/cwd                          session 01M5
 
  › Check the Ember palette.
  ▍ Ember primitives are ready.

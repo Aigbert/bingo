@@ -111,7 +111,7 @@ No layout changes: today's screens only take Ember's inks until their milestone 
       character fails with the side-by-side report, and so does changing one ink.
 - [x] A `NO_COLOR` render of an existing screen carries no colour; a 256-colour render uses
       indices only.
-- [ ] Every existing snapshot keeps its characters, and painted.rs asserts Ember's inks. Gates
+- [x] Every existing snapshot keeps its characters, and painted.rs asserts Ember's inks. Gates
       and checks as below.
 
 ## How every Ember plan is verified (M192–M200)
@@ -151,44 +151,39 @@ Any screen's layout or keys; the characters of today's snapshots; node or playwr
 
 ## Verified
 
-- [x] Inks — `cargo test --workspace --locked`: `every_light_prototype_ink_matches ... ok`; `every_dark_prototype_ink_matches ... ok` (76 values computed once with node, embedded in Rust).
+- [x] Inks — `cargo test --workspace --locked`: `every_light_prototype_ink_matches ... ok`; `every_dark_prototype_ink_matches ... ok` (76 node-computed values embedded in Rust).
 - [x] Glyphs — same command: `prototype_glyphs_have_their_documented_cell_widths ... ok`; only ASCII `->` has the additional two-cell exemption.
-- [x] View vocabulary/motion — same command: `every_ember_ink_is_available_to_views ... ok`; `every_ember_ground_fills_text_and_boxes ... ok`; `text_motion_uses_the_frame_clock_and_has_a_still_form ... ok`; unknown names/kinds pass.
+- [x] Views — same command: `every_ember_ink_is_available_to_views ... ok`; `every_ember_ground_fills_text_and_boxes ... ok`; `text_motion_uses_the_frame_clock_and_has_a_still_form ... ok`; unknown names/kinds pass.
 - [x] Wrapping — same command: `every_wraptest_case_matches_word_for_word ... ok`; `brackets_styled_words_long_units_and_newlines_match_the_prototype ... ok`.
 - [x] Harness — same command: `three_hand_built_done_rows_pass_and_each_failure_explains_its_cell ... ok`; `every_capture_loads_its_geometry_metadata_and_ink_runs ... ok` (105 captures).
-- [x] Depth — same command: `existing_screen_uses_ember_inks_and_respects_terminal_depth ... ok` (NO_COLOR, indexed and truecolor).
-- [ ] Snapshot/gates/platform criterion — `python3 docs/verification/m192/check-snapshots.py`: `PASS: four syntax snapshots retain every character after removing ink annotations`; `PASS: the only other snapshot change is palette values`; `PASS: Cargo.lock, prototype and all scene captures are unchanged`. Native gates pass; Windows limitations below remain.
+- [x] Depth — same command: `existing_screen_uses_ember_inks_and_respects_terminal_depth ... ok` (NO_COLOR, indexed, truecolor).
+- [x] Snapshots/gates — `python3 docs/verification/m192/check-snapshots.py`: `PASS: four syntax snapshots retain every character after removing ink annotations`; only palette values otherwise change; Cargo.lock, prototype and scene captures unchanged. Gates below; Windows owed below.
 
 ### Review fixes
 
-- Probe/rounding/alignment — workspace tests: `palette_probe_keeps_a_background_only_answer ... ok`; `grid_and_formatters_match_the_prototype ... ok` (all six rounding cases).
-- Motion/depth/inheritance — workspace tests: `breathe_and_fade_resolve_inks_before_converting_depth ... ok`; `nested_motion_uses_its_inherited_ink_and_unknown_motion_is_still ... ok`; `nested_text_motion_keeps_its_clock_and_deadline ... ok`.
-- Explicit clocks/visible memo — workspace tests: `a_cached_mod_row_animates_without_a_new_view_or_event ... ok`; `a_breathing_row_off_screen_neither_redraws_nor_schedules ... ok`; `visible_cache_ranges_skip_inline_replacements ... ok`. `PASS`, `track`, `observe`, `Restore`, `motion::now` and `views::next_change` are deleted; no second view deadline walk remains.
-- Capture rules — workspace tests: `ordinary_punctuation_is_not_a_spinner ... ok`; `wide_cells_reset_inks_and_spinner_sets_compare_as_terminal_cells ... ok`; `stream_regions_include_activity_and_strip ... ok`.
-- Palette/shared mechanisms — workspace tests: `terminal_foreground_and_background_reblend_rounded_grounds ... ok`; glyph and ramp tests pass. Private palette construction, shared blends/ANSI/spinner tables, wrap docs/saturation, highlight copy and item-level grid allowances pass Clippy/discipline.
-- Wire — `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` for `bingo-sdk`, `bingo-plugin-rpc`, `bingo-surface-rpc`: exit 0; the same environment with `cargo test -p bingo-mods --locked dollar::tests::schema_and_types_are_generated_from_the_same_rows -- --exact`: `1 passed; 0 failed`. No generated files edited by hand.
-- Unknown motion — workspace tests: `unknown_motion_keeps_the_view_readable ... ok`; `unknown_motion_is_not_an_authoring_variant ... ok`. `#[serde(other)] Unknown` draws still; `#[schemars(skip)]` excludes it from schemas and generated TypeScript.
+- R3.1–3 — `cargo test -p bingo-surface-tui --lib --locked round3_`: idle deadline, removal panic and stale height regressions each FAILED before, each `ok` after; six regressions total: `0 passed; 6 failed` → `6 passed; 0 failed`. [Exact runs](../verification/m192/review-round3.txt).
+- R3.4 — same command: `round3_unknown_motion_ink_has_no_deadline` and `round3_flattened_toast_has_no_motion_deadline`: FAILED → `ok`; shared `moves`, still toast/receipt drawings.
+- R3.5 — same command: `round3_styled_and_nested_text_displays_keep_plain_layout`: FAILED → `ok`; workspace: `a_box_display_keeps_its_clock_and_deadline ... ok`; `a_breathing_row_off_screen_neither_redraws_nor_schedules ... ok`.
+- R3.6 — `cargo test -p bingo-sdk --locked --test ember_style unknown_motion_round_trips_its_original_fields -- --exact`: `0 passed; 1 failed` before; `cargo test -p bingo-sdk --locked`: round-trip, schema exclusion and generated catalogue fixture `ok`; `Other(Value)` preserves unknown fields; generated files unchanged.
+- R3.7 — workspace TUI: `1403 passed; 0 failed`; `scripts/check_discipline.sh`: `discipline ok`; still Actions, named text-only Block conversion, unused activity argument removed; `mismatch` 54 lines.
 
-### Gate evidence
+### Gates
 
 - `cargo fmt --all -- --check`: exit 0, no output.
-- `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 2.29s`.
-- `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 4.25s`.
-- `env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked`: 120 result lines, **6387 passed; 0 failed; 0 ignored**; TUI: `1397 passed; 0 failed`.
+- `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 43.15s`.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 43.04s`.
+- `env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked`: 120 result lines, **6394 passed; 0 failed; 0 ignored**; no wall-clock retry needed.
 - `scripts/check_discipline.sh`: `discipline ok` (advisory warnings only).
-- `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; `warm cargo check -p bingo-core: 0s`; `relink isolation: touching the TUI recompiled 0 crates for core`; `target/debug: 13 GB (soft max 5)`; `budget ok`.
+- `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `0s`, TUI relink `0 crates`; `target/debug: 14 GB (soft max 5)`; `budget ok`.
 - `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
-- `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: `bingo-sdk` / `bingo-surface-rpc`: `Finished dev profile` (7.09s / 9.01s), exit 0.
-- Same Windows command: `bingo-surface-tui` / `bingo-plugin-rpc`: exit 101, `aws-lc-sys`: `fatal error: 'stdlib.h' file not found`, `'windows.h' file not found`; `bingo-mods` additionally fails in `rquickjs-sys`: `clang: error: no such file or directory: '/std:c11'`. Known host C toolchain limitation; CI's Windows job is the backstop. No bypasses.
-- `cargo build -p bingo --locked`: `Finished dev profile ... in 1m 14s`; `TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`.
-- `python3 docs/verification/m192/drive.py`: `PASS 100x32: fake-provider reply captured; private HOME/data/cwd`; `PASS 80x24: fake-provider reply captured; private HOME/data/cwd`; both `CLEAN` lines confirm owned servers stopped and temporary files removed. Updated `.txt`/`.ansi` captures in `docs/verification/m192/`; both contain Ember glow `38;2;239;122;44`.
+- `cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc`: `Finished dev profile ... in 6.36s`; prior `bingo-surface-rpc` check: exit 0.
+- `cargo build -p bingo --locked`: `Finished dev profile ... in 36.28s`; `TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`.
+- `python3 docs/verification/m192/drive.py`: `PASS 100x32` / `PASS 80x24`, fake provider and private HOME/data/cwd; both `CLEAN` lines confirm owned server and temporary-file cleanup; captures in `docs/verification/m192/`.
 
-### Departures and retained M199 work
+### Departures and owed
 
-- Prototype wins: only `GA.arrow` (`->`) is two cells; `GU.arrow` (`→`) is checked. Old crew hue/contrast assertions now check membership in the exact Ember palette.
-- Review narrows spinner tolerance to named capture cells and makes 16-colour/NO_COLOR motion still. Supporting drawing/cache files extend the abbreviated plan file list; screens keep their layout.
-- Motion remains boxed to avoid enlarging SDK enums. `Drawing` carries lines/deadlines explicitly; geometry-only passes and `render` stay still. No retained `views::next_change` caller.
-- Retained for M199: legacy `breath` beside `breathe`, `paths::elide` beside `short_path`, and the old accessor names until their screens are redrawn.
-- Initial review tests `the_item_that_is_still_arriving_is_the_only_one_drawn_again` and `a_failure_flares_and_cools_into_the_words_behind_it` failed identically alone; fixtures now advance to the next deadline and sample the memo chronologically. Both full workspace runs pass.
-- Earlier provider-key test failure reproduced alone with ambient credentials; subsequent test subprocesses unset provider variables. No provider code changed.
-- Omitted: only host-blocked Windows verification. No new dependency, later milestone layout work, prototype edit or scene capture edit.
+- Prototype wins: only `GA.arrow` (`->`) is two cells; old crew hue/contrast assertions pin the exact Ember palette. Spinner tolerance is limited to named cells; colour motion is still at 16 colours/NO_COLOR.
+- No new round-3 departures; Text displays retain dev's layout. Motion stays boxed; drawing clocks/deadlines are explicit; no `views::next_change` remains. No dependency, prototype or scene-capture changes.
+- M199: retain legacy `breath` beside `breathe`, `paths::elide` beside `short_path`, and old accessor names until their screens are redrawn.
+- M193: retain Site/status/toast deadline accumulators; accepted `kept()`/pane-truncation deadlines remain.
+- Owed — Windows `bingo-surface-tui` (rerun, exit 101) and `bingo-plugin-rpc` (prior check): `aws-lc-sys`, missing `stdlib.h` / `windows.h`; `bingo-mods` (prior check) also lacks the rquickjs MSVC toolchain (`/std:c11` rejected). CI's Windows job is the backstop; no bypasses.
