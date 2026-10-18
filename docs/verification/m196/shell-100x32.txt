@@ -20,7 +20,7 @@
 
 
 
-⢀⡀
+ ⡀
 ▍⠈ ! echo shell-landed
 
        shell-landed

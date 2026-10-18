@@ -4,21 +4,21 @@
 
 
 
+
+
    ! echo shell-landed
 
        shell-landed
 
 
    run the test command
-   $ run     sleep 3; printf 'test result: ok. 2 passed; 0 fai…  in background
+   $ run     sh check.sh                                         in background
 
    The shell is in background.
 
-   ✓ sleep 3; printf 'test result: ok. 2 passed; 0 f… finished in the background
-
-   The background tests passed.
+   ── ✓ sh check.sh finished in the background · 2 passed ────────────────────
 
 ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
-   ▍Reply, or / for commands
+   ▍Steer, or queue what comes next
 
-   fake-1                                 ctrl+o details   / commands   ? keys
+   fake-1                                                             esc stop

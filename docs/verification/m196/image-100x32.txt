@@ -27,6 +27,6 @@
 ▍  work until stopped                                                                      stopped
 
 
-   [image 1]▍
+   [image 1] look at this▍
 
    esc again to rewind                                                         ⏎ send   ⇧⏎ newline

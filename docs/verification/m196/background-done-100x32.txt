@@ -18,11 +18,11 @@
 
 
    run the test command
-   $ run     sleep 3; printf 'test result: ok. 2 passed; 0 failed\n'                 in background
+   $ run     sh check.sh                                                             in background
 
    The shell is in background.
 
-   ✓ sleep 3; printf 'test result: ok. 2 passed; 0 f… finished in the background · 2 passed
+   ── ✓ sh check.sh finished in the background · 2 passed ────────────────────────────────────────
 
    The background tests passed.
 

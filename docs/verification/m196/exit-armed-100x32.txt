@@ -24,7 +24,7 @@
 
    work until stopped                                                                      stopped
 
-▍  [image 1]                                                                               stopped
+▍  [image 1] look at this                                                                  stopped
 
 
    ▍Reply, or / for commands

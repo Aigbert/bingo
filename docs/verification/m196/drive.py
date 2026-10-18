@@ -132,7 +132,8 @@ def drive(width, height):
             capture("exit-armed")
             keys("C-c")
 
-            open_session("shells", [{"steps": [{"toolCall": {"name": "Bash", "input": {"command": "sleep 3; printf 'test result: ok. 2 passed; 0 failed\\n'"}}}]}, {"steps": [{"text": "The shell is in background."}]}, {"steps": [{"text": "The background tests passed."}]}])
+            (work / "cwd/check.sh").write_text("sleep 3\nprintf 'test result: ok. 2 passed; 0 failed\\n'\n")
+            open_session("shells", [{"steps": [{"toolCall": {"name": "Bash", "input": {"command": "sh check.sh"}}}]}, {"steps": [{"text": "The shell is in background."}]}, {"steps": [{"text": "The background tests passed."}]}])
             type_text("!echo shell-landed")
             keys("Enter")
             wait("! echo shell-landed")
@@ -145,6 +146,7 @@ def drive(width, height):
             wait("in background")
             capture("background")
             wait("finished in the background")
+            wait("2 passed")
             capture("background-done")
             type_text("!seq 1 50")
             keys("Enter")

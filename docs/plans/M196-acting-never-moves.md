@@ -87,8 +87,9 @@ The input never moves, and every key in it does one predictable thing:
 
 - `crates/bingo-surface-tui/src/{input.rs,input/,keys.rs,run/withdraw.rs,composer.rs,
   activity.rs,complete.rs,mentions.rs,palette.rs,palette/,skills.rs,keybar.rs}`.
-- New `src/queue_rows.rs`.
-- `crates/bingo-mod-palette/src/{draw.rs,rows.rs}`.
+- New `src/queue_rows.rs`; composer/image-chip and shell transcript rendering; no new dependencies.
+- `crates/bingo-mod-palette/src/{draw.rs,rows.rs}` (part 2).
+- `bingo-tool-bash` background notices; PTY tests, smoke and `docs/verification/m196/` drives.
 
 ## Exit criteria
 
@@ -120,3 +121,30 @@ Asks and questions (M197); sheets (M198); teammates and rooms (M200); the exit r
   nothing and the input stays empty, with no duplicate. Test that race with the fake provider.
 - **git in a huge repository.** Bound the read (a timeout and a count cap) and draw without
   state past it.
+
+## Verified
+
+- [x] Bricks 1–6, 9: `cargo test --workspace --locked --no-fail-fast` (provider credentials unset):
+  `acting_full_frames_match_the_prototype ... ok` — all ten part-1 frames, their indexed keys/clocks; named spinner cells only.
+- [x] Same run: history, ordered queue restoration, every key-policy rung, timed double presses, both alt+Enter cases, image refusal, idle `?` pass;
+  `a_fake_provider_delivery_wins_withdrawal_without_duplication ... ok`; TUI `1417 passed; 1 failed` (excluded test below).
+- [x] Black-box PTY: same run, `stopping_returns_a_queued_line_to_the_input ... ok`; `20 passed; 0 failed`.
+- [x] `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 7.52s`.
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 4.52s`.
+- [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `dependencies ... 423 (max 423)`, `budget ok` (7 GB soft warning).
+- [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] `cargo build -p bingo --locked`: `Finished dev profile ... in 8.50s`; `TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
+- [x] `docs/verification/m196/drive.sh`: `PASS 100x32` / `PASS 80x24`; both `CLEAN` lines confirm server and temporary HOME/data/cwd cleanup.
+- [x] `cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc`: `Finished dev profile ... in 7.19s`.
+- [ ] Workspace gate: `6525 passed; 2 failed; 0 ignored`; the remaining deterministic failure is `palette::tests::ctrl_p_is_unbound_and_absent_from_the_palette_keys`.
+  Its old BINDINGS Escape text differs from the new policy. Isolated `cargo test -p bingo-surface-tui --lib --locked <test> -- --exact`: `0 passed; 1 failed`.
+  Both the test and BINDINGS are excluded by ownership instructions; left untouched.
+  Unrelated ACP journaling failed in this suite; isolated `cargo test -p bingo --test cli --locked acp::bridge::a_bridged_call_posts_to_the_parent_and_is_journaled_under_the_turn -- --exact`: `1 passed; 0 failed`.
+- [ ] Windows TUI/binary: the same target check for `bingo-surface-tui` / `bingo` exits 101 in dependencies: missing `stdlib.h` / `windows.h`; binary also lacks QuickJS MSVC `/std:c11` support.
+- [ ] Part 2: bricks 7–8 and palette ranking; captures `palette`, `palette-st`, `palette-ran`, `skills`, `skills-review`,
+  `skills-sent`, `mention`, `mention-inserted`, `small-palette`, `ascii-palette` await M198's shared list window.
+- Prototype wins: brick 5's shell-specific placeholder does not exist in `placeholder()`; retained its standard placeholder.
+  Shell folding is gone; `OUTPUT_ROWS`/`EXPAND` still serve action/tool output and generic quiet notices. Legacy background notices keep their generic view.
+- No new dependency/package/kernel fact; prototype/scenes untouched. Shared ownership and exact changed functions: [handoff](../verification/m196/handoff.md).
+  M198 owes BINDINGS words for `esc`, `ctrl+c`, `up/down`; M202's protected functions are untouched. No branch was merged.
+- Command evidence: [checks](../verification/m196/checks.txt); text/ANSI drives in that directory. Verification remains incomplete at the two blockers above.

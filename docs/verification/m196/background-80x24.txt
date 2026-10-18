@@ -14,7 +14,7 @@
 
 
 ▍  run the test command
-   $ run     sleep 3; printf 'test result: ok. 2 passed; 0 fai…  in background
+   $ run     sh check.sh                                         in background
 
    The shell is in background.
 
