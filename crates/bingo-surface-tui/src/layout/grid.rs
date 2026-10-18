@@ -1,24 +1,34 @@
 //! Ember's shared cell grid and text measures; screens adopt it in M193–M200.
-#![allow(dead_code)]
 use crate::theme;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const SIDE: usize = 0;
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const TX: usize = 3;
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const VX: usize = 5;
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const AX: usize = 13;
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const RM: usize = 2;
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub const MEASURE: usize = 100;
 
+#[allow(dead_code)] // M194 draws with this grid primitive.
 pub fn dock_cap(height: usize) -> usize {
     (height.saturating_mul(66) / 100).saturating_sub(2).max(6)
 }
 
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub fn fit(line: Line<'static>, width: usize) -> Line<'static> {
     if width == 0 {
-        return Line::default();
+        return Line {
+            alignment: line.alignment,
+            ..Line::default()
+        };
     }
     if line.width() <= width {
         return line;
@@ -37,16 +47,25 @@ pub fn fit(line: Line<'static>, width: usize) -> Line<'static> {
                     span.style,
                 ));
                 out.push(Span::styled(ell, theme::dim()));
-                return Line::from(out).style(line.style);
+                return Line {
+                    style: line.style,
+                    alignment: line.alignment,
+                    ..Line::from(out)
+                };
             }
             text.push(ch);
             used += cells;
         }
         out.push(Span::styled(text, span.style));
     }
-    Line::from(out).style(line.style)
+    Line {
+        style: line.style,
+        alignment: line.alignment,
+        ..Line::from(out)
+    }
 }
 
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub fn pad_to(line: Line<'static>, width: usize) -> Line<'static> {
     let mut line = fit(line, width);
     let pad = width.saturating_sub(line.width());
@@ -56,6 +75,7 @@ pub fn pad_to(line: Line<'static>, width: usize) -> Line<'static> {
     line
 }
 
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub fn short_path(path: &str, width: usize, ink: Style) -> Line<'static> {
     let cut = path.rfind('/').map_or(0, |at| at + 1);
     let base = &path[cut..];
@@ -86,6 +106,7 @@ pub fn short_path(path: &str, width: usize, ink: Style) -> Line<'static> {
     )
 }
 
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub fn fmt_dur(ms: u64) -> String {
     let t = ms / 1000;
     match t {
@@ -95,16 +116,21 @@ pub fn fmt_dur(ms: u64) -> String {
     }
 }
 
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub fn fmt_k(n: f64) -> String {
     if n < 1000.0 {
         return format!("{}", (n + 0.5).floor());
     }
     if n < 10000.0 {
+        if n % 500.0 == 250.0 {
+            return format!("{:.1}k", (n + 50.0) / 1000.0);
+        }
         return format!("{:.1}k", n / 1000.0);
     }
     format!("{}k", (n / 1000.0 + 0.5).floor())
 }
 
+#[allow(dead_code)] // M193 draws with this grid primitive.
 pub fn plural(n: usize, word: &str) -> String {
     format!("{n} {word}{}", if n == 1 { "" } else { "s" })
 }
@@ -121,6 +147,20 @@ mod tests {
         assert_eq!(
             [fmt_k(999.0), fmt_k(1500.0), fmt_k(10500.0)],
             ["999", "1.5k", "11k"]
+        );
+        for (n, expected) in [
+            (1250., "1.3k"),
+            (2250., "2.3k"),
+            (9250., "9.3k"),
+            (1450., "1.4k"),
+            (1750., "1.8k"),
+            (9950., "9.9k"),
+        ] {
+            assert_eq!(fmt_k(n), expected);
+        }
+        assert_eq!(
+            fit(Line::from("long text").centered(), 4).alignment,
+            Some(ratatui::layout::Alignment::Center)
         );
         assert_eq!(plural(1, "step"), "1 step");
         assert_eq!(plural(2, "step"), "2 steps");

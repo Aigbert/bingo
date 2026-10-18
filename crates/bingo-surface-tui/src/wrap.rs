@@ -1,14 +1,21 @@
-//! Styled line breaking, ported from Ember's units/wrapSegs.
+//! Word wrapping for styled lines. The transcript is measured, not predicted:
+//! every view that needs to know how tall a block is wraps it first and counts.
 use ratatui::text::{Line, Span};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 mod units;
 use units::{Unit, units};
 
+/// The width prose is wrapped to inside a region `width` columns wide: the
+/// whole of it, or the narrower line a person asked for (`tui.measure`,
+/// [`crate::settings`]; design §7). The number is theirs — this crate names
+/// none of its own.
 pub fn measure(width: usize, cap: Option<usize>) -> usize {
     cap.map_or(width, |cap| width.min(cap))
 }
 
+/// Wrap one styled line to `width` columns, keeping each span's style. An empty
+/// line stays one empty line, so blank separators survive.
 pub fn wrap(line: &Line<'static>, width: usize) -> Vec<Line<'static>> {
     if width < 2 {
         return vec![line.clone()];
@@ -31,6 +38,7 @@ pub fn wrap(line: &Line<'static>, width: usize) -> Vec<Line<'static>> {
         .collect()
 }
 
+/// Wrap every line of a block and flatten the result.
 pub fn wrap_all(lines: &[Line<'static>], width: usize) -> Vec<Line<'static>> {
     lines.iter().flat_map(|line| wrap(line, width)).collect()
 }
@@ -49,7 +57,10 @@ impl Rows {
             Unit::Space(span) => self.space(span),
             Unit::Word(parts) => {
                 let width: usize = parts.iter().map(Span::width).sum();
-                if width > self.width - self.used && self.used > 0 && width <= self.width {
+                if width > self.width.saturating_sub(self.used)
+                    && self.used > 0
+                    && width <= self.width
+                {
                     self.brk(true);
                 }
                 for part in parts {

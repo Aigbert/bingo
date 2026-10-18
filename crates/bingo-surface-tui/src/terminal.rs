@@ -405,21 +405,44 @@ fn detect() -> Detection {
     let palette = crate::theme::follows(ask).then(terminal_palette).flatten();
     Detection {
         ask,
-        foreground: palette
-            .as_ref()
-            .map(|p| (p.foreground.r, p.foreground.g, p.foreground.b)),
-        ground: palette
-            .as_ref()
-            .map(|p| (p.background.r, p.background.g, p.background.b)),
+        foreground: palette.as_ref().and_then(|p| p.foreground),
+        ground: palette.as_ref().map(|p| p.background),
         heard: graphics_probe(),
         motion: crate::clock::moves(std::env::var("BINGO_MOTION").ok().as_deref()),
     }
 }
 
-fn terminal_palette() -> Option<terminal_colorsaurus::ColorPalette> {
+struct TerminalPalette {
+    foreground: Option<(u16, u16, u16)>,
+    background: (u16, u16, u16),
+}
+
+fn terminal_palette() -> Option<TerminalPalette> {
     let mut options = terminal_colorsaurus::QueryOptions::default();
     options.timeout = crate::theme::PROBE;
-    terminal_colorsaurus::color_palette(options).ok()
+    let rgb = |c: terminal_colorsaurus::Color| (c.r, c.g, c.b);
+    let palette = terminal_colorsaurus::color_palette(options).map(|p| TerminalPalette {
+        foreground: Some(rgb(p.foreground)),
+        background: rgb(p.background),
+    });
+    probe_palette(palette, || {
+        let mut options = terminal_colorsaurus::QueryOptions::default();
+        options.timeout = crate::theme::PROBE;
+        terminal_colorsaurus::background_color(options).map(rgb)
+    })
+}
+
+fn probe_palette<E>(
+    palette: Result<TerminalPalette, E>,
+    background: impl FnOnce() -> Result<(u16, u16, u16), E>,
+) -> Option<TerminalPalette> {
+    match palette {
+        Ok(palette) => Some(palette),
+        Err(_) => background().ok().map(|background| TerminalPalette {
+            foreground: None,
+            background,
+        }),
+    }
 }
 
 fn graphics_probe() -> Option<crate::graphics::Heard> {
@@ -442,6 +465,26 @@ fn graphics_probe() -> Option<crate::graphics::Heard> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn palette_probe_keeps_a_background_only_answer() {
+        let bg = (1, 2, 3);
+        let fg = (4, 5, 6);
+        let both = probe_palette(
+            Ok::<_, ()>(TerminalPalette {
+                foreground: Some(fg),
+                background: bg,
+            }),
+            || panic!("a complete palette needs no fallback"),
+        )
+        .unwrap();
+        assert_eq!(both.foreground, Some((4, 5, 6)));
+        assert_eq!(both.background, (1, 2, 3));
+        let only_bg = probe_palette(Err(()), || Ok(bg)).unwrap();
+        assert_eq!(only_bg.foreground, None);
+        assert_eq!(only_bg.background, (1, 2, 3));
+        assert!(probe_palette(Err(()), || Err(())).is_none());
+    }
 
     #[test]
     fn a_title_is_one_osc_two_sequence_with_the_control_bytes_stripped() {
