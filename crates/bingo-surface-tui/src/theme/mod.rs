@@ -92,19 +92,6 @@ pub fn choose(ask: Ask, light: Option<bool>) -> Theme {
     }
 }
 
-impl Theme {
-    /// A foreground token: the palette's colour with 24 bits, the nearest of
-    /// the eight without, and nothing at all under `NO_COLOR`.
-    fn fg(self, ansi: Color, exact: fn(Palette) -> Color) -> Style {
-        match self.colors {
-            Colors::Plain => Style::new(),
-            Colors::Ansi => Style::new().fg(ansi),
-            Colors::True(palette) => Style::new().fg(exact(palette)),
-            Colors::Indexed(palette) => Style::new().fg(nearest(exact(palette))),
-        }
-    }
-}
-
 /// The look of the active pass, or the resting look outside a pass.
 pub fn current() -> Theme {
     crate::render::current().look
@@ -228,27 +215,27 @@ pub fn raised() -> Style {
 /// bingo's own colour: the sparkle, a running step, a card's border, the focused
 /// row. The one warm colour, and the only one that moves.
 pub fn presence() -> Style {
-    current().fg(Color::Yellow, |p| p.ember())
+    foreground("ember").unwrap_or_default()
 }
 
 /// The bright half of a pulse: everything that breathes moves between this
 /// and [`presence`]. Views reach it through [`pulse`] and [`comet`] rather
 /// than directly, because what moves is a phase and not a colour.
 pub fn glow() -> Style {
-    current().fg(Color::LightYellow, |p| p.glow())
+    foreground("glow").unwrap_or_default()
 }
 
 pub fn good() -> Style {
-    current().fg(Color::Green, |p| p.good())
+    foreground("good").unwrap_or_default()
 }
 
 pub fn bad() -> Style {
-    current().fg(Color::Red, |p| p.bad())
+    foreground("bad").unwrap_or_default()
 }
 
 /// The `⏵⏵` on the status line, and links — the one cool colour.
 pub fn mode() -> Style {
-    current().fg(Color::Blue, |p| p.plan())
+    foreground("plan").unwrap_or_default()
 }
 
 /// A diff's rows: `good` and `bad` on their own tints, which only 24 bits can
@@ -312,7 +299,9 @@ pub fn pulse(level: f32) -> Style {
     match current().colors {
         Colors::Plain => Style::new(),
         Colors::Ansi | Colors::Indexed(_) => two_ways(level, presence(), glow()),
-        Colors::True(palette) => Style::new().fg(mix(palette.ember(), palette.glow(), level)),
+        Colors::True(palette) => {
+            Style::new().fg(ink::mix(palette.ember(), palette.glow(), f64::from(level)))
+        }
     }
 }
 
@@ -327,9 +316,11 @@ pub fn comet(age: f32) -> Style {
     match current().colors {
         Colors::Plain => Style::new(),
         Colors::Ansi | Colors::Indexed(_) => two_ways(age, glow(), text()),
-        Colors::True(palette) if age < SETTLES => {
-            Style::new().fg(mix(palette.glow(), palette.ember(), age / SETTLES))
-        }
+        Colors::True(palette) if age < SETTLES => Style::new().fg(ink::mix(
+            palette.glow(),
+            palette.ember(),
+            f64::from(age / SETTLES),
+        )),
         Colors::True(_) => text(),
     }
 }
@@ -430,17 +421,6 @@ fn two_ways(level: f32, low: Style, high: Style) -> Style {
 fn steps(level: f32, steps: u8) -> f32 {
     let last = f32::from(steps.saturating_sub(1)).max(1.0);
     (level.clamp(0.0, 1.0) * last).round() / last
-}
-
-/// `t` of the way from one colour to another. Anything but 24 bits has no
-/// room between two colours, so the far end is the answer.
-fn mix(from: Color, to: Color, t: f32) -> Color {
-    let (Color::Rgb(r1, g1, b1), Color::Rgb(r2, g2, b2)) = (from, to) else {
-        return to;
-    };
-    let t = t.clamp(0.0, 1.0);
-    let at = |a: u8, b: u8| (f32::from(a) + (f32::from(b) - f32::from(a)) * t).round() as u8;
-    Color::Rgb(at(r1, r2), at(g1, g2), at(b1, b2))
 }
 
 /// A colour at a share of its own brightness — how a breath dims without

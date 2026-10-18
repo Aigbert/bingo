@@ -396,7 +396,7 @@ fn a_running_step_spins_in_presence_on_the_wall_clock() {
     let tree = solo(&folded(running_bash()));
     let (mut ui, now) = mid_turn();
     let beat = i64::try_from(crate::spinner::beat().as_millis()).unwrap_or(80);
-    let frames = theme::glyphs().chrome.spinner.len() as i64;
+    let frames = theme::glyphs().chrome.spinner.chars().count() as i64;
     let start = spinner_at(&tree, &mut ui, now);
     assert_ne!(
         start,

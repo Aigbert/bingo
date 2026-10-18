@@ -1,5 +1,7 @@
 //! Glyph vocabulary and the legacy screen spellings.
 use ratatui::symbols::border;
+const SPIN_U: &str = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏";
+const SPIN_A: &str = "-\\|/";
 
 /// The forms of `docs/design/tui.md` §4, and the ASCII spellings of them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -48,7 +50,7 @@ pub struct ChromeGlyphs {
     pub steps: [&'static str; 4],
     /// A running step turns through these, one per `spin`, on the wall clock
     /// so every running row is on the same frame.
-    pub spinner: &'static [&'static str],
+    pub spinner: &'static str,
     pub spin: std::time::Duration,
     /// A finished turn's line: `[0]` folded, `[1]` opened.
     pub fold: [&'static str; 2],
@@ -73,7 +75,7 @@ pub const UNICODE: Glyphs = Glyphs {
         // `◆` is East-Asian ambiguous: a CJK-width terminal draws it in two
         // cells, and the row after it shifts by one there.
         steps: ["✓", "◆", "◌", "✗"],
-        spinner: &["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        spinner: SPIN_U,
         spin: std::time::Duration::from_millis(80),
         fold: ["▸", "▾"],
         stop: "■",
@@ -109,7 +111,7 @@ pub const ASCII: Glyphs = Glyphs {
     chrome: ChromeGlyphs {
         pause: "||",
         steps: ["+", "*", "o", "!"],
-        spinner: &["-", "\\", "|", "/"],
+        spinner: SPIN_A,
         spin: std::time::Duration::from_millis(120),
         fold: [">", "v"],
         stop: "x",
@@ -154,7 +156,7 @@ pub const GU: &[(&str, &str)] = &[
     ("pin", "◆"),
     ("side", "▍"),
     ("think", "≈"),
-    ("spin", "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"),
+    ("spin", SPIN_U),
 ];
 pub const GA: &[(&str, &str)] = &[
     ("lamp", "*"),
@@ -179,7 +181,7 @@ pub const GA: &[(&str, &str)] = &[
     ("pin", "*"),
     ("side", "|"),
     ("think", ":"),
-    ("spin", "-\\|/"),
+    ("spin", SPIN_A),
 ];
 pub const KEYA: &[(&str, &str)] = &[
     ("⇧⏎", "shift+enter"),
@@ -216,13 +218,13 @@ mod tests {
 
     #[test]
     fn prototype_glyphs_have_their_documented_cell_widths() {
-        for table in [GU, GA] {
+        for (ascii, table) in [(false, GU), (true, GA)] {
             for &(name, glyph) in table {
                 if name == "spin" {
                     for frame in glyph.chars() {
                         assert_eq!(frame.width(), Some(1));
                     }
-                } else if !matches!(name, "sep" | "ell" | "ret" | "arrow") {
+                } else if !(matches!(name, "sep" | "ell" | "ret") || ascii && name == "arrow") {
                     assert_eq!(glyph.width(), 1, "{name}: {glyph}");
                 }
             }

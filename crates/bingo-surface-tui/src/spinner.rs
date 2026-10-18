@@ -36,7 +36,13 @@ pub fn glyph(now: Now) -> &'static str {
     if !now.motion || chrome.spinner.is_empty() {
         return chrome.steps[2];
     }
-    chrome.spinner[frame(now, beat(), chrome.spinner.len())]
+    let index = frame(now, beat(), chrome.spinner.chars().count());
+    chrome
+        .spinner
+        .char_indices()
+        .nth(index)
+        .map(|(at, ch)| &chrome.spinner[at..at + ch.len_utf8()])
+        .unwrap_or(theme::glyphs::get("still"))
 }
 
 /// Which of `frames` the wall clock is on, one per `beat`.

@@ -45,7 +45,7 @@ fn ansi(name: &str) -> Color {
     match name {
         "muted" | "ash" | "dim" | "faint" => Color::DarkGray,
         "glow" | "amberGlow" => Color::LightYellow,
-        "ember" | "presence" | "coal" | "amber" | "code" | "num" => Color::Yellow,
+        "ember" | "presence" | "attention" | "coal" | "amber" | "code" | "num" => Color::Yellow,
         "good" | "str" => Color::Green,
         "bad" => Color::Red,
         "plan" | "fn" => Color::Blue,
@@ -66,7 +66,7 @@ pub(super) fn ground(name: &str, color: Color) -> ratatui::style::Style {
     }
 }
 
-pub(super) fn literal(color: Color) -> Style {
+pub(crate) fn literal(color: Color) -> Style {
     use super::Colors;
     match super::current().colors {
         Colors::Plain => Style::new(),
