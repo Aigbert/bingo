@@ -1,12 +1,8 @@
-//! A step that holds more than one call. The executor runs consecutive
-//! concurrency-safe allowed calls as one batch; what a host sees off the wire
-//! must not depend on that.
+//! A step that holds more than one call: both come back, in landing order.
 
 use super::*;
 
-/// Two commands the model asked for in one step: the executor runs them as
-/// one batch, and what a host sees is unchanged by that — both receipts land,
-/// in the order they were asked for, on one round of one turn.
+/// Two commands asked for in one step both come back on one round of one turn.
 #[test]
 fn two_commands_in_one_step_both_come_back() {
     let home = tempfile::tempdir().unwrap();
@@ -38,16 +34,24 @@ fn two_commands_in_one_step_both_come_back() {
         "{}",
         stdout(&out)
     );
-    let calls: Vec<(u32, String)> = frames
+    assert_both_returned(&frames);
+    let reversed: Vec<_> = frames.into_iter().rev().collect();
+    assert_both_returned(&reversed);
+}
+
+fn assert_both_returned(frames: &[bingo_sdk::Frame]) {
+    let calls: Vec<(u32, &serde_json::Value, String)> = frames
         .iter()
         .filter_map(|f| match &f.event {
             Event::ItemCompleted { item } => match &item.body {
                 bingo_sdk::ItemBody::ToolCall {
                     name,
+                    input,
                     output: Some(output),
                     ..
                 } if name == "Bash" => Some((
                     item.round,
+                    &input["command"],
                     output
                         .parts
                         .iter()
@@ -59,8 +63,13 @@ fn two_commands_in_one_step_both_come_back() {
             _ => None,
         })
         .collect();
-    assert_eq!(calls.len(), 2, "both receipts landed: {}", stdout(&out));
+    assert_eq!(calls.len(), 2, "both calls landed: {frames:?}");
     assert_eq!(calls[0].0, calls[1].0, "one step, not two rounds");
-    assert!(calls[0].1.contains("first"), "{calls:?}");
-    assert!(calls[1].1.contains("second"), "{calls:?}");
+    for (command, expected) in [("echo first", "first"), ("echo second", "second")] {
+        let (_, _, output) = calls
+            .iter()
+            .find(|(_, input, _)| *input == command)
+            .unwrap();
+        assert!(output.contains(expected), "{calls:?}");
+    }
 }
