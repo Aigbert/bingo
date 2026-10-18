@@ -140,6 +140,11 @@ mod tests {
                 .fold()
                 .starts_with("   ▸ 1 step · read")
         );
-        assert!(drawn(row_link, row).await.fold().starts_with("   ✓ read a"));
+        assert!(
+            drawn(row_link, row)
+                .await
+                .fold()
+                .starts_with("   ¶ read    a")
+        );
     }
 }
