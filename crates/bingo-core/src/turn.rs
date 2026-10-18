@@ -727,6 +727,7 @@ impl Turn<'_> {
     /// keypress, one ending, wherever in the round it arrived.
     fn interrupted_status(&mut self) -> TurnStatus {
         self.record(ItemBody::Interruption {
+            asked_at: None,
             marker: INTERRUPTED_MARKER.into(),
         });
         TurnStatus::Interrupted {

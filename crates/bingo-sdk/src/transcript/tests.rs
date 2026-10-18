@@ -300,6 +300,7 @@ fn search_reads_full_results_reasoning_and_only_retained_items() {
         output: Some(ToolOutput::text("one\ntwo\nthree\nfour\nfive\nFORK")),
         progress: None,
         duration_ms: None,
+        allowed_by: None,
         quiet: false,
     };
     let mut reasoning = item(2, String::new());
@@ -427,6 +428,7 @@ fn search_caps_results_and_reads_tool_input_as_lines() {
         output: None,
         progress: None,
         duration_ms: None,
+        allowed_by: None,
         quiet: false,
     };
     let transcript = [row].into_iter().collect();

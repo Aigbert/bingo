@@ -193,6 +193,7 @@ impl Turn<'_> {
             output: output.clone(),
             progress: None,
             duration_ms: None,
+            allowed_by: None,
             quiet: false,
         };
         let mut item =

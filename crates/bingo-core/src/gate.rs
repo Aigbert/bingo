@@ -104,6 +104,7 @@ fn receipt_for(
     feedback: Option<String>,
 ) -> ItemBody {
     ItemBody::PermissionReceipt {
+        asked_at: None,
         item: Some(item.clone()),
         interaction: InteractionId::from_raw("pending"),
         tool: call.name.clone(),
@@ -260,7 +261,7 @@ fn resolve_reply(
 
 fn describe(reason: &Reason) -> String {
     match reason {
-        Reason::Rule { rule } => format!("rule {rule}"),
+        Reason::Rule { rule, .. } => format!("rule {rule}"),
         Reason::Mode { mode } => format!("mode {mode}"),
         Reason::Hook { hook } => format!("hook {hook}"),
         Reason::Safety { detail } => format!("safety: {detail}"),

@@ -437,6 +437,7 @@ pub fn tool(
         id,
         status,
         ItemBody::ToolCall {
+            allowed_by: None,
             call_id: "call_1".into(),
             name: name.into(),
             quiet: ["TaskCreate", "TaskUpdate", "TaskGet", "TaskList"].contains(&name)
@@ -454,6 +455,7 @@ pub fn running_tool(id: &str, name: &str, progress: &str) -> Item {
         id,
         ItemStatus::Running,
         ItemBody::ToolCall {
+            allowed_by: None,
             call_id: "call_1".into(),
             name: name.into(),
             input: json!({ "command": "cargo test" }),
@@ -472,6 +474,7 @@ pub fn running_command(id: &str, command: &str) -> Item {
         id,
         ItemStatus::Running,
         ItemBody::ToolCall {
+            allowed_by: None,
             call_id: format!("call_{id}"),
             name: "Bash".into(),
             input: json!({ "command": command }),
@@ -861,6 +864,7 @@ pub fn receipt_item(
         id,
         ItemStatus::Completed,
         ItemBody::PermissionReceipt {
+            asked_at: None,
             item: None,
             interaction: InteractionId::from_raw("int_1"),
             tool: tool.into(),

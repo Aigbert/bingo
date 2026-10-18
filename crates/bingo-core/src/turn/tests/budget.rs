@@ -22,6 +22,7 @@ fn frames_with_results(n: usize, chars: usize) -> Vec<Frame> {
                 output: Some(ToolOutput::text("x".repeat(chars))),
                 progress: None,
                 duration_ms: None,
+                allowed_by: None,
                 quiet: false,
             },
             meta: Default::default(),

@@ -273,7 +273,7 @@ impl Renderer {
             ItemBody::Notice { code, text, .. } => {
                 self.diagnostic(&format!("[notice] {code} {text}"), err)?;
             }
-            ItemBody::Interruption { marker } => self.diagnostic(marker, err)?,
+            ItemBody::Interruption { marker, .. } => self.diagnostic(marker, err)?,
             // Not part of a headless transcript.
             ItemBody::User { .. }
             | ItemBody::Reasoning { .. }

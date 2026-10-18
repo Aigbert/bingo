@@ -58,6 +58,7 @@ async fn a_receipt_queued_after_interruption_cannot_publish_under_the_closed_tur
     let mut item = state.transcript.items().last().unwrap().as_ref().clone();
     item.id = ItemId::mint();
     item.body = ItemBody::PermissionReceipt {
+        asked_at: None,
         item: None,
         interaction: state.interactions[0].id.clone(),
         tool: "Echo".into(),

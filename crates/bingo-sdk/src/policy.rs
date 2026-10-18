@@ -43,13 +43,33 @@ pub enum Decision {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum Reason {
-    Rule { rule: String },
-    Mode { mode: String },
-    Hook { hook: String },
-    Safety { detail: String },
+    Rule {
+        rule: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        source: Option<RuleSource>,
+    },
+    Mode {
+        mode: String,
+    },
+    Hook {
+        hook: String,
+    },
+    Safety {
+        detail: String,
+    },
     ReadOnly,
-    Confirm { detail: String },
+    Confirm {
+        detail: String,
+    },
     Default,
+}
+
+/// Where the matched permission rule was installed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum RuleSource {
+    Settings,
+    Session,
 }
 
 /// What the person decided.

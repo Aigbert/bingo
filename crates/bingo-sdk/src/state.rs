@@ -669,6 +669,7 @@ mod tests {
                 output: None,
                 progress: None,
                 duration_ms: None,
+                allowed_by: None,
                 quiet: false,
             },
             ..assistant(id, "", ItemStatus::Completed)

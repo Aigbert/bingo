@@ -42,6 +42,7 @@ pub fn agent_call(id: &str, text: &str, fields: Value) -> Item {
             ItemStatus::Completed
         },
         ItemBody::ToolCall {
+            allowed_by: None,
             call_id: call.call_id,
             name: call.name,
             input: call.input,

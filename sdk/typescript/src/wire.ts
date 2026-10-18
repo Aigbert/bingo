@@ -728,7 +728,19 @@ export type Item = {
   "turn"?: (TurnId | null);
   [key: string]: unknown;
 };
-export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<ContentPart>; [key: string]: unknown; } | { "kind": "assistant"; "text": string; [key: string]: unknown; } | { "kind": "reasoning"; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; [key: string]: unknown; } | { "callId": string; "durationMs"?: (number | null); "input": unknown; "kind": "toolCall"; "name": string; "output"?: (ToolOutput | null); "progress"?: (string | null); "quiet"?: boolean; [key: string]: unknown; } | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | { "after": number; "before": number; "durationMs": number; "kind": "compaction"; "replaced": number; "summary": string; [key: string]: unknown; } | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
+export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<ContentPart>; [key: string]: unknown; } | { "kind": "assistant"; "text": string; [key: string]: unknown; } | { "kind": "reasoning"; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; [key: string]: unknown; } | {
+  /** The policy that answered without opening an ask. */
+  "allowedBy"?: (Reason | null);
+  "callId": string;
+  "durationMs"?: (number | null);
+  "input": unknown;
+  "kind": "toolCall";
+  "name": string;
+  "output"?: (ToolOutput | null);
+  "progress"?: (string | null);
+  "quiet"?: boolean;
+  [key: string]: unknown;
+} | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | { "after": number; "before": number; "durationMs": number; "kind": "compaction"; "replaced": number; "summary": string; [key: string]: unknown; } | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "askedAt"?: (string | null); "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "askedAt"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "askedAt"?: (string | null); "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
 /** One unit in the transcript order. */
 export type ItemId = string;
 export type ItemStatus = ("pending" | "running" | "completed" | "failed" | "interrupted");
@@ -1129,7 +1141,7 @@ export type Read = {
 };
 /** How a surface reads a row's target. */
 export type Reads = ("path" | "command" | "text");
-export type Reason = ({ "kind": "rule"; "rule": string; [key: string]: unknown; } | { "kind": "mode"; "mode": string; [key: string]: unknown; } | { "hook": string; "kind": "hook"; [key: string]: unknown; } | { "detail": string; "kind": "safety"; [key: string]: unknown; } | { "kind": "readOnly"; [key: string]: unknown; } | { "detail": string; "kind": "confirm"; [key: string]: unknown; } | { "kind": "default"; [key: string]: unknown; });
+export type Reason = ({ "kind": "rule"; "rule": string; "source"?: (RuleSource | null); [key: string]: unknown; } | { "kind": "mode"; "mode": string; [key: string]: unknown; } | { "hook": string; "kind": "hook"; [key: string]: unknown; } | { "detail": string; "kind": "safety"; [key: string]: unknown; } | { "kind": "readOnly"; [key: string]: unknown; } | { "detail": string; "kind": "confirm"; [key: string]: unknown; } | { "kind": "default"; [key: string]: unknown; });
 export type ReasoningProps = { "status": ItemStatus; "text": string; [key: string]: unknown; };
 /**
  * A fixed rectangle: `width` by `height`, offset by `x` and `y` from
@@ -1174,6 +1186,8 @@ export type _Result_5f_of_5f_Array_5f_of_5f_ModelEvent_5f_or_5f_ProviderError = 
 export type _Result_5f_of_5f_Compaction_5f_or_5f_CompactError = ({ "Ok": Compaction; [key: string]: unknown; } | { "Err": CompactError; [key: string]: unknown; });
 export type RewindProps = { "dropped": number; "toTurn": TurnId; [key: string]: unknown; };
 export type Role = ("user" | "assistant");
+/** Where the matched permission rule was installed. */
+export type RuleSource = ("settings" | "session");
 export type Run = {
   /** Its arguments. */
   "args": unknown;

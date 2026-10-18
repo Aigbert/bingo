@@ -2715,6 +2715,7 @@ mod tests {
                     "itm_1",
                     bingo_sdk::ItemStatus::Completed,
                     bingo_sdk::ItemBody::ToolCall {
+                        allowed_by: None,
                         call_id: "call_1".into(),
                         name: "Read".into(),
                         input: serde_json::json!({ "file_path": "shot.png" }),

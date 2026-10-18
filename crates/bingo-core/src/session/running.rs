@@ -170,6 +170,7 @@ pub(super) async fn close_dropped_turn(
         Some(turn.clone()),
         None,
         ItemBody::Interruption {
+            asked_at: None,
             marker: INTERRUPTED_MARKER.into(),
         },
     );

@@ -2520,6 +2520,16 @@
                   "rule": {
                     "type": "string"
                   },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/RuleSource"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "rule"
@@ -2618,6 +2628,14 @@
                   "kind"
                 ]
               }
+            ]
+          },
+          "RuleSource": {
+            "description": "Where the matched permission rule was installed.",
+            "type": "string",
+            "enum": [
+              "settings",
+              "session"
             ]
           }
         }
@@ -6988,6 +7006,17 @@
               {
                 "type": "object",
                 "properties": {
+                  "allowedBy": {
+                    "description": "The policy that answered without opening an ask.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Reason"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "callId": {
                     "type": "string"
                   },
@@ -7155,6 +7184,12 @@
                   "marker": {
                     "type": "string"
                   },
+                  "askedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "interruption"
@@ -7192,6 +7227,12 @@
               {
                 "type": "object",
                 "properties": {
+                  "askedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "item": {
                     "anyOf": [
                       {
@@ -7226,6 +7267,12 @@
               {
                 "type": "object",
                 "properties": {
+                  "askedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "item": {
                     "anyOf": [
                       {
@@ -7499,6 +7546,132 @@
               "note",
               "quiet",
               "aside"
+            ]
+          },
+          "Reason": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "rule": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/RuleSource"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "rule"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "rule"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "mode"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "mode"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "hook": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "hook"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "hook"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "detail": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "safety"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "detail"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "readOnly"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "detail": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "confirm"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "detail"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "default"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            ]
+          },
+          "RuleSource": {
+            "description": "Where the matched permission rule was installed.",
+            "type": "string",
+            "enum": [
+              "settings",
+              "session"
             ]
           },
           "ToolOutput": {
@@ -12617,6 +12790,17 @@
               {
                 "type": "object",
                 "properties": {
+                  "allowedBy": {
+                    "description": "The policy that answered without opening an ask.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Reason"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "callId": {
                     "type": "string"
                   },
@@ -12784,6 +12968,12 @@
                   "marker": {
                     "type": "string"
                   },
+                  "askedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "interruption"
@@ -12821,6 +13011,12 @@
               {
                 "type": "object",
                 "properties": {
+                  "askedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "item": {
                     "anyOf": [
                       {
@@ -12855,6 +13051,12 @@
               {
                 "type": "object",
                 "properties": {
+                  "askedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "item": {
                     "anyOf": [
                       {
@@ -13128,6 +13330,132 @@
               "note",
               "quiet",
               "aside"
+            ]
+          },
+          "Reason": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "rule": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/RuleSource"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "rule"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "rule"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "mode": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "mode"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "mode"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "hook": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "hook"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "hook"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "detail": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "safety"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "detail"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "readOnly"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "detail": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "confirm"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "detail"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "default"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              }
+            ]
+          },
+          "RuleSource": {
+            "description": "Where the matched permission rule was installed.",
+            "type": "string",
+            "enum": [
+              "settings",
+              "session"
             ]
           },
           "ToolOutput": {

@@ -405,6 +405,7 @@ impl Actor {
             output: None,
             progress: None,
             duration_ms: None,
+            allowed_by: None,
             quiet,
         };
         let mut item = self.fresh(Some(turn.clone()), None, body);

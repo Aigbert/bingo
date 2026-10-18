@@ -46,6 +46,7 @@ pub fn tool(id: &str, name: &str, input: &str, output: Option<&str>) -> Item {
             output: output.map(ToolOutput::text),
             progress: None,
             duration_ms: None,
+            allowed_by: None,
             quiet: false,
         },
     )

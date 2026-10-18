@@ -6,6 +6,7 @@ pub(super) fn answered(open: &Interaction, answer: &Answer) -> Option<ItemBody> 
         (&open.kind, answer)
     {
         return Some(ItemBody::PermissionReceipt {
+            asked_at: None,
             item: open.item.clone(),
             interaction: open.id.clone(),
             tool: tool.clone(),
@@ -43,6 +44,7 @@ pub(super) fn answered(open: &Interaction, answer: &Answer) -> Option<ItemBody> 
         _ => return None,
     };
     Some(ItemBody::QuestionAnswer {
+        asked_at: None,
         item: open.item.clone(),
         interaction: open.id.clone(),
         question,

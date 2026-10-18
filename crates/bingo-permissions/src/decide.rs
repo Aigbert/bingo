@@ -67,6 +67,7 @@ fn step_confirm(req: &Request<'_>) -> Option<Decision> {
 fn step_deny_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
     first_match(&rules.deny, req.call, MatchMode::Any, &req.context()).map(|rule| Decision::Deny {
         reason: Reason::Rule {
+            source: None,
             rule: rule.raw().to_string(),
         },
     })
@@ -101,6 +102,7 @@ fn step_allow_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
     first_match(&rules.allow, req.call, MatchMode::All, &req.context()).map(|rule| {
         Decision::Allow {
             reason: Reason::Rule {
+                source: None,
                 rule: rule.raw().to_string(),
             },
         }
@@ -111,6 +113,7 @@ fn step_allow_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
 fn step_ask_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
     first_match(&rules.ask, req.call, MatchMode::Any, &req.context()).map(|rule| Decision::Ask {
         reason: Reason::Rule {
+            source: None,
             rule: rule.raw().to_string(),
         },
         scope: None,

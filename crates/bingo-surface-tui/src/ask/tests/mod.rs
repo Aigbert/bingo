@@ -346,6 +346,7 @@ fn a_single_answered_step_uses_the_singular() {
         "answer",
         ItemStatus::Completed,
         bingo_sdk::ItemBody::QuestionAnswer {
+            asked_at: None,
             item: Some(bingo_sdk::ItemId::from_raw("call")),
             interaction: bingo_sdk::InteractionId::from_raw("q"),
             question: "Form".into(),

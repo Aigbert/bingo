@@ -111,6 +111,7 @@ pub fn stopped_turn() -> Vec<Frame> {
         }
     }
     let marker = ItemBody::Interruption {
+        asked_at: None,
         marker: "[Request interrupted by the user]".into(),
     };
     items.push(in_turn(

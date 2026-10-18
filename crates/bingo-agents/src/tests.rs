@@ -712,6 +712,7 @@ pub(crate) fn called(name: &str, input: serde_json::Value, output: ToolOutput) -
                 output: Some(output),
                 progress: None,
                 duration_ms: None,
+                allowed_by: None,
                 quiet: false,
             },
             meta: Default::default(),

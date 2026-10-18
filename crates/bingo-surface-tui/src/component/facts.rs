@@ -112,6 +112,7 @@ pub fn change(item: &mut Item, props: &Props) {
         }
         Props::Interruption(props) => {
             item.body = ItemBody::Interruption {
+                asked_at: None,
                 marker: props.marker.clone(),
             };
         }
@@ -123,6 +124,7 @@ fn change_receipt_or_operation(item: &mut Item, props: &Props) {
     match props {
         Props::QuestionAnswer(props) => {
             item.body = ItemBody::QuestionAnswer {
+                asked_at: None,
                 item: None,
                 interaction: props.interaction.clone(),
                 question: props.question.clone(),
@@ -131,6 +133,7 @@ fn change_receipt_or_operation(item: &mut Item, props: &Props) {
         }
         Props::PermissionReceipt(props) => {
             item.body = ItemBody::PermissionReceipt {
+                asked_at: None,
                 item: None,
                 interaction: props.interaction.clone(),
                 tool: props.tool.clone(),

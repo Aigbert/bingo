@@ -81,6 +81,7 @@ mod tests {
             output: Some(bingo_sdk::ToolOutput::text("hello")),
             progress: None,
             duration_ms: None,
+            allowed_by: None,
             quiet: false,
         };
         state

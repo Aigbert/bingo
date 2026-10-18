@@ -411,7 +411,7 @@ fn default_item_lines(
         }
         ItemBody::Compaction { before, after, .. } => compacted(*before, *after, rows).into(),
         ItemBody::Rewind { dropped, .. } => rewound(*dropped, rows).into(),
-        ItemBody::Interruption { marker } => vec![indented(marker, theme::dim())].into(),
+        ItemBody::Interruption { marker, .. } => vec![indented(marker, theme::dim())].into(),
         ItemBody::Notice { level, text, .. } => speaks(
             theme::level(*level),
             vec![Line::from(Span::styled(text.clone(), theme::level(*level)))],

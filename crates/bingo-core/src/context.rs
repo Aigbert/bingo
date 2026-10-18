@@ -153,7 +153,7 @@ impl Folder {
             ItemBody::Compaction { summary, .. } => {
                 self.note(format!("[Summary of the conversation so far]\n{summary}"))
             }
-            ItemBody::Interruption { marker } => self.note(marker.clone()),
+            ItemBody::Interruption { marker, .. } => self.note(marker.clone()),
             ItemBody::QuestionAnswer {
                 question, answer, ..
             } => self.note(format!("Q: {question}\nA: {answer}")),
@@ -424,6 +424,7 @@ mod tests {
                 output: output.map(ToolOutput::text),
                 progress: None,
                 duration_ms: None,
+                allowed_by: None,
                 quiet: false,
             },
         )
@@ -796,6 +797,7 @@ mod tests {
                     Shape::Interruption => item(
                         &id,
                         ItemBody::Interruption {
+                            asked_at: None,
                             marker: "[interrupted]".into(),
                         },
                     ),

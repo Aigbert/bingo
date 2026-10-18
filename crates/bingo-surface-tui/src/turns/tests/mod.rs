@@ -119,6 +119,7 @@ fn a_step_the_person_refused_is_not_counted_as_run() {
             "trn_1_r",
             ItemStatus::Completed,
             ItemBody::PermissionReceipt {
+                asked_at: None,
                 item: Some(id("trn_1_5")),
                 interaction: bingo_sdk::InteractionId::from_raw("int_1"),
                 tool: "Edit".into(),
@@ -213,6 +214,7 @@ fn folded_with(decision: DecisionKind) -> TurnFoldProps {
         "trn_1_r",
         ItemStatus::Completed,
         ItemBody::PermissionReceipt {
+            asked_at: None,
             item: Some(id("trn_1_5")),
             interaction: bingo_sdk::InteractionId::from_raw("int_1"),
             tool: "Edit".into(),

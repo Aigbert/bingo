@@ -321,6 +321,7 @@ mod tests {
         );
 
         let read = ItemBody::ToolCall {
+            allowed_by: None,
             call_id: "call_1".into(),
             name: "Read".into(),
             input: serde_json::json!({}),
@@ -344,6 +345,7 @@ mod tests {
         );
         assert!(
             pictures_of(&ItemBody::ToolCall {
+                allowed_by: None,
                 call_id: "call_1".into(),
                 name: "Read".into(),
                 input: serde_json::json!({}),

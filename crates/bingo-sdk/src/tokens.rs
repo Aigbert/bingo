@@ -55,7 +55,7 @@ pub fn item(item: &Item) -> u64 {
                 .saturating_add(result)
         }
         ItemBody::Compaction { summary, .. } => text(summary),
-        ItemBody::Interruption { marker } => text(marker),
+        ItemBody::Interruption { marker, .. } => text(marker),
         ItemBody::QuestionAnswer {
             question, answer, ..
         } => text(question) + text(answer),

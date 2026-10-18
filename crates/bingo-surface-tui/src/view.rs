@@ -1305,6 +1305,7 @@ mod tests {
                     "itm_2",
                     ItemStatus::Completed,
                     ItemBody::Interruption {
+                        asked_at: None,
                         marker: "[interrupted by the user]".into(),
                     },
                 ),

@@ -286,6 +286,7 @@ fn tool_done_with_output() {
         item(
             3,
             item_of(ItemBody::PermissionReceipt {
+                asked_at: None,
                 item: Some(bingo_sdk::ItemId::from_raw("itm_1")),
                 interaction: bingo_sdk::InteractionId::from_raw("int_1"),
                 tool: "Read".into(),
@@ -437,6 +438,7 @@ fn an_interrupted_turn() {
                 "itm_2",
                 ItemStatus::Completed,
                 ItemBody::Interruption {
+                    asked_at: None,
                     marker: "[Request interrupted by the user]".into(),
                 },
             ),

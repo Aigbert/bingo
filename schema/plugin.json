@@ -4988,6 +4988,17 @@
         {
           "type": "object",
           "properties": {
+            "allowedBy": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Reason"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The policy that answered without opening an ask."
+            },
             "callId": {
               "type": "string"
             },
@@ -5155,6 +5166,12 @@
             "marker": {
               "type": "string"
             },
+            "askedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "interruption"
@@ -5192,6 +5209,12 @@
         {
           "type": "object",
           "properties": {
+            "askedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "item": {
               "anyOf": [
                 {
@@ -5226,6 +5249,12 @@
         {
           "type": "object",
           "properties": {
+            "askedAt": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "item": {
               "anyOf": [
                 {
@@ -8727,6 +8756,16 @@
             "rule": {
               "type": "string"
             },
+            "source": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/RuleSource"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "rule"
@@ -9286,6 +9325,14 @@
         "user",
         "assistant"
       ]
+    },
+    "RuleSource": {
+      "type": "string",
+      "enum": [
+        "settings",
+        "session"
+      ],
+      "description": "Where the matched permission rule was installed."
     },
     "Run": {
       "type": "object",

@@ -488,6 +488,9 @@ pub enum ItemBody {
         provider_metadata: ProviderMetadata,
     },
     ToolCall {
+        /// The policy that answered without opening an ask.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        allowed_by: Option<Box<crate::policy::Reason>>,
         call_id: String,
         name: String,
         input: Value,
@@ -532,6 +535,9 @@ pub enum ItemBody {
     },
     Interruption {
         marker: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(with = "Option<String>")]
+        asked_at: Option<Timestamp>,
     },
     Notice {
         level: Level,
@@ -540,12 +546,18 @@ pub enum ItemBody {
     },
     QuestionAnswer {
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(with = "Option<String>")]
+        asked_at: Option<Timestamp>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
         item: Option<ItemId>,
         interaction: InteractionId,
         question: String,
         answer: String,
     },
     PermissionReceipt {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(with = "Option<String>")]
+        asked_at: Option<Timestamp>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         item: Option<ItemId>,
         interaction: InteractionId,
