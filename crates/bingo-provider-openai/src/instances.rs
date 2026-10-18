@@ -15,7 +15,7 @@ use bingo_sdk::{PluginError, Provider, Registrar};
 
 use crate::settings::{OpenAiEndpoint, Settings};
 use crate::variant::Variant;
-use crate::{API_KEY_ENV, BASE_URL_ENV, DEFAULT_BASE_URL, OpenAiProvider};
+use crate::{BASE_URL_ENV, DEFAULT_BASE_URL, OpenAiProvider};
 use bingo_auth_oauth::key::{ApiKey, Places};
 
 /// Local reservations are checked before construction; the host skips any
@@ -24,7 +24,6 @@ const BUILT_IN: [&str; 2] = ["codex", "openai"];
 
 const CONFIG: bingo_auth_oauth::boot::InstanceConfig = bingo_auth_oauth::boot::InstanceConfig {
     reserved: &BUILT_IN,
-    environment: BASE_URL_ENV,
     base_url: DEFAULT_BASE_URL,
 };
 #[cfg(test)]
@@ -36,14 +35,17 @@ pub fn providers(
     oauth: reqwest::Client,
     settings: Settings,
     registrar: &mut Registrar,
+    variables: &bingo_auth_oauth::key::Variable,
 ) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
     let env = registrar.env();
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
-    let mut providers = defaults(&http, &oauth, &settings, registrar, &store, &file);
+    let mut providers = defaults(
+        &http, &oauth, &settings, registrar, &store, &file, variables,
+    );
     for (name, endpoint) in settings.openai.instances {
-        let store = bound(registrar, &store, "openai", &name);
+        let store = bound(registrar, &store, "openai", &name, None);
         if !CONFIG.allowed(&mut named, &name, "openai", &store, registrar) {
             continue;
         }
@@ -60,7 +62,7 @@ pub fn providers(
         ));
     }
     for (name, endpoint) in settings.codex.instances {
-        let store = bound(registrar, &store, "codex", &name);
+        let store = bound(registrar, &store, "codex", &name, None);
         if !CONFIG.allowed(&mut named, &name, "codex", &store, registrar) {
             continue;
         }
@@ -85,9 +87,16 @@ fn defaults(
     registrar: &mut Registrar,
     store: &Arc<CredentialStore>,
     file: &Path,
+    variables: &bingo_auth_oauth::key::Variable,
 ) -> Vec<Arc<dyn Provider>> {
-    let default_store = bound(registrar, store, "openai", "openai");
-    let codex_store = bound(registrar, store, "codex", "codex");
+    let default_store = bound(
+        registrar,
+        store,
+        "openai",
+        "openai",
+        variables.base_url.as_deref(),
+    );
+    let codex_store = bound(registrar, store, "codex", "codex", None);
     vec![
         registered(
             default_openai(
@@ -96,6 +105,7 @@ fn defaults(
                 file,
                 &default_store,
                 Some(registrar.sources()),
+                variables,
             ),
             registrar,
         ),
@@ -123,9 +133,12 @@ fn registered(provider: OpenAiProvider, registrar: &mut Registrar) -> Arc<dyn Pr
 
 /// Where the default `openai` key may be written. `with_endpoint` builds one
 /// too, so the hint reads the same wherever the provider came from.
-pub(crate) fn default_places(file: Option<PathBuf>) -> Places {
+pub(crate) fn default_places(
+    file: Option<PathBuf>,
+    variable: bingo_auth_oauth::key::Variable,
+) -> Places {
     Places {
-        variable: Some(API_KEY_ENV),
+        variable: Some(Arc::new(variable)),
         setting: "openai.apiKey".into(),
         file,
     }
@@ -138,12 +151,13 @@ fn default_openai(
     file: &Path,
     store: &Arc<CredentialStore>,
     sources: Option<&ConfigSources>,
+    variables: &bingo_auth_oauth::key::Variable,
 ) -> OpenAiProvider {
-    let places = default_places(Some(file.to_path_buf()));
+    let places = default_places(Some(file.to_path_buf()), variables.clone());
     let base_url = address::resolve(
         endpoint.base_url.as_deref(),
         DEFAULT_BASE_URL,
-        std::env::var(BASE_URL_ENV).ok().as_deref(),
+        variables.base_url.as_deref(),
     );
     let key = ApiKey::new(
         Variant::Default.provider_id(),
@@ -193,6 +207,7 @@ fn bound(
     store: &CredentialStore,
     family: &str,
     name: &str,
+    base_url: Option<&str>,
 ) -> Arc<CredentialStore> {
     let endpoint = bingo_auth_oauth::boot::Endpoint {
         family,
@@ -207,7 +222,7 @@ fn bound(
         } else {
             DEFAULT_BASE_URL
         },
-        environment: (family == "openai" && name == family).then_some(BASE_URL_ENV),
+        environment: base_url.map(|value| (BASE_URL_ENV, value)),
         resource: (family == "codex").then_some(crate::CODEX_BASE_URL),
     };
     Arc::new(endpoint.store(registrar, store))

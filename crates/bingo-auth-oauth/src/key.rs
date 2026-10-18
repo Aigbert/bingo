@@ -19,11 +19,29 @@ use bingo_sdk::{
     ProviderError,
 };
 
+/// A default provider's variable name and the values captured at registration.
+#[derive(Clone, Debug)]
+pub struct Variable {
+    pub name: &'static str,
+    pub api_key: Option<String>,
+    pub base_url: Option<String>,
+}
+
+impl Variable {
+    pub fn empty(name: &'static str) -> Self {
+        Self {
+            name,
+            api_key: None,
+            base_url: None,
+        }
+    }
+}
+
 /// Where a person may put this provider's key.
 #[derive(Clone, Debug)]
 pub struct Places {
     /// The variable this provider reads; `None` for a named instance.
-    pub variable: Option<&'static str>,
+    pub variable: Option<Arc<Variable>>,
     /// The dotted path of this provider's `apiKey` setting.
     pub setting: String,
     /// The settings file, when the host named one.
@@ -239,7 +257,8 @@ impl ApiKey {
             let from = if self
                 .places
                 .variable
-                .is_some_and(|variable| variable == held.place)
+                .as_ref()
+                .is_some_and(|variable| variable.name == held.place)
             {
                 bingo_sdk::KeySource::Env
             } else {
@@ -260,8 +279,8 @@ impl ApiKey {
     /// Every place this provider reads, in the order it reads them.
     fn hint(&self) -> String {
         let mut ways = vec![format!("run `/login {}` to paste a key", self.provider)];
-        if let Some(variable) = self.places.variable {
-            ways.push(format!("set {variable}"));
+        if let Some(variable) = &self.places.variable {
+            ways.push(format!("set {}", variable.name));
         }
         ways.push(match &self.places.file {
             Some(file) => format!("set {} in {}", self.places.setting, file.display()),
@@ -369,7 +388,13 @@ mod tests {
 
     fn places(variable: Option<&'static str>) -> Places {
         Places {
-            variable,
+            variable: variable.map(|name| {
+                Arc::new(Variable {
+                    name,
+                    api_key: None,
+                    base_url: None,
+                })
+            }),
             setting: "anthropic.apiKey".into(),
             file: Some(PathBuf::from("/home/me/.bingo/settings.toml")),
         }

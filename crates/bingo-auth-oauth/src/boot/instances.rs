@@ -7,7 +7,6 @@ use std::collections::BTreeSet;
 
 pub struct InstanceConfig {
     pub reserved: &'static [&'static str],
-    pub environment: &'static str,
     pub base_url: &'static str,
 }
 
@@ -21,7 +20,8 @@ impl InstanceConfig {
     ) -> Option<Configured> {
         let environment = places
             .variable
-            .and_then(|_| std::env::var(self.environment).ok());
+            .as_ref()
+            .and_then(|variable| variable.base_url.as_deref());
         let permitted = |from_environment| {
             address::configured(
                 sources,
@@ -31,16 +31,16 @@ impl InstanceConfig {
                 } else {
                     resolved
                 },
-                environment.as_deref(),
+                environment,
                 from_environment,
             )
         };
-        if let Some(variable) = places.variable
-            && let Some(key) = blank(std::env::var(variable).ok())
+        if let Some(variable) = &places.variable
+            && let Some(key) = blank(variable.api_key.clone())
         {
             return Some(Configured {
                 key,
-                place: variable.to_string(),
+                place: variable.name.to_string(),
                 address: Some(permitted(true)),
             });
         }
@@ -118,4 +118,54 @@ pub fn blank(value: Option<String>) -> Option<String> {
     value
         .map(|value| value.trim().to_string())
         .filter(|value| !value.is_empty())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn configured_keys_use_explicit_variables_and_ignore_them_for_instances() {
+        let config = InstanceConfig {
+            reserved: &[],
+            base_url: "https://default.example",
+        };
+        let setting = "family.apiKey";
+        let address = "https://variable.example";
+        for (variable, value, expected_key, expected_place, expected_address) in [
+            (Some("API_KEY"), Some(" env "), "env", "API_KEY", address),
+            (
+                Some("API_KEY"),
+                Some("  "),
+                "settings-key",
+                setting,
+                address,
+            ),
+            (Some("API_KEY"), None, "settings-key", setting, address),
+            (None, Some("env"), "settings-key", setting, config.base_url),
+        ] {
+            let places = Places {
+                variable: variable.map(|name| {
+                    std::sync::Arc::new(crate::key::Variable {
+                        name,
+                        api_key: value.map(str::to_string),
+                        base_url: Some(address.into()),
+                    })
+                }),
+                setting: "family.apiKey".into(),
+                file: None,
+            };
+            let configured = config
+                .configured(
+                    &places,
+                    Some(" settings-key ".into()),
+                    None,
+                    config.base_url,
+                )
+                .unwrap();
+            assert_eq!(configured.key, expected_key);
+            assert_eq!(configured.place, expected_place);
+            assert_eq!(configured.address.as_deref(), Some(expected_address));
+        }
+    }
 }

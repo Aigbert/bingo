@@ -142,7 +142,11 @@ impl OpenAiProvider {
         base_url: impl Into<String>,
     ) -> Self {
         let id = Variant::Default.provider_id();
-        let key = ApiKey::detached(id, instances::default_places(None), api_key);
+        let key = ApiKey::detached(
+            id,
+            instances::default_places(None, bingo_auth_oauth::key::Variable::empty(API_KEY_ENV)),
+            api_key,
+        );
         Self::with_credential(http, id, Credential::Key(key), base_url)
     }
 
@@ -356,7 +360,6 @@ impl Provider for OpenAiProvider {
                 &provider.base_url,
                 sources,
                 DEFAULT_BASE_URL,
-                std::env::var(BASE_URL_ENV).ok().as_deref(),
             )),
             Credential::Tokens(source) => {
                 Credential::Tokens(Arc::new(source.at_resource(&provider.base_url)))
@@ -559,6 +562,23 @@ impl Plugin for OpenAiPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        self.register_with_variables(
+            registrar,
+            bingo_auth_oauth::key::Variable {
+                name: API_KEY_ENV,
+                api_key: std::env::var(API_KEY_ENV).ok(),
+                base_url: std::env::var(BASE_URL_ENV).ok(),
+            },
+        )
+    }
+}
+
+impl OpenAiPlugin {
+    fn register_with_variables(
+        &self,
+        registrar: &mut Registrar,
+        variables: bingo_auth_oauth::key::Variable,
+    ) -> Result<(), PluginError> {
         let settings: Settings = registrar.config()?;
         let http = bingo_http::client(bingo_http::Bounds::STREAMED)
             .map_err(|e| PluginError::Failed(e.to_string()))?;
@@ -576,7 +596,7 @@ impl Plugin for OpenAiPlugin {
             true,
             registrar.env(),
         )));
-        for provider in instances::providers(http, oauth, settings, registrar)? {
+        for provider in instances::providers(http, oauth, settings, registrar, &variables)? {
             registrar.provider(provider);
         }
         Ok(())
@@ -661,6 +681,18 @@ pub(crate) mod tests {
     }
 
     fn registered(directory: &tempfile::TempDir, settings: Value) -> Vec<Contribution> {
+        registered_with_variables(
+            directory,
+            settings,
+            bingo_auth_oauth::key::Variable::empty(API_KEY_ENV),
+        )
+    }
+
+    fn registered_with_variables(
+        directory: &tempfile::TempDir,
+        settings: Value,
+        variables: bingo_auth_oauth::key::Variable,
+    ) -> Vec<Contribution> {
         let mut registrar = Registrar::new(
             "bingo.provider.openai",
             settings.clone(),
@@ -675,7 +707,9 @@ pub(crate) mod tests {
             }],
             ..Default::default()
         });
-        OpenAiPlugin.register(&mut registrar).expect("register");
+        OpenAiPlugin
+            .register_with_variables(&mut registrar, variables)
+            .expect("register");
         registrar.into_contributions()
     }
 
@@ -976,6 +1010,61 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn explicit_variables_win_only_for_the_default_and_survive_readdress() {
+        let directory = tempfile::tempdir().unwrap();
+        let built = registered_with_variables(
+            &directory,
+            json!({"openai": {
+                "apiKey": "settings-key",
+                "baseUrl": "https://settings.example",
+                "instances": {"proxy": {"apiKey": "instance-key"}}
+            }}),
+            bingo_auth_oauth::key::Variable {
+                name: API_KEY_ENV,
+                api_key: Some("variable-key".into()),
+                base_url: Some("https://variable.example".into()),
+            },
+        );
+        let built: Vec<_> = built
+            .into_iter()
+            .filter_map(|item| match item {
+                Contribution::Provider(provider) => Some(provider),
+                _ => None,
+            })
+            .collect();
+        let default = built
+            .iter()
+            .find(|provider| provider.id() == "openai")
+            .unwrap();
+        assert_eq!(default.address(), Some("https://variable.example"));
+        let ready = AuthStatus::Ready {
+            from: Some(bingo_sdk::KeySource::Env),
+        };
+        assert_eq!(default.auth(), ready);
+        let instance = built
+            .iter()
+            .find(|provider| provider.id() == "proxy")
+            .unwrap();
+        assert_eq!(instance.address(), Some(DEFAULT_BASE_URL));
+        assert_eq!(
+            instance.auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
+        let changed = default
+            .readdress(
+                &bingo_sdk::InstanceSpec {
+                    base_url: Some("https://variable.example/other".into()),
+                    images: None,
+                },
+                &Default::default(),
+            )
+            .unwrap();
+        assert_eq!(changed.auth(), ready);
+    }
+
+    #[test]
     fn a_claimed_api_key_reaches_the_provider() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let providers = providers(&directory, json!({ "openai": { "apiKey": "sk-settings" } }));
@@ -1052,20 +1141,16 @@ pub(crate) mod tests {
     fn the_missing_key_hint_names_the_login_the_variable_and_the_settings_file() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let file = directory.path().join(".bingo/settings.toml");
-        // A machine that exports the variable has a key, and a provider with
-        // a key has no hint to read.
-        if std::env::var(API_KEY_ENV).is_err() {
-            assert_eq!(
-                providers(&directory, json!({}))[0].auth(),
-                AuthStatus::Missing {
-                    hint: format!(
-                        "No openai key: run `/login openai` to paste a key, set OPENAI_API_KEY, \
-                         or set openai.apiKey in {}.",
-                        file.display()
-                    )
-                }
-            );
-        }
+        assert_eq!(
+            providers(&directory, json!({}))[0].auth(),
+            AuthStatus::Missing {
+                hint: format!(
+                    "No openai key: run `/login openai` to paste a key, set OPENAI_API_KEY, \
+                     or set openai.apiKey in {}.",
+                    file.display()
+                )
+            }
+        );
         assert_eq!(
             hermetic(None).auth(),
             AuthStatus::Missing {
@@ -1245,7 +1330,7 @@ pub(crate) mod tests {
         let store = Arc::new(CredentialStore::new(directory.path().to_path_buf()));
         let key = ApiKey::new(
             "openai",
-            instances::default_places(None),
+            instances::default_places(None, bingo_auth_oauth::key::Variable::empty(API_KEY_ENV)),
             store.clone(),
             None,
         );

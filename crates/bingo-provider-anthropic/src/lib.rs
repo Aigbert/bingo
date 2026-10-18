@@ -91,7 +91,11 @@ impl AnthropicProvider {
         api_key: Option<String>,
         base_url: impl Into<String>,
     ) -> Self {
-        let key = ApiKey::detached(PROVIDER_ID, instances::default_places(None), api_key);
+        let key = ApiKey::detached(
+            PROVIDER_ID,
+            instances::default_places(None, bingo_auth_oauth::key::Variable::empty(API_KEY_ENV)),
+            api_key,
+        );
         Self::keyed(http, PROVIDER_ID, key, base_url, true)
     }
 
@@ -189,13 +193,9 @@ impl Provider for AnthropicProvider {
         if let Some(url) = &spec.base_url {
             provider.base_url = url.trim_end_matches('/').into();
         }
-        provider.key = self.key.readdress(
-            "anthropic",
-            &provider.base_url,
-            sources,
-            DEFAULT_BASE_URL,
-            std::env::var(BASE_URL_ENV).ok().as_deref(),
-        );
+        provider.key =
+            self.key
+                .readdress("anthropic", &provider.base_url, sources, DEFAULT_BASE_URL);
         if provider.credential_origin() != self.credential_origin() {
             provider.lifetime = Default::default();
         }
@@ -320,11 +320,28 @@ impl Plugin for AnthropicPlugin {
     }
 
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        self.register_with_variables(
+            registrar,
+            bingo_auth_oauth::key::Variable {
+                name: API_KEY_ENV,
+                api_key: std::env::var(API_KEY_ENV).ok(),
+                base_url: std::env::var(BASE_URL_ENV).ok(),
+            },
+        )
+    }
+}
+
+impl AnthropicPlugin {
+    fn register_with_variables(
+        &self,
+        registrar: &mut Registrar,
+        variables: bingo_auth_oauth::key::Variable,
+    ) -> Result<(), PluginError> {
         let settings: Settings = registrar.config()?;
         let http = bingo_http::client(bingo_http::Bounds::STREAMED)
             .map_err(|e| PluginError::Failed(e.to_string()))?;
         registrar.provider_shape(Arc::new(shape::Shape::new(http.clone(), registrar.env())));
-        for provider in instances::providers(http, settings, registrar)? {
+        for provider in instances::providers(http, settings, registrar, &variables)? {
             registrar.provider(provider);
         }
         Ok(())
@@ -357,6 +374,18 @@ pub(crate) mod tests {
     }
 
     fn providers(directory: &tempfile::TempDir, settings: Value) -> Vec<Arc<dyn Provider>> {
+        providers_with_variables(
+            directory,
+            settings,
+            bingo_auth_oauth::key::Variable::empty(API_KEY_ENV),
+        )
+    }
+
+    fn providers_with_variables(
+        directory: &tempfile::TempDir,
+        settings: Value,
+        variables: bingo_auth_oauth::key::Variable,
+    ) -> Vec<Arc<dyn Provider>> {
         let mut registrar = Registrar::new(
             "bingo.provider.anthropic",
             settings.clone(),
@@ -371,7 +400,9 @@ pub(crate) mod tests {
             }],
             ..Default::default()
         });
-        AnthropicPlugin.register(&mut registrar).expect("register");
+        AnthropicPlugin
+            .register_with_variables(&mut registrar, variables)
+            .expect("register");
         registrar
             .into_contributions()
             .into_iter()
@@ -600,6 +631,54 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn explicit_variables_win_only_for_the_default_and_survive_readdress() {
+        let directory = tempfile::tempdir().unwrap();
+        let built = providers_with_variables(
+            &directory,
+            json!({"anthropic": {
+                "apiKey": "settings-key",
+                "baseUrl": "https://settings.example",
+                "instances": {"proxy": {"apiKey": "instance-key"}}
+            }}),
+            bingo_auth_oauth::key::Variable {
+                name: API_KEY_ENV,
+                api_key: Some("variable-key".into()),
+                base_url: Some("https://variable.example".into()),
+            },
+        );
+        let default = built
+            .iter()
+            .find(|provider| provider.id() == "anthropic")
+            .unwrap();
+        assert_eq!(default.address(), Some("https://variable.example"));
+        let ready = AuthStatus::Ready {
+            from: Some(bingo_sdk::KeySource::Env),
+        };
+        assert_eq!(default.auth(), ready);
+        let instance = built
+            .iter()
+            .find(|provider| provider.id() == "proxy")
+            .unwrap();
+        assert_eq!(instance.address(), Some(DEFAULT_BASE_URL));
+        assert_eq!(
+            instance.auth(),
+            AuthStatus::Ready {
+                from: Some(bingo_sdk::KeySource::Setting)
+            }
+        );
+        let changed = default
+            .readdress(
+                &bingo_sdk::InstanceSpec {
+                    base_url: Some("https://variable.example/other".into()),
+                    images: None,
+                },
+                &Default::default(),
+            )
+            .unwrap();
+        assert_eq!(changed.auth(), ready);
+    }
+
+    #[test]
     fn a_claimed_api_key_reaches_the_provider() {
         let directory = tempfile::tempdir().expect("a temporary directory");
         let providers = providers(
@@ -729,7 +808,7 @@ pub(crate) mod tests {
         ));
         let key = ApiKey::new(
             PROVIDER_ID,
-            instances::default_places(None),
+            instances::default_places(None, bingo_auth_oauth::key::Variable::empty(API_KEY_ENV)),
             store.clone(),
             None,
         );

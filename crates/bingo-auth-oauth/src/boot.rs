@@ -12,7 +12,7 @@ pub struct Endpoint<'a> {
     pub name: &'a str,
     pub field: &'a str,
     pub default: &'a str,
-    pub environment: Option<&'a str>,
+    pub environment: Option<(&'a str, &'a str)>,
     pub resource: Option<&'a str>,
 }
 
@@ -59,7 +59,7 @@ impl Endpoint<'_> {
     ) -> CredentialStore {
         let environment = self
             .environment
-            .and_then(|variable| std::env::var(variable).ok())
+            .map(|(_, value)| value)
             .filter(|value| !value.trim().is_empty());
         let (file, repository) = self.source(registrar, self.field, user, environment.is_some());
         let address = crate::address::resolve(
@@ -67,7 +67,7 @@ impl Endpoint<'_> {
                 .and_then(|v| v.get(self.field))
                 .and_then(Value::as_str),
             self.default,
-            environment.as_deref(),
+            environment,
         );
         let mut scoped = store
             .at_origin(&address, &file)
@@ -93,7 +93,7 @@ impl Endpoint<'_> {
         user: bool,
         environment: bool,
     ) -> (String, bool) {
-        if environment && let Some(variable) = self.environment {
+        if environment && let Some((variable, _)) = self.environment {
             return (variable.into(), false);
         }
         let mut path = self.path();

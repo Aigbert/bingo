@@ -14,7 +14,7 @@ use bingo_sdk::plugin::ConfigSources;
 use bingo_sdk::{PluginError, Provider, Registrar};
 
 use crate::settings::{AnthropicEndpoint, Settings};
-use crate::{API_KEY_ENV, AnthropicProvider, BASE_URL_ENV, DEFAULT_BASE_URL, PROVIDER_ID};
+use crate::{AnthropicProvider, BASE_URL_ENV, DEFAULT_BASE_URL, PROVIDER_ID};
 use bingo_auth_oauth::key::{ApiKey, Places};
 
 /// Local reservations are checked before construction; the host skips any
@@ -23,7 +23,6 @@ const BUILT_IN: [&str; 4] = ["anthropic", "codex", "fake", "openai"];
 
 const CONFIG: bingo_auth_oauth::boot::InstanceConfig = bingo_auth_oauth::boot::InstanceConfig {
     reserved: &BUILT_IN,
-    environment: BASE_URL_ENV,
     base_url: DEFAULT_BASE_URL,
 };
 #[cfg(test)]
@@ -34,12 +33,19 @@ pub fn providers(
     http: reqwest::Client,
     settings: Settings,
     registrar: &mut Registrar,
+    variables: &bingo_auth_oauth::key::Variable,
 ) -> Result<Vec<Arc<dyn Provider>>, PluginError> {
     let env = registrar.env();
     let store = Arc::new(CredentialStore::new(env.data_dir.clone()));
     let file = env.user_settings();
     let mut named = BTreeSet::new();
-    let default_store = bound(registrar, &store, "anthropic", "anthropic");
+    let default_store = bound(
+        registrar,
+        &store,
+        "anthropic",
+        "anthropic",
+        variables.base_url.as_deref(),
+    );
     let mut providers: Vec<Arc<dyn Provider>> = vec![registered(
         default_anthropic(
             http.clone(),
@@ -47,11 +53,12 @@ pub fn providers(
             &file,
             &default_store,
             Some(registrar.sources()),
+            variables,
         ),
         registrar,
     )];
     for (name, endpoint) in settings.anthropic.instances {
-        let store = bound(registrar, &store, "anthropic", &name);
+        let store = bound(registrar, &store, "anthropic", &name, None);
         if !CONFIG.allowed(&mut named, &name, "anthropic", &store, registrar) {
             continue;
         }
@@ -79,9 +86,12 @@ fn registered(provider: AnthropicProvider, registrar: &mut Registrar) -> Arc<dyn
 
 /// Where the default `anthropic` key may be written. `with_endpoint` builds
 /// one too, so the hint reads the same wherever the provider came from.
-pub(crate) fn default_places(file: Option<PathBuf>) -> Places {
+pub(crate) fn default_places(
+    file: Option<PathBuf>,
+    variable: bingo_auth_oauth::key::Variable,
+) -> Places {
     Places {
-        variable: Some(API_KEY_ENV),
+        variable: Some(Arc::new(variable)),
         setting: "anthropic.apiKey".into(),
         file,
     }
@@ -94,12 +104,13 @@ fn default_anthropic(
     file: &Path,
     store: &Arc<CredentialStore>,
     sources: Option<&ConfigSources>,
+    variables: &bingo_auth_oauth::key::Variable,
 ) -> AnthropicProvider {
-    let places = default_places(Some(file.to_path_buf()));
+    let places = default_places(Some(file.to_path_buf()), variables.clone());
     let base_url = address::resolve(
         endpoint.base_url.as_deref(),
         DEFAULT_BASE_URL,
-        std::env::var(BASE_URL_ENV).ok().as_deref(),
+        variables.base_url.as_deref(),
     );
     let key = ApiKey::new(
         PROVIDER_ID,
@@ -143,13 +154,14 @@ fn bound(
     store: &CredentialStore,
     family: &str,
     name: &str,
+    base_url: Option<&str>,
 ) -> Arc<CredentialStore> {
     let endpoint = bingo_auth_oauth::boot::Endpoint {
         family,
         name,
         field: "baseUrl",
         default: DEFAULT_BASE_URL,
-        environment: (family == "anthropic" && name == family).then_some(BASE_URL_ENV),
+        environment: base_url.map(|value| (BASE_URL_ENV, value)),
         resource: None,
     };
     Arc::new(endpoint.store(registrar, store))
