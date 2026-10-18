@@ -102,7 +102,7 @@ picture() { printf '%s' "$SHOT" | base64 -d >"$WORK/cwd/shot.png"; }
 start() {
   printf '%s' "$1" >"$WORK/script.json"
   keys "HOME=$WORK/home XDG_DATA_HOME=$WORK/data ${2:-} BINGO_FAKE_SCRIPT=$WORK/script.json $BIN --cwd $WORK/cwd ${3:-}" Enter
-  await '/ commands'
+  await 'fake-1'
 }
 
 # Press `$1` until `$2` shows. A dialog ignores keys until its guard has
@@ -189,7 +189,7 @@ await 'own place ▾'
 keys Escape
 vanish '↑↓ pick'
 keys 'composer returned'
-await '▍ composer returned'
+await 'composer returned▍'
 finish
 
 step 'esc interrupts a turn that is still waiting'
@@ -246,7 +246,7 @@ vanish '1/1'
 # CSI-u keeps this Escape separate from the probe under a delayed tty read.
 keys -l "$(printf '\033[27u')"
 keys 'smoke-ready'
-await '▍ smoke-ready'
+await 'smoke-ready▍'
 finish
 
 step 'ctrl+f remains line search with Browse disabled'
@@ -281,7 +281,7 @@ await 'n/N match'
 keys Escape
 keys Escape
 vanish 'j/k scroll'
-await '/ commands'
+await 'fake-1'
 finish
 
 step 'an @ offers the paths under the session and enter takes one'
@@ -290,7 +290,7 @@ start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '@Car'
 await '@Cargo.toml'
 keys Enter
-await '▍ @Cargo.toml'
+await '@Cargo.toml ▍'
 finish
 
 step 'the keys palette opens on ? and closes on esc'
@@ -299,7 +299,7 @@ keys '?'
 # The palette takes the KeyBar's row while open: wait for its own words.
 await 'keys, in this list'
 keys Escape
-await '/ commands'
+await 'fake-1'
 vanish 'keys, in this list'
 finish
 
@@ -311,7 +311,7 @@ keys C-r
 await 'this one'
 keys Escape
 vanish 'this one'
-await '/ commands'
+await 'fake-1'
 finish
 
 step 'a permission dialog answered y runs the tool'
@@ -322,7 +322,7 @@ keys 'write the note' Enter
 await 'Do you want to '
 if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
 # The pending question leaves the prompt available below the rule.
-await '▍ answer above'
+await '▍Answer above'
 press_until 'y' 'Wrote it.'
 [ -f "$WORK/cwd/note.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
 grep -q 'written by the smoke test' "$WORK/cwd/note.txt"
@@ -334,7 +334,7 @@ keys C-c
 await 'ctrl+c again to exit'
 # It holds its window and goes on its own: nothing is pressed to dismiss it.
 vanish 'ctrl+c again to exit'
-await '/ commands'
+await 'fake-1'
 keys C-c C-c
 left
 

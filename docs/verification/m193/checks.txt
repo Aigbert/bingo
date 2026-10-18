@@ -1,0 +1,66 @@
+$ cargo fmt --all -- --check
+exit 0; no output
+
+$ cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.31s
+exit 0
+
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.35s
+exit 0
+
+$ cargo build -p bingo --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.15s
+exit 0
+
+$ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
+test component::sites_tests::welcome_backend ... ok
+test dock::tests::growth_samples_each_fourteen_ms_step_and_shrinks_at_once ... ok
+test footer::tests::m193_hidden_footer_animation_never_schedules ... ok
+test footer::tests::m193_narrow_footer_drops_keys_then_facts_and_keeps_the_model ... ok
+test footer::tests::m193_edge_comet_end_mode_and_reduced_have_deadlines ... ok
+test footer::tests::m193_capture_dock_and_footer_bands ... ok
+test input::tests::the_first_key_is_typed ... ok
+test run::tests::a_child_title_keeps_the_home_directory_like_the_prototype ... ok
+123 result lines; totals: 6442 passed; 0 failed; 0 ignored
+TUI: 1388 passed; PTY: 19 passed
+exit 0
+
+$ scripts/check_discipline.sh
+discipline ok
+
+$ scripts/budget.sh
+dependencies (unique, normal): 423 (max  423)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 8 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+test binaries: 127
+budget ok
+
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+
+$ TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh
+tui-smoke ok
+
+$ python3 docs/verification/m193/drive.py
+PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+CLEAN 100x32: owned tmux server stopped; temporary files removed
+PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+CLEAN 80x24: owned tmux server stopped; temporary files removed
+
+$ cargo check -p bingo-mod-keybar --all-targets --target x86_64-pc-windows-msvc
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.03s
+exit 0
+
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
+exit 101; native Windows C toolchain unavailable; check remains owed
+
+$ cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
+warning: rquickjs-sys@0.14.0: clang: error: no such file or directory: '/std:c11'
+exit 101; native Windows C toolchain unavailable; check remains owed

@@ -391,7 +391,7 @@ fn a_herdr_pane_with_pictures_off_gets_the_chip_and_the_setting() {
         bingo_pictures::testing::png_bytes(100, 200),
     )
     .unwrap();
-    terminal.wait_for("kitty_graphics = true");
+    terminal.wait_for("herdr: pictures need 0.9");
     look(&mut terminal);
     terminal.wait_for("[image: image/png]");
     assert!(

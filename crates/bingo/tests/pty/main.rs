@@ -650,7 +650,7 @@ fn esc_twice_confirms_then_rewinds_the_turn_and_file() {
     );
     // And the turn is out of the transcript.
     terminal.wait_gone("Wrote the note.");
-    terminal.wait_for("▍ write me a note");
+    terminal.wait_for("write me a note▍");
     assert!(!terminal.screen().contains("no such turn"));
     terminal.send(b"\x15next turn\r");
     terminal.wait_for("Next turn is clean.");
