@@ -40,6 +40,7 @@ mod reject;
 mod run;
 mod shell;
 mod sink;
+mod stakes;
 mod supervise;
 mod tail;
 mod upshot;
@@ -382,10 +383,10 @@ impl Tool for BashTool {
     fn preview(&self, input: &Value, cwd: &Path) -> Option<bingo_sdk::Preview> {
         let args: BashArgs = serde_json::from_value(input.clone()).ok()?;
         Some(bingo_sdk::Preview::Command {
+            stakes: stakes::preview(&args.command, cwd),
             command: args.command,
             cwd: cwd.display().to_string(),
             description: args.description,
-            stakes: None,
         })
     }
 
