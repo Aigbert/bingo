@@ -1,4 +1,4 @@
- bingo▍ /var/…/T/tmp.e3Q7npDmHo/100/cwd                            run cat note.txt · session 01M5
+ bingo▍ /var/…/T/tmp.nGAtV5kMje/100/cwd                            run cat note.txt · session 01M5
 
  › run cat note.txt
    ✓ run cat note.txt                                                                           ok

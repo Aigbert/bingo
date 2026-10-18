@@ -149,32 +149,35 @@ its colour and agent rows (M200); Browse; the retry row's facts (M199).
 
 ## Verified
 
-- [x] **A1–A2, A5:** `cargo test --workspace --locked` (provider credential variables removed): `6407 passed; 0 failed; 0 ignored`; contract, 19 row fixtures, nine ACP kinds, typed catalogue accessors and fail-closed tier pass.
+- [x] **A1–A2, A5:** `cargo test --workspace --locked` (provider credential variables removed): `6420 passed; 0 failed; 0 ignored`; contract, 19 row fixtures, nine ACP kinds, typed catalogue accessors and fail-closed tier pass.
 - [x] **Provider encodings:** same command: both `request::tests::a_tool_look_never_reaches_the_model ... ok`.
 - [x] **A3:** same command: all pinned plugin looks pass; `checked_look` checks verbs, mark/ASCII resolution and target-schema properties, including SendFile, MCP and HelloProgress.
 - [x] **A4:** same command: `malformed_tool_looks_refuse_loading_in_words ... ok`; `a_registered_tool_is_prefixed_and_offered_by_the_catalogue ... ok` (JS registration through Tools catalogue).
-- [x] **A4, A6 schemas:** `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk`, then `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods -p bingo-plugin-rpc -p bingo-surface-rpc`: exit 0; plugin/RPC/JS/TS schemas and golden Step props regenerated.
+- [x] **A4, A6 schemas:** `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk`, then `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods -p bingo-plugin-rpc -p bingo-surface-rpc`: `282 passed` (SDK), `386 passed` (wire crates), `0 failed`; regeneration after rebase leaves no diff.
 - [x] **TS SDK:** `node --test sdk/typescript/src/*.test.ts`: `tests 33; pass 33; fail 0`.
 - [x] **A5–A6 rows:** `cargo test -p bingo-surface-tui tool_looks_refresh_when_the_tools_catalogue_changes`: `1 passed; 0 failed`; screen changes `fixture needle` → `find needle`. Removing the reset: `0 passed; 1 failed` (`cached rows: left 1, right 0`); restored: `1 passed; 0 failed`.
 - [x] **Failed start:** `cargo test -p bingo-plugin-rpc a_failed_start_announces_only_the_plugins_catalogue`: `1 passed; 0 failed`; before fix: `[Plugins, Commands, Tools] != [Plugins]`.
 - [x] **Print/RPC:** unchanged black-box tests in workspace run: CLI `306 passed`, RPC `104 passed`, PTY `19 passed`; all `0 failed`.
-- [x] **Native gates:** `cargo fmt --all -- --check`: exit 0, no output; `cargo check --workspace --all-targets --locked`: `Finished dev profile`.
-- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile`; `cargo test --workspace --locked`: `6407 passed; 0 failed; 0 ignored`.
+- [x] **Post-rebase native gates:** `cargo fmt --all -- --check`: exit 0, no output; `cargo check --workspace --all-targets --locked`: `Finished dev profile`.
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile`; `cargo test --workspace --locked`: `6420 passed; 0 failed; 0 ignored`.
 - [x] `scripts/check_discipline.sh`: `discipline ok`; `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
 - [x] `scripts/budget.sh` (approved workspace unicode-width edge; no new package):
   ```text
   dependencies (unique, normal): 423 (max  423)
   warm cargo check -p bingo-core: 0s (max  20s)
   relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
-  target/debug: 15 GB (soft max  5)
+  target/debug: 17 GB (soft max  5)
   warn: target/debug exceeds the soft limit
-  test binaries: 228
+  test binaries: 232
   budget ok
   ```
 - [x] **Drive:** `docs/verification/m194a/drive.sh`: `100x32: live, done, stopped passed`; `80x24: live, done, stopped passed`; asserts `✓ run cat note.txt`. `TUI_SMOKE_SOCKET_PREFIX=m194-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
-- [ ] **Windows:** `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: `12 passed, 7 failed` ([output](../verification/m194a/windows-review.txt)). Channels, MCP, mods, plugin-rpc, surface-tui, tool-fs and tool-web remain owed: aws-lc-sys lacks `stdlib.h` / `windows.h`; mods also rejects MSVC `/DWIN32_LEAN_AND_MEAN` flags. No native build bypassed.
+- [ ] **Windows:** `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: `14 passed, 10 failed` ([output](../verification/m194a/windows-review.txt)). `bingo`, `bingo-channels`, `bingo-mcp`, `bingo-mods`, `bingo-plugin-rpc`, `bingo-provider-anthropic`, `bingo-provider-openai`, `bingo-surface-tui`, `bingo-tool-fs` and `bingo-tool-web` remain owed: aws-lc-sys lacks `stdlib.h` / `windows.h`; mods also rejects MSVC `/DWIN32_LEAN_AND_MEAN` flags. No native build bypassed.
+
+- [x] **Rebase:** `git rebase dev` onto `49450a61`: `Successfully rebased and updated refs/heads/m194a-tool-look`; no conflicts.
 
 Departures and outstanding scope:
+
 - Extra looks: BashOutput `$`/output; ShowPage `?`/show; OpenRoom `@`/open; Listen `@`/listen; ListModels `@`/models; SendFile `@`/send (path `path`); HelloProgress `#`/progress.
 - Agent verbs at `@`: SpawnAgent spawn, ListAgents list, SendMessage send, StopAgent stop, DismissAgent dismiss, SetThinking thinking.
 - ACP: Read `¶`/`<`, Edit `±`/`~`, Delete `×`/`x`, Move `→`/`>`, Search `/`, Execute `$`, Think/Other `•`/`-`, Fetch `↓`/`v`; kind verb, title target as text.
@@ -183,3 +186,4 @@ Departures and outstanding scope:
 - No snapshots deleted; re-pinned `screens__message_tools_{120x40,80x24}` and `screens__bridged_call_while_streaming_{120x40,80x24}` for lowercase fallback names without inserted spaces.
 - Part B, theme/row_mark, six Looks::in_ui sites and transcript::called splitting remain Part B's work; no Ember captures edited. Combined gates criterion stays open for the Windows native-toolchain blocker.
 - Inherited provider credentials break an unrelated auth test (reproduced alone); verification removes the four provider key/base-URL variables.
+- Existing CLI recovery test hung once after rebase; terminated only its owned child. `cargo test -p bingo --test cli agents::a_resumed_root_is_told_which_child_was_mid_turn_when_the_process_ended -- --exact`: `1 passed; 0 failed` unchanged.
