@@ -1,119 +1,134 @@
-//! A shell line the person ran themselves (`!<command>`, ADR-0008 §5).
-//!
-//! It is drawn as what it is and as nothing else: their own block, on the
-//! same raised bar their words are on, with the prompt they typed it at
-//! standing where the `>` of a message stands. What came back hangs under a
-//! `⎿`, folded to the rows a result is folded to, because that is what it is
-//! — output, read by the line rather than as prose (design §5).
-//!
-//! The code the command came to is not part of that output and is never
-//! folded away with it: a line that failed says so on a row of its own, in
-//! `bad`, whatever else was cut. A clean exit says nothing — the output is
-//! the whole of the answer.
-
+//! A shell line is its command band and its complete output well.
+use super::Rows;
+use crate::{layout::grid, theme};
+use bingo_sdk::{Item, ItemBody, SessionState};
 use ratatui::text::{Line, Span};
 
-use super::said;
-use super::{EXPAND, OUTPUT_ROWS, Rows, kept, plain, returns, speaks_indent, under};
-use crate::fold::Fold;
-use crate::theme;
-
-/// What stands where a message's `>` stands: the shell's own prompt.
-const PROMPT: &str = "$";
-
-/// One shell item's block.
-pub(super) fn lines(
-    command: &str,
-    output: &str,
-    exit: Option<i32>,
-    fold: Fold,
-    rows: &Rows<'_>,
-) -> Vec<Line<'static>> {
-    let mut out = typed(command, rows);
-    let came_back = came_back(output, exit, fold);
-    if !came_back.is_empty() {
-        out.extend(returns(came_back, rows));
-    }
+pub(super) fn lines(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
+    let ItemBody::Shell {
+        command,
+        output,
+        exit,
+        ..
+    } = &item.body
+    else {
+        return Default::default();
+    };
+    let mut out = typed(item, command, *exit, rows);
+    out.lines.extend(well(whole(output, *exit), rows.width));
     out
 }
 
-/// The line as it was typed, on the bar the person's own words are drawn on.
-fn typed(command: &str, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let mark = Span::styled(format!(" {PROMPT} "), theme::dim());
-    let body = vec![Line::from(Span::styled(command.to_string(), theme::text()))];
-    said::barred(
-        under(mark, body, speaks_indent(), rows.measured()),
-        rows.width,
-    )
+pub(crate) fn latest(state: &SessionState) -> Option<&Item> {
+    let last = state.transcript.items().iter().rfind(|item| {
+        matches!(item.body, ItemBody::Shell { .. }) || super::band::owns(item, state)
+    })?;
+    matches!(last.body, ItemBody::Shell { .. }).then_some(last)
 }
 
-/// What the line wrote, cut to what the fold allows, and — under whatever is
-/// left of it — the code it came to when that was not a clean exit.
-fn came_back(output: &str, exit: Option<i32>, fold: Fold) -> Vec<Line<'static>> {
-    if fold == Fold::Shut {
+fn typed(item: &Item, command: &str, exit: Option<i32>, rows: &Rows<'_>) -> crate::views::Drawing {
+    let mut line = Line::from(vec![
+        Span::raw("   "),
+        Span::styled("!", theme::glow().patch(theme::bold())),
+        Span::raw(" "),
+        Span::styled(
+            command.to_owned(),
+            theme::foreground("code").unwrap_or_default(),
+        ),
+    ]);
+    let newest = latest(rows.state).is_some_and(|last| last.id == item.id);
+    let light = if newest {
+        light(item, exit, rows)
+    } else {
+        Default::default()
+    };
+    if let Some(mark) = light.lines.first() {
+        line.spans[0] = Span::raw("  ");
+        line.spans.splice(0..0, mark.spans.iter().cloned());
+    }
+    crate::views::Drawing {
+        lines: vec![grid::pad_to(line, rows.width).style(theme::ground("you").unwrap_or_default())],
+        next: light.next,
+    }
+}
+
+fn light(item: &Item, exit: Option<i32>, rows: &Rows<'_>) -> crate::views::Drawing {
+    use bingo_sdk::view::{FadeCurve, TextChild, TextMotion, TextStyle};
+    let failed = exit.is_some_and(|code| code != 0);
+    let motion = item.completed_at.filter(|_| !failed).map(|end| {
+        Box::new(TextMotion::Fade {
+            curve: Some(FadeCurve::EaseOut),
+            from: "glow".into(),
+            at_ms: end.as_millisecond(),
+            ms: 320,
+        })
+    });
+    let view = bingo_sdk::View::Text {
+        children: vec![TextChild::String(theme::glyphs::get("side").into())],
+        style: TextStyle {
+            color: Some(if failed { "bad" } else { "good" }.into()),
+            motion,
+            ..Default::default()
+        },
+    };
+    crate::views::marked(&view, 1, &crate::views::Marks::at(rows.now))
+}
+
+pub(super) fn well(lines: Vec<Line<'static>>, width: usize) -> Vec<Line<'static>> {
+    if lines.is_empty() {
         return Vec::new();
     }
-    let mut body = kept(plain(output), fold, OUTPUT_ROWS, Some(EXPAND));
-    if let Some(code) = exit.filter(|code| *code != 0) {
-        body.push(Line::from(Span::styled(
-            format!("[exit {code}]"),
+    let width = width.saturating_sub(grid::VX + grid::RM);
+    let ground = theme::ground("well").unwrap_or_default();
+    let mut out = vec![Line::default()];
+    out.extend(lines.into_iter().map(|line| {
+        let mut body = Line::from("  ");
+        body.spans
+            .extend(grid::fit(line, width.saturating_sub(4)).spans);
+        body
+    }));
+    out.push(Line::default());
+    out.into_iter()
+        .map(|line| {
+            let mut body = grid::pad_to(line, width);
+            for span in &mut body.spans {
+                span.style = ground.patch(span.style);
+            }
+            body.spans.insert(0, Span::raw(" ".repeat(grid::VX)));
+            body
+        })
+        .collect()
+}
+
+pub fn whole(output: &str, exit: Option<i32>) -> Vec<Line<'static>> {
+    let failed = exit.is_some_and(|code| code != 0);
+    let ink = if failed { theme::bad() } else { theme::ash() };
+    let mut lines: Vec<_> = output
+        .lines()
+        .map(|line| Line::from(Span::styled(line.to_owned(), ink)))
+        .collect();
+    if let Some(code) = exit.filter(|_| failed) {
+        lines.push(Line::from(Span::styled(
+            format!("exit {code}"),
             theme::bad(),
         )));
     }
-    body
-}
-
-/// Everything the line wrote, with nothing folded away: what the sheet opens
-/// on (`crate::pager`).
-pub fn whole(output: &str, exit: Option<i32>) -> Vec<Line<'static>> {
-    came_back(output, exit, Fold::Open)
+    lines
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn texts(lines: &[Line<'static>]) -> Vec<String> {
-        lines.iter().map(|line| line.to_string()).collect()
-    }
-
-    /// The code is the point of a line that failed, so it survives the cut
-    /// that takes the output down to its five rows.
     #[test]
-    fn a_failing_line_keeps_its_code_however_much_output_was_folded_away() {
+    fn shell_output_never_folds_and_failure_keeps_its_exit() {
         let output = (1..=20)
             .map(|n| format!("line {n}"))
             .collect::<Vec<_>>()
             .join("\n");
-        let peeked = texts(&came_back(&output, Some(2), Fold::Peek));
-        assert_eq!(peeked.len(), OUTPUT_ROWS + 2, "five rows, a cut, the code");
-        assert_eq!(peeked.first().map(String::as_str), Some("line 1"));
-        assert_eq!(peeked.last().map(String::as_str), Some("[exit 2]"));
-
-        let open = texts(&came_back(&output, Some(2), Fold::Open));
-        assert_eq!(open.len(), 21);
-        assert_eq!(open.last().map(String::as_str), Some("[exit 2]"));
-    }
-
-    /// A line that simply worked says nothing about how it ended, and one
-    /// shut away says nothing at all.
-    #[test]
-    fn a_clean_exit_adds_no_row_and_a_shut_block_has_none() {
-        assert_eq!(texts(&came_back("hi\n", Some(0), Fold::Peek)), ["hi"]);
-        assert!(came_back("hi\n", Some(1), Fold::Shut).is_empty());
-        assert!(
-            came_back("", Some(0), Fold::Peek).is_empty(),
-            "a silent line is one row"
-        );
-    }
-
-    /// A command killed before it could exit has no code to show: what
-    /// stopped it is the last line of what it wrote (`bingo-tool-bash`).
-    #[test]
-    fn a_line_that_reached_no_code_shows_only_what_it_wrote() {
-        assert_eq!(
-            texts(&came_back("one\n[interrupted]", None, Fold::Peek)),
-            ["one", "[interrupted]"]
-        );
+        let lines = whole(&output, Some(2));
+        assert_eq!(lines.len(), 21);
+        assert_eq!(lines.last().unwrap().to_string(), "exit 2");
+        assert!(whole("", Some(0)).is_empty());
+        assert_eq!(whole("one\n[interrupted]", None).len(), 2);
     }
 }

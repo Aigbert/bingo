@@ -40,7 +40,10 @@ pub fn draw(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
     let right = clock.lines.first().cloned().unwrap_or_default();
     let width = rows.width.saturating_sub(grid::TX + grid::RM).max(1);
     let prompt = text(item);
-    let body = prompt_lines(item, &prompt);
+    let mut body = prompt_lines(item, &prompt);
+    if let Some(line) = body.first_mut() {
+        super::chips::prepend(item, line);
+    }
     let mut lines = wrap::wrap_all(&body, width);
     let room = if first && (turn.live || right.width() > 0) {
         right.width().max(8) + 2
@@ -86,7 +89,7 @@ pub fn draw(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
 
 fn text(item: &Item) -> String {
     match &item.body {
-        ItemBody::User { parts, .. } => super::said::said(parts),
+        ItemBody::User { parts, .. } => super::chips::text(item, &super::said::said(parts)),
         _ => String::new(),
     }
 }
@@ -156,7 +159,7 @@ impl Band {
         Self {
             live: live.is_some(),
             asking: live.is_some() && state.interactions.iter().any(|ask| ask.turn == item.turn),
-            newest: rows.newest == item.turn.as_ref(),
+            newest: rows.newest == item.turn.as_ref() && super::ran::latest(state).is_none(),
             stopped,
             failed: last.is_some_and(|t| matches!(t.status, TurnStatus::Failed { .. })),
             end,
@@ -289,7 +292,8 @@ fn additions(item: &Item, rows: &Rows<'_>, out: &mut crate::views::Drawing) {
         let room = rows
             .width
             .saturating_sub(grid::TX + grid::RM + right.width() + 2);
-        let left = markdown::inline(words.lines().next().unwrap_or_default(), theme::text());
+        let mut left = markdown::inline(words.lines().next().unwrap_or_default(), theme::text());
+        super::chips::prepend(other, &mut left);
         out.lines
             .push(laid(grid::fit(left, room), right, rows.width));
     }

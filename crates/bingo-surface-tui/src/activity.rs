@@ -1,20 +1,17 @@
 //! Waiting, plugin activity placements and queued input beneath the stream.
-use bingo_sdk::{Origin, QueueEntry, SessionState};
 use ratatui::text::{Line, Span};
 
 use crate::clock::Now;
 use crate::tree::{self, Scope, Tree, Wants};
 use crate::ui::Ui;
-use crate::{theme, transcript, views};
+use crate::{theme, views};
 
 /// Background waits, placed activity, queued input and embers in the dock.
 /// The stream owns the live turn's row.
 pub(crate) fn components(tree: &Tree, ui: &Ui, width: usize, now: Now) -> views::Drawing {
     crate::layout::count::band(2);
     let state = tree.viewed();
-    let slots = bingo_sdk::slot::placed(state);
-    let mut out = band(tree, ui, &slots, width, now);
-    out.lines.extend(queued(state));
+    let mut out = waiting(tree, width, now);
     let embers = ui.embers.drawing(state, now, width, !ui.scroll.following());
     out.next = out.next.into_iter().chain(embers.next).min();
     if !out.lines.is_empty() || !embers.lines.is_empty() {
@@ -25,17 +22,12 @@ pub(crate) fn components(tree: &Tree, ui: &Ui, width: usize, now: Now) -> views:
 }
 
 /// A wait and the plugin placements that accompany it. Queued input is separate.
-fn band(
-    tree: &Tree,
-    ui: &Ui,
-    slots: &[bingo_sdk::slot::Placed],
-    width: usize,
-    now: Now,
-) -> views::Drawing {
-    let mut out = waiting(tree, width, now);
-    let running = tree.viewed().busy() || !out.lines.is_empty();
+pub(crate) fn dock(tree: &Tree, ui: &Ui, width: usize, now: Now) -> views::Drawing {
+    let mut out = views::Drawing::default();
+    let slots = bingo_sdk::slot::placed(tree.viewed());
+    let running = tree.viewed().busy();
     if !ui.activity_hidden {
-        for placed in slots {
+        for placed in &slots {
             if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
                 let Some(view) = ui.placed.pulled.view(view, tree.viewed(), width as u16) else {
                     out.lines.push(Line::from(theme::ellipsis()));
@@ -45,14 +37,14 @@ fn band(
                     (true, bingo_sdk::View::Panel { child, .. }) => child,
                     _ => view,
                 };
-                let lines = activity_view(view, width, now);
-                out.append(lines.map_lines(|lines| {
-                    if running {
-                        hung(lines)
-                    } else {
-                        standing(lines)
-                    }
-                }));
+                out.append(
+                    activity_view(view, width.saturating_sub(5), now).map_lines(|lines| {
+                        lines
+                            .into_iter()
+                            .map(|line| views::indent(line, 3))
+                            .collect()
+                    }),
+                );
             }
         }
     }
@@ -117,69 +109,6 @@ fn activity_node(node: &bingo_sdk::TreeNode, width: usize) -> Line<'static> {
         spans.push(Span::styled(format!(" — {badge}"), theme::dim()));
     }
     Line::from(spans)
-}
-
-fn hung(rows: Vec<Line<'static>>) -> Vec<Line<'static>> {
-    let connector = format!("  {}  ", theme::connector());
-    let indent = " ".repeat(connector.chars().count());
-    rows.into_iter()
-        .enumerate()
-        .map(|(at, row)| {
-            let mut spans = vec![Span::styled(
-                if at == 0 {
-                    connector.clone()
-                } else {
-                    indent.clone()
-                },
-                theme::dim(),
-            )];
-            spans.extend(row.spans);
-            Line::from(spans)
-        })
-        .collect()
-}
-
-fn standing(rows: Vec<Line<'static>>) -> Vec<Line<'static>> {
-    rows.into_iter().map(|row| views::indent(row, 2)).collect()
-}
-
-/// The lines the person is holding behind the turn, dim, each under its `>`.
-fn queued(state: &SessionState) -> Vec<Line<'static>> {
-    state
-        .queue
-        .iter()
-        .filter(|entry| pending(&entry.origin))
-        .map(|entry| {
-            Line::from(Span::styled(
-                format!("{} {}{}", theme::user(), entry.preview, waits(entry)),
-                theme::dim(),
-            ))
-        })
-        .collect()
-}
-
-/// The tag a row wears when the running turn will not be steered with it: a
-/// line that asked to wait for the turn to end, and a command, which has
-/// always waited for one (ADR-0008 §2, amended M68). `steerable` is the one
-/// reading of that, so there is nothing else here to keep in step with it.
-fn waits(entry: &QueueEntry) -> &'static str {
-    match entry.steerable {
-        true => "",
-        false => " (waits)",
-    }
-}
-
-/// Whether a queued input is a message the person is waiting to send. A
-/// subsystem's entry — a room's post, a spawn's brief, a job reporting in — is
-/// a steer in flight rather than something pending (ADR-0028), so it is drawn
-/// nowhere here; the turn that absorbs it shows it in the transcript as the
-/// quiet notice it is. The boundary is the transcript's own set, so an unknown
-/// surface fails to the loud, person's side in both places alike.
-fn pending(origin: &Origin) -> bool {
-    matches!(
-        transcript::voice(origin),
-        bingo_sdk::Voice::Said | bingo_sdk::Voice::Note
-    )
 }
 
 /// Background agents can still be working after the viewed turn has ended.

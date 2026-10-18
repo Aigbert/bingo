@@ -16,14 +16,21 @@ pub fn width(width: usize) -> usize {
 }
 
 pub mod fill;
-pub mod strip;
 
 /// Where the editor's text sits on screen once it is folded into a box.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Layout {
     pub lines: Vec<String>,
+    pub images: Vec<u32>,
     /// Row and column of the caret within `lines`.
     pub cursor: (usize, usize),
+}
+
+impl Layout {
+    pub fn images(mut self, held: &crate::pictures::Held, text: &str) -> Self {
+        self.images = held.shown(text).into_iter().map(|(n, _)| n).collect();
+        self
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -42,6 +49,7 @@ impl Composer {
         self.text.is_empty()
     }
 
+    #[cfg(test)]
     pub fn clear(&mut self) {
         self.text.clear();
         self.cursor = 0;
@@ -62,6 +70,22 @@ impl Composer {
     pub fn insert(&mut self, text: &str) {
         self.text.insert_str(self.cursor, text);
         self.cursor += text.len();
+    }
+
+    pub fn picture(&mut self, number: u32, held: &pictures::Held) {
+        let mut end = 0;
+        for (range, token) in pictures::spans(&self.text) {
+            if range.start != end || held.under(token).is_none() {
+                break;
+            }
+            end = range.end;
+            if self.text[end..].starts_with(' ') {
+                end += 1;
+            }
+        }
+        let chip = format!("{} ", pictures::placeholder(number));
+        self.text.insert_str(end, &chip);
+        self.cursor = self.cursor.max(end) + chip.len();
     }
 
     pub fn newline(&mut self) {
@@ -187,7 +211,11 @@ impl Composer {
                 lines.push(String::new());
             }
         }
-        Layout { lines, cursor }
+        Layout {
+            lines,
+            cursor,
+            images: Vec::new(),
+        }
     }
 
     /// Where one step back lands: over a whole `[image N]` when the caret
@@ -322,6 +350,19 @@ mod tests {
     }
 
     #[test]
+    fn pictures_precede_words_and_keep_the_text_caret() {
+        let mut c = at("look here", 4);
+        let mut held = pictures::Held::default();
+        let first = held.hold(c.text(), "first.png".into());
+        c.picture(first, &held);
+        let second = held.hold(c.text(), "second.png".into());
+        c.picture(second, &held);
+        c.insert(" closely");
+        assert_eq!(c.text(), "[image 1] [image 2] look closely here");
+        assert_eq!(held.carried(c.text()).len(), 2);
+    }
+
+    #[test]
     fn home_and_end_are_line_wise() {
         let mut c = at("one\ntwo", 5);
         c.home();
@@ -380,6 +421,7 @@ mod tests {
             Layout {
                 lines: vec!["abc".into(), "def".into()],
                 cursor: (1, 1),
+                images: Vec::new(),
             }
         );
     }
@@ -392,6 +434,7 @@ mod tests {
             Layout {
                 lines: vec!["ab".into(), "cd".into()],
                 cursor: (1, 2),
+                images: Vec::new(),
             }
         );
     }

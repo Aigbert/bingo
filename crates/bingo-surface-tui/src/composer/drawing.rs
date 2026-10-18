@@ -49,8 +49,9 @@ pub fn draw(
                 Span::styled(props.placeholder.clone(), ink("dim")),
             ]);
         } else {
-            spans.extend(input(
+            spans.extend(input_with_images(
                 text,
+                &layout.images,
                 (index == layout.cursor.0).then_some(layout.cursor.1),
                 &caret,
             ));
@@ -76,7 +77,21 @@ fn rested(now: clock::Now, keyed_at: std::time::Instant) -> (clock::Now, std::ti
     )
 }
 
+#[cfg(test)]
 fn input(text: &str, cursor: Option<usize>, caret: &Span<'static>) -> Vec<Span<'static>> {
+    input_with_images(text, &[], cursor, caret)
+}
+
+fn input_with_images(
+    text: &str,
+    images: &[u32],
+    cursor: Option<usize>,
+    caret: &Span<'static>,
+) -> Vec<Span<'static>> {
+    let chips: Vec<_> = crate::pictures::spans(text)
+        .into_iter()
+        .filter(|(_, n)| images.contains(n))
+        .collect();
     let command = text.starts_with(['/', '!']);
     let end = if command {
         text.find(char::is_whitespace).unwrap_or(text.len())
@@ -90,7 +105,9 @@ fn input(text: &str, cursor: Option<usize>, caret: &Span<'static>) -> Vec<Span<'
         if cursor == Some(column) {
             spans.push(caret.clone());
         }
-        let style = if byte < end {
+        let style = if chips.iter().any(|(range, _)| range.contains(&byte)) {
+            ink("plan")
+        } else if byte < end {
             if text.starts_with('!') {
                 ink("code")
             } else if byte == 0 {

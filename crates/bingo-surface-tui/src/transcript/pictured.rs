@@ -22,7 +22,7 @@ use ratatui::text::{Line, Span};
 use super::{Block, Rows, step_body};
 use crate::fold::Fold;
 use crate::graphics::picture::{self, Source};
-use crate::graphics::{self as graphics, Graphics, Picture, band, kitty};
+use crate::graphics::{self as graphics, Graphics, Picture, kitty};
 use crate::{markdown, theme};
 
 /// How many rows of a picture a block that is only peeked at shows — a
@@ -41,9 +41,8 @@ pub(super) fn under_the_words(item: &Item, mut block: Block, fold: Fold, rows: &
         return block;
     }
     let images = picture::pictures_of(&item.body);
-    match item.body {
-        ItemBody::ToolCall { .. } => returned(&mut block, item, &images, fold, rows),
-        _ => above_the_words(&mut block, item, &images, rows),
+    if let ItemBody::ToolCall { .. } = item.body {
+        returned(&mut block, item, &images, fold, rows);
     }
     block
 }
@@ -65,44 +64,6 @@ fn returned(block: &mut Block, item: &Item, images: &[&Image], fold: Fold, rows:
             None => block.lines.extend(step_body(vec![chip(image)], rows)),
         }
     }
-}
-
-/// The pictures a person handed over, as one band of thumbnails above their
-/// own line — the band the composer had them in before `⏎`, so the record and
-/// its preview are the same shape (M62). It stands in the block's own column,
-/// above rows the block has already been given: the `>` mark keeps its place
-/// on the row of their first words, and nothing here moves it.
-///
-/// A terminal that draws no picture draws nothing at all. The line itself
-/// carries the `[image 1]` token, or the path they typed, which is already the
-/// word for what is attached (M45) — so what is left is exactly the block
-/// `--print` and a chat channel have always had.
-fn above_the_words(block: &mut Block, item: &Item, images: &[&Image], rows: &Rows<'_>) {
-    let Graphics::Kitty { cell, .. } = graphics::chosen() else {
-        return;
-    };
-    let thumbnails: Vec<(Source, &Image)> = images
-        .iter()
-        .enumerate()
-        .map(|(part, image)| {
-            (
-                Source::Journal {
-                    item: item.id.clone(),
-                    part,
-                },
-                *image,
-            )
-        })
-        .collect();
-    let indent = 3;
-    let band = band::of(
-        &thumbnails,
-        cell,
-        rows.pictures,
-        room(rows.measured().saturating_sub(indent)),
-    );
-    block.lines.splice(0..0, at_column(band.lines, indent));
-    block.pictures.extend(band.pictures);
 }
 
 /// The pictures an answer's own words named (M51): under each chip line the
@@ -285,11 +246,6 @@ mod tests {
             .collect()
     }
 
-    /// A person's line with a picture behind its token (M45).
-    fn pasted(image: &bingo_sdk::Image) -> Item {
-        carrying(std::slice::from_ref(image))
-    }
-
     /// The same, with as many pictures behind it as they handed over.
     fn carrying(images: &[bingo_sdk::Image]) -> Item {
         let mut parts = vec![ContentPart::text("what is this? [image 1]")];
@@ -302,16 +258,6 @@ mod tests {
                 origin: Origin::surface("tui"),
             },
         )
-    }
-
-    /// The rows of a block that carry placeholder cells, by their index.
-    fn cell_rows(block: &Block) -> Vec<usize> {
-        text(block)
-            .iter()
-            .enumerate()
-            .filter(|(_, line)| line.contains(PLACEHOLDER))
-            .map(|(row, _)| row)
-            .collect()
     }
 
     /// One item's block, on a terminal of this kind and at this fold.
@@ -438,109 +384,18 @@ mod tests {
         assert!(block.pictures.is_empty());
     }
 
-    // ---- the band above the words (M62) ---------------------------------
-
-    /// A picture a person handed over stands in a band *above* their own line,
-    /// in the block's own column and at the band's own size — the shape the
-    /// composer's strip had it in before the line was sent, not a wall of
-    /// pictures under the words.
     #[test]
-    fn a_picture_a_person_pasted_stands_in_a_band_above_their_line() {
-        let block = block(&pasted(&png(100, 200)), graphics::drawing(), Fold::Peek);
-        assert_eq!(
-            block.pictures,
-            vec![Picture {
-                source: Source::Journal {
-                    item: bingo_sdk::ItemId::from_raw("itm_1"),
-                    part: 0,
-                },
-                cols: 3,
-                rows: 3,
-            }],
-            "the band's box, not the block's"
-        );
-        let drawn = text(&block);
-        assert_eq!(drawn.len(), usize::from(band::ROWS) + 1);
-        assert_eq!(cell_rows(&block), vec![0, 1, 2], "the band comes first");
-        assert!(
-            drawn[usize::from(band::ROWS)].contains("what is this? [image 1]"),
-            "and the words under it, on the row that carries the mark: {drawn:?}"
-        );
-        assert_eq!(
-            cells_at(&drawn[2]),
-            Some(speaks_indent()),
-            "in the block's own column: {drawn:?}"
-        );
-    }
-
-    /// Three of them stand side by side on one band, not one under another.
-    #[test]
-    fn three_pictures_stand_side_by_side_on_one_band() {
-        let block = block(
-            &carrying(&[png(100, 100), png(200, 100), png(100, 200)]),
-            graphics::drawing(),
-            Fold::Peek,
-        );
-        assert_eq!(block.pictures.len(), 3);
-        assert_eq!(text(&block).len(), usize::from(band::ROWS) + 1);
-        assert_eq!(
-            block.pictures.iter().map(|p| p.cols).collect::<Vec<_>>(),
-            vec![6, 12, 3],
-            "each fitted into the band's own box, each keeping its shape"
-        );
-    }
-
-    /// Past the fourth they are counted, as the composer counted them.
-    #[test]
-    fn six_pictures_show_four_and_count_the_rest() {
-        let block = block(
-            &carrying(&std::array::from_fn::<_, 6, _>(|_| png(100, 100))),
-            graphics::drawing(),
-            Fold::Peek,
-        );
-        assert_eq!(block.pictures.len(), band::SHOWN);
-        let floor = &text(&block)[usize::from(band::ROWS) - 1];
-        assert!(floor.contains("+2"), "{floor:?}");
-    }
-
-    /// The fold shuts the band away with everything else and opens it to
-    /// exactly what it was: a thumbnail has no taller form, so `ctrl+o` on a
-    /// person's own line has nothing about it to open. The picture itself is
-    /// one click away, in the viewer (M56).
-    #[test]
-    fn the_fold_hides_the_band_and_never_grows_it() {
-        let item = pasted(&png(100, 400));
-        let peeked = block(&item, graphics::drawing(), Fold::Peek);
-        let opened = block(&item, graphics::drawing(), Fold::Open);
-        assert_eq!(peeked.pictures, opened.pictures, "one size, both folds");
-        assert_eq!(text(&peeked), text(&opened));
-        assert_eq!(peeked.pictures[0].rows, band::ROWS);
-        let shut = block(&item, graphics::drawing(), Fold::Shut);
-        assert!(shut.pictures.is_empty());
-        assert_eq!(text(&shut).len(), 1, "the line they typed, and no more");
-    }
-
-    /// The whole way through, on a real buffer: the band is above the person's
-    /// own row on the screen, by exactly its own rows.
-    #[test]
-    fn the_frame_draws_the_band_above_the_persons_row() {
-        let state = folded(vec![said(pasted(&png(100, 200)))]);
-        let (mut ui, now) = scene();
-        let screen = graphics::with(graphics::drawing(), || {
-            crate::test_support::draw_tree(80, 24, &solo(&state), &mut ui, now)
-        });
-        let cells = crate::test_support::row_carrying(&screen, &PLACEHOLDER.to_string());
-        let words = crate::test_support::row_carrying(&screen, "what is this?");
-        assert!(cells < words, "the band is above the words:\n{screen}");
-        assert_eq!(words - cells, band::ROWS, "by the band's own rows");
-    }
-
-    /// And on a terminal that cannot draw it, nothing at all: the line above
-    /// already carries the word for it (M45).
-    #[test]
-    fn a_picture_a_person_pasted_adds_no_chip() {
-        let block = block(&pasted(&png(100, 200)), Graphics::Off, Fold::Peek);
-        assert_eq!(text(&block).len(), 1, "the line they typed, and no more");
+    fn pasted_pictures_are_chips_on_the_persons_band_on_every_terminal() {
+        for terminal in [Graphics::Off, graphics::drawing()] {
+            let block = block(
+                &carrying(&[png(100, 100), png(100, 200)]),
+                terminal,
+                Fold::Peek,
+            );
+            assert!(block.pictures.is_empty());
+            assert_eq!(text(&block).len(), 1);
+            assert!(text(&block)[0].contains("[image 1] [image 2]"));
+        }
     }
 
     /// The fold decides how much of a picture is on the screen, as it decides

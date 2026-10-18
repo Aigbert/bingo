@@ -77,12 +77,6 @@ pub fn next_token(line: &str) -> u32 {
     tokens(line).into_iter().max().map_or(1, |n| n + 1)
 }
 
-/// The name the memo knows a draft's file by: the path's own spelling, which
-/// is also what an answer's `![…](path)` would say for the same file.
-pub fn dest(path: &Path) -> String {
-    path.to_string_lossy().into_owned()
-}
-
 /// The pasted pictures behind the composer, by token: where each one's file
 /// is.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -113,12 +107,6 @@ impl Held {
             .into_iter()
             .filter_map(|n| Some((n, self.by_token.get(&n)?.as_path())))
             .collect()
-    }
-
-    /// The names the memo reads the line's pictures under, so a frame that
-    /// draws the strip asks for them the way it asks for an answer's.
-    pub fn wanted(&self, line: &str) -> Vec<String> {
-        self.carried(line).iter().map(|path| dest(path)).collect()
     }
 
     /// The file one token names, whatever the line says.
@@ -245,7 +233,6 @@ mod tests {
         assert_eq!(n, 1);
         let line = format!("look {}", placeholder(n));
         assert_eq!(held.carried(&line), vec![file("a")]);
-        assert_eq!(held.wanted(&line), vec!["/pasted/a.png"]);
     }
 
     #[test]

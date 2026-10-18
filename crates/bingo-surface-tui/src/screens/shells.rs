@@ -36,7 +36,7 @@ fn backgrounded(seq: u64) -> bingo_sdk::Frame {
             data: json!({ "id": ID, "command": COMMAND }),
             fold: format!("Started in the background as {ID}"),
         }),
-        upshot: None,
+        upshot: Some(bingo_sdk::Upshot::plain("in background")),
     };
     item(
         seq,
@@ -79,7 +79,7 @@ fn ran() -> bingo_sdk::SessionState {
                 "bash",
                 None,
                 &format!(
-                    "Background job {ID} (`{COMMAND}`) exited with code 0 after 45s.\n\
+                    "✓ `{COMMAND}` finished in the background · 412 passed\n\
                      `BashOutput` with id \"{ID}\" reads what it wrote."
                 ),
             ),
@@ -98,7 +98,8 @@ fn shell_running() {
     let (mut ui, now) = scene();
     let state = running();
     let narrow = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(narrow.contains("⎿  Running in the background"), "{narrow}");
+    assert!(narrow.contains("in background"), "{narrow}");
+    assert!(!narrow.contains("⎿"), "{narrow}");
     assert!(narrow.contains("1 shell"), "{narrow}");
     assert!(!narrow.contains("job_ab12cd34"), "{narrow}");
     let wide = draw_tree(120, 40, &solo(&state), &mut ui, now);
@@ -125,10 +126,7 @@ fn shell_ran() {
     );
     assert!(!screen.contains("Running in the background"), "{screen}");
     assert!(!screen.contains("1 shell"), "{screen}");
-    assert!(
-        screen.contains(" ▍ Background job job_ab12cd34"),
-        "{screen}"
-    );
+    assert!(screen.contains("finished in the background"), "{screen}");
     both("shell_ran", &solo(&state), &mut ui, now);
 }
 

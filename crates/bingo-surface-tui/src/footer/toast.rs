@@ -18,7 +18,7 @@ pub(super) fn draw(
 ) -> Option<Drawing> {
     let notice = crate::toast::components(ui, state, now, width, &mut frame.pulls)?;
     let age = now.since(notice.said());
-    let hold = notice.kind.hold();
+    let hold = notice.hold();
     let mut spans = words(&notice.kind, state);
     fade(&mut spans, age, hold, now.motion);
     Some(Drawing {
@@ -45,9 +45,15 @@ fn words(kind: &NoticeKind, state: &bingo_sdk::SessionState) -> Vec<Span<'static
             let color = match toast.level {
                 bingo_sdk::Level::Error => "bad",
                 bingo_sdk::Level::Warn => "amber",
-                _ => "fg",
+                _ => "muted",
             };
-            let mut spans = vec![Span::styled(toast.text.clone(), ink(color))];
+            let mut spans = Vec::new();
+            for (index, part) in toast.text.split(" · ").enumerate() {
+                if index > 0 {
+                    spans.push(Span::styled(" · ", ink("faint")));
+                }
+                spans.push(Span::styled(part.to_owned(), ink(color)));
+            }
             if let Some(about) = &toast.about {
                 spans.push(Span::styled(format!(" · {about}"), ink("dim")));
             }

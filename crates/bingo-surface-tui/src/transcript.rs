@@ -25,6 +25,7 @@ mod said;
 use components::item_lines;
 
 pub(crate) mod band;
+mod chips;
 use crate::component::live;
 /// Producer replacements for individual transcript rows.
 pub(crate) mod slots;
@@ -35,7 +36,7 @@ mod output;
 /// The picture under the words, where the terminal draws one (§5).
 mod pictured;
 /// A shell line the person ran themselves (`!<command>`).
-mod ran;
+pub(crate) mod ran;
 /// A turn's steps and narration at column 3.
 mod steps;
 pub(crate) use steps::asked;
@@ -478,12 +479,7 @@ fn default_item_lines(
         }
         ItemBody::Reasoning { .. } => thinking::lines(item, place, fold, rows).into(),
         ItemBody::ToolCall { .. } => called(item, agents, fold, rows).into(),
-        ItemBody::Shell {
-            command,
-            output,
-            exit,
-            ..
-        } => ran::lines(command, output, *exit, fold, rows).into(),
+        ItemBody::Shell { .. } => ran::lines(item, rows).into(),
         ItemBody::Action { name, args, result } => {
             action(item.status, name, args, result.as_ref(), fold, rows, cue).into()
         }

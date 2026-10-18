@@ -105,17 +105,13 @@ fn a_notice_is_marked_and_everybody_else_keeps_the_bar() {
     let (mut ui, now) = scene();
     crate::theme::with(truecolor(), || {
         let painted = painted(120, 40, &solo(&folded(reported())), &mut ui, now);
-        assert_row_styled(
-            &painted,
-            "Background job",
-            &[
-                (" ▍ ", crate::theme::good()),
-                (JOB.lines().next().unwrap_or_default(), crate::theme::text()),
-            ],
-        );
+        let row = painted.row("finished in the background");
+        assert!(row.iter().any(|(text, style)| text.contains('✓')
+            && style.fg == crate::theme::as_drawn(crate::theme::good()).fg));
         assert!(
-            painted.coloured("BashOutput").is_empty(),
-            "what hangs under it is a result and spends nothing"
+            row.iter()
+                .any(|(text, style)| text == "cargo test --workspace"
+                    && style.fg == crate::theme::foreground("code").unwrap().fg)
         );
         let bar = painted.row("look at the deploy");
         let width: usize = bar.iter().map(|(text, _)| text.width()).sum();
@@ -166,14 +162,22 @@ fn the_line_is_the_persons_own_and_only_a_bad_exit_is_coloured() {
         &drawn,
         "git status --short",
         &[
-            (" $ ", crate::theme::dim()),
-            ("git status --short", crate::theme::text()),
+            ("   ", ratatui::style::Style::default()),
+            ("!", crate::theme::glow().patch(crate::theme::bold())),
+            (" ", ratatui::style::Style::default()),
+            (
+                "git status --short",
+                crate::theme::foreground("code").unwrap(),
+            ),
         ],
     );
-    assert_eq!(drawn.coloured("[exit 1]"), vec!["[exit 1]".to_string()]);
+    assert_eq!(drawn.coloured("exit 1"), vec!["exit 1".to_string()]);
     assert!(
-        drawn.coloured("+fn a() {}").is_empty(),
-        "the output itself spends none"
+        drawn
+            .row("+fn a() {}")
+            .iter()
+            .any(|(text, style)| text.contains("+fn a() {}")
+                && style.fg == crate::theme::as_drawn(crate::theme::bad()).fg)
     );
 }
 
@@ -251,6 +255,7 @@ fn no_screen_paints_prose_in_a_colour_of_its_own() {
         crate::theme::with(look, || {
             let mut allowed = crate::theme::spendable();
             allowed.insert(crate::theme::foreground("code").unwrap().fg.unwrap());
+            allowed.insert(crate::theme::foreground("faint").unwrap().fg.unwrap());
             allowed.insert(crate::theme::foreground("amber").unwrap().fg.unwrap());
             allowed.insert(crate::theme::foreground("amberGlow").unwrap().fg.unwrap());
             allowed.insert(

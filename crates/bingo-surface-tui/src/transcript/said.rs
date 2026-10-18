@@ -9,7 +9,6 @@
 
 use bingo_sdk::{ContentPart, Driver, Item, Origin};
 use ratatui::text::{Line, Span};
-use unicode_width::UnicodeWidthStr;
 
 use super::{OUTPUT_ROWS, Rows, bullet_style, kept, plain, returns, speaks};
 use crate::fold::Fold;
@@ -182,6 +181,12 @@ fn notice(
     // A blank line between the headline and the rest is a separator in the
     // text — a command's prompt puts one there — and under a `⎿` it would be
     // a row spent on nothing.
+    if head.starts_with(['✓', '×']) {
+        return vec![crate::views::indent(
+            quiet_head(head),
+            crate::layout::grid::TX,
+        )];
+    }
     let rest = rest.trim_start_matches('\n');
     let mut out = speaks(
         bullet_style(item.status, false),
@@ -196,6 +201,32 @@ fn notice(
         out.extend(returns(kept(plain(rest), fold, OUTPUT_ROWS, None), rows));
     }
     out
+}
+
+fn quiet_head(head: &str) -> Line<'static> {
+    let mark = head
+        .strip_prefix("✓ ")
+        .map(|text| (text, theme::glyphs::get("ok"), theme::good()))
+        .or_else(|| {
+            head.strip_prefix("× ")
+                .map(|text| (text, theme::glyphs::get("times"), theme::bad()))
+        });
+    let (text, mark, ink) = mark.unwrap_or((head, "", theme::ash()));
+    let mut line = Line::default();
+    for (index, part) in text.split(" · ").enumerate() {
+        if index > 0 {
+            line.spans.push(Span::styled(
+                theme::glyphs::get("sep"),
+                theme::foreground("faint").unwrap_or_default(),
+            ));
+        }
+        line.spans
+            .extend(crate::markdown::inline(part, theme::ash()).spans);
+    }
+    if !mark.is_empty() {
+        line.spans.insert(0, Span::styled(format!("{mark} "), ink));
+    }
+    line
 }
 
 /// The conversation a delivery says it came from, where saying it tells a
@@ -235,24 +266,6 @@ fn headline(head: &str, principal: Option<&str>, conversation: Option<&str>) -> 
 /// opened this turn the way typing does, and it is not what anybody typed.
 /// Every row of a block on the raised bar. A shell line the person ran is on
 /// the same bar for the same reason ([`super::ran`]): it is theirs.
-pub(super) fn barred(lines: Vec<Line<'static>>, width: usize) -> Vec<Line<'static>> {
-    lines.into_iter().map(|line| bar(line, width)).collect()
-}
-
-/// What stands in the gutter of a line on the bar: the theme's own `>` for
-/// what a person typed, the word `wake` for the note a turn left itself. Its
-/// width is the indent every line under it takes, so the two forms wrap alike.
-/// The raised bar behind a `>` line: it runs to the edge of the transcript,
-/// so what you said is a band and not a sentence.
-fn bar(line: Line<'static>, width: usize) -> Line<'static> {
-    let mut spans = line.spans;
-    let used: usize = spans.iter().map(|s| s.content.width()).sum();
-    spans.push(Span::raw(" ".repeat(width.saturating_sub(used))));
-    let mut line = Line::from(spans);
-    line.style = theme::raised();
-    line
-}
-
 #[cfg(test)]
 mod voice_contract {
     use super::*;

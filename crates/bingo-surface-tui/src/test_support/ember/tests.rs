@@ -126,7 +126,7 @@ fn ordinary_punctuation_is_not_a_spinner() {
 }
 
 #[test]
-fn stream_regions_include_activity_and_strip() {
+fn stream_regions_include_activity() {
     let mut capture = Capture::load("done");
     capture.rows = parse::rows("# fixture\na\nb\nc\nf\n", "");
     let mut buffer = Buffer::empty(Rect::new(0, 0, 1, 4));
@@ -135,8 +135,7 @@ fn stream_regions_include_activity_and_strip() {
     }
     let regions = crate::frame::Regions {
         transcript: Rect::new(0, 0, 1, 1),
-        activity: Rect::new(0, 1, 1, 1),
-        strip: Rect::new(0, 2, 1, 1),
+        activity: Rect::new(0, 1, 1, 2),
         ..Default::default()
     };
     assert_regions(&capture, Band::Stream, &buffer, &regions);

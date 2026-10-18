@@ -472,8 +472,9 @@ fn an_interrupted_turn() {
 }
 
 /// What a background job says when it ends, first line first.
-const JOB: &str = "Background job ab12cd34 (`cargo test --workspace`) exited with code 0 after \
-                   2m 4s.\n`BashOutput` with id \"ab12cd34\" reads what it wrote.";
+const JOB: &str = "✓ `cargo test --workspace` finished in the background · 412 passed\n\
+                   Background job ab12cd34 exited with code 0 after 2m 4s.\n\
+                   `BashOutput` with id \"ab12cd34\" reads what it wrote.";
 
 /// The three sides of one rule in one transcript: a job reporting in and an
 /// agent answering are the machinery, and a person writing from a channel is

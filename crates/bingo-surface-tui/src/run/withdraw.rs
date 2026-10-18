@@ -85,7 +85,7 @@ pub(super) fn stop(run: &mut Run, intents: Vec<IntentId>) {
         return run.not_yet();
     };
     let session = run.session.tree.view().clone();
-    run.discard_actions(&[session.clone()]);
+    run.discard_actions(std::slice::from_ref(&session));
     let interrupt = run.mint(super::Submission::Ordinary(None));
     let host = run.host.clone();
     run.spawn(async move {

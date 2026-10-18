@@ -125,8 +125,8 @@ fn an_expired_toast_never_uses_a_stale_mod_answer() {
 
 #[test]
 fn the_keybar_reads_the_persons_keymap() {
-    let (ui, now) = scene();
-    let pairs = resting(&solo(&state()), &ui, now);
+    let (ui, _) = scene();
+    let pairs = resting(&solo(&state()), &ui);
     assert_eq!(
         pairs,
         vec![

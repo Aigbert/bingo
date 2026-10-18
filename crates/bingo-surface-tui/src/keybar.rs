@@ -16,8 +16,7 @@ pub fn draw(
     let pairs = if let Some((_, ask)) = tree.open_interaction() {
         sealed::pairs(ui, ask, question_focus(ui, frame, ask))
     } else {
-        site::hints(tree.viewed(), ui, frame)
-            .map_or_else(|| resting(tree, ui, now), |hints| hints.pairs)
+        site::hints(tree.viewed(), ui, frame).map_or_else(|| resting(tree, ui), |hints| hints.pairs)
     };
     let pairs = pairs
         .into_iter()
@@ -39,10 +38,7 @@ pub fn draw(
         .map_lines(|lines| if width == 0 { Vec::new() } else { lines })
 }
 
-fn resting(tree: &Tree, ui: &Ui, now: Now) -> Vec<KeyPair> {
-    if ui.exit_armed(now.instant) {
-        return vec![KeyPair::new("ctrl+c", "again to exit")];
-    }
+fn resting(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
     if !ui.scroll.following() {
         return vec![
             KeyPair::new("end", "latest"),
@@ -167,18 +163,6 @@ fn placeholder(state: &bingo_sdk::SessionState) -> String {
         "Reply, or / for commands"
     }
     .into()
-}
-
-#[cfg(test)]
-pub fn hints(
-    tree: &Tree,
-    ui: &Ui,
-    width: usize,
-    now: Now,
-    _: &mut Vec<crate::pulled::Key>,
-) -> Line<'static> {
-    let pairs = resting(tree, ui, now);
-    own(&Props::KeyBar(KeyBarProps { pairs }), width).remove(0)
 }
 
 #[cfg(test)]

@@ -7,6 +7,10 @@ use bingo_sdk::{ItemId, SessionState, TurnStatus};
 use ratatui::{buffer::Buffer, layout::Rect, style::Color};
 
 pub fn anchor(state: &SessionState) -> Option<&ItemId> {
+    if let Some(shell) = super::ran::latest(state) {
+        return matches!(shell.body, bingo_sdk::ItemBody::Shell { exit: Some(0), .. })
+            .then_some(&shell.id);
+    }
     let last = state.last_turn.as_ref()?;
     if state.turn.is_some() || last.status != TurnStatus::Completed {
         return Default::default();
@@ -29,10 +33,13 @@ pub fn draw(
     if !now.motion || theme::glyphs::get("side").is_ascii() {
         return Default::default();
     }
-    let Some(turn) = state.last_turn.as_ref() else {
+    let end = super::ran::latest(state)
+        .and_then(|item| item.completed_at)
+        .or_else(|| state.last_turn.as_ref().map(|turn| turn.ended_at));
+    let Some(end) = end else {
         return Default::default();
     };
-    let k = now.wall.duration_since(turn.ended_at).as_millis() as f64 / 700.0;
+    let k = now.wall.duration_since(end).as_millis() as f64 / 700.0;
     if !(0.0..1.0).contains(&k) {
         return Default::default();
     }

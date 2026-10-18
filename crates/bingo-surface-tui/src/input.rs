@@ -460,10 +460,13 @@ fn leaving(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
 
 fn split_return(ui: &Ui, tree: &Tree, key: KeyEvent) -> bool {
     let owner = crate::focus::owner(ui, tree);
-    let bound = crate::pane::key_handler(ui, tree.viewed(), key).is_some()
-        || tree
+    let bound = match owner {
+        crate::focus::Owner::Pane => crate::pane::key_handler(ui, tree.viewed(), key).is_some(),
+        crate::focus::Owner::Interaction => tree
             .open_interaction()
-            .is_some_and(|(_, ask)| crate::ask::handler(ui, ask, key).is_some());
+            .is_some_and(|(_, ask)| crate::ask::handler(ui, ask, key).is_some()),
+        _ => false,
+    };
     keys::split_return(owner, ui.dialog.aside, bound)
 }
 
@@ -519,9 +522,10 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     if ui.focus.row().is_some() {
         ui.focus = crate::focus::Focus::Composer;
     }
+    let owner = crate::focus::owner(ui, tree);
     let open = keys::Open {
         // One layer is open at a time, whichever form it takes.
-        sheet: ui.focus.showing(),
+        sheet: owner == crate::focus::Owner::Layer,
         card: tree.is_root(tree.view()) && tree.open_interaction().is_some(),
         dropdown: !suggestions(ui, tree).is_empty(),
         busy: tree.viewed().busy(),

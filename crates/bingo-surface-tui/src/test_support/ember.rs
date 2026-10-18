@@ -4,6 +4,7 @@ use crate::{clock::Now, theme};
 use ratatui::{buffer::Buffer, layout::Rect};
 use serde::Deserialize;
 use std::path::PathBuf;
+pub mod acting;
 mod compare;
 mod parse;
 pub mod story;

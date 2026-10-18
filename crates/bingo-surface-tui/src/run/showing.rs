@@ -44,7 +44,7 @@ fn placing(
     transport: Transport,
 ) -> Vec<u8> {
     let pixels = |picture: &Picture| {
-        match picture.source.image_in(state, &ui.pictures, &ui.linked) {
+        match picture.source.image_in(state, &ui.linked) {
             Some(image) => ui.decoded.pixels(picture.id(), image, picture.pixels(cell)),
             // Not where it was drawn from any more: a rewind took the item, or
             // the draft that held it is gone. Nothing will ever draw it.
@@ -144,7 +144,7 @@ pub(super) fn open(run: &mut Run, source: &Source) {
 /// handed over as a file ([`viewer`]).
 fn handed_over(run: &Run, source: &Source) -> Result<String, String> {
     let state = run.session.tree.viewed();
-    let image = source.image_in(state, &run.ui.pictures, &run.ui.linked);
+    let image = source.image_in(state, &run.ui.linked);
     viewer::open(
         &run.opener,
         source,

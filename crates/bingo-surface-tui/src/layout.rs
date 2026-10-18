@@ -40,8 +40,6 @@ pub struct Layout {
     pub top: usize,
     /// The card on the screen, when one is open.
     pub card: Option<Card>,
-    /// The thumbnails the composer's strip drew, in the line's own order.
-    pub strip: Vec<crate::graphics::Picture>,
     /// Where this frame drew each picture's cells, in the terminal's own rows
     /// and columns: what a click on a picture is answered against. It is read
     /// back out of the lines that were drawn
@@ -81,14 +79,9 @@ impl Layout {
         self.placed().into_iter().find(|picture| picture.id() == id)
     }
 
-    /// Every picture this frame put cells on the screen for, oldest first: the
-    /// transcript's, then the composer's own. The strip comes last because
-    /// what falls off the terminal's cap is the oldest, and the picture a
-    /// person is about to send is the newest thing on the screen.
+    /// Every picture in the rendered transcript, oldest first.
     pub fn placed(&self) -> Vec<crate::graphics::Picture> {
-        let mut placed = self.blocks.pictures();
-        placed.extend(self.strip.iter().cloned());
-        placed
+        self.blocks.pictures()
     }
 
     pub fn padding(&self) -> usize {

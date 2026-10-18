@@ -77,6 +77,7 @@ struct Revision {
     role: Role,
     tool: Option<bingo_sdk::component::Step>,
     band: Option<crate::transcript::band::Revision>,
+    shell: bool,
 }
 
 fn revision(
@@ -120,6 +121,7 @@ fn revision(
         graphics: crate::graphics::chosen(),
         role: place.role.clone(),
         band: crate::transcript::band::revision(item, rows),
+        shell: crate::transcript::ran::latest(rows.state).is_some_and(|shell| shell.id == item.id),
         tool: match &item.body {
             ItemBody::ToolCall { name, input, .. } if !matches!(place.role, Role::Step { .. }) => {
                 Some(crate::tool_rows::resolve(
@@ -771,7 +773,7 @@ mod tests {
     /// of what the block is a rendering of — or the row would say `Running`
     /// for as long as the transcript stood (M75).
     #[test]
-    fn a_shell_that_ends_makes_its_block_draw_again() {
+    fn a_background_shell_keeps_its_landed_step_when_it_ends() {
         let started = bingo_sdk::ToolOutput {
             parts: vec![bingo_sdk::ContentPart::text("Started it")],
             is_error: false,
@@ -824,11 +826,11 @@ mod tests {
         sync(&mut blocks, &state, 80);
         assert_eq!(
             blocks.renders(),
-            2,
-            "the shell ended, the row is drawn again"
+            1,
+            "the notice carries completion; the step stays in background"
         );
         sync(&mut blocks, &state, 80);
-        assert_eq!(blocks.renders(), 2, "and then it is a memo again");
+        assert_eq!(blocks.renders(), 1, "and it remains a memo");
     }
 
     /// A block is drawn once and cloned ever after, so a picture read in

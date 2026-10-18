@@ -54,10 +54,10 @@ fn layout_renders_each_band_once_and_reuses_unchanged_blocks() {
     let tree = solo(&state);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
     assert_eq!(first.blocks.renders(), 200);
-    assert_eq!(first.renders, [1; 4]);
+    assert_eq!(first.renders, [1, 0, 1, 1]);
     let next = layout(first, &tree, &ui, SIZE, now);
     assert_eq!(next.blocks.renders(), 200);
-    assert_eq!(next.renders, [1; 4]);
+    assert_eq!(next.renders, [1, 0, 1, 1]);
     assert_eq!(next.canvas.buffer.content.len(), 120 * 40);
 }
 
@@ -83,37 +83,21 @@ fn layout_schedules_a_scroll_sample() {
 }
 
 #[test]
-fn layout_answers_picture_clicks_without_painting() {
-    use crate::effect::Effect;
-    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
-    let click = |x, y| MouseEvent {
-        kind: MouseEventKind::Down(MouseButton::Left),
-        column: x,
-        row: y,
-        modifiers: KeyModifiers::NONE,
-    };
+fn sent_images_are_chips_without_thumbnail_targets() {
     let (mut ui, now) = scene();
-    let mut state = state();
     let mut picture = user("itm_picture", "A picture.");
     if let bingo_sdk::ItemBody::User { parts, .. } = &mut picture.body {
         parts.push(bingo_sdk::ContentPart::Image(bingo_pictures::testing::png(
             40, 40,
         )));
     }
-    state.transcript = vec![picture].into_iter().collect();
-    let tree = solo(&state);
-    crate::graphics::with(crate::graphics::drawing(), || {
-        ui.shown = layout(Layout::default(), &tree, &ui, SIZE, now);
-        let cell = ui.shown.cells[0];
-        let picture = ui
-            .shown
-            .picture_at(cell.area.as_position())
-            .expect("visible picture");
-        assert_eq!(
-            crate::pointer::on_mouse(&mut ui, &tree, click(cell.area.x, cell.area.y), now),
-            vec![Effect::OpenPicture(picture.source)]
-        );
-    });
+    let state = folded(vec![frame(
+        1,
+        bingo_sdk::Event::ItemCompleted { item: picture },
+    )]);
+    let screen = draw_sized(120, 40, &state, &mut ui, now);
+    assert!(screen.contains("[image 1] A picture."));
+    assert!(ui.shown.cells.is_empty());
 }
 
 #[test]

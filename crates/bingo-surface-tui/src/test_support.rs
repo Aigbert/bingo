@@ -279,7 +279,7 @@ pub fn child_permission() -> Interaction {
 pub fn drafted(ui: &mut crate::ui::Ui, image: bingo_sdk::Image) -> u32 {
     let token = crate::pictures::next_token(ui.composer.text());
     let path = std::path::PathBuf::from(format!("/draft/{token}.png"));
-    let dest = crate::pictures::dest(&path);
+    let dest = path.to_string_lossy().into_owned();
     ui.linked.take(&dest);
     ui.linked.answered(crate::graphics::linked::Answer {
         dest,

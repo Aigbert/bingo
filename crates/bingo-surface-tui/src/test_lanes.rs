@@ -270,29 +270,14 @@ pub fn task_payload(records: Value) -> Value {
     slot::with(serde_json::json!({"tasks": records}), slots)
 }
 
-pub fn shell_payload(table: Value, item: &str) -> Value {
-    use bingo_sdk::{
-        ItemId, Tone,
-        slot::{self, Slot},
-    };
-    slot::with(
+pub fn shell_payload(table: Value, _item: &str) -> Value {
+    bingo_sdk::slot::with(
         table,
-        [
-            Slot::Status {
-                text: "1 shell".into(),
-                tone: Tone::Neutral,
-                until: None,
-            },
-            Slot::Row {
-                caption: None,
-                item: ItemId::from_raw(item),
-                mark: None,
-                title: None,
-                badge: None,
-                body: Some(View::text("Running in the background")),
-                actions: vec![],
-            },
-        ],
+        [bingo_sdk::slot::Slot::Status {
+            text: "1 shell".into(),
+            tone: bingo_sdk::Tone::Neutral,
+            until: None,
+        }],
     )
 }
 

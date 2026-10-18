@@ -10,9 +10,6 @@ pub const COMPOSER_MIN: u16 = 3;
 pub struct Demand {
     /// Rows of text in the input box, before its border.
     pub composer: u16,
-    /// Rows of thumbnails standing on the box, when the draft carries
-    /// pictures a terminal can draw (M48; outside the border since 2026-09-04).
-    pub strip: u16,
     /// Rows between the transcript and the box: the activity row and whatever
     /// is queued behind it.
     pub activity: u16,
@@ -26,8 +23,6 @@ pub struct Demand {
 pub struct Regions {
     pub transcript: Rect,
     pub activity: Rect,
-    /// The thumbnails' rows, directly on the box's top border.
-    pub strip: Rect,
     pub composer: Rect,
     pub status: Rect,
     /// The open palette, under the box.
@@ -40,7 +35,7 @@ impl Regions {
         // `union` of an empty rect with another is not the other — an empty
         // transcript would drag the band back to row 0 with no height — so
         // only the regions with rows are joined.
-        [self.transcript, self.activity, self.strip]
+        [self.transcript, self.activity]
             .into_iter()
             .filter(|region| region.height > 0)
             .reduce(|band, region| band.union(region))
@@ -57,14 +52,11 @@ pub fn regions(size: Rect, demand: Demand) -> Regions {
     let rows = composer_rows(demand.composer, rest.height)
         .min(crate::layout::grid::dock_cap(usize::from(size.height)) as u16 + 2);
     let composer = take_bottom(&mut rest, rows);
-    let rows = strip_rows(demand.strip, rest.height);
-    let strip = take_bottom(&mut rest, rows);
     let rows = activity_rows(demand.activity, rest.height);
     let activity = take_bottom(&mut rest, rows);
     Regions {
         transcript: rest,
         activity,
-        strip,
         composer,
         status,
         palette,
@@ -79,14 +71,6 @@ fn palette_rows(want: u16, room: u16) -> u16 {
 /// The dock takes its body, edge and pad, bounded by the available rows.
 fn composer_rows(text: u16, room: u16) -> u16 {
     text.saturating_add(2).max(COMPOSER_MIN).min(room)
-}
-
-/// The strip is rows of its own above the box, never rows out of it: a
-/// picture pasted into a full draft must not push a line of it off the
-/// screen. It is all there or not there — a thumbnail cut to one row is not a
-/// thumbnail — and it yields before the transcript's last row does.
-fn strip_rows(want: u16, room: u16) -> u16 {
-    if want < room { want } else { 0 }
 }
 
 /// The activity rows yield before the transcript's last row does.
@@ -147,22 +131,6 @@ mod tests {
         assert_eq!(r.composer.bottom(), r.palette.y);
         assert_eq!(r.palette.bottom(), r.status.y);
         assert_eq!(r.status.height, 1);
-    }
-    #[test]
-    fn thumbnails_stand_above_the_dock_and_yield_whole() {
-        let at = |height| {
-            regions(
-                Rect::new(0, 0, 80, height),
-                Demand {
-                    composer: 1,
-                    strip: 3,
-                    ..Demand::default()
-                },
-            )
-        };
-        assert_eq!(at(8).strip.height, 3);
-        assert_eq!(at(7).strip.height, 0);
-        assert_eq!(at(8).strip.bottom(), at(8).composer.y);
     }
 }
 

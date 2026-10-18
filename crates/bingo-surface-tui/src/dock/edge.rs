@@ -43,6 +43,16 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
     {
         return flash(width, mode::current(state).flash_ink(), age, 900, now);
     }
+    if let Some(shell) = crate::transcript::ran::latest(state)
+        && let Some(end) = shell.completed_at
+    {
+        let ink = if matches!(shell.body, bingo_sdk::ItemBody::Shell { exit: Some(0), .. }) {
+            "good"
+        } else {
+            "bad"
+        };
+        return flash(width, ink, now.past(end), 1100, now);
+    }
     if let Some(turn) = &state.last_turn {
         let ink = match turn.status {
             bingo_sdk::TurnStatus::Completed => "good",

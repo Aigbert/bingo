@@ -47,12 +47,19 @@ fn emit(state: &mut SessionState, at: i64, event: Event) {
     state.apply(&frame);
 }
 
-fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
+pub(super) fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
     let id = format!("ember-{n}");
     let t0 = turn["t0"].as_i64().unwrap();
     emit(state, t0, started(&id));
     let mut prompt = user(&format!("{id}-prompt"), turn["prompt"].as_str().unwrap());
     prompt.turn = Some(TurnId::from_raw(&id));
+    if let ItemBody::User { parts, .. } = &mut prompt.body {
+        for _ in turn["chips"].as_array().into_iter().flatten() {
+            parts.push(ContentPart::Image(
+                bingo_sdk::Image::from_bytes("image/png", b"fixture").unwrap(),
+            ));
+        }
+    }
     stamp(&mut prompt, t0, Some(t0));
     emit(state, t0, Event::ItemCompleted { item: prompt });
     for (at, data) in turn["items"].as_array().unwrap().iter().enumerate() {
@@ -73,22 +80,7 @@ fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
             },
         );
     }
-    if turn["reply"].is_object() {
-        let reply = &turn["reply"];
-        let text = markdown(reply["blocks"].as_array().unwrap());
-        let mut item = assistant(&format!("{id}-reply"), &text, ItemStatus::Completed);
-        item.turn = Some(TurnId::from_raw(&id));
-        stamp(
-            &mut item,
-            reply["at"].as_i64().unwrap(),
-            Some(turn["endAt"].as_f64().unwrap() as i64),
-        );
-        emit(
-            state,
-            item.completed_at.unwrap().as_millisecond(),
-            Event::ItemCompleted { item },
-        );
-    }
+    fold_reply(state, &id, turn);
     let status = match turn["state"].as_str().unwrap() {
         "done" => Some(TurnStatus::Completed),
         "stopped" => Some(TurnStatus::Interrupted {
@@ -101,6 +93,48 @@ fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
             state,
             turn["endAt"].as_f64().unwrap() as i64,
             completed(&id, status),
+        );
+    }
+}
+
+fn fold_reply(state: &mut SessionState, id: &str, turn: &Value) {
+    if turn["reply"].is_object() {
+        let reply = &turn["reply"];
+        let text = markdown(reply["blocks"].as_array().unwrap());
+        let text: String = text
+            .chars()
+            .take(
+                reply["revealed"]
+                    .as_u64()
+                    .map_or(usize::MAX, |n| n as usize),
+            )
+            .collect();
+        let finished = turn["state"] == "done";
+        let mut item = assistant(
+            &format!("{id}-reply"),
+            &text,
+            if finished {
+                ItemStatus::Completed
+            } else {
+                ItemStatus::Running
+            },
+        );
+        item.turn = Some(TurnId::from_raw(id));
+        stamp(
+            &mut item,
+            reply["at"].as_i64().unwrap(),
+            finished.then(|| turn["endAt"].as_f64().unwrap() as i64),
+        );
+        emit(
+            state,
+            item.completed_at
+                .unwrap_or(item.started_at)
+                .as_millisecond(),
+            if finished {
+                Event::ItemCompleted { item }
+            } else {
+                Event::ItemStarted { item }
+            },
         );
     }
 }

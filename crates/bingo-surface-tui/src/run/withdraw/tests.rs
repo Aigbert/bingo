@@ -78,7 +78,7 @@ async fn until(attached: &mut Attachment, matches: impl Fn(&Event) -> bool) {
 async fn a_fake_provider_delivery_wins_withdrawal_without_duplication() {
     let home = tempfile::tempdir().unwrap();
     let script =
-        serde_json::from_value(serde_json::json!({"responses":[{"steps":[{"text":"done"}]}]}))
+        serde_json::from_value(serde_json::json!({"responses":[{"steps":[{"delay":{"ms":60000}}]}, {"steps":[{"text":"done"}]}]}))
             .unwrap();
     let host = bingo_core::Host::build(
         vec![Box::new(bingo_provider_fake::FakePlugin::new(Arc::new(
@@ -101,15 +101,26 @@ async fn a_fake_provider_delivery_wins_withdrawal_without_duplication() {
         )
         .await
         .unwrap();
-    let intent = IntentId::mint();
-    attached.handle.submit(
-        intent.clone(),
-        Input::text("delivered once", crate::origin()),
-    );
+    attached
+        .handle
+        .submit(IntentId::mint(), Input::text("first turn", crate::origin()));
     until(&mut attached, |event| {
-        matches!(event, Event::TurnCompleted { .. })
+        matches!(event, Event::TurnStarted { .. })
     })
     .await;
+    let intent = IntentId::mint();
+    attached
+        .handle
+        .submit(intent.clone(), input("delivered once", vec![]));
+    until(
+        &mut attached,
+        |event| matches!(event, Event::QueueChanged { entries, .. } if !entries.is_empty()),
+    )
+    .await;
+    attached
+        .handle
+        .interrupt(IntentId::mint(), bingo_sdk::InterruptScope::Head);
+    until(&mut attached, |event| matches!(event, Event::ItemCompleted { item } if matches!(&item.body, bingo_sdk::ItemBody::User { parts, .. } if parts.iter().any(|part| part.as_text() == Some("delivered once"))))).await;
     let taken = host.withdraw(&attached.session, &intent, identity()).await;
     assert_eq!(taken.as_ref().unwrap_err().code, ErrorCode::NotFound);
     let mut run = crate::run::tests::idle(Instant::now());
@@ -124,7 +135,7 @@ async fn a_fake_provider_delivery_wins_withdrawal_without_duplication() {
             .iter()
             .filter(|item| matches!(&item.body, bingo_sdk::ItemBody::User { .. }))
             .count(),
-        1
+        2
     );
     host.shutdown().await;
 }

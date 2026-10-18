@@ -53,6 +53,10 @@ impl Controls {
     pub fn hold_picture(&mut self, path: std::path::PathBuf) -> u32 {
         self.pictures.hold(self.composer.text(), path)
     }
+    pub fn paste_picture(&mut self, path: std::path::PathBuf) {
+        let number = self.hold_picture(path);
+        self.composer.picture(number, &self.pictures);
+    }
     pub fn new(history: Vec<String>) -> Self {
         Self {
             actions: Default::default(),

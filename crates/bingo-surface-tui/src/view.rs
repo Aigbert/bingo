@@ -11,7 +11,6 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::clock::Now;
 use crate::commands::{Group, Suggestion};
-use crate::composer::strip;
 use crate::frame::{self, Demand, Regions};
 use crate::tree::{self, Tree};
 use crate::ui::{Card, Open, Ui};
@@ -32,8 +31,13 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let tools = crate::tool_rows::Looks::in_ui(ui);
     let area = frame.area();
     let state = tree.viewed();
-    let draft = ui.composer.layout(prompt::width(area.width as usize));
-    let strip = strip(ui, &frame.measurements, area.width);
+    let draft = Draft {
+        layout: ui
+            .composer
+            .layout(prompt::width(area.width as usize))
+            .images(&ui.pictures, ui.composer.text()),
+        above: composer_above(tree, ui, frame, now),
+    };
     let activity = activity::components(tree, ui, area.width as usize, now);
     let activity_next = activity.next;
     let mut activity = activity.lines;
@@ -41,7 +45,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let band = crate::component::band::draw(state, ui, frame, now);
     activity.extend(band.lines.iter().cloned());
     let palette = palette(tree, ui, frame, now);
-    let mut regions = frame::regions(area, demand(&draft, &strip, &activity, &palette));
+    let mut regions = frame::regions(area, demand(&draft, &activity, &palette));
     grow(frame, &mut regions, now);
     activity = frame.collect(views::Drawing {
         lines: activity,
@@ -49,7 +53,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     });
     frame.seating = crate::pane::seating(ui, state, regions.transcript);
     regions.transcript = frame.seating.transcript;
-    pull_activity(state, ui, frame, regions.activity);
+    pull_activity(state, ui, frame, regions.composer);
     let layer_regions = regions;
     if crate::browse::active(ui) && regions.transcript.height > 0 {
         regions.transcript.y += 1;
@@ -59,7 +63,6 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     render_transcript(tree, ui, frame, regions.transcript, now, &tools);
     render_activity(ui, frame, regions.activity, activity);
     crate::component::band::place(&band, frame, regions.activity, band_offset);
-    render_strip(frame, regions.strip, strip);
     render_composer(tree, ui, frame, regions.composer, now, draft);
     crate::pane::draw(ui, state, frame, now);
 
@@ -93,19 +96,14 @@ fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) 
 }
 
 /// What the frame must make room for before the transcript is given the rest.
-fn demand(
-    draft: &prompt::Layout,
-    strip: &graphics::Band,
-    activity: &[Line<'_>],
-    palette: &[Line<'_>],
-) -> Demand {
+fn demand(draft: &Draft, activity: &[Line<'_>], palette: &[Line<'_>]) -> Demand {
     Demand {
         composer: u16::try_from(
-            draft.lines.len().clamp(1, COMPOSER_ROWS)
-                + usize::from(draft.lines.len() > COMPOSER_ROWS),
+            draft.layout.lines.len().clamp(1, COMPOSER_ROWS)
+                + usize::from(draft.layout.lines.len() > COMPOSER_ROWS)
+                + draft.above.len(),
         )
         .unwrap_or(u16::MAX),
-        strip: strip.height(),
         activity: u16::try_from(activity.len()).unwrap_or(u16::MAX),
         palette: u16::try_from(palette.len()).unwrap_or(u16::MAX),
     }
@@ -121,16 +119,26 @@ fn palette(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'stat
     crate::palette::draw(ui, tree, frame, width, rows, now)
 }
 
-/// The draft's thumbnails, measured and rendered once for this frame.
-fn strip(ui: &Ui, measured: &graphics::Decoded, width: u16) -> graphics::Band {
-    strip::rows(
-        &ui.pictures,
-        ui.composer.text(),
-        &ui.linked,
-        graphics::chosen(),
-        measured,
-        u16::try_from(prompt::width(usize::from(width))).unwrap_or(u16::MAX),
-    )
+struct Draft {
+    layout: prompt::Layout,
+    above: Vec<Line<'static>>,
+}
+
+fn composer_above(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
+    let width = frame.area().width as usize;
+    let mut drawing = activity::dock(tree, ui, width, now);
+    drawing.append(crate::queue_rows::draw(
+        tree.viewed(),
+        &ui.queue_arrivals,
+        width,
+        now,
+    ));
+    let lines = frame.collect(drawing);
+    if ui.focus.search().is_some() || crate::palette::active(ui) {
+        Vec::new()
+    } else {
+        lines
+    }
 }
 
 /// Persistent session facts keep their row in every focus state.
@@ -159,7 +167,6 @@ fn grow(frame: &mut Layout, regions: &mut Regions, now: Now) {
     regions.composer.y += extra;
     regions.composer.height = rows;
     regions.activity.y += extra;
-    regions.strip.y += extra;
     regions.transcript.height += extra;
     frame.growth = Some(growth);
     frame.wake(growth.next(now));
@@ -814,14 +821,7 @@ fn lined(area: Rect, padding: usize) -> Rect {
 
 /// The prompt box: the caret lives here and nowhere else. Its border is the
 /// one box the frame draws itself; what is inside it is [`crate::composer`]'s.
-fn render_composer(
-    tree: &Tree,
-    ui: &Ui,
-    frame: &mut Layout,
-    area: Rect,
-    now: Now,
-    draft: prompt::Layout,
-) {
+fn render_composer(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now, draft: Draft) {
     frame.render_widget(Paragraph::new("").style(crate::dock::ground()), area);
     let drawing = crate::dock::draw(tree, ui, area.width as usize, now);
     frame.place(
@@ -839,32 +839,27 @@ fn render_composer(
     if let Some(search) = ui.focus.search() {
         frame.render_widget(Paragraph::new(search::row(search)), inner);
     } else {
-        render_draft(tree.viewed(), ui, frame, inner, draft, now);
+        let rows = draft.layout.lines.len().clamp(1, COMPOSER_ROWS)
+            + usize::from(draft.layout.lines.len() > COMPOSER_ROWS);
+        let above = inner
+            .height
+            .saturating_sub(rows as u16)
+            .min(draft.above.len() as u16);
+        let start = draft.above.len().saturating_sub(above as usize);
+        frame.render_widget(
+            Paragraph::new(draft.above.into_iter().skip(start).collect::<Vec<_>>()),
+            Rect {
+                height: above,
+                ..inner
+            },
+        );
+        let input = Rect {
+            y: inner.y + above,
+            height: inner.height - above,
+            ..inner
+        };
+        render_draft(tree.viewed(), ui, frame, input, draft.layout, now);
     }
-}
-
-/// The thumbnails, standing on the box's top border in the rows the frame
-/// cut for them, indented to the prompt's own column so a picture sits over
-/// the words it belongs to. A frame that cut no rows for it — the screen was
-/// too short — draws none of it: what is being typed matters more than what
-/// was pasted beside it.
-fn render_strip(frame: &mut Layout, area: Rect, strip: graphics::Band) {
-    let rows = strip.height();
-    if rows == 0 || area.height < rows {
-        frame.strip.clear();
-        return;
-    }
-    let indent = 3;
-    let band = Rect {
-        x: area.x + indent,
-        width: area.width.saturating_sub(indent),
-        ..area
-    };
-    frame
-        .cells
-        .extend(graphics::placed::cells(&strip.lines, band));
-    frame.strip = strip.pictures;
-    frame.render_widget(Paragraph::new(strip.lines), band);
 }
 
 /// The draft itself and the caret in it. `width` is the box's, borders and
@@ -1318,7 +1313,7 @@ mod tests {
     #[test]
     fn the_pending_area_draws_only_what_the_person_queued() {
         let mine = band(&[("tui", "also fix the docs", true)]);
-        assert!(mine.contains("› also fix the docs"), "{mine}");
+        assert!(mine.contains("also fix the docs"), "{mine}");
 
         let steer = band(&[("room", "the build is green", true)]);
         assert_eq!(
@@ -1332,7 +1327,7 @@ mod tests {
             ("room", "the build is green", true),
             ("tui", "also fix the docs", true),
         ]);
-        assert!(both.contains("› also fix the docs"), "{both}");
+        assert!(both.contains("also fix the docs"), "{both}");
         assert!(!both.contains("the build is green"), "{both}");
 
         assert_eq!(
@@ -1352,11 +1347,14 @@ mod tests {
     #[test]
     fn a_line_that_will_not_steer_wears_the_tag_and_the_busy_box_says_why() {
         let steers = band(&[("tui", "also fix the docs", true)]);
-        assert!(steers.contains("› also fix the docs"), "{steers}");
-        assert!(!steers.contains("(waits)"), "{steers}");
+        assert!(steers.contains("also fix the docs"), "{steers}");
+        assert!(steers.contains("at the next step"), "{steers}");
 
         let waits = band(&[("tui", "and then the docs", false)]);
-        assert!(waits.contains("› and then the docs (waits)"), "{waits}");
+        assert!(
+            waits.contains("and then the docs") && waits.contains("queued"),
+            "{waits}"
+        );
 
         assert!(waits.contains("Steer, or queue what comes next"), "{waits}");
         assert!(
@@ -1391,8 +1389,8 @@ mod tests {
         assert_eq!(rows(&[("room", "the build is green", true)]), 0);
         assert_eq!(
             rows(&[("tui", "also fix the docs", true)]),
-            2,
-            "the row and its air"
+            0,
+            "queued rows belong to the dock"
         );
     }
 
@@ -2011,131 +2009,26 @@ mod tests {
         );
     }
 
-    // ---- M48: the strip of thumbnails standing on the box -----------
-
-    /// A draft carrying pictures, as a person leaves it: the tokens in the
-    /// line and the pictures held behind them.
-    fn carrying(ui: &mut Ui, pictures: usize) {
-        for _ in 0..pictures {
-            crate::test_support::drafted(ui, bingo_pictures::testing::png(100, 200));
+    #[test]
+    fn images_stay_in_the_input_at_every_terminal_depth() {
+        for graphics in [crate::graphics::Graphics::Off, crate::graphics::drawing()] {
+            crate::graphics::with(graphics, || {
+                let (mut ui, now) = scene();
+                let state = state();
+                render(&state, &mut ui, now);
+                let region = ui.shown.regions.composer;
+                for _ in 0..5 {
+                    drafted(&mut ui, bingo_pictures::testing::png(40, 40));
+                }
+                let screen = render(&state, &mut ui, now);
+                assert!(screen.contains("[image 5]"));
+                assert!(!screen.contains(crate::graphics::kitty::PLACEHOLDER));
+                assert_eq!(region, ui.shown.regions.composer);
+                assert!(ui.shown.cells.is_empty());
+                ui.composer.clear();
+                assert!(!render(&state, &mut ui, now).contains("[image 1]"));
+            });
         }
-    }
-
-    /// The rows of the input box, from its top border down: the last box on
-    /// the screen, the welcome box being above it.
-    fn box_rows(screen: &str) -> Vec<String> {
-        let lines: Vec<&str> = screen.lines().collect();
-        let top = lines.len() - 4;
-        lines[top..]
-            .iter()
-            .take(2)
-            .map(|line| (*line).to_string())
-            .collect()
-    }
-
-    fn placeholder_rows(screen: &str) -> usize {
-        screen
-            .lines()
-            .filter(|line| line.contains(crate::graphics::kitty::PLACEHOLDER))
-            .count()
-    }
-
-    /// A pasted picture is three rows of cells standing on the box's top
-    /// border, and the box itself is exactly the height it was.
-    #[test]
-    fn a_carried_picture_puts_a_strip_on_the_box() {
-        let state = state();
-        let (mut ui, now) = scene();
-        let plain = render(&state, &mut ui, now);
-        crate::graphics::with(crate::graphics::drawing(), || {
-            carrying(&mut ui, 1);
-            let screen = render(&state, &mut ui, now);
-            assert_eq!(box_rows(&screen).len(), box_rows(&plain).len(), "{screen}");
-            assert_eq!(
-                placeholder_rows(&screen),
-                usize::from(graphics::band::ROWS),
-                "{screen}"
-            );
-            let lines: Vec<&str> = screen.lines().collect();
-            let top = usize::from(ui.shown.regions.composer.y);
-            assert!(
-                lines[top - usize::from(graphics::band::ROWS)..top]
-                    .iter()
-                    .all(|row| row.contains(crate::graphics::kitty::PLACEHOLDER)),
-                "the cells are the rows right above the border: {screen}"
-            );
-            let first = lines[top - usize::from(graphics::band::ROWS)].trim_start_matches('"');
-            assert!(
-                first.starts_with("   ") && first.chars().nth(3) != Some(' '),
-                "and stand in the prompt's own column: {screen}"
-            );
-            assert!(
-                box_rows(&screen)[1].contains("[image 1]"),
-                "the token is still in the words, on the box's first row: {screen}"
-            );
-        });
-    }
-
-    /// The line is the record: deleting the token takes the strip with it and
-    /// gives the transcript its rows back.
-    #[test]
-    fn deleting_the_token_takes_the_strip_with_it() {
-        let state = state();
-        let (mut ui, now) = scene();
-        crate::graphics::with(crate::graphics::drawing(), || {
-            let plain = render(&state, &mut ui, now);
-            carrying(&mut ui, 1);
-            assert_eq!(placeholder_rows(&render(&state, &mut ui, now)), 3);
-            ui.composer.clear();
-            let after = render(&state, &mut ui, now);
-            assert_eq!(placeholder_rows(&after), 0, "{after}");
-            assert_eq!(after, plain, "and the box is what it was");
-        });
-    }
-
-    /// Four thumbnails and a count of what would not fit.
-    #[test]
-    fn five_carried_pictures_show_four_and_a_count() {
-        let state = state();
-        let (mut ui, now) = scene();
-        crate::graphics::with(crate::graphics::drawing(), || {
-            carrying(&mut ui, 5);
-            let screen = render(&state, &mut ui, now);
-            assert!(screen.contains("+1"), "{screen}");
-            assert_eq!(ui.shown.strip.len(), graphics::band::SHOWN, "{screen}");
-        });
-    }
-
-    /// A terminal that draws no pictures gets no band: the tokens in the line
-    /// already say what is attached.
-    #[test]
-    fn a_terminal_that_draws_no_pictures_gets_no_strip() {
-        let state = state();
-        let (mut ui, now) = scene();
-        carrying(&mut ui, 2);
-        let screen = render(&state, &mut ui, now);
-        assert_eq!(placeholder_rows(&screen), 0, "{screen}");
-        assert!(screen.contains("[image 1]"), "{screen}");
-        assert!(ui.shown.strip.is_empty());
-    }
-
-    /// A room is posted into rather than asked, and its prompt keeps the
-    /// box's first row with the strip standing above the border.
-    #[test]
-    fn a_rooms_prompt_keeps_its_row_under_the_strip() {
-        let tree = room_tree(Vec::new());
-        let (mut ui, now) = scene();
-        crate::graphics::with(crate::graphics::drawing(), || {
-            carrying(&mut ui, 1);
-            let screen = render_tree(&tree, &mut ui, now);
-            let rows = box_rows(&screen);
-            let prompt = rows
-                .iter()
-                .position(|row| row.contains("[image 1]"))
-                .unwrap_or_else(|| panic!("the room's own prompt: {screen}"));
-            assert_eq!(prompt, 1, "{rows:?}");
-            assert_eq!(placeholder_rows(&screen), usize::from(graphics::band::ROWS));
-        });
     }
 
     /// The widest drawn row carrying the answer's own words. The welcome box
@@ -2177,9 +2070,9 @@ mod tests {
         let state = state();
         let (mut ui, now) = scene();
         crate::graphics::with(crate::graphics::drawing(), || {
-            carrying(&mut ui, 1);
+            drafted(&mut ui, bingo_pictures::testing::png(40, 40));
             let screen = draw_sized(80, 5, &state, &mut ui, now);
-            assert_eq!(placeholder_rows(&screen), 0, "{screen}");
+            assert!(!screen.contains(crate::graphics::kitty::PLACEHOLDER));
             assert!(screen.contains("[image 1]"), "{screen}");
         });
     }
@@ -2303,7 +2196,10 @@ mod placement_tests {
             &mut layout,
             Rect::new(0, 0, 80, 0),
             still(now),
-            ui.composer.layout(74),
+            Draft {
+                layout: ui.composer.layout(74),
+                above: Vec::new(),
+            },
         );
         assert_eq!(layout.deadline(), Some(later(now, 1100).instant));
     }

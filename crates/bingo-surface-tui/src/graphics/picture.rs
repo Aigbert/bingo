@@ -11,18 +11,14 @@ use bingo_sdk::{ContentPart, Image, ItemBody, ItemId, SessionState};
 use super::Cell;
 use super::kitty::MAX_CELLS;
 use super::linked::Linked;
-use crate::pictures::{Held, dest};
 
-/// Where a picture on the screen came from: the three places this surface has
+/// Where a picture on the screen came from: the two places this surface has
 /// one to draw.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Source {
     /// The journal: which item, and which of its pictures
     /// ([`pictures_of`]'s order).
     Journal { item: ItemId, part: usize },
-    /// The draft: a pasted picture behind the composer's line, under the
-    /// `[image N]` that names it (M45).
-    Draft { token: u32 },
     /// The words themselves: a `![what it is](path or URL)` an answer wrote,
     /// read in once per destination and kept there (M51). Two items that name
     /// the same picture are one picture, which is why this says nothing about
@@ -51,27 +47,17 @@ impl Source {
     pub fn id(&self) -> u32 {
         match self {
             Source::Journal { item, part } => hashed(item.as_str().as_bytes(), &part.to_le_bytes()),
-            Source::Draft { token } => DRAFT | hashed(b"draft", &token.to_le_bytes()),
             Source::Linked { dest } => LINKED | hashed(b"linked", dest.as_bytes()),
         }
     }
 
-    /// The picture itself, read back out of where it came from — one lookup
-    /// that knows all three places, so nothing that needs the bytes has a
-    /// second one. A draft's picture is a file (ADR-0052), and the memo that
-    /// reads an answer's paths reads it too: the composer holds where it is.
-    pub fn image_in<'a>(
-        &self,
-        state: &'a SessionState,
-        held: &'a Held,
-        linked: &'a Linked,
-    ) -> Option<&'a Image> {
+    /// Resolve a drawn picture from its journal parts or linked destination.
+    pub fn image_in<'a>(&self, state: &'a SessionState, linked: &'a Linked) -> Option<&'a Image> {
         match self {
             Source::Journal { item, part } => {
                 let found = state.transcript.get(item)?;
                 pictures_of(&found.body).get(*part).copied()
             }
-            Source::Draft { token } => linked.image(&dest(held.under(*token)?)),
             Source::Linked { dest } => linked.image(dest),
         }
     }
@@ -94,7 +80,6 @@ impl Picture {
 
 /// The two bits that say which kind of picture a number is, and the bits left
 /// for the hash. A journal picture wears neither.
-const DRAFT: u32 = 0x80_0000;
 const LINKED: u32 = 0x40_0000;
 const MASK: u32 = 0x3f_ffff;
 
@@ -186,14 +171,6 @@ mod tests {
         }
     }
 
-    fn draft(token: u32) -> Picture {
-        Picture {
-            source: Source::Draft { token },
-            cols: 1,
-            rows: 1,
-        }
-    }
-
     fn named(dest: &str) -> Picture {
         Picture {
             source: Source::Linked { dest: dest.into() },
@@ -226,8 +203,6 @@ mod tests {
             ..picture("itm_1", 0)
         };
         assert_eq!(bigger.id(), picture("itm_1", 0).id());
-        assert_eq!(draft(3).id(), draft(3).id());
-        assert_ne!(draft(3).id(), draft(4).id());
     }
 
     /// A picture the words named is its destination and nothing else: the
@@ -243,7 +218,6 @@ mod tests {
         for i in 0..2000 {
             for id in [
                 picture(&format!("itm_{i}"), i).id(),
-                draft(i as u32).id(),
                 named(&format!("{i}.png")).id(),
             ] {
                 assert!(id > 0 && id <= 0xff_ffff, "{id:#x}");
@@ -252,50 +226,17 @@ mod tests {
     }
 
     /// No two kinds of picture can share a number — not because a hash is
-    /// lucky, but because the three quarters of the range they sit in are
+    /// lucky, but because the two quarters of the range they sit in are
     /// disjoint. A number that collided would put the wrong picture on the
     /// screen.
     #[test]
-    fn the_three_kinds_of_picture_never_share_a_number() {
+    fn the_two_kinds_of_picture_never_share_a_number() {
         let journal: Vec<u32> = (0..4000)
             .map(|i| picture(&format!("itm_{i}"), i % 7).id())
             .collect();
-        let drafts: Vec<u32> = (0..4000u32).map(|token| draft(token).id()).collect();
         let named: Vec<u32> = (0..4000).map(|i| named(&format!("{i}.png")).id()).collect();
-        for (one, two) in [(&journal, &drafts), (&journal, &named), (&drafts, &named)] {
-            let one: std::collections::BTreeSet<u32> = one.iter().copied().collect();
-            assert!(two.iter().all(|id| !one.contains(id)));
-        }
-    }
-
-    /// The two places a picture may be, through one lookup. A draft's is
-    /// the file the composer holds, read by the memo (ADR-0052): nothing
-    /// until the read lands, the picture after.
-    #[test]
-    fn a_draft_is_read_out_of_the_file_the_composer_is_holding() {
-        let state = crate::test_support::folded(Vec::new());
-        let mut held = Held::default();
-        let path = std::path::PathBuf::from("/pasted/a.png");
-        let token = held.hold("", path.clone());
-        let mut linked = Linked::default();
-        assert_eq!(
-            draft(token).source.image_in(&state, &held, &linked),
-            None,
-            "not read yet"
-        );
-        linked.take(&dest(&path));
-        linked.answered(super::super::linked::Answer {
-            dest: dest(&path),
-            result: Ok(image("pasted")),
-        });
-        assert_eq!(
-            draft(token).source.image_in(&state, &held, &linked),
-            Some(&image("pasted"))
-        );
-        assert_eq!(
-            draft(token + 1).source.image_in(&state, &held, &linked),
-            None
-        );
+        let journal: std::collections::BTreeSet<u32> = journal.into_iter().collect();
+        assert!(named.iter().all(|id| !journal.contains(id)));
     }
 
     /// Where pictures live: a person's own parts and what a tool answered
@@ -372,24 +313,23 @@ mod tests {
                 },
             ),
         });
-        let held = Held::default();
         assert_eq!(
             picture("itm_9", 0)
                 .source
-                .image_in(&state, &held, &Linked::default()),
+                .image_in(&state, &Linked::default()),
             Some(&image("one"))
         );
         assert_eq!(
             picture("itm_9", 1)
                 .source
-                .image_in(&state, &held, &Linked::default()),
+                .image_in(&state, &Linked::default()),
             None,
             "no second part"
         );
         assert_eq!(
             picture("itm_8", 0)
                 .source
-                .image_in(&state, &held, &Linked::default()),
+                .image_in(&state, &Linked::default()),
             None,
             "no such item"
         );
