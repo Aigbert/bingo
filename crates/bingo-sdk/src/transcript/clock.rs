@@ -10,46 +10,49 @@ pub struct TurnClock {
     pub next_second: Option<Timestamp>,
 }
 
+/// Whether a turn is still working, waiting for a person, or over.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ends {
+    Live { asked: Option<Timestamp> },
+    Over,
+}
+
+impl Ends {
+    pub fn of(state: &SessionState, turn: &TurnId) -> Self {
+        if state.turn.as_ref().is_some_and(|live| &live.id == turn) {
+            Self::Live {
+                asked: state
+                    .interactions
+                    .iter()
+                    .filter(|ask| ask.turn.as_ref() == Some(turn))
+                    .map(|ask| ask.opened_at)
+                    .min(),
+            }
+        } else {
+            Self::Over
+        }
+    }
+}
+
 /// Read the same clock for live, newest and historical turns. An evicted or
 /// empty turn has no clock. Old receipts without `asked_at` imply no wait.
 pub fn clock(state: &SessionState, turn: &TurnId, now: Timestamp) -> Option<TurnClock> {
-    let items = turn_items(state, turn);
-    let start = items.first()?.started_at;
-    let (end, ticking) = end_of(state, turn, &items, now, start);
-    let elapsed = end.duration_since(start) - waiting(closed_waits(&items, start, end));
-    Some(TurnClock {
-        elapsed,
-        next_second: deadline(ticking, now, elapsed),
-    })
-}
-
-fn turn_items<'a>(state: &'a SessionState, turn: &TurnId) -> Vec<&'a Item> {
-    state
+    let items: Vec<_> = state
         .transcript
         .items()
         .iter()
         .filter(|item| item.turn.as_ref() == Some(turn))
         .map(AsRef::as_ref)
-        .collect()
+        .collect();
+    clock_of(&items, Ends::of(state, turn), now)
 }
 
-fn end_of(
-    state: &SessionState,
-    turn: &TurnId,
-    items: &[&Item],
-    now: Timestamp,
-    start: Timestamp,
-) -> (Timestamp, bool) {
-    if state.turn.as_ref().is_some_and(|live| &live.id == turn) {
-        let ask = state
-            .interactions
-            .iter()
-            .filter(|ask| ask.turn.as_ref() == Some(turn))
-            .map(|ask| ask.opened_at)
-            .min();
-        (ask.unwrap_or(now).max(start), ask.is_none())
-    } else {
-        (
+/// Measure one turn's ordered items, subtracting the union of recorded waits.
+pub fn clock_of(items: &[&Item], ends: Ends, now: Timestamp) -> Option<TurnClock> {
+    let start = items.first()?.started_at;
+    let (end, ticking) = match ends {
+        Ends::Live { asked } => (asked.unwrap_or(now).max(start), asked.is_none()),
+        Ends::Over => (
             items
                 .iter()
                 .filter_map(|item| item.completed_at)
@@ -57,8 +60,13 @@ fn end_of(
                 .unwrap_or(start)
                 .max(start),
             false,
-        )
-    }
+        ),
+    };
+    let elapsed = end.duration_since(start) - waiting(closed_waits(items, start, end));
+    Some(TurnClock {
+        elapsed,
+        next_second: deadline(ticking, now, elapsed),
+    })
 }
 
 fn closed_waits(items: &[&Item], start: Timestamp, end: Timestamp) -> Vec<(Timestamp, Timestamp)> {
@@ -80,7 +88,8 @@ fn deadline(ticking: bool, now: Timestamp, elapsed: SignedDuration) -> Option<Ti
     ticking.then(|| next_second(now, elapsed)).flatten()
 }
 
-fn next_second(now: Timestamp, elapsed: SignedDuration) -> Option<Timestamp> {
+/// When an elapsed duration next reaches a whole second.
+pub fn next_second(now: Timestamp, elapsed: SignedDuration) -> Option<Timestamp> {
     let remainder = elapsed.as_nanos() % 1_000_000_000;
     now.checked_add(SignedDuration::from_nanos(
         (1_000_000_000 - remainder) as i64,

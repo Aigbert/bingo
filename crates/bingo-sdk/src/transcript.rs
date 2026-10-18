@@ -2,7 +2,7 @@
 
 pub(crate) mod checkpoint;
 mod clock;
-pub use clock::{TurnClock, clock};
+pub use clock::{Ends, TurnClock, clock, clock_of, next_second};
 mod find;
 mod turns;
 pub use find::{Match, find, text};

@@ -172,3 +172,62 @@ fn successive_answered_asks_subtract_both_waits() {
     live(&mut s, "t");
     assert_eq!(read(&s, 4500), (1650, Some(at(4850))));
 }
+
+#[test]
+fn indexed_and_session_clocks_agree_across_waits_and_finished_turns() {
+    use bingo_sdk::transcript::{Ends, clock_of};
+    let mut s = state();
+    prompt(&mut s);
+    receipt(&mut s, Some(600));
+    let first = s.transcript.items().to_vec();
+    for (turn, offset) in [("open", 3000), ("done", 6000)] {
+        for original in &first {
+            let mut item = original.as_ref().clone();
+            item.id = bingo_sdk::ItemId::from_raw(format!("{turn}-{}", item.id));
+            item.turn = Some(TurnId::from_raw(turn));
+            item.started_at += jiff::SignedDuration::from_millis(offset);
+            item.completed_at = Some(item.started_at);
+            if let bingo_sdk::ItemBody::PermissionReceipt {
+                asked_at: Some(asked),
+                ..
+            } = &mut item.body
+            {
+                *asked += jiff::SignedDuration::from_millis(offset);
+            }
+            s.transcript.apply(&Event::ItemCompleted { item });
+        }
+    }
+    live(&mut s, "open");
+    s.interactions.push(serde_json::from_value(json!({
+        "id":"ask","session":"s","turn":"open","openedAt":at(5500),
+        "kind":{"kind":"question","question":"Where?","options":[],"freeText":true,"multi":false},
+        "answers":["text"]
+    })).unwrap());
+    for (turn, elapsed, next) in [
+        ("t", 7150, Some(at(9850))),
+        ("open", 650, None),
+        ("done", 500, None),
+    ] {
+        if turn != "done" {
+            live(&mut s, turn);
+        }
+        let id = TurnId::from_raw(turn);
+        let items: Vec<_> = s
+            .transcript
+            .items()
+            .iter()
+            .filter(|item| item.turn.as_ref() == Some(&id))
+            .map(AsRef::as_ref)
+            .collect();
+        for clock in [
+            clock_of(&items, Ends::of(&s, &id), at(9000)),
+            clock(&s, &id, at(9000)),
+        ] {
+            let clock = clock.unwrap();
+            assert_eq!(
+                (clock.elapsed.as_millis(), clock.next_second),
+                (elapsed, next)
+            );
+        }
+    }
+}
