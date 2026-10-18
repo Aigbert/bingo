@@ -1,6 +1,7 @@
 # ADR-0095 — The frame follows the approved prototype
 
-Status: proposed · 2026-10-16 · Amends: ADR-0084 §1, §5 · Refines: M73
+Status: proposed · 2026-10-16 · Amends: ADR-0084 §1, §5 · Refines: M73 · Amended by ADR-0097
+(2026-10-18): §1, §2, §6, §7 and `TurnFold` superseded, §3 refined, the prototype is Ember
 
 ## Context
 
@@ -81,3 +82,23 @@ every drawing that shows them (status, footer, header, receipts).
   answers none of the new sites.
 
 Supersedes: nothing. Refs: ADR-0064, ADR-0082, ADR-0084, ADR-0086, M73, M71.
+
+## Amendment — 2026-10-18 (ADR-0097)
+
+The approved prototype is now bingo Ember (`docs/design/ember/`). It replaces the frame (§1),
+the toasts (§2), the thinking fold (§6), the stop line (§7) and `TurnFold` (§8). §3 keeps M73
+for prose and takes Ember's chrome tokens. §4, §5 and §9 stand.
+
+- **The prototype is the spec, cell by cell.** Every scene has a capture of its characters and
+  ink tokens, exported from the prototype's own renderer. Every scene also has a `TestBackend`
+  test that renders the same state at the same size and moment. The test compares characters
+  exactly, and inks wherever the capture names a token. A tmux drive is still owed before a
+  release.
+- **Change the prototype before the code.** If a scene should look different, edit the
+  prototype first, rebuild it, re-export the captures, and only then change the code. The person
+  approves any change to what a scene shows.
+- **Sites.** `Step` carries its tool's look (mark, ASCII twin, verb) from the tool's
+  declaration. `Marks` keeps only the states that belong to no tool. `TurnFold` retires, and
+  `TurnDuration` draws on the band. `KeyBar` is drawn in the footer. Inside a turn, a step's
+  row is asked of `Ledger` once per row, so a mod may answer for its own steps.
+
