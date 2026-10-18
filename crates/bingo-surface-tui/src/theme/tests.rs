@@ -82,12 +82,12 @@ fn tints_follow_the_ground_without_recolouring_prose_or_accents() {
     let Colors::True(palette) = changed.colors else {
         panic!("truecolour")
     };
-    assert_ne!(palette.faint, DARK.faint);
-    assert_ne!(palette.add_tint, DARK.add_tint);
-    assert_eq!(palette.ember, DARK.ember);
+    assert_ne!(palette.faint(), DARK.faint());
+    assert_ne!(palette.add_tint(), DARK.add_tint());
+    assert_eq!(palette.ember(), DARK.ember());
     with(changed, || {
         assert_eq!(text().fg, Some(Color::Reset));
-        assert_eq!(dim().fg, Some(palette.dim));
+        assert_eq!(dim().fg, Some(palette.dim()));
     });
     let indexed = Ask {
         truecolor: false,
@@ -96,18 +96,18 @@ fn tints_follow_the_ground_without_recolouring_prose_or_accents() {
     };
     assert!(follows(indexed));
     with(detect(indexed, Some(reference_ground(true))), || {
-        assert_eq!(rule_style().fg, Some(nearest(LIGHT.faint)));
+        assert_eq!(rule_style().fg, Some(nearest(LIGHT.faint())));
     });
 }
 
 #[test]
 fn chrome_has_light_pairs_and_fixed_xterm_nearest_colours() {
     for (dark, light) in [
-        (DARK.faint, LIGHT.faint),
-        (DARK.muted, LIGHT.muted),
-        (DARK.code, LIGHT.code),
-        (DARK.well, LIGHT.well),
-        (DARK.pick, LIGHT.pick),
+        (DARK.faint(), LIGHT.faint()),
+        (DARK.muted(), LIGHT.muted()),
+        (DARK.code(), LIGHT.code()),
+        (DARK.well(), LIGHT.well()),
+        (DARK.pick(), LIGHT.pick()),
     ] {
         assert_ne!(dark, light);
     }
@@ -123,7 +123,7 @@ fn chrome_has_light_pairs_and_fixed_xterm_nearest_colours() {
                 assert!(matches!(presence().fg, Some(Color::Indexed(_))));
                 assert!(matches!(rule_style().fg, Some(Color::Indexed(_))));
                 assert_eq!(text().fg, Some(Color::Reset));
-                assert_eq!(dim().fg, Some(nearest(palette.dim)));
+                assert_eq!(dim().fg, Some(nearest(palette.dim())));
             },
         );
     }
@@ -466,14 +466,14 @@ type Token = (&'static str, fn(Palette) -> Color);
 
 /// Every token of §4's table, in the order the table lists them.
 const TOKENS: &[Token] = &[
-    ("raised", |p| p.you),
-    ("presence", |p| p.ember),
-    ("glow", |p| p.glow),
-    ("good", |p| p.good),
-    ("bad", |p| p.bad),
-    ("mode", |p| p.plan),
-    ("good_tint", |p| p.add_tint),
-    ("bad_tint", |p| p.del_tint),
+    ("raised", |p| p.you()),
+    ("presence", |p| p.ember()),
+    ("glow", |p| p.glow()),
+    ("good", |p| p.good()),
+    ("bad", |p| p.bad()),
+    ("mode", |p| p.plan()),
+    ("good_tint", |p| p.add_tint()),
+    ("bad_tint", |p| p.del_tint()),
 ];
 
 fn hex(colour: Color) -> String {
@@ -523,16 +523,16 @@ fn each_palette_reads_against_its_own_ground() {
             continue;
         }
         assert!(
-            luma(of(LIGHT)) < luma(LIGHT.you),
+            luma(of(LIGHT)) < luma(LIGHT.you()),
             "`{name}` must read on the light ground"
         );
         assert!(
-            luma(of(DARK)) > luma(DARK.you),
+            luma(of(DARK)) > luma(DARK.you()),
             "`{name}` must read on the dark one"
         );
     }
     assert!(
-        luma(DARK.you) < luma(LIGHT.you),
+        luma(DARK.you()) < luma(LIGHT.you()),
         "and each tint is at its own ground's end of the scale"
     );
 }
@@ -616,7 +616,7 @@ fn a_breath_is_five_steps_of_presence_on_twenty_four_bits() {
         assert_eq!(sampled[4], presence(), "the top of it is presence itself");
         assert_eq!(
             sampled[0],
-            Style::new().fg(scaled(DARK.ember, 0.65)),
+            Style::new().fg(scaled(DARK.ember(), 0.65)),
             "and the bottom is 65 % of it"
         );
         assert_eq!(breath(0.1), sampled[0], "a level between steps snaps");
@@ -638,11 +638,11 @@ fn a_ramp_the_eight_colours_cannot_draw_takes_its_two_ends() {
 #[test]
 fn a_ramp_on_twenty_four_bits_passes_between_its_ends() {
     with(dark(), || {
-        assert_eq!(pulse(0.0).fg, Some(DARK.ember));
-        assert_eq!(pulse(1.0).fg, Some(DARK.glow));
+        assert_eq!(pulse(0.0).fg, Some(DARK.ember()));
+        assert_eq!(pulse(1.0).fg, Some(DARK.glow()));
         let middle = pulse(0.5).fg.expect("a colour between the two");
-        assert_ne!(middle, DARK.ember);
-        assert_ne!(middle, DARK.glow);
+        assert_ne!(middle, DARK.ember());
+        assert_ne!(middle, DARK.glow());
     });
 }
 
@@ -652,10 +652,10 @@ fn a_ramp_on_twenty_four_bits_passes_between_its_ends() {
 #[test]
 fn a_ramp_towards_the_ink_ends_on_the_terminals_own() {
     with(dark(), || {
-        assert_eq!(comet(0.0).fg, Some(DARK.glow));
+        assert_eq!(comet(0.0).fg, Some(DARK.glow()));
         let cooling = comet(SETTLES / 2.0).fg.expect("a colour on the way");
-        assert_ne!(cooling, DARK.glow);
-        assert_ne!(cooling, DARK.ember);
+        assert_ne!(cooling, DARK.glow());
+        assert_ne!(cooling, DARK.ember());
         assert_eq!(comet(SETTLES), text(), "and the ink takes the rest");
         assert_eq!(comet(1.0), text());
         assert_eq!(self::cooling(1.0), text());
@@ -691,7 +691,7 @@ fn body_ink_is_terminal_owned_and_dim_uses_ember_or_a_modifier() {
         with(look, || {
             assert_eq!(text(), Style::new().fg(Color::Reset), "{:?}", look.colors);
             match look.colors {
-                Colors::True(palette) => assert_eq!(dim().fg, Some(palette.dim)),
+                Colors::True(palette) => assert_eq!(dim().fg, Some(palette.dim())),
                 _ => assert!(dim().add_modifier.contains(Modifier::DIM)),
             }
         });

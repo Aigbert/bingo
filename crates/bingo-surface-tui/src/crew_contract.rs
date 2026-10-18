@@ -71,7 +71,7 @@ fn crew_hues_use_the_prototype_identity_palette() {
                 "reviewer", "scout", "writer", "builder", "tester", "planner", "fox", "Scout",
             ] {
                 let color = face::style(name).fg.unwrap();
-                assert!(p.crew.contains(&color), "{name}: {color:?}");
+                assert!(p.crew().contains(&color), "{name}: {color:?}");
             }
         });
     }

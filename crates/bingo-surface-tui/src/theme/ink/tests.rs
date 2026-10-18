@@ -100,10 +100,13 @@ fn terminal_foreground_and_background_reblend_rounded_grounds() {
         (0xfafa, 0xf0f0, 0xe0e0),
         true,
     );
-    assert_eq!(palette.fg, rgb(0x203040));
-    assert_eq!(palette.bg, rgb(0xfaf0e0));
-    assert_eq!(palette.muted, mix(palette.fg, palette.bg, 0.32));
-    assert_eq!(palette.pick, mix(palette.you, LIGHT.glow, 0.17));
-    assert_eq!(palette.amber_tint, mix(palette.you, LIGHT.amber_glow, 0.12));
-    assert_eq!(palette.glow, LIGHT.glow);
+    assert_eq!(palette.fg(), rgb(0x203040));
+    assert_eq!(palette.bg(), rgb(0xfaf0e0));
+    assert_eq!(palette.muted(), mix(palette.fg(), palette.bg(), 0.32));
+    assert_eq!(palette.pick(), mix(palette.you(), LIGHT.glow(), 0.17));
+    assert_eq!(
+        palette.amber_tint(),
+        mix(palette.you(), LIGHT.amber_glow(), 0.12)
+    );
+    assert_eq!(palette.glow(), LIGHT.glow());
 }

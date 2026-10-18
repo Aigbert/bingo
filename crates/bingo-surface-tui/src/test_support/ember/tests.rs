@@ -99,6 +99,6 @@ fn wide_cells_reset_inks_and_spinner_sets_compare_as_terminal_cells() {
     };
     let mut buffer = Buffer::empty(Rect::new(0, 0, 4, 1));
     buffer.set_string(0, 0, "你", Style::default());
-    buffer.set_string(2, 0, "⠼", Style::new().fg(theme::LIGHT.glow));
+    buffer.set_string(2, 0, "⠼", Style::new().fg(theme::LIGHT.glow()));
     assert_band(&capture, Band::Frame, &buffer);
 }

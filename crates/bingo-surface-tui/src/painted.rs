@@ -214,16 +214,16 @@ fn existing_screen_uses_ember_inks_and_respects_terminal_depth() {
                             .0
                             .content
                             .iter()
-                            .any(|cell| cell.bg == theme::LIGHT.you)
+                            .any(|cell| cell.bg == theme::LIGHT.you())
                     );
                     assert!(
                         drawing
                             .0
                             .content
                             .iter()
-                            .any(|cell| cell.fg == theme::LIGHT.ember)
+                            .any(|cell| cell.fg == theme::LIGHT.ember())
                     );
-                    assert_eq!(theme::LIGHT.you, Color::Rgb(0xef, 0xea, 0xe8));
+                    assert_eq!(theme::LIGHT.you(), Color::Rgb(0xef, 0xea, 0xe8));
                 }
             }
         });

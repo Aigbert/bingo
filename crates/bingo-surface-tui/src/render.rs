@@ -251,7 +251,7 @@ mod tests {
                         assert_eq!(
                             terminal.backend().buffer()[(0, 0)].bg,
                             match look.colors {
-                                theme::Colors::True(palette) => palette.you,
+                                theme::Colors::True(palette) => palette.you(),
                                 _ => unreachable!(),
                             }
                         );
@@ -291,9 +291,9 @@ mod ember_tests {
         let theme::Colors::True(palette) = detection.render().look.colors else {
             panic!("truecolor");
         };
-        assert_ne!(palette.muted, theme::LIGHT.muted);
-        assert_ne!(palette.pick, theme::LIGHT.pick);
-        assert_eq!(palette.glow, theme::LIGHT.glow);
+        assert_ne!(palette.muted(), theme::LIGHT.muted());
+        assert_ne!(palette.pick(), theme::LIGHT.pick());
+        assert_eq!(palette.glow(), theme::LIGHT.glow());
         for (look, palette) in [
             (theme::Look::Light, theme::LIGHT),
             (theme::Look::Dark, theme::DARK),

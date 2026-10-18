@@ -138,7 +138,7 @@ pub fn detect_palette(
 
 #[cfg(test)]
 pub(crate) fn reference_ground(light: bool) -> (u16, u16, u16) {
-    let Color::Rgb(r, g, b) = (if light { LIGHT.bg } else { DARK.bg }) else {
+    let Color::Rgb(r, g, b) = (if light { LIGHT.bg() } else { DARK.bg() }) else {
         return (0, 0, 0);
     };
     (u16::from(r) * 257, u16::from(g) * 257, u16::from(b) * 257)
@@ -194,8 +194,8 @@ pub fn with<R>(theme: Theme, f: impl FnOnce() -> R) -> R {
 /// Identity colours belong only to agent sigils and names.
 pub fn crew(index: usize) -> Style {
     match current().colors {
-        Colors::True(palette) => Style::new().fg(palette.crew[index % 6]),
-        Colors::Indexed(palette) => Style::new().fg(nearest(palette.crew[index % 6])),
+        Colors::True(palette) => Style::new().fg(palette.crew()[index % 6]),
+        Colors::Indexed(palette) => Style::new().fg(nearest(palette.crew()[index % 6])),
         _ => text(),
     }
 }
@@ -219,8 +219,8 @@ pub fn dim() -> Style {
 /// The bar behind a `>` line, a card's surface, a placed view. Never text.
 pub fn raised() -> Style {
     match current().colors {
-        Colors::True(palette) => Style::new().bg(palette.you),
-        Colors::Indexed(palette) => Style::new().bg(nearest(palette.you)),
+        Colors::True(palette) => Style::new().bg(palette.you()),
+        Colors::Indexed(palette) => Style::new().bg(nearest(palette.you())),
         _ => Style::new(),
     }
 }
@@ -228,37 +228,37 @@ pub fn raised() -> Style {
 /// bingo's own colour: the sparkle, a running step, a card's border, the focused
 /// row. The one warm colour, and the only one that moves.
 pub fn presence() -> Style {
-    current().fg(Color::Yellow, |p| p.ember)
+    current().fg(Color::Yellow, |p| p.ember())
 }
 
 /// The bright half of a pulse: everything that breathes moves between this
 /// and [`presence`]. Views reach it through [`pulse`] and [`comet`] rather
 /// than directly, because what moves is a phase and not a colour.
 pub fn glow() -> Style {
-    current().fg(Color::LightYellow, |p| p.glow)
+    current().fg(Color::LightYellow, |p| p.glow())
 }
 
 pub fn good() -> Style {
-    current().fg(Color::Green, |p| p.good)
+    current().fg(Color::Green, |p| p.good())
 }
 
 pub fn bad() -> Style {
-    current().fg(Color::Red, |p| p.bad)
+    current().fg(Color::Red, |p| p.bad())
 }
 
 /// The `⏵⏵` on the status line, and links — the one cool colour.
 pub fn mode() -> Style {
-    current().fg(Color::Blue, |p| p.plan)
+    current().fg(Color::Blue, |p| p.plan())
 }
 
 /// A diff's rows: `good` and `bad` on their own tints, which only 24 bits can
 /// draw; the column's `+` and `-` carry it everywhere else.
 pub fn added() -> Style {
-    tinted(good(), |p| p.add_tint)
+    tinted(good(), |p| p.add_tint())
 }
 
 pub fn removed() -> Style {
-    tinted(bad(), |p| p.del_tint)
+    tinted(bad(), |p| p.del_tint())
 }
 
 fn tinted(fg: Style, tint: fn(Palette) -> Color) -> Style {
@@ -301,7 +301,7 @@ pub fn breath(level: f32) -> Style {
         Colors::Plain => Style::new(),
         Colors::Ansi | Colors::Indexed(_) => two_ways(level, dim(), presence()),
         Colors::True(palette) => Style::new().fg(scaled(
-            palette.ember,
+            palette.ember(),
             BREATH_FLOOR + (1.0 - BREATH_FLOOR) * level,
         )),
     }
@@ -312,7 +312,7 @@ pub fn pulse(level: f32) -> Style {
     match current().colors {
         Colors::Plain => Style::new(),
         Colors::Ansi | Colors::Indexed(_) => two_ways(level, presence(), glow()),
-        Colors::True(palette) => Style::new().fg(mix(palette.ember, palette.glow, level)),
+        Colors::True(palette) => Style::new().fg(mix(palette.ember(), palette.glow(), level)),
     }
 }
 
@@ -328,7 +328,7 @@ pub fn comet(age: f32) -> Style {
         Colors::Plain => Style::new(),
         Colors::Ansi | Colors::Indexed(_) => two_ways(age, glow(), text()),
         Colors::True(palette) if age < SETTLES => {
-            Style::new().fg(mix(palette.glow, palette.ember, age / SETTLES))
+            Style::new().fg(mix(palette.glow(), palette.ember(), age / SETTLES))
         }
         Colors::True(_) => text(),
     }
@@ -745,7 +745,7 @@ pub fn blend_style(style: Style, with: &str, weight: f64) -> Option<Style> {
     let palette = palette();
     let from = match style.fg {
         Some(Color::Rgb(r, g, b)) => Color::Rgb(r, g, b),
-        _ => palette.fg,
+        _ => palette.fg(),
     };
     let to = palette.named(with)?;
     let color = ink::mix(from, to, weight);

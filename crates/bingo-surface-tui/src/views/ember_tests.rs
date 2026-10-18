@@ -151,8 +151,8 @@ fn fades_finish_and_nested_spinners_wake_on_their_own_beat() {
             })),
             ..Default::default()
         });
-        assert_eq!(draw(&fade, now)[(0, 0)].fg, theme::LIGHT.glow);
-        assert_eq!(draw(&fade, later(now, 420))[(0, 0)].fg, theme::LIGHT.good);
+        assert_eq!(draw(&fade, now)[(0, 0)].fg, theme::LIGHT.glow());
+        assert_eq!(draw(&fade, later(now, 420))[(0, 0)].fg, theme::LIGHT.good());
         assert!(next_change(&fade, later(now, 420)).is_none());
         let spin = view(TextStyle {
             motion: Some(Box::new(TextMotion::Spin)),
@@ -284,7 +284,7 @@ fn box_grounds_stop_at_the_box_and_preserve_nested_grounds() {
         let buffer = draw(&view, scene().1);
         assert_eq!(buffer[(0, 0)].bg, Color::Reset);
         for x in 1..7 {
-            assert_eq!(buffer[(x, 0)].bg, theme::LIGHT.well);
+            assert_eq!(buffer[(x, 0)].bg, theme::LIGHT.well());
         }
         assert_eq!(buffer[(7, 0)].bg, Color::Reset);
     });
