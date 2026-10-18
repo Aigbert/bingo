@@ -91,9 +91,9 @@ Drawing them is M194 part B's.
   - the newest turn and an older one read alike.
 - [x] Read tests: `N lines` for a whole read and for a partial read of the same file, and `W×H`
       for a picture.
-- [ ] `--print` and RPC black-box tests pass. A test that pins whole JSON is re-pinned only for
+- [x] `--print` and RPC black-box tests pass. A test that pins whole JSON is re-pinned only for
       the new optional fields, and each such test is named in Verified.
-- [ ] Gates, one at a time, and the Windows check for each crate touched.
+- [x] Gates, one at a time, and the Windows check for each crate touched (host toolchain limits below).
 
 ## Non-goals
 
@@ -115,34 +115,34 @@ Drawing them is M194 part B's.
 
 ## Verified
 
-- [x] Contracts precede producers: `6e0d5cc2` and `28ca9900`; schemas/types accompany their fields.
+- [x] Contract tests precede fields and producers; all schemas/types and mechanical compatibility accompany the fields (including former `16784ab4`).
 - [x] `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --lib --test why_and_time --locked` → exit 0; optional interruption timestamp round-trips; old item fixtures omit new fields.
 - [x] Schema generators: plugin-rpc `--lib` → `132 passed`; surface-rpc `--lib schema` → `6 passed`; mods `--lib schema_and_types_are_generated_from_the_same_rows` → `1 passed` (each with `BINGO_UPDATE_SCHEMA=1`, `--locked`).
-- [x] `cargo test -p bingo --test kernel provenance --locked` → three real-ladder reads failed before B1, then `3 passed`; bypass/settings/session reads have no reason.
-- [x] `cargo test -p bingo-core -p bingo-permissions --lib --locked` → core `682 passed`; permissions `114 passed` in final targeted runs; deny/ask precedence and untrusted reads remain intact.
-- [x] B2/B3: `cargo test -p bingo-core --lib session::tests::receipts --locked` → four failures before fixes; final core run passes all six receipt/stop/wait tests, with immediate-denial feedback preserved.
+- [x] `cargo test -p bingo --test kernel provenance --locked` → three real-ladder reads failed before B1, then passed; final kernel suite has `32 passed`, including the non-read bypass guard.
+- [x] `cargo test -p bingo-core -p bingo-permissions --lib --locked` → core `689 passed`; permissions `114 passed` in final targeted runs; deny/ask precedence and untrusted reads remain intact.
+- [x] B2/B3: `cargo test -p bingo-core --lib session::tests::receipts --locked` → four failures before fixes; final core run passes all six receipt/stop/wait tests plus six recording guards; four round-3 failures became green. Dropped-stamp mutation fails, restored passes.
 - [x] `cargo test -p bingo-sdk --test turn_clock --test why_and_time --locked` → `11 passed`, `2 passed`; interruption clock test failed before the fix. No production clock caller.
 - [x] `cargo test -p bingo-tool-fs -p bingo-store-jsonl --lib --locked` → `91 passed`, `74 passed`; singular-line and original-dimensions tests both failed before fixes.
-- [x] Store replay plants the recorded pre-M201 `frames-v1.jsonl`, folds five items, omits new fields, retains a 6,039 µs clock, and leaves journal bytes unchanged.
+- [x] Store replay plants the recorded pre-M201 `frames-v1.jsonl`, folds eight items including all three legacy wait-closing kinds; clocks stay 6,039 µs / 2 s and journal bytes are unchanged.
 - [x] `node --test sdk/typescript/src/*.test.ts` → `tests 33`, `pass 33`, `fail 0`; deleted the vacuous provenance test, leaving plugin-kit's expected count unchanged.
 - [x] `cargo fmt --all -- --check` → exit 0; `scripts/check_discipline.sh` → `discipline ok` (existing warnings).
-- [x] `scripts/budget.sh` → `dependencies (unique, normal): 423 (max 423)`, `budget ok`; no dependency added; target/debug 15 GB exceeds the soft 5 GB limit.
+- [x] `scripts/budget.sh` → `dependencies (unique, normal): 423 (max 423)`, `budget ok`; no dependency added; target/debug 17 GB exceeds the soft 5 GB limit.
 - [x] `cargo deny check` → `advisories ok, bans ok, licenses ok, sources ok`.
-- [ ] `cargo check --workspace --all-targets --locked` → exit 101: TUI `transcript.rs:424` pattern must ignore the new field (E0027).
-- [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings` → exit 101, same pattern.
-- [ ] `cargo test --workspace --locked` → exit 101, same pattern; no wall-clock test failure.
-- [ ] `cargo test -p bingo --test cli --test rpc --test kernel --test plugin_kit --locked` → exit 101, same pattern; no black-box re-pins.
+- [x] `cargo check --workspace --all-targets --locked` → exit 0, also at each of the nine commits via the requested rebase -x walk.
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings` → exit 0.
+- [x] `cargo test --workspace --locked` → exit 0; summed suite results: `6508 passed; 0 failed; 0 ignored`. No wall-clock failures or retries.
+- [x] `cargo test -p bingo --test cli --test rpc --test kernel --test plugin_kit --locked` → CLI/print `309 passed`, RPC `104`, kernel `32`, plugin-kit `35`; no re-pins.
 - Windows: `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` → sdk/core/store-jsonl/agents/checkpoints/context/rooms exit 0.
-- Windows: permissions → tree-sitter headers; pictures/tool-fs/print/tui → aws-lc-sys headers; bingo → aws-lc-sys/rquickjs-sys headers (exit 101, accepted host limits).
+- Windows: permissions → tree-sitter headers; pictures/tool-fs/print/tui → aws-lc-sys headers; bingo → aws-lc-sys/tree-sitter headers plus rquickjs-sys MSVC flags rejected by host cc (exit 101, host limits).
 - Shapes: `allowedBy: Option<Box<Reason>>` reuses policy provenance compactly; optional `Rule.source` distinguishes settings/session. Trusted reads retain ReadOnly unless a hook allows them.
 - Shapes: optional `askedAt` on receipts/questions/interruptions preserves the opening instant; existing item time supplies the end. Absence is omitted; no duration is stored.
 - B2 withdraws actor approval receipts and reconciliation: the gate writes one final receipt with the settling interaction and first opening time. Deny/question answers retain dev's actor writers; exact interaction-id dedup never rewrites receipts.
 - Allow receipts again follow the ack; `a_permission_is_answered_once_and_late_answers_are_rejected` restores dev's expectation. An edited call asked again then denied retains that final ask's own opening time in the actor's Deny receipt.
 - B3 replaces cancellation receipts with an interruption timestamp: the running turn holds the earliest open ask only until the actor stamps the interruption, including dropped turns. Explicit question Cancel still means skipped; interrupted asks add no answer to context.
-- B4/clock helpers split marking Running, selecting items/end/waits/deadline; overlapping waits and skew clamping are unchanged.
+- B4/clock helpers split marking Running, selecting items/end/waits/deadline; agent_turn is 49 lines, resolve_check 60. The sharing test stays moved to respect the 1,000-line file limit.
 - Read reports total lines (including partial reads), singular `1 line`, and original file dimensions using the existing header reader; model parts are unchanged.
-- Deleted the one-reader reason fixture; core tests use an inline opaque mode, and the binary tests cover the real bypass ladder. Hook allows on reads still record Hook.
-- Plan findings retained: legacy HookOutcome has no Allow; a full tool.check interceptor does. Input items precede TurnStarted slightly, so the clock follows the specified first-item start.
+- Failed prompters (including judge Mailbox) now deny with "Permission interaction closed", no receipt; dev produced a Cancel/Deny receipt. Deny/ask rules record Settings source because both lists are settings-only.
+- M202 handoff: turn-end hooks see the turn's Interruption with asked_at None while the journal has the stamp. Input items precede TurnStarted slightly; queued messages are stamped when their own turn lands.
 - Other surfaces unchanged: ACP bridge/shape::refused carries refusal text; channel-adapter question::ladder carries permission summaries; neither renders automatic allow provenance or turn duration. Feishu's footer uses usage.
-- Scope: accepted TUI compatibility remains; new interruption literals receive None. One additional `{ marker, .. }` pattern is prepared in `/tmp/m201-interruption-pattern.patch`, awaiting the exact-scope exception requested from the user.
-- Owed: apply that pattern, rewrite history once (including folding TUI literals into the field commit), then repeat full gates/black-box checks. No history rewrite has occurred during fixes.
+- Scope: approved compatibility only in TUI: nine original files plus interruption None in component/facts, screens, test_support/worked, view, and `{ marker, .. }` in transcript. Ledger untouched.
+- Round 3: rebased onto `32d6113d`; regeneration changed nothing. Publish only publishes; emit/dropped-turn stamp, and all four receipt paths share recording/refresh. [Evidence and handoff](../verification/m201/round-3.md).
