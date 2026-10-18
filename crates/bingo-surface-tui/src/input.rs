@@ -1249,6 +1249,7 @@ mod tests {
     fn shift_tab_types_only_a_mode_word_and_signs_the_rest_as_the_placer() {
         let placed = |next: bingo_sdk::Action| {
             let item = |label: &str, action| bingo_sdk::ActionItem {
+                meaning: None,
                 label: label.into(),
                 action,
                 key: None,
@@ -1312,6 +1313,7 @@ mod tests {
             current: "acme".into(),
             modes: ["acme", "bypassPermissions"]
                 .map(|mode| bingo_sdk::ActionItem {
+                    meaning: None,
                     label: mode.into(),
                     key: None,
                     action: bingo_sdk::Action {
@@ -3295,6 +3297,7 @@ mod m148 {
                 badge: None,
                 caption: None,
                 body: Some(bingo_sdk::View::text("table")),
+                    meaning: None,
                 actions: vec![ActionItem {
                     label: "Tick".into(),
                     key: None,

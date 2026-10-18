@@ -114,6 +114,7 @@ mod tests {
         let tree = solo(&state);
         let (mut ui, now) = scene();
         let item = ActionItem {
+            meaning: None,
             label: "Hide".into(),
             key: Some('h'),
             action: bingo_sdk::Action {

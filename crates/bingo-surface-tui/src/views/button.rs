@@ -21,6 +21,7 @@ pub fn lines(
     let mut lines = if let Some(action) = &props.on_press {
         super::actions::lines(
             &[ActionItem {
+                meaning: None,
                 label,
                 action: action.clone(),
                 key: props.hotkey,

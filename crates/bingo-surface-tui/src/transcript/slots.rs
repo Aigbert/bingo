@@ -217,6 +217,7 @@ pub(crate) mod fixtures {
                         caption: None,
                         body: None,
                         actions: vec![bingo_sdk::ActionItem {
+                            meaning: None,
                             label: "background".into(),
                             action: bingo_sdk::Action {
                                 name: "bash.promote".into(),
@@ -258,6 +259,7 @@ pub(crate) mod fixtures {
                             badge: Some("sample".into()),
                             body: None,
                             actions: vec![bingo_sdk::ActionItem {
+                                meaning: None,
                                 label: "open".into(),
                                 action: bingo_sdk::Action {
                                     name: "stranger.open".into(),

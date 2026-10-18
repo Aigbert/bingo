@@ -8,6 +8,8 @@ export type ActionItem = {
   /** A single-key hint; the surface may use another key. */
   "key"?: (string | null);
   "label": string;
+  /** A one-line explanation supplied by the action owner. */
+  "meaning"?: (string | null);
   [key: string]: unknown;
 };
 export type ActionProps = { "args": unknown; "name": string; "result"?: unknown; "status": ItemStatus; [key: string]: unknown; };
@@ -733,7 +735,7 @@ export type ItemStatus = ("pending" | "running" | "completed" | "failed" | "inte
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
 /** An error as it appears on the wire and in the journal. */
 export type KernelError = { "code": ErrorCode; "message": string; [key: string]: unknown; };
-export type KeyBarProps = { "pairs": Array<KeyPair>; "toast"?: (KeyToast | null); [key: string]: unknown; };
+export type KeyBarProps = { "pairs": Array<KeyPair>; [key: string]: unknown; };
 /**
  * A chord a command declares for itself. A bare chord runs the command
  * alone; one with `args` submits the command with them, so a shortcut for
@@ -741,7 +743,6 @@ export type KeyBarProps = { "pairs": Array<KeyPair>; "toast"?: (KeyToast | null)
  */
 export type KeyBinding = (string | { "args": string; "chord": string; [key: string]: unknown; });
 export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
-export type KeyToast = { "about"?: (string | null); "level": Level; "text": string; [key: string]: unknown; };
 /** The `Ledger` site: the rows of a running turn's steps. */
 export type LedgerProps = {
   /** What each row starts with. */

@@ -132,6 +132,13 @@
     "ActionItem": {
       "type": "object",
       "properties": {
+        "meaning": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A one-line explanation supplied by the action owner."
+        },
         "label": {
           "type": "string"
         },
@@ -5334,16 +5341,6 @@
           "items": {
             "$ref": "#/$defs/KeyPair"
           }
-        },
-        "toast": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/KeyToast"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "required": [
@@ -5390,27 +5387,6 @@
       "required": [
         "keys",
         "action"
-      ]
-    },
-    "KeyToast": {
-      "type": "object",
-      "properties": {
-        "about": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "text": {
-          "type": "string"
-        },
-        "level": {
-          "$ref": "#/$defs/Level"
-        }
-      },
-      "required": [
-        "text",
-        "level"
       ]
     },
     "LedgerProps": {

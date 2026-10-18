@@ -88,6 +88,7 @@ impl Promotions {
                 badge: None,
                 body: None,
                 actions: vec![bingo_sdk::ActionItem {
+                    meaning: None,
                     label: "background".into(),
                     action: bingo_sdk::Action {
                         name: ACTION.into(),
@@ -198,6 +199,7 @@ mod tests {
                 caption: None,
                 body: None,
                 actions: vec![bingo_sdk::ActionItem {
+                    meaning: None,
                     label: "background".into(),
                     action: bingo_sdk::Action {
                         name: "bash.promote".into(),

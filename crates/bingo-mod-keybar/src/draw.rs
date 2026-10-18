@@ -52,18 +52,11 @@ mod tests {
     use super::*;
     use bingo_sdk::component::KeyPair;
     #[test]
-    fn narrow_widths_drop_whole_pairs_from_the_left_and_ignore_toasts() {
-        let mut props = KeyBarProps {
+    fn narrow_widths_drop_whole_pairs_from_the_left() {
+        let props = KeyBarProps {
             pairs: vec![KeyPair::new("↑↓", "pick"), KeyPair::new("esc", "close")],
-            toast: None,
         };
         assert_eq!(tree(&props, 12).fold().trim(), "esc close");
         assert!(tree(&props, 3).fold().trim().is_empty());
-        props.toast = Some(bingo_sdk::component::KeyToast {
-            about: None,
-            text: "saved".into(),
-            level: bingo_sdk::Level::Info,
-        });
-        assert_eq!(tree(&props, 80).fold().trim(), "↑↓ pick   esc close");
     }
 }

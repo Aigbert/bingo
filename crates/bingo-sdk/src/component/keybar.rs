@@ -4,7 +4,6 @@ use super::*;
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct KeyBarProps {
     pub pairs: Vec<KeyPair>,
-    pub toast: Option<KeyToast>,
 }
 impl KeyBarProps {
     /// The pairs that fit in `width` cells, kept whole from the right, and the
@@ -98,7 +97,6 @@ mod tests {
                 KeyPair::new("", "ccc"),
                 KeyPair::new("esc", "close"),
             ],
-            toast: None,
         };
         let fit = |width| {
             let (pairs, used) = props.fitting(width, str::len);

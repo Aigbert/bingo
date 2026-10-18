@@ -29,6 +29,7 @@ fn actions() -> Vec<ActionItem> {
     [("Tick", "hello.tick"), ("Reset", "hello.reset")]
         .into_iter()
         .map(|(label, name)| ActionItem {
+            meaning: None,
             label: label.into(),
             action: Action {
                 name: name.into(),

@@ -47,16 +47,19 @@ fn actions() -> View {
     View::Actions {
         items: vec![
             ActionItem {
+                meaning: None,
                 label: "Approve".into(),
                 action: action("board.tick"),
                 key: None,
             },
             ActionItem {
+                meaning: None,
                 label: "Next".into(),
                 action: action("board.next"),
                 key: None,
             },
             ActionItem {
+                meaning: None,
                 label: "Skip".into(),
                 action: action("board.skip"),
                 key: Some('s'),

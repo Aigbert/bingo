@@ -383,6 +383,7 @@ mod mode_contract {
 
     fn item(label: &str, value: &str) -> ActionItem {
         ActionItem {
+            meaning: None,
             label: label.into(),
             key: None,
             action: crate::Action {

@@ -49,6 +49,7 @@ pub fn board_view() -> View {
             View::Actions {
                 items: vec![
                     bingo_sdk::ActionItem {
+                        meaning: None,
                         label: "Tick".into(),
                         action: bingo_sdk::Action {
                             name: "board.tick".into(),
@@ -57,6 +58,7 @@ pub fn board_view() -> View {
                         key: None,
                     },
                     bingo_sdk::ActionItem {
+                        meaning: None,
                         label: "Reset".into(),
                         action: bingo_sdk::Action {
                             name: "board.reset".into(),
@@ -124,6 +126,7 @@ fn stranger_payload() -> Value {
                 current: "awake".into(),
                 modes: ["rest", "awake"]
                     .map(|label| ActionItem {
+                        meaning: None,
                         label: label.into(),
                         action: Action {
                             name: "stranger.choose".into(),
@@ -378,6 +381,23 @@ pub fn plugin_view(plugin: &str, value: Value) -> Event {
             .into_iter()
             .flatten()
             .map(|mode| bingo_sdk::ActionItem {
+                meaning: Some(
+                    match mode.as_str().unwrap() {
+                        "default" => "trusted read-only tools run; everything else asks",
+                        "acceptEdits" => {
+                            "edits inside the working directories run without a prompt"
+                        }
+                        "plan" => "nothing that is not read-only runs at all",
+                        "bypassPermissions" => {
+                            "everything runs except what only a person may decide"
+                        }
+                        "dontAsk" => {
+                            "nobody is there to answer, so what would have asked is denied"
+                        }
+                        _ => "",
+                    }
+                    .into(),
+                ),
                 label: match mode.as_str().unwrap() {
                     "acceptEdits" => "accept edits",
                     "bypassPermissions" => "bypass",

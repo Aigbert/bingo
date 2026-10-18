@@ -135,6 +135,7 @@ mod tests {
                 [bingo_sdk::slot::Slot::Mode {
                     current: "acceptEdits".into(),
                     modes: vec![bingo_sdk::ActionItem {
+                        meaning: None,
                         label: "accept edits".into(),
                         key: None,
                         action: bingo_sdk::Action {

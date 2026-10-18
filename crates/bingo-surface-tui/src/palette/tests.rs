@@ -172,6 +172,7 @@ fn setup() -> (SessionState, Ui, Now) {
             [slot::Slot::Mode {
                 current: "default".into(),
                 modes: vec![ActionItem {
+                    meaning: None,
                     label: "default".into(),
                     action: Action {
                         name: "permission".into(),

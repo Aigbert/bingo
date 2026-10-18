@@ -1,4 +1,4 @@
-//! One fixed row, projected from the current owner and the live keymap.
+//! Footer pairs projected from the current owner and the live keymap.
 mod sealed;
 mod site;
 use crate::{clock::Now, layout::Layout, theme, tree::Tree, ui::Ui};
@@ -29,7 +29,7 @@ pub fn draw(
             pair
         })
         .collect();
-    let props = Props::KeyBar(KeyBarProps { pairs, toast: None });
+    let props = Props::KeyBar(KeyBarProps { pairs });
     if tree.open_interaction().is_some() {
         return own(&props, width).into();
     }
@@ -180,14 +180,7 @@ pub fn hints(
     _: &mut Vec<crate::pulled::Key>,
 ) -> Line<'static> {
     let pairs = resting(tree, ui, now);
-    own(
-        &Props::KeyBar(KeyBarProps {
-            pairs,
-            toast: crate::toast::current(ui, tree.viewed(), now),
-        }),
-        width,
-    )
-    .remove(0)
+    own(&Props::KeyBar(KeyBarProps { pairs }), width).remove(0)
 }
 
 #[cfg(test)]

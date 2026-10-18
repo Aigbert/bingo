@@ -237,6 +237,7 @@ impl PermissionPolicy for PermissionsPolicy {
                     .cycle()
                     .iter()
                     .map(|mode| bingo_sdk::ActionItem {
+                        meaning: Some(mode.meaning().to_owned()),
                         label: mode.label().to_string(),
                         key: None,
                         action: bingo_sdk::Action {
@@ -358,6 +359,7 @@ mod tests {
         assert_eq!(modes.len(), Mode::Default.cycle().len());
         for (item, mode) in modes.iter().zip(Mode::ALL) {
             assert_eq!(item.label, mode.label());
+            assert_eq!(item.meaning.as_deref(), Some(mode.meaning()));
             assert_eq!(item.action.name, "permission");
             assert_eq!(item.action.args, json!(mode));
         }

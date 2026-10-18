@@ -260,6 +260,9 @@ pub struct TreeNode {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ActionItem {
+    /// A one-line explanation supplied by the action owner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub meaning: Option<String>,
     pub label: String,
     pub action: Action,
     /// A single-key hint; the surface may use another key.

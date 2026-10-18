@@ -401,11 +401,7 @@
           "action": "close",
           "emphasis": false
         }
-      ],
-      "toast": {
-        "text": "Saved",
-        "level": "info"
-      }
+      ]
     }
   },
   {

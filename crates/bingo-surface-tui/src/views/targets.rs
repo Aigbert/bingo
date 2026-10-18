@@ -38,6 +38,7 @@ pub(super) fn mask(view: &View, lines: Vec<Line<'static>>, marks: &Marks) -> Vec
         let mut targets = targets.borrow_mut();
         let symbol = char::from_u32(FIRST + targets.len() as u32).unwrap_or(' ');
         targets.push(ActionItem {
+            meaning: None,
             label: String::new(),
             key: button.hotkey,
             action: action.clone(),

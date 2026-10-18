@@ -97,11 +97,13 @@ fn every_node() -> Vec<(View, &'static str)> {
             View::Actions {
                 items: vec![
                     ActionItem {
+                        meaning: None,
                         label: "Approve".into(),
                         action: action("board.tick"),
                         key: Some('1'),
                     },
                     ActionItem {
+                        meaning: None,
                         label: "Next".into(),
                         action: action("board.next"),
                         key: None,
@@ -352,4 +354,21 @@ fn an_unknown_node_inside_a_known_one_folds_in_place() {
     }))
     .expect("a panel around a word from the future is still a panel");
     assert_eq!(view.fold(), "Board\nAAPL 1 2");
+}
+
+#[test]
+fn round2_action_meaning_is_optional_and_round_trips() {
+    let old = serde_json::json!({"label":"plan", "action":{"name":"permission","args":"plan"}});
+    let item: super::ActionItem = serde_json::from_value(old.clone()).unwrap();
+    assert_eq!(serde_json::to_value(item).unwrap(), old);
+    let mut wire = old;
+    wire["meaning"] = serde_json::json!("a policy-owned sentence");
+    let item: super::ActionItem = serde_json::from_value(wire.clone()).unwrap();
+    assert_eq!(serde_json::to_value(item).unwrap(), wire);
+}
+
+#[test]
+fn round2_keybar_has_only_pairs() {
+    let wire = serde_json::to_value(crate::component::KeyBarProps::default()).unwrap();
+    assert_eq!(wire, serde_json::json!({"pairs":[]}));
 }

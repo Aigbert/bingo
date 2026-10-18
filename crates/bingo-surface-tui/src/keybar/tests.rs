@@ -1,6 +1,6 @@
 use super::*;
 use crate::test_support::*;
-use bingo_sdk::{View, component::KeyToast};
+use bingo_sdk::View;
 use ratatui::{Terminal, backend::TestBackend, widgets::Paragraph};
 
 #[test]
@@ -46,7 +46,6 @@ fn a_toast_replaces_the_previous_one_without_moving_the_frame() {
 fn keys_are_muted_actions_are_dim_and_pairs_have_three_spaces() {
     let props = Props::KeyBar(KeyBarProps {
         pairs: vec![KeyPair::new("↑↓", "pick"), KeyPair::new("esc", "close")],
-        toast: None,
     });
     let line = own(&props, 80).remove(0);
     assert_eq!(line.spans[0].style, theme::foreground("muted").unwrap());
@@ -90,22 +89,6 @@ fn the_keybar_is_replaceable_when_no_ask_is_open() {
     ui.placed.pulled.request(&key);
     ui.placed.pulled.answer(key, View::text("outside keybar"));
     assert!(draw_tree(108, 30, &tree, &mut ui, now).contains("outside keybar"));
-}
-
-#[test]
-fn toasts_do_not_replace_the_keybar_pairs() {
-    let props = Props::KeyBar(KeyBarProps {
-        pairs: vec![KeyPair::new("esc", "close")],
-        toast: Some(KeyToast {
-            about: None,
-            text: "a long toast that exceeds the whole row\nand has another line".into(),
-            level: bingo_sdk::Level::Info,
-        }),
-    });
-    let lines = own(&props, 20);
-    assert_eq!(lines.len(), 1);
-    assert!(lines[0].width() <= 20);
-    assert!(lines[0].to_string().contains("esc"));
 }
 
 #[test]

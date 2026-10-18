@@ -109,6 +109,8 @@ export type ActionItem = {
   /** A single-key hint; the surface may use another key. */
   "key"?: (string | null);
   "label": string;
+  /** A one-line explanation supplied by the action owner. */
+  "meaning"?: (string | null);
   [key: string]: unknown;
 };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
@@ -623,6 +625,8 @@ export type ActionItem = {
   /** A single-key hint; the surface may use another key. */
   "key"?: (string | null);
   "label": string;
+  /** A one-line explanation supplied by the action owner. */
+  "meaning"?: (string | null);
   [key: string]: unknown;
 };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
@@ -1284,6 +1288,8 @@ export type ActionItem = {
   /** A single-key hint; the surface may use another key. */
   "key"?: (string | null);
   "label": string;
+  /** A one-line explanation supplied by the action owner. */
+  "meaning"?: (string | null);
   [key: string]: unknown;
 };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
@@ -2159,6 +2165,8 @@ export type ActionItem = {
   /** A single-key hint; the surface may use another key. */
   "key"?: (string | null);
   "label": string;
+  /** A one-line explanation supplied by the action owner. */
+  "meaning"?: (string | null);
   [key: string]: unknown;
 };
 export type Align = ("flex-start" | "center" | "flex-end" | "stretch");

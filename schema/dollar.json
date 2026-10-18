@@ -1463,6 +1463,13 @@
     "ActionItem": {
       "type": "object",
       "properties": {
+        "meaning": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "A one-line explanation supplied by the action owner."
+        },
         "label": {
           "type": "string"
         },

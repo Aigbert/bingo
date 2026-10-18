@@ -1608,6 +1608,13 @@
             "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
             "type": "object",
             "properties": {
+              "meaning": {
+                "description": "A one-line explanation supplied by the action owner.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "label": {
                 "type": "string"
               },
@@ -4107,6 +4114,13 @@
             "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
             "type": "object",
             "properties": {
+              "meaning": {
+                "description": "A one-line explanation supplied by the action owner.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "label": {
                 "type": "string"
               },
@@ -8773,6 +8787,13 @@
             "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
             "type": "object",
             "properties": {
+              "meaning": {
+                "description": "A one-line explanation supplied by the action owner.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "label": {
                 "type": "string"
               },
@@ -12439,6 +12460,13 @@
             "description": "A button: the surface fires `Input::Action` with `action` (ADR-0008 §1).",
             "type": "object",
             "properties": {
+              "meaning": {
+                "description": "A one-line explanation supplied by the action owner.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
               "label": {
                 "type": "string"
               },
