@@ -54,7 +54,7 @@ pub fn resolve(name: &str, input: &Value, tools: &Looks, ascii: bool) -> Step {
         verb: row.verb,
         target,
         reads,
-        tier: declared.map(|(_, tier)| *tier).unwrap_or(Tier::Change),
+        tier: declared.map(|(_, tier)| *tier).unwrap_or(Tier::of(None)),
         state: StepState::Done,
         upshot: None,
         answer: None,
