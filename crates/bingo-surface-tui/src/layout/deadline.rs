@@ -8,7 +8,7 @@ use std::time::Instant;
 
 pub(super) fn next(tree: &Tree, ui: &Ui, layout: &Layout, now: Now) -> Option<Instant> {
     [
-        crate::activity::next_change(tree, ui, now),
+        crate::activity::next_change(tree, now),
         ui.scroll.next_change(now),
         ui.placed.toasts.next(tree.viewed(), now),
         ui.focus.next_change(now),

@@ -71,15 +71,7 @@ fn mismatch(row: &Row, x: u16, buffer: &Buffer, bx: u16, by: u16, spinner: bool)
             color
         };
         if layer == "fg" && !symbol.is_empty() {
-            let mut expected = ratatui::style::Modifier::empty();
-            for part in token.split('+').skip(1) {
-                expected |= match part {
-                    "b" => ratatui::style::Modifier::BOLD,
-                    "i" => ratatui::style::Modifier::ITALIC,
-                    "u" => ratatui::style::Modifier::UNDERLINED,
-                    _ => panic!("unknown capture modifier {part}"),
-                };
-            }
+            let expected = modifiers(token);
             if cell.modifier != expected {
                 return Some(format!(
                     "modifiers: expected {expected:?}, rendered {:?}",
@@ -94,6 +86,21 @@ fn mismatch(row: &Row, x: u16, buffer: &Buffer, bx: u16, by: u16, spinner: bool)
         }
     }
     None
+}
+
+fn modifiers(token: &str) -> ratatui::style::Modifier {
+    token
+        .split('+')
+        .skip(1)
+        .fold(ratatui::style::Modifier::empty(), |modifiers, part| {
+            modifiers
+                | match part {
+                    "b" => ratatui::style::Modifier::BOLD,
+                    "i" => ratatui::style::Modifier::ITALIC,
+                    "u" => ratatui::style::Modifier::UNDERLINED,
+                    _ => panic!("unknown capture modifier {part}"),
+                }
+        })
 }
 
 fn same_spinner(expected: &str, actual: &str) -> bool {

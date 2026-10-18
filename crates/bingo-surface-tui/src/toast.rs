@@ -134,7 +134,7 @@ pub fn components(
     now: Now,
     width: usize,
     pulls: &mut Vec<crate::pulled::Key>,
-    next: &mut Option<std::time::Instant>,
+    _next: &mut Option<std::time::Instant>,
 ) -> Option<bingo_sdk::component::KeyToast> {
     let mut toast = current(ui, state, now)?;
     let Some((placed, _)) = ui
@@ -159,7 +159,7 @@ pub fn components(
         &props,
         answer,
         width,
-        &crate::views::Marks::at(now),
+        &crate::views::Marks::default(),
         |props, _| {
             let bingo_sdk::component::Props::Toast(props) = props else {
                 return Vec::new();
@@ -167,7 +167,6 @@ pub fn components(
             vec![ratatui::text::Line::from(props.text.clone())]
         },
     );
-    *next = (*next).into_iter().chain(drawing.next).min();
     toast.text = drawing
         .lines
         .iter()

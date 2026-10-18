@@ -11,25 +11,22 @@ pub fn style(
     motion: Option<&TextMotion>,
     now: Option<Now>,
 ) -> Style {
-    let Some(now) = now.filter(|now| now.motion) else {
+    let (Some(motion), Some(now)) = (motion, now) else {
         return style;
     };
-    if !matches!(
-        theme::current().colors,
-        theme::Colors::True(_) | theme::Colors::Indexed(_)
-    ) {
+    if !moves(motion, now) {
         return style;
     }
     let (other, weight) = match motion {
-        Some(TextMotion::Breathe {
+        TextMotion::Breathe {
             with,
             period_ms,
             depth,
-        }) => (
+        } => (
             with,
             clock::breathe(now, Duration::from_millis(*period_ms)) * depth.clamp(0.0, 1.0),
         ),
-        Some(TextMotion::Fade { from, at_ms, ms }) => (from, 1.0 - clock::prog(now, *at_ms, *ms)),
+        TextMotion::Fade { from, at_ms, ms } => (from, 1.0 - clock::prog(now, *at_ms, *ms)),
         _ => return style,
     };
     if weight == 0.0 {
@@ -42,15 +39,7 @@ pub fn style(
 }
 
 pub fn next(motion: &TextMotion, now: Now) -> Option<Instant> {
-    if !now.motion {
-        return None;
-    }
-    if !matches!(motion, TextMotion::Spin)
-        && !matches!(
-            theme::current().colors,
-            theme::Colors::True(_) | theme::Colors::Indexed(_)
-        )
-    {
+    if !moves(motion, now) {
         return None;
     }
     match motion {
@@ -70,5 +59,21 @@ pub fn next(motion: &TextMotion, now: Now) -> Option<Instant> {
             )
         }
         _ => None,
+    }
+}
+
+fn moves(motion: &TextMotion, now: Now) -> bool {
+    if !now.motion {
+        return false;
+    }
+    match motion {
+        TextMotion::Spin => true,
+        TextMotion::Breathe { with: ink, .. } | TextMotion::Fade { from: ink, .. } => {
+            matches!(
+                theme::current().colors,
+                theme::Colors::True(_) | theme::Colors::Indexed(_)
+            ) && theme::palette().named(ink).is_some()
+        }
+        TextMotion::Other(_) => false,
     }
 }

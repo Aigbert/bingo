@@ -287,11 +287,11 @@ impl From<crate::views::Drawing> for Block {
         }
     }
 }
-impl From<Block> for crate::views::Drawing {
-    fn from(block: Block) -> Self {
-        Self {
-            lines: block.lines,
-            next: block.next,
+impl Block {
+    pub fn into_text_drawing(self) -> crate::views::Drawing {
+        crate::views::Drawing {
+            lines: self.lines,
+            next: self.next,
         }
     }
 }
@@ -380,8 +380,7 @@ pub fn item_block(
     // write, over the start its kind has. One question, asked once, here.
     let fold = fold::fold_of(rows.folds, item);
     let mut block = item_lines(item, place, agents, rows, cue, fold);
-    let next = crate::ask::receipts::append(item, &mut block.lines, rows);
-    block.next = block.next.into_iter().chain(next).min();
+    crate::ask::receipts::append(item, &mut block.lines, rows);
     pictured::under_the_words(item, block, fold, rows)
 }
 

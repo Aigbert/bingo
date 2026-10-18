@@ -258,15 +258,18 @@ fn breathing_row_state() -> bingo_sdk::SessionState {
                         badge: None,
                         caption: None,
                         actions: vec![],
-                        body: Some(view(TextStyle {
-                            color: Some("glow".into()),
-                            motion: Some(Box::new(TextMotion::Breathe {
-                                with: "coal".into(),
-                                period_ms: 1800,
-                                depth: 1.0,
-                            })),
-                            ..Default::default()
-                        })),
+                        body: Some(View::Box {
+                            children: vec![view(TextStyle {
+                                color: Some("glow".into()),
+                                motion: Some(Box::new(TextMotion::Breathe {
+                                    with: "coal".into(),
+                                    period_ms: 1800,
+                                    depth: 1.0,
+                                })),
+                                ..Default::default()
+                            })],
+                            layout: Default::default(),
+                        }),
                     }],
                 ),
             ),
@@ -447,5 +450,32 @@ fn a_breathing_row_off_screen_neither_redraws_nor_schedules() {
         draw_tree(80, 24, &tree, &mut ui, later(now, 900));
         assert!(ui.shown.blocks.renders() > renders);
         assert!(ui.shown.next_frame.is_some());
+    });
+}
+
+#[test]
+fn round3_unknown_motion_ink_has_no_deadline() {
+    theme::with(crate::painted::daylight(), || {
+        let now = scene().1;
+        for motion in [
+            TextMotion::Breathe {
+                with: "nonsense".into(),
+                period_ms: 1800,
+                depth: 1.0,
+            },
+            TextMotion::Fade {
+                from: "nonsense".into(),
+                at_ms: now.wall.as_millisecond(),
+                ms: 900,
+            },
+        ] {
+            let moving = view(TextStyle {
+                motion: Some(Box::new(motion)),
+                ..Default::default()
+            });
+            let drawn = marked(&moving, 12, &Marks::at(now));
+            assert_eq!(drawn.lines, render(&moving, 12));
+            assert_eq!(drawn.next, None);
+        }
     });
 }

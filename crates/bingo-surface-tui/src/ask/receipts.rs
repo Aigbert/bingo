@@ -57,12 +57,10 @@ pub fn label(body: &ItemBody) -> Option<String> {
         _ => None,
     }
 }
-pub fn append(
-    item: &Item,
-    lines: &mut [Line<'static>],
-    rows: &Rows<'_>,
-) -> Option<std::time::Instant> {
-    let first = lines.first_mut()?;
+pub fn append(item: &Item, lines: &mut [Line<'static>], rows: &Rows<'_>) {
+    let Some(first) = lines.first_mut() else {
+        return;
+    };
     let drawn: crate::views::Drawing = rows
         .answers
         .to(&item.id)
@@ -78,7 +76,7 @@ pub fn append(
                 &crate::component::items::id(receipt),
                 &props,
                 rows.width,
-                &crate::views::Marks::at(rows.now),
+                &crate::views::Marks::default(),
                 |_, _| vec![Line::from(own.clone())],
             )
         })
@@ -90,7 +88,7 @@ pub fn append(
         .collect::<Vec<_>>()
         .join(" · ");
     if words.is_empty() {
-        return None;
+        return;
     }
     let gap = rows
         .width
@@ -98,5 +96,4 @@ pub fn append(
         .max(2);
     first.spans.push(Span::raw(" ".repeat(gap)));
     first.spans.push(Span::styled(words, theme::dim()));
-    drawn.next
 }

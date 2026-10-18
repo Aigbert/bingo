@@ -691,3 +691,49 @@ fn sealed_site(component: Component) -> bingo_sdk::SessionState {
         frame(2, opened(interaction)),
     ])
 }
+
+#[test]
+fn round3_flattened_toast_has_no_motion_deadline() {
+    let mut state = site(Component::Toast);
+    matched(&mut state);
+    let (mut ui, now) = scene();
+    ui.sync_toasts(&state, now);
+    let mut frame = crate::layout::Layout::default();
+    crate::toast::components(
+        &ui,
+        &state,
+        now,
+        80,
+        &mut frame.pulls,
+        &mut frame.next_frame,
+    )
+    .unwrap();
+    let key = frame
+        .pulls
+        .iter()
+        .find(|key| key.request.component == Component::Toast)
+        .unwrap()
+        .clone();
+    ui.placed.pulled.request(&key);
+    ui.placed.pulled.answer(
+        key,
+        serde_json::from_value(json!({
+            "kind":"Text", "motion":{"kind":"breathe","with":"glow","periodMs":1800,"depth":1.0},
+            "children":["still words"]
+        }))
+        .unwrap(),
+    );
+    crate::theme::with(crate::painted::daylight(), || {
+        let toast = crate::toast::components(
+            &ui,
+            &state,
+            now,
+            80,
+            &mut frame.pulls,
+            &mut frame.next_frame,
+        )
+        .unwrap();
+        assert_eq!(toast.text, "still words");
+        assert_eq!(frame.next_frame, None);
+    });
+}

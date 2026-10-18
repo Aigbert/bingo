@@ -52,7 +52,7 @@ pub(super) fn item_lines(
                             cue,
                             if group.is_expanded { Fold::Open } else { fold },
                         )
-                        .into()
+                        .into_text_drawing()
                     })
                     .collect()
             },
@@ -101,14 +101,8 @@ fn component_item(
                     }
                     _ => fold,
                 };
-                crate::views::Drawing::from(default_item_lines(
-                    &changed_item,
-                    place,
-                    agents,
-                    rows,
-                    cue,
-                    fold,
-                ))
+                default_item_lines(&changed_item, place, agents, rows, cue, fold)
+                    .into_text_drawing()
             },
         );
         block.lines = drawn.lines;

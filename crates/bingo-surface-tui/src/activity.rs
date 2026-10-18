@@ -47,7 +47,7 @@ const VERBS: [&str; 10] = [
     "tinkering",
 ];
 
-pub fn next_change(tree: &Tree, _ui: &Ui, now: Now) -> Option<std::time::Instant> {
+pub fn next_change(tree: &Tree, now: Now) -> Option<std::time::Instant> {
     tree.sessions().any(SessionState::busy).then(|| {
         if now.motion {
             now.instant + clock::FRAME

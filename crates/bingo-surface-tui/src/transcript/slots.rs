@@ -110,7 +110,7 @@ pub(super) fn actions_under(item: &Item, indent: usize, rows: &Rows<'_>) -> Vec<
         items: actions.clone(),
     };
     let width = rows.width.saturating_sub(indent).max(1);
-    let body = crate::views::marked(&view, width, &crate::views::Marks::at(rows.now));
+    let body = crate::views::marked(&view, width, &crate::views::Marks::default());
     super::under(
         Span::raw(" ".repeat(indent)),
         body.lines,

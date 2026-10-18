@@ -59,14 +59,7 @@ pub(super) fn folded(
     };
     let (drawing, limit) = match &output.display {
         Some(view @ View::Diff { .. }) => (views::marked(view, width, &marks), DIFF_ROWS),
-        Some(view @ View::Text { children, style })
-            if style == &Default::default()
-                && children
-                    .iter()
-                    .all(|child| matches!(child, bingo_sdk::view::TextChild::String(_))) =>
-        {
-            (plain(&view.fold()).into(), OUTPUT_ROWS)
-        }
+        Some(view @ View::Text { .. }) => (plain(&view.fold()).into(), OUTPUT_ROWS),
         Some(view) => (views::marked(view, width, &marks), OUTPUT_ROWS),
         None => (plain(&text_of(output)).into(), OUTPUT_ROWS),
     };
@@ -159,11 +152,32 @@ mod tests {
     }
 
     #[test]
-    fn nested_text_motion_keeps_its_clock_and_deadline() {
+    fn round3_styled_and_nested_text_displays_keep_plain_layout() {
+        for display in [
+            serde_json::json!({"kind":"Text","color":"good","children":["a\tb  \n"]}),
+            serde_json::json!({"kind":"Text","children":[{"kind":"Text","color":"good","children":["a\tb  \n"]}]}),
+        ] {
+            let view: View = serde_json::from_value(display).unwrap();
+            let mut output = ToolOutput::text("model text");
+            output.display = Some(view.clone());
+            let drawn = folded(
+                &output,
+                Fold::Open,
+                80,
+                Some(crate::test_support::scene().1),
+            );
+            assert_eq!(drawn.lines, plain(&view.fold()));
+            assert_eq!(drawn.lines[0].to_string(), "a       b");
+            assert_eq!(drawn.next, None);
+        }
+    }
+
+    #[test]
+    fn a_box_display_keeps_its_clock_and_deadline() {
         let mut output = ToolOutput::text("model text");
         output.display = Some(
             serde_json::from_value(serde_json::json!({
-                "kind": "Text", "children": [{
+                "kind": "Box", "children": [{
                     "kind": "Text", "motion": {"kind": "spin"}, "children": ["waiting"]
                 }]
             }))
@@ -171,7 +185,10 @@ mod tests {
         );
         let now = crate::test_support::scene().1;
         let moving = folded(&output, Fold::Open, 80, Some(now));
-        assert_eq!(moving.lines[0].to_string(), crate::spinner::glyph(now));
+        assert_eq!(
+            moving.lines[0].to_string().trim(),
+            crate::spinner::glyph(now)
+        );
         assert_eq!(moving.next, Some(crate::spinner::next(now)));
         assert_eq!(folded(&output, Fold::Open, 80, None).next, None);
     }
