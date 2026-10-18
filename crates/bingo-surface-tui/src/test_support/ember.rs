@@ -6,6 +6,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 mod compare;
 mod parse;
+pub mod story;
 
 /// The private clock origin in prototype/p8-page.js (snapshot and capture).
 pub const CLOCK_ORIGIN_MS: i64 = 10_000_000;

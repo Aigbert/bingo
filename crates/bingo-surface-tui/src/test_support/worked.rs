@@ -130,6 +130,16 @@ pub fn long_session(turns: usize) -> Vec<Frame> {
         .flat_map(|n| {
             let turn = format!("trn_{n}");
             told(&turn, worked(&turn), TurnStatus::Completed)
+                .into_iter()
+                .map(move |mut frame| {
+                    let offset = jiff::SignedDuration::from_secs(n as i64 * 10);
+                    frame.ts += offset;
+                    if let Event::ItemCompleted { item } = &mut frame.event {
+                        item.started_at += offset;
+                        item.completed_at = item.completed_at.map(|at| at + offset);
+                    }
+                    frame
+                })
         })
         .enumerate()
         .map(|(seq, frame)| Frame {
@@ -144,7 +154,14 @@ fn told(turn: &str, items: Vec<Item>, status: TurnStatus) -> Vec<Frame> {
     let mut frames = vec![frame(1, started(turn))];
     let end = items.len() as u64 + 2;
     frames.extend(numbered(2, items));
-    frames.push(frame(end, super::completed(turn, status)));
+    let mut done = frame(end, super::completed(turn, status.clone()));
+    done.ts = super::ts()
+        + jiff::SignedDuration::from_secs(if matches!(status, TurnStatus::Interrupted { .. }) {
+            7
+        } else {
+            8
+        });
+    frames.push(done);
     frames
 }
 
@@ -152,7 +169,12 @@ fn numbered(first: u64, items: Vec<Item>) -> Vec<Frame> {
     items
         .into_iter()
         .zip(first..)
-        .map(|(item, seq)| frame(seq, Event::ItemCompleted { item }))
+        .map(|(item, seq)| {
+            let at = item.completed_at.unwrap_or(item.started_at);
+            let mut next = frame(seq, Event::ItemCompleted { item });
+            next.ts = at;
+            next
+        })
         .collect()
 }
 

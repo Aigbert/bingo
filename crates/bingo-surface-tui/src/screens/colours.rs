@@ -12,10 +12,7 @@ fn an_answer_row_is_white_after_its_bullet() {
     assert_row_styled(
         &painted,
         "All 33 pass.",
-        &[
-            (" ▍ ", crate::theme::presence()),
-            ("All 33 pass.", crate::theme::text()),
-        ],
+        &[("   All 33 pass.", crate::theme::text())],
     );
 }
 
@@ -25,17 +22,13 @@ fn an_answer_row_is_white_after_its_bullet() {
 fn every_row_of_a_batch_wears_the_live_mark_at_once() {
     let (mut ui, now) = mid_turn();
     let painted = painted(80, 24, &solo(&folded(running_together())), &mut ui, now);
-    let spinner = format!("{} ", crate::spinner::glyph(now));
+    let spinner = crate::spinner::glyph(now).to_string();
     for command in ["cargo fmt --all -- --check", "cargo test --workspace"] {
-        assert_row_styled(
-            &painted,
-            command,
-            &[
-                ("   ", crate::theme::text()),
-                (&spinner, crate::theme::presence()),
-                (&format!("bash {command}"), crate::theme::text()),
-            ],
-        );
+        let row = painted.row(command);
+        assert!(row.iter().any(|(text, style)| text == &spinner
+            && style.fg == crate::theme::as_drawn(crate::theme::glow()).fg));
+        assert!(row.iter().any(|(text, style)| text == "bash"
+            && style.fg == crate::theme::as_drawn(crate::theme::ash()).fg));
     }
 }
 
@@ -54,11 +47,11 @@ fn a_step_rows_mark_is_the_only_cell_a_colour_is_spent_on() {
     )]);
     let (mut ui, now) = scene();
     open_the_turns(&mut ui, &state);
+    assert!(!draw_tree(80, 24, &solo(&state), &mut ui, now).contains("Read 3 lines"));
     let painted = painted(80, 24, &solo(&state), &mut ui, now);
-    assert_eq!(painted.coloured("read src/lib.rs"), vec!["✓".to_string()]);
-    assert!(
-        painted.coloured("Read 3 lines").is_empty(),
-        "a result spends none at all"
+    assert_eq!(
+        painted.coloured("read    src/lib.rs"),
+        vec!["¶".to_string(), "lib.rs".to_string()]
     );
 }
 
@@ -84,20 +77,15 @@ fn a_skill_rows_mark_wears_the_state_and_spends_the_only_colour() {
     )]);
     let (mut ui, now) = scene();
     ui.catalogs.commands = crate::commands::entries(skills::skills_in_the_catalogue());
-    for state in [called, typed] {
-        let state = with_skill_row(state, "itm_1", "guide", "the wire format");
-        let painted = painted(80, 24, &solo(&state), &mut ui, now);
-        assert_row_styled(
-            &painted,
-            "Skill(guide)",
-            &[
-                (" ❖ ", crate::theme::good()),
-                ("Skill", crate::theme::bold()),
-                ("(guide) the wire format", crate::theme::text()),
-            ],
-        );
-        assert_eq!(painted.coloured("Skill(guide)"), vec!["❖".to_string()]);
-    }
+    let call = painted(80, 24, &solo(&called), &mut ui, still(later(now, 1000)));
+    assert!(
+        call.row("skill   guide")
+            .iter()
+            .any(|(text, _)| text.contains('§'))
+    );
+    let typed = with_skill_row(typed, "itm_1", "guide", "the wire format");
+    let typed = painted(80, 24, &solo(&typed), &mut ui, now);
+    assert_eq!(typed.coloured("Skill(guide)"), vec!["❖".to_string()]);
 }
 
 #[test]
@@ -173,7 +161,7 @@ fn the_status_line_spends_no_colour_but_the_mode() {
 #[test]
 fn the_line_is_the_persons_own_and_only_a_bad_exit_is_coloured() {
     let (mut ui, now) = scene();
-    let drawn = painted(80, 24, &solo(&super::ran::session()), &mut ui, now);
+    let drawn = painted(80, 40, &solo(&super::ran::session()), &mut ui, now);
     assert_row_styled(
         &drawn,
         "git status --short",
@@ -196,7 +184,7 @@ fn a_shell_line_sits_on_the_bar_your_own_words_sit_on() {
     let (mut ui, now) = scene();
     let tree = solo(&super::ran::session());
     crate::theme::with(truecolor(), || {
-        let row = painted(80, 24, &tree, &mut ui, now).row("git status --short");
+        let row = painted(80, 40, &tree, &mut ui, now).row("git status --short");
         let width: usize = row.iter().map(|(text, _)| text.width()).sum();
         assert_eq!(width, 80, "the bar runs to the edge: {row:#?}");
         let ground = crate::theme::as_drawn(crate::theme::raised()).bg;
@@ -262,6 +250,8 @@ fn no_screen_paints_prose_in_a_colour_of_its_own() {
     for look in [truecolor(), daylight()] {
         crate::theme::with(look, || {
             let mut allowed = crate::theme::spendable();
+            allowed.insert(crate::theme::foreground("code").unwrap().fg.unwrap());
+            allowed.insert(crate::theme::foreground("amber").unwrap().fg.unwrap());
             allowed.insert(crate::theme::foreground("amberGlow").unwrap().fg.unwrap());
             allowed.insert(
                 crate::theme::blended("faint", "glow", 0.4)
@@ -284,7 +274,7 @@ fn no_screen_paints_prose_in_a_colour_of_its_own() {
                 ),
                 (
                     "a shell line the person ran",
-                    painted(80, 24, &solo(&super::ran::session()), &mut idle, now),
+                    painted(80, 40, &solo(&super::ran::session()), &mut idle, now),
                 ),
                 (
                     "what a channel reported",

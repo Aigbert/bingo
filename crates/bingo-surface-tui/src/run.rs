@@ -652,11 +652,17 @@ impl Run {
     /// One event off the terminal, or the end of the stream, which is a
     /// hangup and so a way out.
     fn keyed(&mut self, key: Option<Term>) -> Wake {
+        let stopping = self.ui.stop_asked.clone();
         match key {
             Some(event) => self.heard(event),
             None => self.exit = Some(Exit { code: 0 }),
         }
-        Wake::Event
+        // Cancellation may complete before the next tick; acknowledge its key first.
+        if self.ui.stop_asked.is_some() && self.ui.stop_asked != stopping {
+            Wake::Frame
+        } else {
+            Wake::Event
+        }
     }
 
     /// One answer to a host call this run spawned.
@@ -908,9 +914,6 @@ impl Run {
             Reply::Stored(request, sessions) => palette::fill_palette(self, &request, sessions),
             Reply::Commands(fetch, result) => catalogues::received(self, fetch, result),
             Reply::Catalogue(source, ids) => {
-                if source == "tools" {
-                    self.ui.shown.blocks = Default::default();
-                }
                 if source == "plugins" {
                     self.ui.catalogs.plugins = ids;
                 } else {
@@ -1206,7 +1209,7 @@ mod tests {
             "the tree's handle routes an answer to whoever asked"
         );
         assert!(
-            harness.recorder.last().contains("edit · reviewer"),
+            harness.recorder.last().contains("edit    · reviewer"),
             "the dialog names the child: {}",
             harness.recorder.last()
         );
@@ -1353,6 +1356,22 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn stopping_is_painted_before_the_next_kernel_frame() {
+        let now = scene().1;
+        let state = folded(vec![frame(1, started("trn_1"))]);
+        let mut run = idle_in(
+            state,
+            std::sync::Arc::new(TestSession::default()),
+            now.instant,
+        );
+        let mut screen = Recorder::default();
+        run.paint(&mut screen, Wake::Frame, now).unwrap();
+        let wake = run.keyed(Some(Term::Key(KeyCode::Esc.into())));
+        run.paint(&mut screen, wake, later(now, 1)).unwrap();
+        assert!(screen.last().contains("stopping"));
+    }
+
     #[tokio::test(start_paused = true)]
     async fn reduced_motion_wakes_the_working_row_without_an_event() {
         let now = Now {
@@ -1368,23 +1387,23 @@ mod tests {
         run.detection.motion = false;
         let mut screen = Recorder::default();
         run.paint(&mut screen, Wake::Frame, now).unwrap();
-        assert!(!screen.last().contains("burrowing"));
+        assert!(!screen.last().contains("working"));
         assert_eq!(
             run.next_draw(),
-            Some(now.instant + Duration::from_millis(300))
+            Some(now.instant + Duration::from_millis(500))
         );
         tick(run.next_draw()).await;
         assert_eq!(
             tokio::time::Instant::now().into_std() - now.instant,
-            Duration::from_millis(300)
+            Duration::from_millis(500)
         );
-        run.paint(&mut screen, Wake::Frame, later(now, 300))
+        run.paint(&mut screen, Wake::Frame, later(now, 500))
             .unwrap();
-        assert!(screen.last().contains("burrowing"));
+        assert!(screen.last().contains("working"));
     }
 
     /// A turn that answers and finishes, then `wait` of nothing at all before
-    /// ctrl+d. Answers with how many frames the run drew.
+    /// ctrl+d. Answers with how many frames the settled interval drew.
     async fn frames_of_a_flash(wait: Duration) -> usize {
         let mut harness = Harness::new();
         harness.recorder.motion = Some(true);
@@ -1407,6 +1426,9 @@ mod tests {
         // A frame apart, so one is drawn while the answer is still running: a
         // completion only flashes where the rendering it replaces was seen.
         let (host, _) = TestHost::paced(frames, TICK * 2);
+        // Declared Spin phases settle with the turn; M193's caret keeps moving
+        // for ten seconds. Measure only after both have rested.
+        let settled = tokio::time::Instant::now().into_std() + Duration::from_millis(10_750);
         drive(
             &host,
             options(None, harness.home.path()),
@@ -1420,7 +1442,12 @@ mod tests {
             "it comes to rest on the finished answer: {}",
             harness.recorder.last()
         );
-        harness.recorder.frames.len()
+        harness
+            .recorder
+            .painted_at
+            .iter()
+            .filter(|&&at| at >= settled)
+            .count()
     }
 
     /// The idle measure again, over a run that had motion in it. The waiting
@@ -1431,8 +1458,8 @@ mod tests {
     async fn the_seconds_after_a_flash_cost_no_frames_at_all() {
         assert_eq!(
             frames_of_a_flash(Duration::from_secs(12)).await,
-            frames_of_a_flash(Duration::from_secs(14)).await,
-            "two more seconds of waiting drew two more seconds of frames"
+            1,
+            "after the caret rests, only the exit key draws"
         );
     }
 
@@ -1643,7 +1670,7 @@ mod tests {
         );
         assert_eq!(
             ended.screen.last().map(String::as_str),
-            Some(" ▍ answer 30"),
+            Some("   answer 30"),
             "{:?}",
             ended.screen
         );

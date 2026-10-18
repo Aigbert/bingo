@@ -26,7 +26,6 @@ use crate::views;
 
 mod interaction;
 mod mode;
-mod turn;
 
 pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
@@ -235,10 +234,6 @@ fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
     let Some(id) = latest(state, focused.as_ref(), opens) else {
         return;
     };
-    if let Some(line) = ui.shown.blocks.roles().line_of(state, &id) {
-        turn::open(ui, tree, now, line);
-        return;
-    }
     let Some(item) = item_of(state, &id) else {
         return;
     };
@@ -813,14 +808,9 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     // being typed: it opens whole (design §5). A message outranks it.
     if ui.composer.is_empty()
         && let Some(block) = ui.select.block.clone()
+        && pager::open_block(ui, tree, now, Some(&block))
     {
-        if let Some(line) = turn::folded_line(ui, tree, &block) {
-            ui.folds.insert(line, fold::Fold::Open);
-            return Vec::new();
-        }
-        if pager::open_block(ui, tree, now, Some(&block)) {
-            return Vec::new();
-        }
+        return Vec::new();
     }
     if ui.composer.text().ends_with('\\') {
         ui.composer.backspace();
@@ -2127,18 +2117,11 @@ mod tests {
 
     /// A block with more under it than a row can hold.
     fn long_result() -> SessionState {
-        let output =
-            bingo_sdk::ToolOutput::text((1..=9).map(|i| format!("line {i}\n")).collect::<String>());
+        let output = (1..=9).map(|i| format!("line {i}\n")).collect::<String>();
         folded(vec![frame(
             1,
             bingo_sdk::Event::ItemCompleted {
-                item: crate::test_support::loose(tool(
-                    "itm_1",
-                    "Read",
-                    serde_json::json!({"file_path": "src/lib.rs"}),
-                    Some(output),
-                    bingo_sdk::ItemStatus::Completed,
-                )),
+                item: crate::test_support::shell("itm_1", "list", &output, Some(0)),
             },
         )])
     }
@@ -2638,9 +2621,11 @@ mod tests {
         let state = long_transcript(60);
         let (mut ui, now) = reading_back(&state);
         let tree = solo(&state);
-        on_mouse(&mut ui, &tree, click(4, 5), now);
+        let screen = render_tree(&tree, &mut ui, now);
+        let y = row_carrying(&screen, "line 49");
+        on_mouse(&mut ui, &tree, click(4, y), now);
         let folded = ui.folds.len();
-        let copied = on_mouse(&mut ui, &tree, released(4, 5), now);
+        let copied = on_mouse(&mut ui, &tree, released(4, y), now);
         assert!(copied.is_empty(), "a click copies nothing: {copied:?}");
         assert!(ui.notice().is_none(), "and says nothing");
         assert!(ui.select.block.is_some(), "the block is still focused");
@@ -2787,15 +2772,15 @@ mod tests {
         open_the_read(&mut ui);
         crate::graphics::with(crate::graphics::drawing(), || {
             let screen = render(&state, &mut ui, now);
-            let row = row_carrying(&screen, "read shot.png");
+            let row = row_carrying(&screen, "read    shot.png");
             assert!(
                 on_mouse(&mut ui, &solo(&state), click(4, row), now).is_empty(),
                 "the step's row above the cells is the block's"
             );
             assert_eq!(
                 ui.folds.get(&bingo_sdk::ItemId::from_raw("itm_1")),
-                Some(&fold::Fold::Open),
-                "and under the folded line it starts a selection, not a fold"
+                Some(&fold::Fold::Peek),
+                "the step row cycles only its own output"
             );
             let cells = cells_row(&screen);
             // Ten cells from column 5, so column 60 is past the picture.

@@ -151,6 +151,15 @@ fn append_node(
             .map(crate::spinner::glyph)
             .unwrap_or_else(|| theme::glyphs::get("still"));
         append(&[TextChild::String(glyph.to_string())], style, now, out);
+    } else if props.motion.as_deref() == Some(&TextMotion::Shimmer) {
+        let mut drawn = super::Drawing::still(vec![Line::default()]);
+        append(children, style, now, &mut drawn);
+        super::motion::shimmer(&mut drawn.lines, now);
+        if let (Some(last), Some(first)) = (out.lines.last_mut(), drawn.lines.first()) {
+            last.spans.extend(first.spans.clone());
+        }
+        out.lines.extend(drawn.lines.into_iter().skip(1));
+        out.next = out.next.into_iter().chain(drawn.next).min();
     } else {
         append(children, style, now, out);
     }

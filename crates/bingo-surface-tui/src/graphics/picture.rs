@@ -68,11 +68,7 @@ impl Source {
     ) -> Option<&'a Image> {
         match self {
             Source::Journal { item, part } => {
-                let found = state
-                    .transcript
-                    .items()
-                    .iter()
-                    .find(|kept| kept.id == *item)?;
+                let found = state.transcript.get(item)?;
                 pictures_of(&found.body).get(*part).copied()
             }
             Source::Draft { token } => linked.image(&dest(held.under(*token)?)),

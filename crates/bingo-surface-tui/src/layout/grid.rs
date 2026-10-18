@@ -73,26 +73,8 @@ pub fn pad_to(line: Line<'static>, width: usize) -> Line<'static> {
 
 #[allow(dead_code)] // M193 draws with this grid primitive.
 pub fn short_path(path: &str, width: usize, ink: Style) -> Line<'static> {
-    let cut = path.rfind('/').map_or(0, |at| at + 1);
-    let base = &path[cut..];
-    let mut dirs: Vec<_> = path[..cut].split('/').filter(|s| !s.is_empty()).collect();
-    let mut lead = if path.starts_with('/') {
-        "/".to_string()
-    } else {
-        String::new()
-    };
-    let head = loop {
-        let head = if dirs.is_empty() {
-            lead.clone()
-        } else {
-            format!("{lead}{}/", dirs.join("/"))
-        };
-        if dirs.is_empty() || head.width() + base.width() <= width {
-            break head;
-        }
-        dirs.remove(0);
-        lead = format!("{}/", theme::glyphs::get("ell"));
-    };
+    let (head, base) =
+        bingo_sdk::component::row::short_path(path, width, theme::glyphs::get("ell"));
     fit(
         Line::from(vec![
             Span::styled(head, theme::dim()),
@@ -100,16 +82,6 @@ pub fn short_path(path: &str, width: usize, ink: Style) -> Line<'static> {
         ]),
         width,
     )
-}
-
-#[allow(dead_code)] // M193 draws with this grid primitive.
-pub fn fmt_dur(ms: u64) -> String {
-    let t = ms / 1000;
-    match t {
-        0..60 => format!("{t}s"),
-        60..3600 => format!("{}m {:02}s", t / 60, t % 60),
-        _ => format!("{}h {:02}m", t / 3600, t / 60 % 60),
-    }
 }
 
 #[allow(dead_code)] // M193 draws with this grid primitive.
@@ -138,8 +110,6 @@ mod tests {
     fn grid_and_formatters_match_the_prototype() {
         assert_eq!([SIDE, TX, VX, AX, RM, MEASURE], [0, 3, 5, 13, 2, 100]);
         assert_eq!([dock_cap(0), dock_cap(24), dock_cap(32)], [6, 13, 19]);
-        assert_eq!(fmt_dur(61999), "1m 01s");
-        assert_eq!(fmt_dur(3660000), "1h 01m");
         assert_eq!(
             [fmt_k(999.0), fmt_k(1500.0), fmt_k(10500.0)],
             ["999", "1.5k", "11k"]

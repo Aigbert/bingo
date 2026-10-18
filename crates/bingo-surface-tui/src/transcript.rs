@@ -1,11 +1,9 @@
-//! One item to styled lines (`docs/design/tui.md` §4, ADR-0095 §6): every mark
-//! at column 1 — `▍` for what the model says, `›` on a raised bar for what you
-//! said — and a turn's steps at column 3 under one folded line. The reducer is the only history: nothing here
-//! remembers a thing, and [`crate::blocks`] stacks and memoises what it draws.
+//! Items draw as prompt bands, persistent step rows and answers (ADR-0097).
+//! The reducer owns history; blocks memoise these projections of it.
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{CommandSpec, DecisionKind, Item, ItemBody, ItemStatus, SessionState, ToolOutput};
+use bingo_sdk::{DecisionKind, Item, ItemBody, ItemStatus, SessionState, ToolOutput};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use serde_json::Value;
@@ -17,14 +15,20 @@ use crate::graphics::{Decoded, Linked, Picture};
 use crate::tree::{self, Agents};
 use crate::{markdown, paths, theme, thoughts, wrap};
 
+mod answer;
+mod history;
+pub use history::History;
 mod components;
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
 mod said;
-use components::{component_call, item_lines};
+use components::item_lines;
 
+pub(crate) mod band;
+use crate::component::live;
 /// Producer replacements for individual transcript rows.
 pub(crate) mod slots;
+pub mod sparks;
 
 /// What is under a tool row: its output, folded to what a row can spare.
 mod output;
@@ -32,14 +36,11 @@ mod output;
 mod pictured;
 /// A shell line the person ran themselves (`!<command>`).
 mod ran;
-/// A turn's parts at column 3: its steps, its folded line, its stop line.
+/// A turn's steps and narration at column 3.
 mod steps;
 pub(crate) use steps::asked;
-/// The comet tail on the cells of a block that just arrived (§6).
-mod comet;
 /// The rows a thought draws, one of them or a run of them (§4, §6).
 mod thinking;
-use comet::{arriving, comet};
 
 pub use output::whole;
 use output::{folded, kept, plain, tail};
@@ -48,8 +49,6 @@ pub use thinking::thought;
 
 pub(crate) use said::voice;
 
-/// How long the comet tail of a block still arriving takes to cool (§6).
-pub const COMET: Duration = Duration::from_millis(180);
 /// How long one light takes to cross the name of a call that has just come
 /// back: six frames (§6). A thirty-three millisecond flash is below the
 /// threshold at which a person reads it as something happening.
@@ -69,8 +68,6 @@ const PULSE: Duration = Duration::from_millis(1200);
 
 /// Output rows kept under a finished tool row before the rest folds away.
 const OUTPUT_ROWS: usize = 5;
-/// A running tool's tail: enough to see it move, few enough to look past.
-const TAIL_ROWS: usize = 3;
 /// A thought's rows, streaming or peeked at. Fewer than a tool's tail, and the
 /// reason is the difference between the two: a tool's output is *read* — a
 /// person is looking for the line that says what happened — and a thought is
@@ -88,6 +85,7 @@ const EXPAND: &str = "ctrl+o to expand";
 #[derive(Clone)]
 pub struct Rows<'a> {
     pub tools: crate::tool_rows::Looks,
+    pub history: std::rc::Rc<History<'a>>,
     pub pulled: Option<&'a crate::pulled::Memo>,
     pub state: &'a SessionState,
     pub names: Vec<markdown::mentions::Name>,
@@ -97,6 +95,7 @@ pub struct Rows<'a> {
     pub folds: &'a Folds,
     /// The frame being drawn: what every cue below is a function of.
     pub now: Now,
+    pub stop_asked: Option<&'a bingo_sdk::TurnId>,
     /// The pictures already turned into pixels. A row that draws one has to
     /// know how many pixels it is before it can say how many cells it takes,
     /// and that answer is kept rather than worked out again every frame.
@@ -107,18 +106,42 @@ pub struct Rows<'a> {
     pub linked: &'a Linked,
     /// Plugin placements read from this frame's folded session.
     pub slots: Vec<bingo_sdk::slot::Placed>,
-    /// The person's answers, by the item each answers, read off this frame's
-    /// session once.
-    pub answers: crate::ask::receipts::Answers<'a>,
+    /// Each mode's label, derived once per frame from slots' Mode placement
+    /// so a step's why never searches the placements.
+    pub(super) mode_labels: std::collections::BTreeMap<String, String>,
     /// A newer release than this build, when the start-up check found one
     /// (M63). Terminal-side, like the fold and the scroll: it is a fact about
     /// this machine, not about the conversation.
     pub update: Option<&'a str>,
-    /// The widest a line of prose may be drawn, where a person set one
-    /// (`tui.measure`, [`crate::settings`]; design §7). Nothing at all is the
-    /// region's own width, so the transcript fills the terminal it is in.
+    /// A person's region cap (`tui.measure`). Prose inside it keeps the
+    /// 100-cell measure from column 3 (ADR-0097 §3).
     pub measure: Option<usize>,
     pub entrance: crate::welcome::Entrance<'a>,
+}
+
+impl<'a> std::ops::Deref for Rows<'a> {
+    type Target = History<'a>;
+    fn deref(&self) -> &Self::Target {
+        &self.history
+    }
+}
+
+fn mode_labels(slots: &[bingo_sdk::slot::Placed]) -> std::collections::BTreeMap<String, String> {
+    let modes = slots.iter().find_map(|placed| match &placed.slot {
+        bingo_sdk::slot::Slot::Mode { modes, .. } => Some(modes),
+        _ => None,
+    });
+    modes
+        .into_iter()
+        .flatten()
+        .filter_map(|item| {
+            let value = item.action.args.as_str()?;
+            Some((
+                value.to_owned(),
+                bingo_sdk::slot::mode_label(value, modes?).to_owned(),
+            ))
+        })
+        .collect()
 }
 
 impl<'a> Rows<'a> {
@@ -129,12 +152,33 @@ impl<'a> Rows<'a> {
         state: &'a SessionState,
         width: usize,
         folds: &'a Folds,
-        _commands: &'a [CommandSpec],
         pictures: &'a Decoded,
         linked: &'a Linked,
         now: Now,
     ) -> Self {
+        Self::using(
+            (state, History::of(state)),
+            width,
+            folds,
+            pictures,
+            linked,
+            now,
+        )
+    }
+
+    fn using(
+        history: (&'a SessionState, std::rc::Rc<History<'a>>),
+        width: usize,
+        folds: &'a Folds,
+        pictures: &'a Decoded,
+        linked: &'a Linked,
+        now: Now,
+    ) -> Self {
+        let (state, history) = history;
+        let slots = bingo_sdk::slot::placed(state);
+        let mode_labels = mode_labels(&slots);
         Self {
+            history,
             tools: Default::default(),
             pulled: None,
             state,
@@ -142,14 +186,36 @@ impl<'a> Rows<'a> {
             width,
             folds,
             now,
+            stop_asked: None,
             pictures,
             linked,
-            slots: bingo_sdk::slot::placed(state),
-            answers: crate::ask::receipts::Answers::of(state),
+            slots,
+            mode_labels,
             update: None,
             measure: None,
             entrance: crate::welcome::Entrance::default(),
         }
+    }
+
+    pub fn arriving(&self, item: &Item) -> bool {
+        item.status == ItemStatus::Running
+            && self
+                .state
+                .turn
+                .as_ref()
+                .is_some_and(|turn| item.turn.as_ref() == Some(&turn.id))
+            && !self
+                .state
+                .interactions
+                .iter()
+                .any(|ask| ask.turn == item.turn)
+    }
+
+    pub fn turn_items(&self, item: &Item) -> &[&'a Item] {
+        self.turns
+            .get(&item.turn)
+            .map(Vec::as_slice)
+            .unwrap_or_default()
     }
 
     pub fn components(mut self, memo: &'a crate::pulled::Memo) -> Self {
@@ -367,12 +433,25 @@ pub fn item_block(
         return Block::default();
     }
     if let Some(block) = steps::part(item, &place.role, rows) {
-        return block;
+        return if matches!(place.role, crate::turns::Role::Step { .. }) {
+            pictured::under_the_words(item, block, fold::fold_of(rows.folds, item), rows)
+        } else {
+            block
+        };
     }
     // How much of this block is on the screen — what `ctrl+o` and a click both
     // write, over the start its kind has. One question, asked once, here.
     let fold = fold::fold_of(rows.folds, item);
     let mut block = item_lines(item, place, agents, rows, cue, fold);
+    if item.turn.is_some()
+        && place
+            .previous
+            .is_some_and(|previous| previous.turn == item.turn)
+        && matches!(item.body, ItemBody::Assistant { .. })
+        && !block.lines.is_empty()
+    {
+        block.lines.insert(0, Line::default());
+    }
     crate::ask::receipts::append(item, &mut block.lines, rows);
     pictured::under_the_words(item, block, fold, rows)
 }
@@ -388,18 +467,17 @@ fn default_item_lines(
     match &item.body {
         ItemBody::Unknown { .. } => Block::default(),
         ItemBody::User { parts, origin } => {
-            said::lines(item, parts, origin, place, fold, rows).into()
+            if band::owns(item, rows.state) {
+                band::draw(item, rows).into()
+            } else {
+                said::lines(item, parts, origin, place, fold, rows).into()
+            }
         }
-        ItemBody::Assistant { text } => assistant(
-            text,
-            item.status,
-            fold,
-            rows,
-            cue,
-            latest_answer(item, rows.state),
-        ),
+        ItemBody::Assistant { text } => {
+            assistant(text, item.status, fold, rows, rows.arriving(item))
+        }
         ItemBody::Reasoning { .. } => thinking::lines(item, place, fold, rows).into(),
-        ItemBody::ToolCall { .. } => called(item, agents, fold, rows, cue).into(),
+        ItemBody::ToolCall { .. } => called(item, agents, fold, rows).into(),
         ItemBody::Shell {
             command,
             output,
@@ -463,19 +541,11 @@ fn rewound(dropped: u32, rows: &Rows<'_>) -> Vec<Line<'static>> {
 /// its own (design §3: a child is a row where it began) — but a call that
 /// moved the task list draws no row at all, because the list under the
 /// activity row is its row (M74, as Claude Code draws none).
-fn called(
-    item: &Item,
-    agents: &Agents<'_>,
-    fold: Fold,
-    rows: &Rows<'_>,
-    cue: Cue,
-) -> crate::views::Drawing {
+fn called(item: &Item, agents: &Agents<'_>, fold: Fold, rows: &Rows<'_>) -> crate::views::Drawing {
     let ItemBody::ToolCall {
-        call_id,
         name,
         input,
         output,
-        progress,
         quiet,
         ..
     } = &item.body
@@ -483,52 +553,37 @@ fn called(
         return crate::views::Drawing::default();
     };
     if *quiet && !item.status.failed(output.as_ref()) {
-        return output
-            .as_ref()
-            .and_then(|output| output.display.as_ref())
-            .map(|view| {
-                crate::views::marked(
-                    view,
-                    rows.result_width(),
-                    &crate::views::Marks::at(rows.now),
-                )
-                .map_lines(|lines| returns(lines, rows))
-            })
-            .unwrap_or_default();
+        return quiet_call(output.as_ref(), rows);
     }
-    let external = item
-        .external()
-        .then(|| {
-            bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
-                call_id: call_id.clone(),
-                name: name.clone(),
-                input: input.clone(),
-            })
-        })
-        .flatten();
-    let (label, about) = match &external {
-        Some(call) => (call.title.as_str(), String::new()),
-        None => (
-            name.as_str(),
-            crate::tool_rows::resolve(name, input, &rows.tools, theme::bullet().is_ascii()).target,
-        ),
-    };
     match agents.get(&item.id) {
         Some(child) => child_row(child, name, input, rows).into(),
-        None => component_call(
+        None => steps::step_block(
             item,
-            Call {
-                status: item.status,
-                name: label,
-                about,
-                output: output.as_ref(),
-                progress: progress.as_deref(),
-                fold,
-            },
+            &crate::turns::step(item, rows),
+            fold == Fold::Open,
             rows,
-            cue,
-        ),
+        )
+        .into_text_drawing(),
     }
+}
+
+fn quiet_call(output: Option<&ToolOutput>, rows: &Rows<'_>) -> crate::views::Drawing {
+    output
+        .and_then(|output| output.display.as_ref())
+        .map(|view| {
+            crate::views::marked(
+                view,
+                rows.result_width(),
+                &crate::views::Marks::at(rows.now),
+            )
+            .map_lines(|lines| step_body(lines, rows))
+        })
+        .unwrap_or_default()
+}
+
+/// A display or picture stays below its step until a detail well can own it.
+fn step_body(body: Vec<Line<'static>>, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    under(Span::raw("     "), body, 5, rows.measured())
 }
 
 // ---- the two marks ------------------------------------------------------
@@ -598,83 +653,31 @@ fn returns(body: Vec<Line<'static>>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 
 // ---- the kinds ----------------------------------------------------------
 
-/// The answer: the brightest text on the screen, after the presence `▍` — and,
-/// while it is still arriving, a comet tail on the cells that just landed.
+/// The answer arrives without surface pacing, with a tail blend and caret.
 ///
 /// The words may name a picture themselves (M51). The tail is lit first: a row
 /// of placeholder cells is not text, and cooling it would spend the colour the
 /// picture's own number is carried in.
-pub(crate) fn latest_answer(item: &Item, state: &SessionState) -> bool {
-    state
-        .transcript
-        .items()
-        .iter()
-        .rev()
-        .find(|item| matches!(item.body, ItemBody::Assistant { .. }))
-        .is_some_and(|latest| latest.id == item.id)
-}
-
-fn assistant(
-    text: &str,
-    status: ItemStatus,
-    fold: Fold,
-    rows: &Rows<'_>,
-    cue: Cue,
-    latest: bool,
-) -> Block {
-    let written = markdown::mentioned(text, rows.measured().saturating_sub(3), &rows.names);
-    let lit = match arriving(status, rows, cue) {
-        Some(age) => comet(written.lines, age),
-        None => written.lines,
-    };
-    let body = pictured::in_the_words(lit, &written.images, fold, rows);
+fn assistant(text: &str, status: ItemStatus, fold: Fold, rows: &Rows<'_>, arriving: bool) -> Block {
+    let width = rows.measured().saturating_sub(5).min(100);
+    let source = answer::closed(text, status);
+    let mut written = markdown::mentioned(&source, width, &rows.names);
+    answer::finish(&mut written.lines, status, width, rows.now, arriving);
+    let body = pictured::in_the_words(written.lines, &written.images, fold, rows);
     Block {
-        lines: under(
-            Span::styled(
-                format!(" {} ", theme::mark()),
-                if latest {
-                    theme::presence()
-                } else {
-                    theme::ash()
-                },
-            ),
-            body.lines,
-            3,
-            rows.measured(),
-        ),
+        lines: body
+            .lines
+            .into_iter()
+            .map(|mut line| {
+                line.spans.insert(0, Span::raw("   "));
+                line
+            })
+            .collect(),
         ..body
     }
 }
 
-/// One tool call, as much of it as there is yet.
-#[derive(Clone)]
-struct Call<'a> {
-    status: ItemStatus,
-    name: &'a str,
-    /// What the row says the call is about, in the words whoever built it
-    /// reads the call in: a tool's input as its declared look spells it, an ACP
-    /// agent's own title.
-    about: String,
-    output: Option<&'a ToolOutput>,
-    progress: Option<&'a str>,
-    /// How much of what came back is shown.
-    fold: Fold,
-}
-
-fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> crate::views::Drawing {
-    let failed = call.status.failed(call.output);
-    let bullet = live_bullet(call.status, failed, rows);
-    let landing = Landing::of(cue, failed, rows);
-    let mut out = bullet.heading(vec![signature(call.name, &call.about, rows, landing)], rows);
-    out.append(result(&call, rows));
-    out
-}
-
-/// The bullet says what state the row is in; its motion says how fresh that
-/// state is — it pulses between `presence` and its glow while the tool runs.
-/// What the answer landing looks like is the row's own words ([`Landing`]),
-/// not a frame of weight on the bullet: a thirty-three millisecond flash is
-/// below the threshold at which a person reads it as something happening.
+/// Legacy child rows keep their own pulse until M200 supplies their step projection.
 fn live_bullet(status: ItemStatus, failed: bool, rows: &Rows<'_>) -> Bullet {
     let moving = rows.now.motion && status == ItemStatus::Running;
     let style = if moving {
@@ -683,21 +686,21 @@ fn live_bullet(status: ItemStatus, failed: bool, rows: &Rows<'_>) -> Bullet {
         bullet_style(status, failed)
     };
     Bullet {
-        span: Span::styled(format!(" {} ", theme::bullet()), style),
+        style,
         next: moving.then_some(rows.now.instant + clock::FRAME),
     }
 }
 
 #[must_use]
 struct Bullet {
-    span: Span<'static>,
+    style: Style,
     next: Option<Instant>,
 }
 
 impl Bullet {
     fn heading(self, body: Vec<Line<'static>>, rows: &Rows<'_>) -> crate::views::Drawing {
         crate::views::Drawing {
-            lines: under(self.span, body, speaks_indent(), rows.measured()),
+            lines: marked(theme::bullet(), self.style, body, rows),
             next: self.next,
         }
     }
@@ -754,22 +757,6 @@ fn bullet_style(status: ItemStatus, failed: bool) -> Style {
         ItemStatus::Failed => theme::bad(),
         ItemStatus::Pending | ItemStatus::Interrupted => theme::dim(),
     }
-}
-
-/// What is under a tool row: its tail while it runs, its output once it is
-/// done, folded to a line that says how much was left out.
-fn result(call: &Call<'_>, rows: &Rows<'_>) -> crate::views::Drawing {
-    if call.status == ItemStatus::Running {
-        let Some(progress) = call.progress else {
-            return crate::views::Drawing::default();
-        };
-        return returns(tail(progress, TAIL_ROWS, rows.result_width()), rows).into();
-    }
-    let Some(output) = call.output else {
-        return crate::views::Drawing::default();
-    };
-    let body = folded(output, call.fold, rows.result_width(), Some(rows.now));
-    body.map_lines(|lines| returns(lines, rows))
 }
 
 /// A sub-session is a row where it began: what it is, what it was asked, and
@@ -903,58 +890,56 @@ fn calls(item: &Item, tool: &str) -> bool {
 }
 
 /// What stands under the last turn once it is over and nothing runs: why it
-/// failed, then what it cost (`▍ Worked for 15m 11s · done 13:48`). Both are
+/// failed, followed by any informational closing notice. Both are
 /// derived from `last_turn` rather than kept as lines of the surface's own,
 /// and neither belongs to an item, so this is the transcript's last block
 /// rather than one of them: it scrolls with the answer it closes (M84,
 /// 2026-09-08, user-directed — not a row pinned over the composer) and the
 /// next turn takes it away.
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
-    crate::component::closing::props(state)
-        .iter()
-        .map(|props| {
-            crate::component::closing::draw(state, rows.pulled, props, rows.width, rows.now)
-        })
-        .collect()
+    let mut out = live::draw(state, rows);
+    for props in crate::component::closing::props(state) {
+        out.append(crate::component::closing::draw(
+            state,
+            rows.pulled,
+            &props,
+            rows.width,
+            rows.now,
+        ));
+    }
+    out
 }
 
 pub(crate) fn component_closing(
     state: &SessionState,
     props: &bingo_sdk::component::Props,
-    now: Now,
+    width: usize,
 ) -> Vec<Line<'static>> {
-    match props {
-        bingo_sdk::component::Props::InfoNotice(props) => vec![Line::from(Span::styled(
-            format!(
-                " {} {}{}",
-                theme::bullet(),
-                props.text,
-                props
-                    .command
-                    .as_ref()
-                    .map(|c| format!(" /{c}"))
-                    .unwrap_or_default()
-            ),
-            theme::bad(),
-        ))],
-        bingo_sdk::component::Props::TurnDuration(props) => {
-            let when = state
-                .last_turn
-                .as_ref()
-                .map(|turn| crate::worked::words(turn, now.wall, &crate::clock::zone()).1)
-                .unwrap_or_default();
-            vec![Line::from(Span::styled(
-                format!(
-                    " {} {} {}{when}",
-                    theme::mark(),
-                    props.word,
-                    crate::worked::duration(std::time::Duration::from_millis(props.duration_ms))
-                ),
-                theme::dim(),
-            ))]
+    let bingo_sdk::component::Props::InfoNotice(props) = props else {
+        return Vec::new();
+    };
+    let head = match state.last_status() {
+        Some(bingo_sdk::TurnStatus::Failed { error }) => {
+            error.code.as_str().to_lowercase().replace('_', " ")
         }
-        _ => Vec::new(),
+        _ => "error".into(),
+    };
+    let line = crate::layout::grid::fit(
+        Line::from(vec![
+            Span::styled(head, theme::bad()),
+            Span::styled(theme::glyphs::get("sep"), theme::dim()),
+            Span::styled(props.text.clone(), theme::text()),
+        ]),
+        width.saturating_sub(5),
+    );
+    let mut out = under(Span::raw("   "), vec![line], 3, width);
+    if let Some(command) = &props.command {
+        out.push(Line::from(vec![
+            Span::raw("   "),
+            Span::styled(format!("/{command}"), theme::ash()),
+        ]));
     }
+    out
 }
 
 /// A divider from column 1 to the edge, with its reason in the left run.
@@ -1033,21 +1018,17 @@ mod tests {
             .iter()
             .map(|c| c.symbol())
             .collect();
-        assert!(text.contains("✓ read Read note.md"), "{text}");
+        assert!(text.contains("¶ read    Read note.md"), "{text}");
         assert!(text.contains("hello"), "{text}");
     }
 
     /// A member's own transcript: a session a model answers.
     fn drawn(items: Vec<Item>) -> Vec<String> {
         let state = stated(items);
-        rendered_with(&state, &turns_opened(&state, &Folds::new()), &[])
+        rendered_with(&state, &turns_opened(&state, &Folds::new()))
     }
 
-    /// Items no turn holds draw their own rows: `▏ Thought for 2s` over a
-    /// thought's newest rows, `▍ Name(args)` over a folded result. Inside a
-    /// turn the same items fold under its line and are read there opened
-    /// (ADR-0095 §6, `turns_tests`), so these rows are reached only by an item
-    /// outside every turn.
+    /// Turn-less calls use the same step geometry and keep their folded output.
     fn turnless(items: Vec<Item>) -> Vec<String> {
         drawn(items.into_iter().map(loose).collect())
     }
@@ -1061,8 +1042,7 @@ mod tests {
         rendered(&state)
     }
 
-    /// The same items in a surface whose catalogue files `guide` under the
-    /// skills, which is how a `/guide` line is known to be one.
+    /// The same items in a surface with a skill mod's placed command row.
     fn drawn_knowing_the_skill(items: Vec<Item>) -> Vec<String> {
         rendered_with(
             &crate::test_support::with_skill_row(
@@ -1072,20 +1052,19 @@ mod tests {
                 "the wire format",
             ),
             &Folds::new(),
-            &catalogue(),
         )
     }
 
     /// Every item outside any turn, so each draws its own block: these tests
-    /// pin each kind's grammar, and how a turn folds them is `turns_tests`'.
+    /// pin each kind's grammar; turn rows are covered by `turn_tests`.
     fn stated(items: Vec<Item>) -> SessionState {
-        crate::test_support::with_skill_tool_rows(folded(
+        folded(
             items
                 .into_iter()
                 .enumerate()
                 .map(|(i, item)| frame(i as u64 + 1, Event::ItemCompleted { item }))
                 .collect(),
-        ))
+        )
     }
 
     #[test]
@@ -1094,7 +1073,7 @@ mod tests {
         let folds = Folds::new();
         let pictures = Decoded::default();
         let linked = Linked::default();
-        let mut rows = Rows::of(&state, 400, &folds, &[], &pictures, &linked, Now::real());
+        let mut rows = Rows::of(&state, 400, &folds, &pictures, &linked, Now::real());
         for (name, input, look, _, target) in crate::tool_rows::cases() {
             rows.tools = crate::tool_rows::declared(name, look);
             let lines = child_row(&state, name, &input, &rows);
@@ -1104,26 +1083,10 @@ mod tests {
         }
     }
 
-    fn catalogue() -> Vec<CommandSpec> {
-        vec![CommandSpec {
-            opens: false,
-            keys: vec![],
-            hidden: false,
-            name: "guide".into(),
-            aliases: Vec::new(),
-            hint: String::new(),
-            args: bingo_sdk::ArgSpec::Free {
-                hint: String::new(),
-            },
-            instant: false,
-            family: "skill".into(),
-        }]
-    }
-
     /// The transcript without the welcome box, which `welcome.rs` pins on its
     /// own: these tests are about the grammar under it.
     fn rendered(state: &SessionState) -> Vec<String> {
-        rendered_with(state, &Folds::new(), &[])
+        rendered_with(state, &Folds::new())
     }
 
     /// A call on a memory file is drawn as remembering (M84): the verb for the
@@ -1192,18 +1155,18 @@ mod tests {
         assert!(
             lines
                 .iter()
-                .any(|l| l.contains("Recall from memory(the-build)")),
+                .any(|l| l.contains("Recall from memory  the-build")),
             "{lines:?}"
         );
         assert!(
-            lines.iter().any(|l| l.contains("Write memory(MEMORY.md)")),
+            lines.iter().any(|l| l.contains("Write memory  MEMORY.md")),
             "{lines:?}"
         );
         assert!(
-            lines.iter().any(|l| l.contains("Read(src/lib.rs)")),
+            lines.iter().any(|l| l.contains("read    src/lib.rs")),
             "{lines:?}"
         );
-        assert!(!lines.iter().any(|l| l.contains("Read(/data")), "{lines:?}");
+        assert!(!lines.iter().any(|l| l.contains("read(/data")), "{lines:?}");
     }
 
     /// A call that moved the task list is no row: the list under the activity
@@ -1243,7 +1206,7 @@ mod tests {
         assert!(
             board
                 .iter()
-                .any(|l| l.contains("✓ taskcreate write the plan")),
+                .any(|l| l.contains("• taskcreate  write the plan")),
             "{board:?}"
         );
 
@@ -1260,11 +1223,11 @@ mod tests {
         );
     }
 
-    fn rendered_with(state: &SessionState, folds: &Folds, commands: &[CommandSpec]) -> Vec<String> {
+    fn rendered_with(state: &SessionState, folds: &Folds) -> Vec<String> {
         let mut blocks = crate::blocks::Blocks::default();
         let pictures = Decoded::default();
         let linked = Linked::default();
-        let rows = Rows::of(state, 60, folds, commands, &pictures, &linked, scene().1);
+        let rows = Rows::of(state, 60, folds, &pictures, &linked, scene().1);
         let height = blocks.sync(state, &Agents::new(), &rows);
         let mut rows: Vec<String> = blocks
             .window(0, height)
@@ -1305,7 +1268,7 @@ mod tests {
                 ),
                 person("itm_4", "thanks"),
             ]),
-            vec![" › thanks".to_string()],
+            vec!["▍  thanks".to_string()],
             "the nudge, the reading and a copied post are the room's"
         );
     }
@@ -1322,7 +1285,7 @@ mod tests {
                 Some("scout"),
                 "Two nits, else fine."
             )]),
-            vec![" ▍ scout: Two nits, else fine.".to_string()],
+            vec!["▍  scout  Two nits, else fine.".to_string()],
         );
         assert_eq!(
             drawn(vec![delivered(
@@ -1352,7 +1315,7 @@ mod tests {
             ),
         ]);
         let hidden = Folds::from([(ItemId::from_raw("itm_context"), Fold::Open)]);
-        for lines in [rendered(&state), rendered_with(&state, &hidden, &[])] {
+        for lines in [rendered(&state), rendered_with(&state, &hidden)] {
             let text = lines.join("\n");
             assert!(text.contains("Show the current state"), "{text}");
             assert!(text.contains("Review completed"), "{text}");
@@ -1425,7 +1388,7 @@ mod tests {
     fn a_second_line_of_yours_stays_on_the_bar_under_the_first() {
         assert_eq!(
             drawn(vec![person("itm_1", "one\ntwo")]),
-            vec![" › one".to_string(), "   two".to_string()],
+            vec!["▍  one".to_string(), "▍  two".to_string()],
         );
     }
 
@@ -1461,7 +1424,7 @@ mod tests {
         for loud in bingo_sdk::PERSON_SURFACES {
             assert_eq!(
                 drawn(vec![delivered("itm_1", loud, None, "it ended")]),
-                vec![" › it ended".to_string()],
+                vec!["▍  it ended".to_string()],
                 "{loud} is a person surface"
             );
         }
@@ -1483,8 +1446,8 @@ mod tests {
                 bingo_sdk::Voice::Note
             )]),
             vec![
-                " wake check the build again".to_string(),
-                "      and say what you find".to_string(),
+                "▍  wake-up  check the build again".to_string(),
+                "▍  and say what you find".to_string(),
             ],
         );
     }
@@ -1559,7 +1522,7 @@ mod tests {
     /// out again here — it is asserted to be the one above, which is the whole
     /// of what "one skill row" means.
     #[test]
-    fn the_models_own_call_draws_the_same_row() {
+    fn the_models_skill_call_draws_a_step_row() {
         let called = drawn(vec![tool(
             "itm_1",
             "Skill",
@@ -1570,21 +1533,15 @@ mod tests {
             ItemStatus::Completed,
         )]);
         assert_eq!(
-            called.first(),
-            drawn_knowing_the_skill(vec![skill_prompt()]).first(),
-            "one run, one row, whichever door it came through",
-        );
-        assert_eq!(
             called,
             vec![
-                " ❖ Skill(guide) the wire format".to_string(),
-                "  ⎿  Base directory for this skill: /skills/guide".to_string(),
-            ],
-            "the catalogue is not consulted: the call says what it is",
+                "   • skill   guide",
+                "     Base directory for this skill: /skills/guide"
+            ]
         );
+        assert!(!called.join("\n").contains('⎿'));
     }
 
-    /// A skill asked for with nothing to substitute is the signature alone.
     #[test]
     fn a_skill_with_no_arguments_is_the_signature_alone() {
         assert_eq!(
@@ -1595,7 +1552,7 @@ mod tests {
                 None,
                 ItemStatus::Running,
             )]),
-            vec![" ❖ Skill(guide)".to_string()],
+            vec!["   ⠋ skill   guide".to_string()],
         );
     }
 
@@ -1610,7 +1567,7 @@ mod tests {
             None,
             ItemStatus::Completed,
         )]);
-        assert_eq!(lines[1..], ["   ✓ skill the wire format"], "{lines:?}");
+        assert_eq!(lines[..], ["   • skill   the wire format"], "{lines:?}");
     }
 
     /// A message from another session says who sent it, as a room's post does.
@@ -1623,7 +1580,7 @@ mod tests {
                 Some("reviewer"),
                 "done, two nits"
             )]),
-            vec![" ▍ reviewer: done, two nits".to_string()],
+            vec!["▍  reviewer  done, two nits".to_string()],
         );
     }
 
@@ -1652,7 +1609,7 @@ mod tests {
                 ItemStatus::Completed,
             )]),
             vec![
-                " ▍ alpha bravo charlie delta echo foxtrot golf hotel india".to_string(),
+                "   alpha bravo charlie delta echo foxtrot golf hotel india".to_string(),
                 "   juliet".to_string(),
             ],
             "a wrapped answer hangs under its own bullet"
@@ -1669,10 +1626,9 @@ mod tests {
             Some(output),
             ItemStatus::Completed,
         )]);
-        assert!(lines[0].starts_with("   ▾ 1 step · read"), "{lines:?}");
         assert_eq!(
-            lines[1..],
-            ["   ✓ read Cargo.toml", "     Read 3 lines"],
+            lines[..],
+            ["   • read    Cargo.toml", "     Read 3 lines"],
             "the path is named from the session's own directory"
         );
     }
@@ -1690,12 +1646,12 @@ mod tests {
             Some(output),
             ItemStatus::Completed,
         )]);
-        assert_eq!(lines.len(), 2 + 9, "{lines:?}");
+        assert_eq!(lines.len(), 1 + 9, "{lines:?}");
         assert_eq!(lines.last().map(String::as_str), Some("     line 9"));
     }
 
     #[test]
-    fn a_long_result_says_how_much_it_folded_away_and_what_opens_it() {
+    fn a_long_tool_result_keeps_only_its_step_row() {
         let output = ToolOutput::text((1..=9).map(|i| format!("line {i}\n")).collect::<String>());
         let drawn = turnless(vec![tool(
             "itm_1",
@@ -1704,11 +1660,8 @@ mod tests {
             Some(output),
             ItemStatus::Completed,
         )]);
-        assert_eq!(drawn.len(), OUTPUT_ROWS + 2);
-        assert_eq!(
-            drawn.last().map(String::as_str),
-            Some("     … +4 lines (ctrl+o to expand)")
-        );
+        assert_eq!(drawn.len(), 1);
+        assert!(!drawn[0].contains("ctrl+o"));
     }
 
     #[test]
@@ -1720,10 +1673,8 @@ mod tests {
         assert_eq!(
             rendered(&state),
             vec![
-                " ▍ Bash(cargo test)".to_string(),
-                "  ⎿  two".to_string(),
-                "     three".to_string(),
-                "     four".to_string(),
+                "   ⠋ bash    cargo test".to_string(),
+                "             four".to_string()
             ],
         );
     }
@@ -1820,13 +1771,8 @@ mod tests {
             thought_at("itm_3", "Then the crate map.", 3),
         ]);
         assert_eq!(
-            lines[1..],
-            [
-                "     The manifest first.",
-                "   ✓ read Cargo.toml",
-                "     Read 3 lines",
-                "     Then the crate map.",
-            ],
+            lines[..],
+            ["   • read    Cargo.toml", "     Read 3 lines",],
             "{lines:?}"
         );
     }
@@ -1927,9 +1873,7 @@ mod tests {
         );
     }
 
-    /// The same cut under a running tool, whose lines are as long as the
-    /// program chose to make them: [`TAIL_ROWS`] rows, not three lines of any
-    /// width.
+    /// Only the newest output line hangs under a running step, cut to its width.
     #[test]
     fn a_running_tools_long_lines_are_cut_to_rows() {
         let progress = "Compiling bingo-surface-tui v0.1.0 (/tmp/project/crates/bingo-surface-tui)\n\
@@ -1940,7 +1884,8 @@ mod tests {
             loose(running_tool("itm_1", "Bash", progress)),
         )]);
         let drawn = rendered(&state);
-        assert_eq!(drawn.len(), 1 + TAIL_ROWS, "{drawn:?}");
+        assert_eq!(drawn.len(), 2, "{drawn:?}");
+        assert!(drawn[1].starts_with("             Compiling bingo-provider-fake"));
     }
 
     /// The bug the row-wise cut was made for (2026-09-06, user-reported): the
@@ -1991,7 +1936,7 @@ mod tests {
         )]);
         let at = |fold| {
             let folds: Folds = [(ItemId::from_raw("itm_1"), fold)].into_iter().collect();
-            rendered_with(&state, &folds, &[])
+            rendered_with(&state, &folds)
         };
         assert_eq!(
             at(Fold::Peek),
@@ -2047,8 +1992,11 @@ mod tests {
             }),
         )]);
         assert_eq!(
-            lines[1..],
-            ["   ✓ read Read src/lib.rs (1 - 50)", "     pub mod wire;"],
+            lines[..],
+            [
+                "   ¶ read    Read src/lib.rs (1 - 50)",
+                "     pub mod wire;"
+            ],
             "{lines:?}"
         );
     }
@@ -2101,7 +2049,7 @@ mod tests {
             "tool something",
             serde_json::json!({ "external": true }),
         )]);
-        assert_eq!(lines[1..], ["   ✓ other Tool"], "{lines:?}");
+        assert_eq!(lines[..], ["   • other   Tool"], "{lines:?}");
     }
 
     /// A call that failed says so where every other row says it: the bullet.
@@ -2122,11 +2070,11 @@ mod tests {
                 ]
             }),
         )]);
-        let lines = rendered_with(&state, &turns_opened(&state, &Folds::new()), &[]);
+        let lines = rendered_with(&state, &turns_opened(&state, &Folds::new()));
         assert_eq!(
-            lines[1..],
+            lines[..],
             [
-                "   ✗ other toolu_04Bash                             failed",
+                "   • other   toolu_04Bash                           failed",
                 "     no such file",
             ],
             "{lines:?}"
@@ -2177,7 +2125,7 @@ mod tests {
                 receipt_item("itm_2", "Edit", DecisionKind::Deny, Some("use cargo clean")),
             ]),
             vec![
-                " ▍ Edit(src/lib.rs)".to_string(),
+                "   • edit    src/lib.rs                             failed".to_string(),
                 "  ⎿  you: no — use cargo clean".to_string(),
             ],
             "no blank line, and the tool is named once"
@@ -2198,7 +2146,7 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_turn_is_a_bullet_of_its_own() {
+    fn a_failed_turn_names_its_error_above_the_hint() {
         let state = folded(vec![
             frame(1, started("trn_1")),
             frame(
@@ -2216,7 +2164,7 @@ mod tests {
         ]);
         assert_eq!(
             rendered(&state).last().map(String::as_str),
-            Some(" ▍ no route to the provider")
+            Some("   provider unavailable · no route to the provider")
         );
     }
 
@@ -2226,8 +2174,7 @@ mod tests {
         let folds = Folds::new();
         let pictures = Decoded::default();
         let linked = Linked::default();
-        let rows =
-            Rows::of(state, width, &folds, &[], &pictures, &linked, scene().1).measuring(measure);
+        let rows = Rows::of(state, width, &folds, &pictures, &linked, scene().1).measuring(measure);
         let height = blocks.sync(state, &Agents::new(), &rows);
         blocks
             .window(0, height)
@@ -2237,22 +2184,18 @@ mod tests {
             .unwrap_or(0)
     }
 
-    /// Prose fills the terminal, and the measure is the person's (design §7,
-    /// M89): the cap is what they set, not what this crate believes.
+    /// Inside a person's narrower region, prose keeps its measure from
+    /// column 3 (ADR-0097 §3).
     #[test]
-    fn prose_fills_the_width_until_a_person_asks_for_less() {
+    fn prose_keeps_its_measure_inside_a_persons_narrower_region() {
         let state = folded(vec![frame(
             1,
             Event::ItemCompleted {
                 item: assistant("itm_1", &"word ".repeat(60), ItemStatus::Completed),
             },
         )]);
-        let filled = widest_row(&state, 160, None);
-        assert!(filled > 100, "the region is the measure: {filled} cells");
-        assert!(filled <= 160, "and never wider than it: {filled} cells");
-        let capped = widest_row(&state, 160, Some(100));
-        assert!(capped <= 100, "{capped} cells");
-        assert!(capped > 80, "and it uses the measure it has: {capped}");
+        assert_eq!(widest_row(&state, 200, None), 102);
+        assert_eq!(widest_row(&state, 200, Some(60)), 57);
     }
 
     #[test]
@@ -2274,7 +2217,7 @@ mod tests {
         let opened: Folds = [(ItemId::from_raw("itm_1"), Fold::Open)]
             .into_iter()
             .collect();
-        let rows = rendered_with(&state, &opened, &[]).join("\n");
+        let rows = rendered_with(&state, &opened).join("\n");
         assert!(rows.contains("line 9"), "{rows}");
         assert!(!rows.contains("+4 lines"), "{rows}");
     }
@@ -2317,3 +2260,9 @@ mod tests {
         assert_eq!(after.transcript.items().len(), 2, "retained, but not drawn");
     }
 }
+
+#[cfg(test)]
+mod ember_tests;
+
+#[cfg(test)]
+mod turn_tests;

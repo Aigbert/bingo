@@ -65,6 +65,10 @@ thiserror.workspace = true
 libc = "0.2"
 
 [dev-dependencies]
+bingo-tool-fs.workspace = true
+bingo-tool-bash.workspace = true
+bingo-tool-web.workspace = true
+bingo-skills.workspace = true
 bingo-agents.workspace = true
 bingo-tasks.workspace = true
 bingo-provider-fake.workspace = true

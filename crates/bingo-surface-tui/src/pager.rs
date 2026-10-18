@@ -642,7 +642,7 @@ mod tests {
         let in_transcript =
             crate::markdown::render(&table, crate::wrap::measure(160, Some(100)) - 2);
         assert_eq!(widest(&in_transcript), 98, "cut to the measure, with an …");
-        assert_eq!(widest(&sheet_of(&item, 160)), 122, "and whole in the sheet");
+        assert_eq!(widest(&sheet_of(&item, 160)), 123, "and whole in the sheet");
     }
 
     #[test]

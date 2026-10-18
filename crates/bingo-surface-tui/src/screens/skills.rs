@@ -53,25 +53,20 @@ fn typed() -> bingo_sdk::SessionState {
 /// The model's door: the `Skill` call names the skill and hands it the same
 /// words, and the body comes back as the call's output.
 fn called() -> bingo_sdk::SessionState {
-    with_skill_row(
-        folded(vec![
-            item(1, user("itm_1", "read the guide on the wire format")),
-            item(
-                2,
-                tool(
-                    "itm_2",
-                    "Skill",
-                    json!({"name": "guide", "arguments": "the wire format"}),
-                    Some(ToolOutput::text(body())),
-                    ItemStatus::Completed,
-                ),
+    folded(vec![
+        item(1, user("itm_1", "read the guide on the wire format")),
+        item(
+            2,
+            tool(
+                "itm_2",
+                "Skill",
+                json!({"name": "guide", "arguments": "the wire format"}),
+                Some(ToolOutput::text(body())),
+                ItemStatus::Completed,
             ),
-            item(3, assistant("itm_3", ANSWER, ItemStatus::Completed)),
-        ]),
-        "itm_2",
-        "guide",
-        "the wire format",
-    )
+        ),
+        item(3, assistant("itm_3", ANSWER, ItemStatus::Completed)),
+    ])
 }
 
 /// The skill's page without the line that asked for it: what the command's

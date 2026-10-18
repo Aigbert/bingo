@@ -286,7 +286,7 @@ pub struct Ui {
     pub linked: Linked,
     /// A newer release than this build, as the start-up check found it (M63).
     pub welcome: crate::welcome::Details,
-    /// The widest a line of prose is drawn, where a person set a measure
+    /// The region cap, inside which prose keeps its 100-cell measure
     /// (`tui.measure`, [`crate::settings`]; design §7). Terminal-side like the
     /// fold and the scroll, and read once at the start: it is a fact about
     /// this machine, not about the conversation.

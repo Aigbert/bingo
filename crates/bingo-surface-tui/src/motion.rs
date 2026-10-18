@@ -44,12 +44,9 @@ fn screen(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> String {
 /// the activity row, the border on the input box's own row.
 fn leading_style(tree: &Tree, ui: &mut crate::ui::Ui, now: Now, needle: &str) -> Style {
     let painted = crate::painted::painted(80, 24, tree, ui, now);
-    let runs = if needle == "burrowing" {
-        painted.at(ui.shown.regions.activity.bottom().saturating_sub(1))
-    } else {
-        painted.row(needle)
-    };
-    runs.first()
+    let runs = painted.row(needle);
+    runs.iter()
+        .find(|(text, _)| !text.trim().is_empty())
         .map(|(_, style)| *style)
         .unwrap_or_else(|| panic!("no row carries {needle:?}"))
 }
@@ -75,40 +72,6 @@ fn turning() -> Tree {
     solo(&folded(vec![frame(1, started("trn_1"))]))
 }
 
-#[test]
-fn waiting_caret_blinks_without_changing_its_glyph() {
-    let tree = turning();
-    let (mut ui, now) = scene();
-    for ms in [530, 1060, 1590] {
-        let at = later(now, ms);
-        let style = leading_style(&tree, &mut ui, at, "burrowing");
-        let expected = if ms / 530 % 2 == 1 {
-            theme::dim()
-        } else {
-            theme::presence()
-        };
-        assert_eq!(style, theme::as_drawn(expected));
-        assert!(row(&tree, &mut ui, at, "burrowing").starts_with(" ▍"));
-    }
-}
-
-#[test]
-fn the_blocked_caret_breathes_on_the_tool_period() {
-    let (mut ui, now) = mid_turn();
-    theme::with(crate::painted::truecolor(), || {
-        for ms in [0, 550, 1100, 1650, 2200] {
-            let at = later(now, ms);
-            assert_eq!(
-                leading_style(&solo(&calling()), &mut ui, at, "burrowing"),
-                theme::as_drawn(theme::breath(crate::clock::breath(
-                    at,
-                    Duration::from_millis(2200)
-                )))
-            );
-        }
-    });
-}
-
 /// A state whose one item is still arriving, and one whose one item is a
 /// call the turn is waiting on.
 fn answering() -> bingo_sdk::SessionState {
@@ -132,21 +95,17 @@ fn calling() -> bingo_sdk::SessionState {
 fn arriving_words_hold_the_caret_steady_while_tools_breathe() {
     let (mut ui, now) = mid_turn();
     let at = later(now, 250);
-    crate::theme::with(crate::painted::truecolor(), || {
-        let mut drawn =
-            |state: &bingo_sdk::SessionState| leading_style(&solo(state), &mut ui, at, "burrowing");
-        let on = |period| {
-            theme::as_drawn(theme::breath(crate::clock::breath(
-                at,
-                Duration::from_millis(period),
-            )))
-        };
-        assert_eq!(drawn(&answering()), theme::as_drawn(theme::glow()));
-        assert_eq!(drawn(&calling()), on(2_200));
-        assert_ne!(
-            drawn(&answering()),
-            drawn(&calling()),
-            "and the two rhythms are told apart on the screen"
+    theme::with(crate::painted::truecolor(), || {
+        let answer = screen(&solo(&answering()), &mut ui, at);
+        assert!(answer.contains("half a sen▍"), "{answer}");
+        assert!(!answer.contains("working"));
+        let tool = screen(&solo(&calling()), &mut ui, at);
+        assert!(!tool.contains("working"), "{tool}");
+        let working = screen(&turning(), &mut ui, at);
+        assert!(working.contains("working"), "{working}");
+        assert_eq!(
+            leading_style(&turning(), &mut ui, at, "working"),
+            theme::as_drawn(theme::glow())
         );
     });
 }
@@ -180,12 +139,36 @@ fn the_wait_breathes_at_the_pace_a_tool_holds_a_turn_and_leaves_the_box_dim() {
     let at = later(now, 250);
     let tree = waited_on(1);
     crate::theme::with(crate::painted::truecolor(), || {
-        assert_eq!(
-            leading_style(&tree, &mut ui, at, "Waiting for"),
-            theme::as_drawn(theme::breath(crate::clock::breath(
-                at,
-                Duration::from_millis(2_200)
-            ))),
+        let view = bingo_sdk::View::Text {
+            children: vec![bingo_sdk::view::TextChild::String(format!(
+                " {} ",
+                theme::mark()
+            ))],
+            style: bingo_sdk::view::TextStyle {
+                color: Some("presence".into()),
+                motion: Some(Box::new(bingo_sdk::view::TextMotion::Breathe {
+                    with: "dim".into(),
+                    period_ms: 2200,
+                    depth: 1.0,
+                })),
+                ..Default::default()
+            },
+        };
+        let expected = crate::views::marked(&view, 80, &crate::views::Marks::at(at));
+        let row = crate::activity::components(&tree, &ui, 80, at);
+        let ink = row
+            .lines
+            .iter()
+            .find(|line| line.to_string().contains("Waiting for"))
+            .unwrap()
+            .spans[0]
+            .style;
+        assert_eq!(ink, expected.lines[0].spans[0].style);
+        assert_eq!(row.next, expected.next);
+        assert!(
+            crate::activity::components(&tree, &ui, 80, still(at))
+                .next
+                .is_none()
         );
     });
     assert_eq!(
@@ -199,7 +182,7 @@ fn the_wait_breathes_at_the_pace_a_tool_holds_a_turn_and_leaves_the_box_dim() {
 fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
     let (mut ui, now) = mid_turn();
     let screen = screen(&solo(&state()), &mut ui, now);
-    assert!(!screen.contains("burrowing"), "{screen}");
+    assert!(!screen.contains("working"), "{screen}");
     assert!(
         !screen.contains("bingo▍") && screen.contains("   ▍Ask anything"),
         "{screen}"
@@ -249,8 +232,9 @@ fn tail(ui: &mut crate::ui::Ui, now: Now, at: Now) -> Vec<Style> {
     runs
 }
 
+/// Arrival, not time, advances the tail; the former 180 ms settling check does not apply.
 #[test]
-fn a_comet_tail_cools_from_the_glow_to_the_text_behind_it() {
+fn an_answer_tail_blends_without_adding_its_own_pace() {
     let (mut ui, now) = mid_turn();
     crate::theme::with(crate::painted::truecolor(), || {
         let fresh = tail(&mut ui, now, now);
@@ -262,15 +246,37 @@ fn a_comet_tail_cools_from_the_glow_to_the_text_behind_it() {
         assert_ne!(fresh.first(), fresh.last(), "and the ramp is a ramp");
 
         let warm = tail(&mut ui, now, later(now, 75));
-        assert_ne!(warm, fresh, "the whole tail cools as it ages");
-        let cool = tail(&mut ui, now, later(now, 150));
-        assert_ne!(cool, warm);
-        let cold = tail(&mut ui, now, later(now, 180));
         assert_eq!(
-            cold,
-            tail(&mut ui, now, still(later(now, 180))),
-            "and after 180 ms the row is drawn as a still surface draws it"
+            warm, fresh,
+            "arrival, not a second clock, advances the tail"
         );
+        let (mut reduced_ui, _) = scene();
+        let reduced = crate::painted::painted(80, 24, &streaming(), &mut reduced_ui, still(now));
+        let cells: Vec<_> = reduced
+            .row("still warm")
+            .into_iter()
+            .flat_map(|(text, ink)| text.chars().map(move |c| (c, ink)).collect::<Vec<_>>())
+            .filter(|(c, _)| *c != '▍')
+            .collect();
+        for (_, ink) in cells.iter().rev().take(10) {
+            assert_eq!(*ink, theme::as_drawn(theme::text()));
+        }
+        let mut state = answering();
+        state.apply(&frame(
+            3,
+            Event::ItemCompleted {
+                item: assistant(
+                    "itm_1",
+                    "the last cells are still warm",
+                    ItemStatus::Completed,
+                ),
+            },
+        ));
+        state.apply(&frame(4, completed("trn_1", TurnStatus::Completed)));
+        let tree = solo(&state);
+        let moving = crate::painted::painted(80, 24, &tree, &mut ui, now).row("still warm");
+        let resting = crate::painted::painted(80, 24, &tree, &mut ui, still(now)).row("still warm");
+        assert_eq!(moving, resting);
     });
 }
 
@@ -296,7 +302,7 @@ fn running_bash() -> Vec<bingo_sdk::Frame> {
 
 /// The glyph a running step's row starts with, on the frame at `now`.
 fn spinner_at(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> String {
-    let drawn = row(tree, ui, now, "bash cargo test");
+    let drawn = row(tree, ui, now, "bash    cargo test");
     drawn.trim_start().chars().take(1).collect()
 }
 
@@ -322,8 +328,8 @@ fn a_running_step_spins_in_presence_on_the_wall_clock() {
     crate::theme::with(crate::painted::truecolor(), || {
         assert_eq!(
             style_of(&tree, &mut ui, now, &start),
-            theme::as_drawn(theme::presence()),
-            "in presence"
+            theme::as_drawn(theme::glow()),
+            "in glow"
         );
     });
 }
@@ -334,84 +340,13 @@ fn a_running_step_spins_in_presence_on_the_wall_clock() {
 fn a_turn_that_answers_at_once_never_flashes_a_row() {
     let tree = turning();
     let (mut ui, now) = scene();
-    for ms in [0i64, 100, 200, 299] {
+    for ms in [0i64, 100, 200, 499] {
         let screen = screen(&tree, &mut ui, later(now, ms));
-        assert!(!screen.contains("burrowing"), "at {ms} ms: {screen}");
+        assert!(!screen.contains("working"), "at {ms} ms: {screen}");
     }
     assert!(
-        screen(&tree, &mut ui, later(now, 300)).contains("burrowing"),
-        "and it appears at 300 ms"
-    );
-}
-
-#[test]
-fn the_activity_row_says_a_verb_a_clock_and_what_the_turn_has_said() {
-    let mut state = folded(vec![frame(1, started("trn_1"))]);
-    state.apply(&frame(
-        2,
-        Event::TurnUsage {
-            turn: bingo_sdk::TurnId::from_raw("trn_1"),
-            usage: bingo_sdk::Usage {
-                output_tokens: 1_200,
-                ..Default::default()
-            },
-            context: Default::default(),
-        },
-    ));
-    let (mut ui, now) = scene();
-    let tree = solo(&state);
-    let mut row = |ms| row(&tree, &mut ui, later(now, ms), "burrowing");
-    assert_eq!(
-        row(4_000),
-        " ▍ burrowing · 4s",
-        "the verb is drawn from the turn's own id, so the row never changes its mind"
-    );
-    assert!(row(5_000).contains("· 5s"), "the clock ticks once a second");
-}
-
-/// The answer to the key, on the key's own frame. The row keeps everything
-/// that says the turn is still alive — the sparkle breathes, the clock ticks —
-/// and loses only the hint, whose key has just been pressed.
-#[test]
-fn a_turn_asked_to_stop_says_so_and_keeps_its_sparkle_and_its_clock() {
-    let state = folded(vec![frame(1, started("trn_1"))]);
-    let tree = solo(&state);
-    let (mut ui, now) = scene();
-    ui.stop_asked = Some(bingo_sdk::TurnId::from_raw("trn_1"));
-    let mut row = |ms| row(&tree, &mut ui, later(now, ms), crate::activity::STOPPING);
-    assert_eq!(row(4_000), " ▍ Stopping · 4s");
-    // The sparkle is at another of its four glyphs a second later, which is
-    // the point: the row is still alive while it winds down.
-    assert!(
-        row(5_000).ends_with(" Stopping · 5s"),
-        "the clock ticks on: {}",
-        row(5_000)
-    );
-    assert!(
-        !row(4_000).contains("esc to interrupt"),
-        "the key it named has been pressed"
-    );
-    assert_eq!(
-        leading_style(&tree, &mut ui, later(now, 4_000), crate::activity::STOPPING),
-        theme::as_drawn(theme::dim())
-    );
-}
-
-/// The row that answers a key is never held back by the delay that spares a
-/// fast turn its flash: a person who pressed `esc` at 40 ms must see it.
-#[test]
-fn stopping_outruns_the_activity_row_s_own_delay() {
-    let state = folded(vec![frame(1, started("trn_1"))]);
-    let tree = solo(&state);
-    let (mut ui, now) = scene();
-    assert!(
-        !screen(&tree, &mut ui, later(now, 40)).contains("burrowing"),
-        "a turn this young says nothing on its own"
-    );
-    ui.stop_asked = Some(bingo_sdk::TurnId::from_raw("trn_1"));
-    assert!(
-        screen(&tree, &mut ui, later(now, 40)).contains(crate::activity::STOPPING),
-        "but the answer to a key is not a cue, and does not wait"
+        screen(&tree, &mut ui, later(now, 500)).contains("working"),
+        "and it appears at 500 ms"
     );
 }
 
@@ -423,34 +358,8 @@ fn the_next_turn_is_not_the_one_that_was_stopped() {
     let (mut ui, now) = scene();
     ui.stop_asked = Some(bingo_sdk::TurnId::from_raw("trn_1"));
     let drawn = screen(&solo(&state), &mut ui, later(now, 4_000));
-    assert!(drawn.contains("sniffing around · 4s"), "{drawn}");
-    assert!(!drawn.contains(crate::activity::STOPPING), "{drawn}");
-}
-
-#[test]
-fn every_verb_is_one_of_bingos_own() {
-    let words = [
-        "kindling",
-        "stoking",
-        "smouldering",
-        "foraging",
-        "tracking",
-        "burrowing",
-        "sniffing around",
-        "pouncing",
-        "sifting",
-        "tinkering",
-    ];
-    let (mut ui, now) = mid_turn();
-    for id in ["trn_1", "trn_2", "trn_9", "trn_ffff", "trn_01J"] {
-        let state = folded(vec![frame(1, started(id))]);
-        let row = screen(&solo(&state), &mut ui, now)
-            .lines()
-            .find(|line| words.iter().any(|word| line.contains(word)))
-            .expect("the activity row")
-            .to_string();
-        assert!(words.iter().any(|word| row.contains(word)), "{id}: {row}");
-    }
+    assert!(drawn.contains("working"), "{drawn}");
+    assert!(!drawn.contains("stopping"), "{drawn}");
 }
 
 // ---- a card's guard -----------------------------------------------------
@@ -644,8 +553,9 @@ fn the_transcript_crossfades_through_dim_into_the_session_stepped_into() {
     let mut tree = spawned_tree(busy_child("reviewer"));
     tree.show(&child_id());
     let (mut ui, now) = scene();
-    let row =
-        |ui: &mut crate::ui::Ui, at| crate::painted::painted(80, 24, &tree, ui, at).row("read ×3");
+    let row = |ui: &mut crate::ui::Ui, at| {
+        crate::painted::painted(80, 24, &tree, ui, at).row("read    src/lib.rs")
+    };
     let plain = row(&mut ui, now);
 
     ui.switched = Some(now.instant);
@@ -667,15 +577,15 @@ fn the_transcript_crossfades_through_dim_into_the_session_stepped_into() {
 fn motion_off_holds_every_cue_at_its_resting_frame() {
     let tree = turning();
     let (mut ui, now) = mid_turn();
-    let still = still(later(now, 450));
+    let still = still(later(now, 600));
     assert_eq!(
-        leading_style(&tree, &mut ui, still, "burrowing"),
-        theme::as_drawn(theme::presence()),
-        "the sparkle rests at presence"
+        leading_style(&tree, &mut ui, still, "working"),
+        theme::as_drawn(theme::glow()),
+        "the still mark keeps its glow"
     );
-    let drawn = row(&tree, &mut ui, still, "burrowing");
+    let drawn = row(&tree, &mut ui, still, "working");
     assert!(
-        drawn.starts_with(" ▍"),
+        drawn.starts_with("   ◌"),
         "and holds its first glyph: {drawn}"
     );
 
@@ -742,7 +652,7 @@ fn a_finished_turn_takes_the_whole_of_the_presence_with_it() {
     ]);
     let (mut ui, now) = mid_turn();
     let screen = screen(&solo(&state), &mut ui, now);
-    assert!(!screen.contains("burrowing"), "{screen}");
+    assert!(!screen.contains("working"), "{screen}");
     assert_eq!(
         composer_style(&solo(&state), &mut ui, still(now)),
         theme::as_drawn(theme::glow().patch(crate::dock::ground())),
@@ -773,7 +683,6 @@ fn an_idle_frame_is_the_same_frame_a_second_later() {
 #[test]
 fn the_rhythms_are_the_ones_the_design_names() {
     assert_eq!(FRAME, Duration::from_millis(33));
-    assert_eq!(crate::transcript::COMET, Duration::from_millis(180));
     assert_eq!(theme::PULSE, Duration::from_secs(1));
     assert_eq!(crate::ui::NOTICE, Duration::from_millis(2700));
     assert_eq!(crate::ui::SWITCH, FRAME * 2);

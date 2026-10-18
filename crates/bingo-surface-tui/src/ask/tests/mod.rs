@@ -45,6 +45,7 @@ fn scene_for(mut open: Interaction, command: bool) -> (crate::tree::Tree, Ui, cr
     ]);
     state.config.kernel["render"] = json!({"Question":[{}]});
     let (mut ui, now) = scene();
+    catalogue(&mut ui);
     ui.dialog.focus_on(state.interactions.first());
     (solo(&state), ui, still(now))
 }
@@ -372,7 +373,7 @@ fn a_single_answered_step_uses_the_singular() {
     ]);
     let (mut ui, now) = scene();
     let screen = draw_sized(108, 30, &state, &mut ui, still(now));
-    assert!(screen.contains("▸ 1 step ·"), "{screen}");
-    assert!(screen.contains("· you: Beta"), "{screen}");
+    assert!(screen.contains("• askuserquestion"), "{screen}");
+    assert!(!screen.contains("1 step"), "{screen}");
     assert!(!screen.contains("Form"), "{screen}");
 }

@@ -212,20 +212,6 @@ fn a_finished_thought_shuts_where_the_ring_comes_round() {
     );
 }
 
-/// Once more: the whole of it where it happened, still dim and still under the
-/// `⎿`, because it is still working and not an answer.
-#[test]
-fn a_finished_thought_opens_whole_where_it_sits() {
-    let (mut ui, now) = scene();
-    ui.folds.insert(the_thought(), Fold::Open);
-    both(
-        "reasoning_open",
-        &solo(&a_thought_worth_reading()),
-        &mut ui,
-        now,
-    );
-}
-
 /// Anthropic's redacted thinking, and an OpenAI turn the provider summarised
 /// nothing of: the row alone. Nothing folds, so nothing is promised.
 #[test]

@@ -2,7 +2,9 @@
 source: crates/bingo-surface-tui/src/screens.rs
 expression: "inked(\"json\", \"{\\n  \\\"model\\\": \\\"gpt-5.4\\\",\\n  \\\"stream\\\": true\\n}\\n\")"
 ---
-    ⟨dim⟩{⟨text⟩                      ⟨?⟩json⟨dim⟩
-    ⟨dim⟩  ⟨text⟩"model"⟨str⟩: ⟨text⟩"gpt-5.4"⟨str⟩,⟨text⟩      ⟨?⟩
-    ⟨dim⟩  ⟨text⟩"stream"⟨str⟩: ⟨text⟩true⟨kw⟩           ⟨?⟩
-    ⟨dim⟩}⟨text⟩                          ⟨?⟩
+                                                      ⟨well⟩json⟨dim⟩  ⟨well⟩
+  ⟨well⟩{⟨text⟩                                                         ⟨well⟩
+  ⟨well⟩  ⟨text⟩"model"⟨str⟩: ⟨text⟩"gpt-5.4"⟨str⟩,⟨text⟩                                     ⟨well⟩
+  ⟨well⟩  ⟨text⟩"stream"⟨str⟩: ⟨text⟩true⟨kw⟩                                          ⟨well⟩
+  ⟨well⟩}⟨text⟩                                                         ⟨well⟩
+                                                            ⟨well⟩

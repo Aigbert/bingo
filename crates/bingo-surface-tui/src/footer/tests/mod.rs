@@ -319,10 +319,11 @@ fn reduced_activity_wakes_for_its_first_row() {
     assert_eq!(ui.shown.regions.activity.height, 0);
     assert_eq!(
         ui.shown.deadline(),
-        Some(now.instant + std::time::Duration::from_millis(300))
+        Some(now.instant + std::time::Duration::from_millis(500))
     );
-    draw_tree(80, 24, &tree, &mut ui, still(later(now, 300)));
-    assert!(ui.shown.regions.activity.height > 0);
+    draw_tree(80, 24, &tree, &mut ui, still(later(now, 500)));
+    assert_eq!(ui.shown.regions.activity.height, 0);
+    assert!(draw_tree(80, 24, &tree, &mut ui, still(later(now, 500))).contains("working"));
 }
 
 #[test]
@@ -443,4 +444,117 @@ fn needs_you_calls_the_main_session_bingo_in_glow() {
             .style,
         super::ink("glow")
     );
+}
+
+#[test]
+fn ember_full_frames_match_the_prototype() {
+    for name in [
+        "live",
+        "done",
+        "ascii-live",
+        "ascii-done",
+        "reduced-live",
+        "small-done",
+        "mode",
+        "mode-later",
+    ] {
+        let capture = Capture::load(name).spinners(if matches!(name, "live" | "ascii-live") {
+            &[(25, 3)]
+        } else {
+            &[]
+        });
+        let (state, mut ui) = full_fixture(&capture);
+        capture.render(|| {
+            let size = capture.size();
+            let screen = drawn(
+                size.width,
+                size.height,
+                &solo(&state),
+                &mut ui,
+                capture.now(),
+            );
+            assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+        });
+    }
+}
+
+fn full_fixture(capture: &Capture) -> (SessionState, Ui) {
+    let (dock, mut ui) = fixture(capture);
+    let (mut state, _) = crate::test_support::ember::story::scene(&capture.entry.file);
+    let slots = bingo_sdk::slot::placed(&dock);
+    state.summary = dock.summary;
+    state.config = dock.config;
+    state.extensions = dock.extensions;
+    state.signals = dock.signals;
+    if let Some(call) = state
+        .transcript
+        .items()
+        .iter()
+        .find(|item| item.status == ItemStatus::Running)
+    {
+        let id = call.id.clone();
+        let slots: Vec<_> = slots
+            .into_iter()
+            .filter_map(|placed| match placed.slot {
+                bingo_sdk::slot::Slot::Row { actions, .. } => Some(bingo_sdk::slot::Slot::Row {
+                    item: id.clone(),
+                    actions,
+                    mark: None,
+                    title: None,
+                    badge: None,
+                    caption: None,
+                    body: None,
+                }),
+                _ => None,
+            })
+            .collect();
+        apply(
+            &mut state,
+            0,
+            extended(
+                "bingo.bash",
+                "running",
+                bingo_sdk::slot::with(json!({}), slots),
+            ),
+        );
+    }
+    ui.catalogs.values.insert(
+        "tools".into(),
+        crate::test_support::ember::story::catalogue(),
+    );
+    (state, ui)
+}
+
+#[test]
+fn ember_live_motion_is_only_side_light_spinner_and_comet() {
+    let capture = Capture::load("live");
+    capture.render(|| {
+        let (state, mut ui) = full_fixture(&capture);
+        let mut now = later(capture.now(), 700);
+        // The budget measures stream motion and the comet after the caret rests.
+        now.instant += std::time::Duration::from_secs(10);
+        let size = capture.size();
+        let a = drawn(size.width, size.height, &solo(&state), &mut ui, now);
+        let edge = ui.shown.regions.composer.y;
+        let b = drawn(
+            size.width,
+            size.height,
+            &solo(&state),
+            &mut ui,
+            later(now, 500),
+        );
+        let cells = moved(a.buffer(), b.buffer());
+        assert!(
+            cells.contains(&(0, 19))
+                && cells.contains(&(3, 25))
+                && cells.iter().any(|(_, y)| *y == edge),
+            "{cells:?}"
+        );
+        assert!(
+            cells
+                .iter()
+                .all(|cell| [(0, 19), (3, 25)].contains(cell) || cell.1 == edge),
+            "{cells:?}"
+        );
+    });
 }

@@ -58,46 +58,46 @@ pub fn resolve(name: &str, input: &Value, tools: &Looks, ascii: bool) -> Step {
         state: StepState::Done,
         upshot: None,
         answer: None,
-        why: None,
         elapsed_ms: None,
+        why: None,
         landed_at: None,
     }
 }
 
 #[cfg(test)]
-pub(crate) fn cases() -> Vec<(&'static str, Value, ToolLook, String, &'static str)> {
-    vec![
-        (
-            "Bash",
-            serde_json::json!({"command":"echo first\necho second", "description":"wrong"}),
-            ToolLook::new('$', "run").target("command", bingo_sdk::Reads::Command),
-            "echo first\necho second".into(),
-            "echo first",
-        ),
-        (
-            "WebFetch",
-            serde_json::json!({"url":format!("https://example.test/{}", "a".repeat(160)), "prompt":"wrong"}),
-            ToolLook::new('↓', "fetch")
-                .ascii('v')
-                .target("url", bingo_sdk::Reads::Path),
-            format!("https://example.test/{}", "a".repeat(160)),
-            "https://example.test/aa…aaaaaaaaaaaaaaaaaaaaaaaa",
-        ),
-    ]
-}
-
-#[cfg(test)]
-pub(crate) fn declared(name: &str, look: ToolLook) -> Looks {
-    Looks::of(&[CatalogEntry {
-        id: name.into(),
-        label: name.into(),
-        meta: serde_json::json!({"look":look,"traits":bingo_sdk::ToolTraits::read_only()}),
-    }])
-}
+pub(crate) use tests::{cases, declared};
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    pub(crate) fn cases() -> Vec<(&'static str, Value, ToolLook, String, &'static str)> {
+        vec![
+            (
+                "Bash",
+                serde_json::json!({"command":"echo first\necho second", "description":"wrong"}),
+                ToolLook::new('$', "run").target("command", bingo_sdk::Reads::Command),
+                "echo first\necho second".into(),
+                "echo first",
+            ),
+            (
+                "WebFetch",
+                serde_json::json!({"url":format!("https://example.test/{}", "a".repeat(160)), "prompt":"wrong"}),
+                ToolLook::new('↓', "fetch")
+                    .ascii('v')
+                    .target("url", bingo_sdk::Reads::Path),
+                format!("https://example.test/{}", "a".repeat(160)),
+                "https://example.test/aa…aaaaaaaaaaaaaaaaaaaaaaaa",
+            ),
+        ]
+    }
+
+    pub(crate) fn declared(name: &str, look: ToolLook) -> Looks {
+        Looks::of(&[CatalogEntry {
+            id: name.into(),
+            label: name.into(),
+            meta: serde_json::json!({"look":look,"traits":bingo_sdk::ToolTraits::read_only()}),
+        }])
+    }
 
     #[test]
     fn declared_targets_survive_long_and_multiline_inputs() {

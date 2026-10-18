@@ -2,17 +2,17 @@
 source: crates/bingo-surface-tui/src/screens/windows.rs
 expression: screen.clone()
 ---
-" › turn 05: do the thing                                                        "
+"   turn 05: do the thing                                                        "
 "                                                                                "
-" › turn 06: do the thing                                                        "
+"   turn 06: do the thing                                                        "
 "                                                                                "
-" › turn 07: do the thing                                                        "
+"   turn 07: do the thing                                                        "
 "                                                                                "
-" › turn 08: do the thing                                                        "
+"   turn 08: do the thing                                                        "
 "                                                                                "
-" › turn 09: do the thing                                                        "
+"   turn 09: do the thing                                                        "
 "                                                                                "
-" › turn 10: do the thing                                                        "
+"   turn 10: do the thing                                                        "
 "Rewind to                                                                       "
 "  …                                                                             "
 "  turn 11: do the thing · 1 item                                                "

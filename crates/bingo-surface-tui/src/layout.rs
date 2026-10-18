@@ -113,6 +113,10 @@ impl Layout {
 
     /// Visible cache ranges exclude the rows replaced by an inline card.
     pub fn visible_lines(&self, height: usize) -> Vec<std::ops::Range<usize>> {
+        // An empty stream still exposes its insertion point for a row's arrival.
+        if self.height == 0 && height > 0 {
+            return std::iter::once(0..1).collect();
+        }
         let mut ranges: Vec<std::ops::Range<usize>> = Vec::new();
         for line in (0..height).filter_map(|row| self.line_at(row)) {
             if let Some(last) = ranges.last_mut()

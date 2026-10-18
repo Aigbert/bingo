@@ -206,7 +206,7 @@ fn layout_running_turn_schedules_each_motion_sample() {
     let next = layout(first, &tree, &ui, SIZE, later_sample);
     assert_eq!(
         next.deadline(),
-        Some(later_sample.instant + crate::clock::FRAME)
+        Some(crate::spinner::next(later_sample).min(later_sample.instant + crate::clock::FRAME))
     );
 }
 
@@ -254,7 +254,7 @@ fn visible_cache_ranges_skip_inline_replacements() {
 }
 
 #[test]
-fn round3_idle_nonterminal_item_schedules_nothing() {
+fn idle_nonterminal_item_schedules_nothing() {
     let (ui, now) = scene();
     let mut unfinished = user("unfinished", "a resumed item");
     unfinished.status = bingo_sdk::ItemStatus::Running;

@@ -375,7 +375,8 @@ fn check_motion_depth(
     match colors {
         theme::Colors::True(_) | theme::Colors::Indexed(_) => {
             let ink = theme::palette().named(own.unwrap_or("fg")).unwrap();
-            let expected = theme::literal(theme::ink::mix(ink, theme::palette().glow(), 0.5));
+            let weight = 0.5;
+            let expected = theme::literal(theme::ink::mix(ink, theme::palette().glow(), weight));
             assert_eq!(draw(&moving, middle)[(0, 0)].fg, expected.fg.unwrap());
         }
         _ => {
@@ -404,7 +405,7 @@ fn nested_motion_uses_its_inherited_ink_and_unknown_motion_is_still() {
             theme::ink::mix(theme::LIGHT.good(), theme::LIGHT.glow(), 0.5)
         );
         let unknown: View = serde_json::from_value(
-            json!({"kind":"Text", "motion":{"kind":"shimmer"}, "children":["ink"]}),
+            json!({"kind":"Text", "motion":{"kind":"ripple"}, "children":["ink"]}),
         )
         .unwrap();
         assert_eq!(draw(&unknown, now), draw(&view(TextStyle::default()), now));
@@ -430,7 +431,9 @@ fn a_breathing_row_off_screen_neither_redraws_nor_schedules() {
         ));
     }
     theme::with(crate::painted::daylight(), || {
-        let (mut ui, now) = scene();
+        let (mut ui, born) = scene();
+        // Only the off-screen row could wake this frame; the caret has rested.
+        let now = later(born, 10_000);
         let tree = solo(&state);
         draw_tree(80, 24, &tree, &mut ui, now);
         let (_, end) = ui
@@ -439,14 +442,11 @@ fn a_breathing_row_off_screen_neither_redraws_nor_schedules() {
             .span(&bingo_sdk::ItemId::from_raw("user"))
             .unwrap();
         assert!(end <= ui.shown.top);
-        assert_eq!(ui.shown.deadline(), Some(now.instant + crate::clock::FRAME));
+        assert_eq!(ui.shown.deadline(), None);
         let renders = ui.shown.blocks.renders();
         draw_tree(80, 24, &tree, &mut ui, later(now, 900));
         assert_eq!(ui.shown.blocks.renders(), renders);
-        assert_eq!(
-            ui.shown.deadline(),
-            Some(later(now, 900).instant + crate::clock::FRAME)
-        );
+        assert_eq!(ui.shown.deadline(), None);
         ui.scroll.home(
             ui.shown.height,
             ui.shown.regions.transcript.height as usize,
@@ -459,7 +459,7 @@ fn a_breathing_row_off_screen_neither_redraws_nor_schedules() {
 }
 
 #[test]
-fn round3_unknown_motion_ink_has_no_deadline() {
+fn unknown_motion_ink_has_no_deadline() {
     theme::with(crate::painted::daylight(), || {
         let now = scene().1;
         for motion in [
@@ -483,5 +483,56 @@ fn round3_unknown_motion_ink_has_no_deadline() {
             assert_eq!(drawn.lines, render(&moving, 12));
             assert_eq!(drawn.next, None);
         }
+    });
+}
+
+#[test]
+fn linear_notes_and_eased_landings_sample_distinct_curves() {
+    theme::with(crate::painted::daylight(), || {
+        let now = Now {
+            wall: jiff::Timestamp::UNIX_EPOCH,
+            ..scene().1
+        };
+        for (curve, weight) in [
+            (None, 0.5),
+            (Some(bingo_sdk::view::FadeCurve::EaseOut), 0.125),
+        ] {
+            let v = view(TextStyle {
+                color: Some("dim".into()),
+                motion: Some(Box::new(TextMotion::Fade {
+                    from: "glow".into(),
+                    at_ms: 0,
+                    ms: 420,
+                    curve,
+                })),
+                ..Default::default()
+            });
+            let expected = theme::ink::mix(theme::palette().dim(), theme::palette().glow(), weight);
+            assert_eq!(draw(&v, later(now, 210))[(0, 0)].fg, expected);
+            assert_eq!(marked(&v, 12, &Marks::at(later(now, 420))).next, None);
+        }
+    });
+}
+
+#[test]
+fn shimmer_samples_each_cell_and_schedules_only_with_motion() {
+    theme::with(crate::painted::daylight(), || {
+        let now = later(scene().1, 300);
+        let v = view(TextStyle {
+            color: Some("muted".into()),
+            motion: Some(Box::new(TextMotion::Shimmer)),
+            ..Default::default()
+        });
+        let drawn = draw(&v, now);
+        for x in 0..3 {
+            let expected = theme::ink::mix(
+                theme::palette().named("muted").unwrap(),
+                theme::palette().glow(),
+                crate::clock::shimmer(now, x, 3),
+            );
+            assert_eq!(drawn[(x as u16, 0)].fg, expected);
+        }
+        assert!(marked(&v, 12, &Marks::at(now)).next.is_some());
+        assert_eq!(marked(&v, 12, &Marks::at(still(now))).next, None);
     });
 }

@@ -52,8 +52,6 @@ pub struct ChromeGlyphs {
     /// so every running row is on the same frame.
     pub spinner: &'static str,
     pub spin: std::time::Duration,
-    /// A finished turn's line: `[0]` folded, `[1]` opened.
-    pub fold: [&'static str; 2],
     pub stop: &'static str,
     pub receipts: [&'static str; 4],
     pub context: [&'static str; 2],
@@ -77,7 +75,6 @@ pub const UNICODE: Glyphs = Glyphs {
         steps: ["✓", "◆", "◌", "✗"],
         spinner: SPIN_U,
         spin: std::time::Duration::from_millis(80),
-        fold: ["▸", "▾"],
         stop: "■",
         receipts: ["⇄", "✎", "⟲", "⇣"],
         context: ["▰", "▱"],
@@ -113,7 +110,6 @@ pub const ASCII: Glyphs = Glyphs {
         steps: ["+", "*", "o", "!"],
         spinner: SPIN_A,
         spin: std::time::Duration::from_millis(120),
-        fold: [">", "v"],
         stop: "x",
         receipts: ["=", "/", "<", "v"],
         context: ["#", "-"],

@@ -1,0 +1,125 @@
+{
+  "read": {
+    "mod": "fs",
+    "mark": "¶",
+    "ascii": "<",
+    "verb": "read",
+    "arg": "path",
+    "ro": true
+  },
+  "glob": {
+    "mod": "fs",
+    "mark": "*",
+    "verb": "find",
+    "arg": "path",
+    "ro": true
+  },
+  "grep": {
+    "mod": "fs",
+    "mark": "/",
+    "verb": "search",
+    "ro": true
+  },
+  "edit": {
+    "mod": "fs",
+    "mark": "±",
+    "ascii": "~",
+    "verb": "edit",
+    "arg": "path",
+    "edit": true
+  },
+  "write": {
+    "mod": "fs",
+    "mark": "+",
+    "verb": "write",
+    "arg": "path",
+    "edit": true
+  },
+  "bash": {
+    "mod": "bash",
+    "mark": "$",
+    "verb": "run",
+    "arg": "cmd"
+  },
+  "kill": {
+    "mod": "bash",
+    "mark": "×",
+    "ascii": "x",
+    "verb": "stop",
+    "arg": "cmd"
+  },
+  "fetch": {
+    "mod": "web",
+    "mark": "↓",
+    "ascii": "v",
+    "verb": "fetch",
+    "arg": "path",
+    "ro": true
+  },
+  "search": {
+    "mod": "web",
+    "mark": "»",
+    "ascii": ">",
+    "verb": "web",
+    "ro": true
+  },
+  "look": {
+    "mod": "pictures",
+    "mark": "¤",
+    "ascii": "o",
+    "verb": "look",
+    "arg": "path",
+    "ro": true
+  },
+  "agent": {
+    "mod": "agents",
+    "mark": "@"
+  },
+  "room": {
+    "mod": "rooms",
+    "mark": "@",
+    "verb": "seat"
+  },
+  "todo": {
+    "mod": "tasks",
+    "mark": "#",
+    "verb": "plan"
+  },
+  "ask": {
+    "mod": "fs",
+    "mark": "?",
+    "verb": "ask"
+  },
+  "skill": {
+    "mod": "skills",
+    "mark": "§",
+    "ascii": "&",
+    "verb": "skill",
+    "ro": true
+  },
+  "wake": {
+    "mod": "schedule",
+    "mark": "∞",
+    "ascii": "^",
+    "verb": "wake"
+  },
+  "recall": {
+    "mod": "experience",
+    "mark": "√",
+    "ascii": "!",
+    "verb": "recall",
+    "ro": true
+  },
+  "mcp": {
+    "mod": "mcp",
+    "mark": "◊",
+    "ascii": "%"
+  },
+  "query": {
+    "mod": "postgres",
+    "mark": "∑",
+    "ascii": "=",
+    "verb": "query",
+    "ro": true
+  }
+}

@@ -50,6 +50,8 @@ fn read(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
                         // and into an escape, so it reads colours off the
                         // tokens rather than naming any (M69).
                         | "opening/storyboard.rs"
+                        // Sparks blend with the already-painted ground.
+                        | "transcript/sparks.rs"
                         | "identity.rs"
                         | "crew_contract.rs"
                         | "motion.rs"
@@ -155,6 +157,7 @@ fn every_token_is_spent_where_the_design_says() {
                 "composer/drawing.rs",
                 "dialog.rs",
                 "form.rs",
+                "highlight.rs",
                 "markdown.rs",
                 "pager.rs",
                 "pill.rs",
@@ -162,10 +165,10 @@ fn every_token_is_spent_where_the_design_says() {
                 "rewind.rs",
                 "search.rs",
                 "transcript.rs",
+                "transcript/band.rs",
                 "transcript/ran.rs",
                 "transcript/said.rs",
                 "transcript/slots.rs",
-                "transcript/steps.rs",
                 "view.rs",
                 "views/actions.rs",
                 "views/input.rs",
@@ -174,7 +177,6 @@ fn every_token_is_spent_where_the_design_says() {
                 "views/panel.rs",
                 "views/progress.rs",
                 "views/select.rs",
-                "views/table.rs",
                 "views/text.rs",
                 "views/tree.rs",
             ],
@@ -185,9 +187,11 @@ fn every_token_is_spent_where_the_design_says() {
                 "activity.rs",
                 "ask/drawing.rs",
                 "ask/receipts.rs",
+                "component/live.rs",
                 "dialog.rs",
                 "form.rs",
                 "graphics/band.rs",
+                "highlight.rs",
                 "layers.rs",
                 "layout/grid.rs",
                 "markdown.rs",
@@ -196,6 +200,8 @@ fn every_token_is_spent_where_the_design_says() {
                 "rewind.rs",
                 "search.rs",
                 "transcript.rs",
+                "transcript/answer.rs",
+                "transcript/band.rs",
                 "transcript/output.rs",
                 "transcript/pictured.rs",
                 "transcript/ran.rs",
@@ -215,7 +221,6 @@ fn every_token_is_spent_where_the_design_says() {
                 "views/list.rs",
                 "views/markdown.rs",
                 "views/progress.rs",
-                "views/table.rs",
                 "views/text.rs",
                 "views/tree.rs",
                 "window.rs",
@@ -241,21 +246,12 @@ fn every_token_is_spent_where_the_design_says() {
                 "search.rs",
                 "select.rs",
                 "transcript.rs",
-                "transcript/steps.rs",
                 "views/actions.rs",
                 "views/badge.rs",
             ],
         ),
-        ("glow", &["activity.rs", "transcript/steps.rs"]),
-        (
-            "good",
-            &[
-                "activity.rs",
-                "transcript.rs",
-                "transcript/steps.rs",
-                "views/badge.rs",
-            ],
-        ),
+        ("glow", &["transcript/answer.rs", "transcript/band.rs"]),
+        ("good", &["activity.rs", "transcript.rs", "views/badge.rs"]),
         (
             "bad",
             &[
@@ -268,12 +264,9 @@ fn every_token_is_spent_where_the_design_says() {
             ],
         ),
         ("mode", &["markdown/mentions.rs"]),
-        ("breath", &["activity.rs"]),
+        ("breath", &[]),
         ("pulse", &["transcript.rs", "views/progress.rs"]),
-        (
-            "comet",
-            &["activity.rs", "embers.rs", "transcript/comet.rs"],
-        ),
+        ("comet", &["embers.rs"]),
         ("landing", &["transcript.rs"]),
         ("cooling", &["transcript.rs"]),
         ("fading", &[]),
@@ -537,7 +530,11 @@ fn the_ascii_table_spells_every_glyph_in_one_cell() {
         assert_eq!(thinking(), "|");
         assert_eq!(border().top_left, "+");
         assert_eq!(ellipsis(), "...");
-        assert_eq!(row_mark('❖'), "*", "and a skill says so in words instead");
+        assert_eq!(
+            bingo_sdk::look::mark(Some('❖'), bullet().is_ascii()).to_string(),
+            "-",
+            "and a skill says so in words instead"
+        );
         assert_eq!(caret(), "|");
         assert_eq!(rule(), "-", "the rule is the box's own stroke");
     });
@@ -555,7 +552,14 @@ fn a_mark_in_the_bullets_place_is_the_bullets_width() {
         },
         ascii(),
     ] {
-        with(look, || assert_eq!(row_mark('❖').width(), bullet().width()));
+        with(look, || {
+            assert_eq!(
+                bingo_sdk::look::mark(Some('❖'), bullet().is_ascii())
+                    .to_string()
+                    .width(),
+                bullet().width()
+            )
+        });
     }
 }
 
@@ -573,26 +577,7 @@ fn dark() -> Theme {
 }
 
 #[test]
-fn a_breath_is_five_steps_of_presence_on_twenty_four_bits() {
-    with(dark(), || {
-        let sampled: Vec<Style> = (0..=4).map(|i| breath(i as f32 / 4.0)).collect();
-        let mut distinct = sampled.clone();
-        distinct.dedup();
-        assert_eq!(distinct.len(), 5, "five steps, all different");
-        assert_eq!(sampled[4], presence(), "the top of it is presence itself");
-        assert_eq!(
-            sampled[0],
-            Style::new().fg(scaled(DARK.ember(), 0.65)),
-            "and the bottom is 65 % of it"
-        );
-        assert_eq!(breath(0.1), sampled[0], "a level between steps snaps");
-    });
-}
-
-#[test]
 fn a_ramp_the_eight_colours_cannot_draw_takes_its_two_ends() {
-    assert_eq!(breath(0.0), dim());
-    assert_eq!(breath(1.0), presence());
     assert_eq!(pulse(0.0), presence());
     assert_eq!(pulse(1.0), glow());
     assert_eq!(comet(0.0), glow());
@@ -667,7 +652,7 @@ fn body_ink_is_terminal_owned_and_dim_uses_ember_or_a_modifier() {
 #[test]
 fn nothing_that_moves_spends_a_colour_under_no_colour() {
     with(no_colour(), || {
-        for style in [breath(1.0), pulse(1.0), comet(0.0), warming(1.0)] {
+        for style in [pulse(1.0), comet(0.0), warming(1.0)] {
             assert_eq!(style, Style::new());
         }
         assert_eq!(fading(bingo_sdk::Level::Error, 1.0), Style::new());

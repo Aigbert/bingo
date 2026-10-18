@@ -1,5 +1,5 @@
 //! What was said into a session, as one transcript draws it: a person's own
-//! line on its bar, a subsystem reporting in on a marked row, and — in a room's
+//! band with a name for correspondents, a subsystem notice, and — in a room's
 //! own view — the conversation itself.
 //!
 //! One `ItemBody::User` is every one of those. Which it is comes off the origin
@@ -11,7 +11,7 @@ use bingo_sdk::{ContentPart, Driver, Item, Origin};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthStr;
 
-use super::{OUTPUT_ROWS, Rows, bullet_style, kept, plain, returns, speaks, under};
+use super::{OUTPUT_ROWS, Rows, bullet_style, kept, plain, returns, speaks};
 use crate::fold::Fold;
 use crate::{seats, theme};
 
@@ -44,7 +44,7 @@ pub fn lines(
     match voice(origin) {
         bingo_sdk::Voice::Aside => Vec::new(),
         bingo_sdk::Voice::Quiet => notice(item, parts, origin, fold, rows),
-        bingo_sdk::Voice::Said | bingo_sdk::Voice::Note => user(parts, origin, rows),
+        bingo_sdk::Voice::Said | bingo_sdk::Voice::Note => super::band::draw(item, rows).lines,
     }
 }
 
@@ -110,7 +110,7 @@ fn post(item: &Item, place: &super::Place<'_>, rows: &Rows<'_>) -> Vec<Line<'sta
         crate::face::face(&post.author).sigil()
     };
     let mut out = super::marked(glyph, crate::face::style(&post.author), body, rows);
-    if first_post(item, rows.state) {
+    if rows.first_post == Some(&item.id) {
         out.extend(member_row(&members, rows));
     }
     out
@@ -134,15 +134,6 @@ fn member_row(members: &[String], rows: &Rows<'_>) -> Vec<Line<'static>> {
     )
 }
 
-fn first_post(item: &Item, state: &bingo_sdk::SessionState) -> bool {
-    state
-        .transcript
-        .items()
-        .iter()
-        .find(|item| matches!(item.body, bingo_sdk::ItemBody::User { .. }))
-        .is_some_and(|first| first.id == item.id)
-}
-
 /// The room's composer speaks as the holder; the shared matcher owns @all.
 fn addressed(post: &bingo_collab::mentions::Post, members: &[String]) -> bool {
     if bingo_collab::name::same(&post.author, seats::HOLDER)
@@ -163,7 +154,7 @@ fn addressed(post: &bingo_collab::mentions::Post, members: &[String]) -> bool {
 }
 
 /// What a `User` item says, as its parts spell it.
-fn said(parts: &[ContentPart]) -> String {
+pub(super) fn said(parts: &[ContentPart]) -> String {
     parts
         .iter()
         .filter_map(ContentPart::as_text)
@@ -242,34 +233,6 @@ fn headline(head: &str, principal: Option<&str>, conversation: Option<&str>) -> 
 ///
 /// A wake is on the bar too and wears its own word instead of the `>`: it
 /// opened this turn the way typing does, and it is not what anybody typed.
-fn user(parts: &[ContentPart], origin: &Origin, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let text = said(parts);
-    if text.trim().is_empty() {
-        return Vec::new();
-    }
-    let mut body: Vec<Line<'static>> = text
-        .lines()
-        .map(|line| {
-            Line::from(crate::markdown::mentions::spans(
-                line,
-                theme::text(),
-                &rows.names,
-            ))
-        })
-        .collect();
-    if let Some(name) = origin.principal.as_deref()
-        && let Some(first) = body.first_mut()
-    {
-        first.spans.insert(
-            0,
-            Span::styled(format!("{name}: "), theme::text().patch(theme::bold())),
-        );
-    }
-    let mark = mark(origin);
-    let indent = mark.content.width();
-    barred(under(mark, body, indent, rows.measured()), rows.width)
-}
-
 /// Every row of a block on the raised bar. A shell line the person ran is on
 /// the same bar for the same reason ([`super::ran`]): it is theirs.
 pub(super) fn barred(lines: Vec<Line<'static>>, width: usize) -> Vec<Line<'static>> {
@@ -279,14 +242,6 @@ pub(super) fn barred(lines: Vec<Line<'static>>, width: usize) -> Vec<Line<'stati
 /// What stands in the gutter of a line on the bar: the theme's own `>` for
 /// what a person typed, the word `wake` for the note a turn left itself. Its
 /// width is the indent every line under it takes, so the two forms wrap alike.
-fn mark(origin: &Origin) -> Span<'static> {
-    let word = match voice(origin) == bingo_sdk::Voice::Note {
-        true => &origin.surface,
-        false => theme::user(),
-    };
-    Span::styled(format!(" {word} "), theme::dim())
-}
-
 /// The raised bar behind a `>` line: it runs to the edge of the transcript,
 /// so what you said is a band and not a sentence.
 fn bar(line: Line<'static>, width: usize) -> Line<'static> {

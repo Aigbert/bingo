@@ -46,10 +46,10 @@ fn three_hand_built_done_rows_pass_and_each_failure_explains_its_cell() {
         assert!(report.contains("capture ink: bg") && report.contains("rendered ink:"));
         assert!(std::panic::catch_unwind(|| assert_band(&capture, Band::Dock, &changed)).is_err());
         let mut changed = buffer.clone();
-        changed[(10, 1)].set_style(theme::bad());
+        changed[(11, 1)].set_style(theme::bad());
         let report = compare::compare(&capture, Band::Dock, &changed, changed.area).unwrap_err();
         assert!(report.contains("fg: expected dim"), "{report}");
-        assert_eq!(moved(&buffer, &changed), vec![(10, 1)]);
+        assert_eq!(moved(&buffer, &changed), vec![(11, 1)]);
         assert!(std::panic::catch_unwind(|| assert_band(&capture, Band::Dock, &changed)).is_err());
     });
 }

@@ -342,23 +342,23 @@ async fn a_disabled_panel_restores_its_folded_names_on_the_next_palette_open() {
 #[tokio::test]
 async fn tool_looks_refresh_when_the_tools_catalogue_changes() {
     let now = still(scene().1);
-    let call = tool(
+    let mut call = tool(
         "call",
         "fixture",
         serde_json::json!({"query":"needle"}),
         Some(bingo_sdk::ToolOutput::text("found")),
         bingo_sdk::ItemStatus::Completed,
     );
+    call.turn = None;
     let state = folded(vec![frame(
         1,
         bingo_sdk::Event::ItemCompleted { item: call },
     )]);
     let mut run =
         super::super::tests::idle_in(state, Arc::new(TestSession::default()), now.instant);
-    open_the_turns(&mut run.ui, run.session.tree.viewed());
     let before = draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
-    assert!(before.contains("fixture needle"), "{before}");
-    assert!(!before.contains("find needle"), "{before}");
+    assert!(before.contains("fixture  needle"), "{before}");
+    assert!(!before.contains("find    needle"), "{before}");
     let host = TestHost::default();
     host.on_catalog(|kind| async move {
         assert_eq!(kind, CatalogKind::Tools);
@@ -381,12 +381,7 @@ async fn tool_looks_refresh_when_the_tools_catalogue_changes() {
         run.ui.catalogs.values["tools"][0].meta["look"]["verb"],
         "find"
     );
-    assert_eq!(
-        run.ui.shown.blocks.renders(),
-        0,
-        "a Tools reply discards cached rows"
-    );
     let after = draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
-    assert!(after.contains("find needle"), "{after}");
-    assert!(!after.contains("fixture needle"), "{after}");
+    assert!(after.contains("find    needle"), "{after}");
+    assert!(!after.contains("fixture  needle"), "{after}");
 }

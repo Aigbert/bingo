@@ -323,3 +323,11 @@ const fn channel(a: u8, b: u8, t: f64) -> u8 {
 
 #[cfg(test)]
 mod tests;
+
+/// Resolve the terminal default before a colour is interpolated.
+pub fn foreground(ink: Option<Color>, palette: Palette) -> Color {
+    match ink {
+        None | Some(Color::Reset) => palette.fg(),
+        Some(ink) => ink,
+    }
+}

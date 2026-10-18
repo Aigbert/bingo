@@ -1,7 +1,7 @@
 //! The picture the words carry: design §5's image row, as rows of the
 //! transcript.
 //!
-//! A picture a tool answered with hangs under the `⎿` its result hangs from,
+//! A picture a tool answered with stands at column 5 under its step,
 //! at the size it came back; pictures a person handed over stand as one band
 //! of thumbnails *above* their own words, the way the composer showed them
 //! before `⏎` ([`under_the_words`], M62); and a picture an answer's own words
@@ -19,7 +19,7 @@
 use bingo_sdk::{Image, Item, ItemBody};
 use ratatui::text::{Line, Span};
 
-use super::{Block, Rows, returns};
+use super::{Block, Rows, step_body};
 use crate::fold::Fold;
 use crate::graphics::picture::{self, Source};
 use crate::graphics::{self as graphics, Graphics, Picture, band, kitty};
@@ -48,7 +48,7 @@ pub(super) fn under_the_words(item: &Item, mut block: Block, fold: Fold, rows: &
     block
 }
 
-/// What a tool answered with, under the `⎿` its result hangs from: each
+/// What a tool answered with, at column 5 under its step: each
 /// picture at the size the fold allows, and the chip that names it where the
 /// terminal draws none.
 fn returned(block: &mut Block, item: &Item, images: &[&Image], fold: Fold, rows: &Rows<'_>) {
@@ -59,30 +59,10 @@ fn returned(block: &mut Block, item: &Item, images: &[&Image], fold: Fold, rows:
         };
         match drawn(source, image, room(rows.result_width()), height(fold), rows) {
             Some((picture, cells)) => {
-                block.lines.extend(returns(cells, rows));
+                block.lines.extend(step_body(cells, rows));
                 block.pictures.push(picture);
             }
-            None => block.lines.extend(returns(vec![chip(image)], rows)),
-        }
-    }
-}
-
-/// What a step of an opened turn answered with, at its whole height, standing
-/// at `indent` under the step's words — where the rest of its answer hangs.
-pub(super) fn under_the_step(block: &mut Block, item: &Item, indent: usize, rows: &Rows<'_>) {
-    let images = picture::pictures_of(&item.body);
-    let room = room(rows.measured().saturating_sub(indent));
-    for (part, image) in images.iter().enumerate() {
-        let source = Source::Journal {
-            item: item.id.clone(),
-            part,
-        };
-        match drawn(source, image, room, height(Fold::Open), rows) {
-            Some((picture, cells)) => {
-                block.lines.extend(at_column(cells, indent));
-                block.pictures.push(picture);
-            }
-            None => block.lines.extend(at_column(vec![chip(image)], indent)),
+            None => block.lines.extend(step_body(vec![chip(image)], rows)),
         }
     }
 }
@@ -347,7 +327,7 @@ mod tests {
             other => [(item.id.clone(), other)].into_iter().collect(),
         };
         let now = scene().1;
-        let rows = Rows::of(&state, 60, &folds, &[], &pictures, linked, now);
+        let rows = Rows::of(&state, 60, &folds, &pictures, linked, now);
         let cue = crate::transcript::Cue {
             since: now.instant,
             flip: false,
@@ -406,7 +386,7 @@ mod tests {
         );
         let drawn = text(&block);
         assert_eq!(drawn.len(), 11, "the row, then ten rows of picture");
-        assert!(drawn[1].starts_with("  ⎿  "), "under the mark: {drawn:?}");
+        assert!(drawn[1].starts_with("     "), "under the mark: {drawn:?}");
         assert_eq!(
             drawn[1].matches(PLACEHOLDER).count(),
             10,
@@ -443,7 +423,7 @@ mod tests {
     #[test]
     fn a_terminal_that_draws_no_pictures_draws_the_chip() {
         let block = block(&read(&png(100, 200)), Graphics::Off, Fold::Peek);
-        assert_eq!(text(&block)[1], "  ⎿  [image: image/png]");
+        assert_eq!(text(&block)[1], "     [image: image/png]");
         assert!(block.pictures.is_empty(), "and nothing is sent");
     }
 
@@ -452,7 +432,7 @@ mod tests {
     #[test]
     fn a_picture_no_decoder_reads_is_the_chip_on_any_terminal() {
         let block = block(&read(&unreadable()), graphics::drawing(), Fold::Peek);
-        assert_eq!(text(&block)[1], "  ⎿  [image: image/png]");
+        assert_eq!(text(&block)[1], "     [image: image/png]");
         assert!(block.pictures.is_empty());
     }
 
@@ -620,7 +600,7 @@ mod tests {
         let pictures = Decoded::default();
         let folds = opened();
         let linked = Linked::default();
-        let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
+        let rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
         let tail = graphics::with(graphics::drawing(), || {
             let mut blocks = Blocks::default();
             let height = blocks.sync(&state, &Agents::new(), &rows);
@@ -628,7 +608,7 @@ mod tests {
             blocks.tail(height)
         });
         assert!(
-            tail.iter().any(|line| line.contains("read shot.png")),
+            tail.iter().any(|line| line.contains("read    shot.png")),
             "the row survives: {tail:?}"
         );
         assert!(
@@ -646,7 +626,7 @@ mod tests {
         let pictures = Decoded::default();
         let folds = opened();
         let linked = Linked::default();
-        let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
+        let rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
         graphics::with(graphics::drawing(), || {
             let mut blocks = Blocks::default();
             blocks.sync(&state, &Agents::new(), &rows);
@@ -667,7 +647,7 @@ mod tests {
         let pictures = Decoded::default();
         let folds = opened();
         let linked = Linked::default();
-        let rows = Rows::of(&state, 60, &folds, &[], &pictures, &linked, scene().1);
+        let rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
         let mut blocks = Blocks::default();
         graphics::with(Graphics::Off, || blocks.sync(&state, &Agents::new(), &rows));
         assert!(blocks.pictures().is_empty(), "drawn as the chip first");
@@ -804,7 +784,7 @@ mod tests {
             Fold::Peek,
             &linked,
         );
-        assert_eq!(text(&block), vec![" ▍ [image: shot]"]);
+        assert_eq!(text(&block), vec!["   [image: shot]"]);
         assert!(block.pictures.is_empty());
     }
 
@@ -818,7 +798,7 @@ mod tests {
             Fold::Peek,
             &Linked::default(),
         );
-        assert_eq!(text(&block), vec![" ▍ [image: shot]"]);
+        assert_eq!(text(&block), vec!["   [image: shot]"]);
         assert!(block.pictures.is_empty(), "nothing to send yet");
         assert_eq!(block.wanted, vec!["docs/x.png".to_string()]);
     }
@@ -833,7 +813,7 @@ mod tests {
             Fold::Peek,
             &linked,
         );
-        assert_eq!(text(&block), vec![" ▍ [image: shot] (not found)"]);
+        assert_eq!(text(&block), vec!["   [image: shot] (not found)"]);
         let spans = &block.lines[0].spans;
         assert_eq!(
             spans.last().map(|s| s.style),

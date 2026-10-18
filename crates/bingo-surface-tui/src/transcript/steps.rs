@@ -1,35 +1,20 @@
-//! A turn's parts, every one at column 3 (ADR-0095 §6–§8): a step's row, the
-//! line a finished turn folds to, a thought of an opened turn, and the line
-//! where the person stopped it. What hangs under a step starts at column 5,
-//! under its words.
-
-use bingo_sdk::component::ledger::{Marks, STEP_INDENT, plural};
-use bingo_sdk::component::row::{Ink, Piece};
-use bingo_sdk::component::{Props, Step, StepState, TurnFoldProps};
-
+//! One Ledger request per step; details remain attached to that step.
 use super::*;
 use crate::turns::Role;
-
-/// Where what hangs under a step starts: under the step's own words.
+use bingo_sdk::component::{Props, Step, StepState};
 const HANG: usize = 5;
 
-/// The lines an item draws for the part it plays in its turn, or nothing at
-/// all when the part is its own drawing.
 pub(super) fn part(item: &Item, role: &Role, rows: &Rows<'_>) -> Option<Block> {
     match role {
         Role::Own => None,
         Role::Hidden => Some(Block::default()),
         Role::Step { step, opened } => Some(step_block(item, step, *opened, rows)),
-        Role::Fold { fold, then } => Some(fold_block(item, fold, then.as_deref(), rows)),
-        Role::Thought => Some(thought_block(item, rows).into()),
-        Role::Stop { ran, total } => Some(stop_block(item, *ran, *total, rows).into()),
+        Role::Narration => Some(narration(item, rows).into()),
     }
 }
 
-/// A step's row, through the site that owns it, and, under an opened turn,
-/// what the step brought back: its words, then its pictures.
-fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block {
-    let (id, props) = crate::turns::ledger(item, step);
+pub(super) fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block {
+    let (id, props) = crate::turns::ledger(item, step, &rows.answers, rows.now);
     let mut out = crate::component::resolve(
         rows.state,
         rows.pulled,
@@ -39,86 +24,138 @@ fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block 
         &crate::views::Marks::at(rows.now),
         |changed, width| ledger(changed, width, rows.now),
     );
-    // An action is on what the step is doing; a step that has ended is doing
-    // nothing, whatever a producer last said.
-    if matches!(step.state, StepState::Running | StepState::Asked) {
-        out.lines
-            .extend(super::slots::actions_under(item, HANG, rows));
+    if step.state == StepState::Running {
+        out.next = out
+            .next
+            .into_iter()
+            .chain(
+                bingo_sdk::transcript::next_second(
+                    rows.now.wall,
+                    crate::turns::running_for(item, &rows.answers, rows.now),
+                )
+                .map(|at| rows.now.deadline(at)),
+            )
+            .min();
+        out.append(progress(item, step.target_column(), rows));
     }
-    if !opened {
-        return out.into();
+    if opened {
+        out.append(result(item, rows, Fold::Open));
+    } else if fails_turn(item, step, rows) {
+        out.lines.extend(fail_tail(item, rows));
     }
-    out.append(result(item, rows));
-    let mut block = Block::from(out);
-    pictured::under_the_step(&mut block, item, HANG, rows);
-    block
+    Block::from(out)
 }
 
-/// The row of a step that is asking, standing on its own: the head of the
-/// card it opens where its row was, in the row's own columns.
 pub(crate) fn asked(step: &Step, width: usize) -> Line<'static> {
-    let glyph = theme::glyphs().chrome.steps[1];
-    line(step.row(glyph, width, UnicodeWidthStr::width))
+    crate::views::marked(
+        &step.drawing(&crate::turns::marks(), width),
+        width,
+        &Default::default(),
+    )
+    .lines
+    .into_iter()
+    .next()
+    .unwrap_or_default()
 }
 
-/// The surface's own drawing of the ledger: one row a step.
-fn ledger(props: &Props, width: usize, now: Now) -> Vec<Line<'static>> {
+fn ledger(props: &Props, width: usize, now: Now) -> crate::views::Drawing {
     let Props::Ledger(ledger) = props else {
-        return Vec::new();
+        return Default::default();
     };
     ledger
         .steps
         .iter()
         .map(|step| {
-            let glyph = glyph(step, &ledger.marks, now);
-            line(step.row(glyph, width, UnicodeWidthStr::width))
+            crate::views::marked(
+                &step.drawing(&ledger.marks, width),
+                width,
+                &crate::views::Marks::at(now),
+            )
         })
         .collect()
 }
 
-/// What a step's row starts with: what state it is in, a running one turning.
-fn glyph<'a>(step: &Step, marks: &'a Marks, now: Now) -> &'a str {
-    match step.state {
-        StepState::Running => crate::spinner::glyph(now),
-        state => marks.step(state),
-    }
-}
-
-/// The line a finished turn folds to, through the site that owns it, and
-/// under it, when the turn is opened, the part the holder plays there.
-fn fold_block(item: &Item, fold: &TurnFoldProps, then: Option<&Role>, rows: &Rows<'_>) -> Block {
-    let (id, props) = crate::turns::folded(item, fold);
-    let out = crate::component::resolve(
-        rows.state,
-        rows.pulled,
-        &id,
-        &props,
-        rows.width,
-        &crate::views::Marks::at(rows.now),
-        folded_line,
+fn narration(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
+    let ItemBody::Assistant { text } = &item.body else {
+        return Default::default();
+    };
+    let lines = wrap::wrap_all(
+        &[Line::from(Span::styled(
+            text.clone(),
+            theme::ash().patch(theme::italic()),
+        ))],
+        rows.measured().saturating_sub(5).min(100),
     );
-    let mut block = Block::from(out);
-    if let Some(under) = then.and_then(|then| part(item, then, rows)) {
-        block.next = block.next.into_iter().chain(under.next).min();
-        block.lines.extend(under.lines);
-        block.pictures.extend(under.pictures);
+    crate::views::Drawing {
+        lines: under(Span::raw("   "), lines, 3, rows.width),
+        next: None,
     }
-    block
 }
 
-/// The surface's own drawing of the folded line.
-fn folded_line(props: &Props, width: usize) -> Vec<Line<'static>> {
-    let Props::TurnFold(fold) = props else {
+fn fails_turn(item: &Item, step: &Step, rows: &Rows<'_>) -> bool {
+    let state = rows.state;
+    step.state == StepState::Failed
+        && state
+            .turn
+            .as_ref()
+            .is_none_or(|t| Some(&t.id) != item.turn.as_ref())
+        && !rows.followed.contains(&item.id)
+}
+
+fn fail_tail(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
+    let ItemBody::ToolCall {
+        output, progress, ..
+    } = &item.body
+    else {
         return Vec::new();
     };
-    fold.row(width, UnicodeWidthStr::width)
-        .map(line)
-        .into_iter()
+    let text = output
+        .as_ref()
+        .map(|output| {
+            output
+                .parts
+                .iter()
+                .filter_map(bingo_sdk::ContentPart::as_text)
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_else(|| progress.clone().unwrap_or_default());
+    let lines: Vec<_> = text.lines().collect();
+    if lines.is_empty() {
+        return Vec::new();
+    }
+    let ground = theme::ground("well").unwrap_or_default();
+    let width = rows.width.saturating_sub(HANG + 2);
+    let blank = Line::from(Span::styled(" ".repeat(width), ground));
+    let mut out = vec![blank.clone()];
+    for text in lines.iter().skip(lines.len().saturating_sub(4)) {
+        let bad = ["error", "failed", "panicked"]
+            .iter()
+            .any(|word| text.to_lowercase().contains(word));
+        let ink = if bad { theme::bad() } else { theme::ash() };
+        let line = crate::layout::grid::fit(
+            Line::from(Span::styled((*text).to_owned(), ink)),
+            width.saturating_sub(4),
+        );
+        let mut spans = vec![Span::raw("  ")];
+        spans.extend(line.spans);
+        out.push(crate::layout::grid::pad_to(Line::from(spans), width).style(ground));
+    }
+    out.push(blank);
+    out.into_iter()
+        .map(|mut line| {
+            for span in &mut line.spans {
+                span.style = ground.patch(span.style);
+            }
+            line.style = Style::default();
+            line.spans.insert(0, Span::raw(" ".repeat(HANG)));
+            line
+        })
         .collect()
 }
 
 /// What came back from a step, through the site that owns it.
-fn result(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
+fn result(item: &Item, rows: &Rows<'_>, fold: Fold) -> crate::views::Drawing {
     let Some((id, props)) = crate::turns::result(item) else {
         return crate::views::Drawing::default();
     };
@@ -140,6 +177,7 @@ fn result(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
                     width,
                     ..rows.clone()
                 },
+                fold,
             )
         },
     )
@@ -147,14 +185,14 @@ fn result(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
 
 /// What came back from a step, under its words, nothing of it folded: the
 /// turn was opened to be read.
-fn hung(output: &ToolOutput, rows: &Rows<'_>) -> crate::views::Drawing {
+fn hung(output: &ToolOutput, rows: &Rows<'_>, fold: Fold) -> crate::views::Drawing {
     let inner = rows.width.saturating_sub(HANG).max(1);
-    folded(output, Fold::Open, inner, Some(rows.now)).map_lines(|lines| {
+    folded(output, fold, inner, Some(rows.now)).map_lines(|lines| {
         let body = lines
             .into_iter()
             .map(|line| shortened(line, rows))
             .collect();
-        under(Span::raw(" ".repeat(HANG)), body, HANG, rows.width)
+        step_body(body, rows)
     })
 }
 
@@ -168,112 +206,69 @@ fn shortened(line: Line<'static>, rows: &Rows<'_>) -> Line<'static> {
     Line::from(spans).style(line.style)
 }
 
-/// A thought of an opened turn, through the site that owns it.
-fn thought_block(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
-    let Some((id, props)) = crate::turns::fact(item) else {
-        return crate::views::Drawing::default();
+fn progress(item: &Item, ax: usize, rows: &Rows<'_>) -> crate::views::Drawing {
+    let Some(props @ Props::ToolProgress(_)) = crate::component::items::tail(item) else {
+        return Default::default();
     };
     crate::component::resolve(
         rows.state,
         rows.pulled,
-        &id,
+        &crate::component::items::id(item),
         &props,
         rows.width,
         &crate::views::Marks::at(rows.now),
-        |changed, width| {
-            let Props::Reasoning(reasoning) = changed else {
+        |props, width| {
+            let Props::ToolProgress(props) = props else {
                 return Vec::new();
             };
-            thought(&reasoning.text, width)
+            let last = props.hint.lines().last().unwrap_or_default();
+            let line = crate::layout::grid::fit(
+                Line::from(Span::styled(last.trim_start().to_owned(), theme::dim())),
+                width.saturating_sub(ax + 2),
+            );
+            under(Span::raw(" ".repeat(ax)), vec![line], ax, width)
         },
     )
 }
 
-/// A thought's words, dim, under the steps' words.
-fn thought(text: &str, width: usize) -> Vec<Line<'static>> {
-    under(Span::raw(" ".repeat(HANG)), plain(text), HANG, width)
-}
-
-/// Where the person stopped the turn, through the site that owns the stop.
-/// The stop line counts the turn's steps, which the site's props do not
-/// carry, so the surface's own drawing is that line whatever they say.
-fn stop_block(item: &Item, ran: usize, total: usize, rows: &Rows<'_>) -> crate::views::Drawing {
-    let Some((id, props)) = crate::turns::fact(item) else {
-        return vec![stop_line(ran, total)].into();
-    };
-    crate::component::resolve(
-        rows.state,
-        rows.pulled,
-        &id,
-        &props,
-        rows.width,
-        &crate::views::Marks::at(rows.now),
-        |_, _| vec![stop_line(ran, total)],
-    )
-}
-
-/// The line a stopped turn ends on: `■ you stopped the turn · 2 of 3 steps
-/// had run; nothing after them`, or the first four words when no step had
-/// begun.
-fn stop_line(ran: usize, total: usize) -> Line<'static> {
-    let mut words = String::from("you stopped the turn");
-    if total > 0 {
-        words.push_str(&format!(
-            " \u{b7} {ran} of {total} {} had run; nothing after them",
-            plural(total)
-        ));
-    }
-    let glyph = theme::glyphs().chrome.stop;
-    Line::from(vec![
-        Span::styled(STEP_INDENT, theme::text()),
-        Span::styled(format!("{glyph} "), theme::bad()),
-        Span::styled(words, theme::dim()),
-    ])
-}
-
-/// A row of pieces in the theme's inks.
-fn line(pieces: Vec<Piece>) -> Line<'static> {
-    let spans = pieces
-        .into_iter()
-        .map(|piece| Span::styled(piece.text, ink(piece.ink)))
-        .collect::<Vec<_>>();
-    Line::from(spans)
-}
-
-fn ink(ink: Ink) -> Style {
-    match ink {
-        Ink::Plain => theme::text(),
-        Ink::Dim => theme::dim(),
-        Ink::Ash => theme::ash(),
-        Ink::Good => theme::good(),
-        Ink::Bad => theme::bad(),
-        Ink::Glow => theme::glow(),
-        Ink::Presence => theme::presence(),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::stop_line;
+    use super::*;
+    use crate::test_support::{folded, frame, scene, started, still, tool};
+    use bingo_sdk::Event;
 
     #[test]
-    fn the_stop_line_counts_what_ran_and_says_nothing_of_steps_never_begun() {
-        let stop = crate::theme::glyphs().chrome.stop;
-        assert_eq!(
-            stop_line(2, 3).to_string(),
-            format!(
-                "   {stop} you stopped the turn \u{b7} 2 of 3 steps had run; nothing after them"
-            )
+    fn a_finished_step_hangs_nothing_until_opened() {
+        let mut call = tool(
+            "step",
+            "Bash",
+            serde_json::json!({"command":"cat note.txt"}),
+            None,
+            ItemStatus::Completed,
         );
-        assert_eq!(
-            stop_line(0, 1).to_string(),
-            format!(
-                "   {stop} you stopped the turn \u{b7} 0 of 1 step had run; nothing after them"
-            )
-        );
-        assert_eq!(
-            stop_line(0, 0).to_string(),
-            format!("   {stop} you stopped the turn")
-        );
+        if let ItemBody::ToolCall { output, .. } = &mut call.body {
+            let mut value = bingo_sdk::ToolOutput::text("one\ntwo\nthree");
+            value.display = Some(bingo_sdk::View::text("one\ntwo\nthree"));
+            *output = Some(value);
+        }
+        let state = folded(vec![
+            frame(1, started("trn_1")),
+            frame(2, Event::ItemCompleted { item: call.clone() }),
+        ]);
+        let folds = Default::default();
+        let pictures = Default::default();
+        let linked = Default::default();
+        let rows = &Rows::of(&state, 80, &folds, &pictures, &linked, still(scene().1));
+        {
+            let step = crate::turns::step(&call, rows);
+            let closed = step_block(&call, &step, false, rows);
+            assert_eq!(closed.lines.len(), 1);
+            let open = step_block(&call, &step, true, rows);
+            assert!(
+                open.lines
+                    .iter()
+                    .any(|line| line.to_string().contains("three"))
+            );
+        }
     }
 }

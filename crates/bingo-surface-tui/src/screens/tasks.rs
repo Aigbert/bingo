@@ -119,8 +119,8 @@ fn tasks_at_work() {
     let now = still(now);
     let state = at_work(three());
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(screen.contains(" ▍ Shipping it · 1s"), "{screen}");
-    assert!(screen.contains("⎿  ✔ Write the plan"), "{screen}");
+    assert!(screen.contains("cargo test"), "{screen}");
+    assert!(screen.contains("  ✔ Write the plan"), "{screen}");
     assert!(!screen.contains("TaskCreate"), "{screen}");
     both("tasks_at_work", &solo(&state), &mut ui, now);
 }
@@ -168,7 +168,7 @@ fn activity_hidden() {
     ui.activity_hidden = true;
     let state = at_work(three());
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(screen.contains(" ▍ Shipping it ·"), "{screen}");
+    assert!(screen.contains("cargo test"), "{screen}");
     assert!(!screen.contains("Write the plan"), "{screen}");
     insta::assert_snapshot!("tasks_hidden_80x24", screen);
 }

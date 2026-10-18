@@ -1,4 +1,4 @@
-use crate::{clock::Now, worked};
+use crate::clock::Now;
 use bingo_sdk::{SessionState, TurnStatus, component::*};
 
 pub fn props(state: &SessionState) -> Vec<Props> {
@@ -12,22 +12,9 @@ pub fn props(state: &SessionState) -> Vec<Props> {
             command: None,
         }));
     }
-    if let Some(turn) = &state.last_turn
-        && worked::ran(turn) >= worked::SAY_AFTER
-    {
-        out.push(Props::TurnDuration(TurnDurationProps {
-            word: worked::verb(&turn.status).0.into(),
-            duration_ms: worked::ran(turn).as_millis().min(u128::from(u64::MAX)) as u64,
-        }));
-    }
     out
 }
-pub fn id(props: &Props) -> &'static str {
-    match props {
-        Props::InfoNotice(_) => "InfoNotice",
-        _ => "TurnDuration",
-    }
-}
+pub const ID: &str = "InfoNotice";
 pub fn draw(
     state: &SessionState,
     memo: Option<&crate::pulled::Memo>,
@@ -38,11 +25,11 @@ pub fn draw(
     super::resolve(
         state,
         memo,
-        id(props),
+        ID,
         props,
         width,
         &crate::views::Marks::at(now),
-        |props, _| crate::transcript::component_closing(state, props, now),
+        |props, width| crate::transcript::component_closing(state, props, width),
     )
 }
 pub fn requests(
@@ -61,7 +48,7 @@ pub fn requests(
                 .len();
         if to > frame.top
             && from < frame.top + usize::from(rows)
-            && let Some(key) = super::key(state, id(&props), &props, width, rows)
+            && let Some(key) = super::key(state, ID, &props, width, rows)
         {
             frame.pulls.push(key);
         }

@@ -152,7 +152,7 @@ mod tests {
     }
 
     #[test]
-    fn round3_styled_and_nested_text_displays_keep_plain_layout() {
+    fn styled_and_nested_text_displays_keep_plain_layout() {
         for display in [
             serde_json::json!({"kind":"Text","color":"good","children":["a\tb  \n"]}),
             serde_json::json!({"kind":"Text","children":[{"kind":"Text","color":"good","children":["a\tb  \n"]}]}),

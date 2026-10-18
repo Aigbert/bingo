@@ -35,6 +35,7 @@ struct Revision {
     component: (u64, u64),
     render_config: serde_json::Value,
     status: ItemStatus,
+    arriving: bool,
     /// Names and room data affect prose even when an item's bytes stay put.
     names: Vec<crate::markdown::mentions::Name>,
     room: Option<Seq>,
@@ -61,7 +62,6 @@ struct Revision {
     /// draws nothing now, and the entry has to go the frame it stops.
     run: usize,
     last: bool,
-    latest_answer: bool,
     /// The look it was drawn in. A style is baked into a `Line`, and the
     /// terminal may change which palette a token is worth under a running
     /// surface (M71): the lines are then a memo of a drawing nobody would make
@@ -73,9 +73,10 @@ struct Revision {
     /// can turn them on under a running surface, and a block drawn before it
     /// holds the chip where the picture now goes.
     graphics: crate::graphics::Graphics,
-    /// The part it plays in its turn: a step's row holds the step's words, and
-    /// a folded line every step of its turn, so a neighbour moving redraws it.
+    /// The part it plays in its turn, including its resolved tool look.
     role: Role,
+    tool: Option<bingo_sdk::component::Step>,
+    band: Option<crate::transcript::band::Revision>,
 }
 
 fn revision(
@@ -87,18 +88,13 @@ fn revision(
 ) -> Revision {
     let request = crate::component::items::id(item);
     Revision {
-        receipts: rows
-            .answers
-            .to(&item.id)
-            .iter()
-            .map(|receipt| receipt.id.clone())
-            .collect(),
+        receipts: receipts(item, rows),
         component: (
-            // A folded line is asked for by the item holding it, a call's rows
-            // by the call: an answer to either draws the block again.
+            // The band and its clock share one block, so either reply revises it.
             rows.pulled.map_or(0, |memo| {
                 memo.version(&request)
                     .max(memo.version(&item.id.to_string()))
+                    .max(memo.version(&format!("{}:duration", item.id)))
             }),
             rows.state
                 .invalidated
@@ -108,6 +104,9 @@ fn revision(
         ),
         render_config: rows.state.config.kernel["render"].clone(),
         status: item.status,
+        arriving: matches!(place.role, Role::Own)
+            && matches!(item.body, ItemBody::Assistant { .. })
+            && rows.arriving(item),
         names: rows.names.clone(),
         room: (rows.state.summary.driver == bingo_sdk::Driver::Log).then_some(rows.state.seq),
         size: size(&item.body),
@@ -115,13 +114,49 @@ fn revision(
         fold,
         run: place.run.len(),
         last: !place.joined,
-        latest_answer: transcript::latest_answer(item, rows.state),
         linked: rows.linked.answers(),
         slots: rows.placed_on(&item.id).cloned().collect(),
         look: crate::theme::current(),
         graphics: crate::graphics::chosen(),
         role: place.role.clone(),
+        band: crate::transcript::band::revision(item, rows),
+        tool: match &item.body {
+            ItemBody::ToolCall { name, input, .. } if !matches!(place.role, Role::Step { .. }) => {
+                Some(crate::tool_rows::resolve(
+                    name,
+                    input,
+                    &rows.tools,
+                    crate::theme::bullet().is_ascii(),
+                ))
+            }
+            _ => None,
+        },
     }
+}
+
+fn receipts(item: &Item, rows: &Rows<'_>) -> Vec<ItemId> {
+    let band = item.turn.is_some()
+        && transcript::band::owns(item, rows.state)
+        && transcript::band::first(item, rows);
+    rows.answers
+        .to(&item.id)
+        .iter()
+        .map(|receipt| receipt.id.clone())
+        .chain(
+            rows.turns
+                .get(&item.turn)
+                .filter(|_| band)
+                .into_iter()
+                .flatten()
+                .filter(|other| {
+                    matches!(
+                        other.body,
+                        ItemBody::User { .. } | ItemBody::PermissionReceipt { .. }
+                    )
+                })
+                .map(|other| other.id.clone()),
+        )
+        .collect()
 }
 
 /// How much of the body is on the screen. Anything that grows a block grows
@@ -203,16 +238,13 @@ impl Motion {
 /// call's own words move for, the comet tail of an answer still arriving, and
 /// no time at all for anything that is simply there.
 fn settles(item: &Item, flip: bool, moving: bool) -> Duration {
-    if !moving {
+    if !moving || matches!(item.body, ItemBody::Assistant { .. }) {
         return Duration::ZERO;
     }
     if flip {
         return transcript::LANDING;
     }
-    match (&item.body, item.status) {
-        (ItemBody::Assistant { .. }, ItemStatus::Running) => transcript::COMET,
-        _ => Duration::ZERO,
-    }
+    Duration::ZERO
 }
 
 fn cue_deadline(
@@ -221,6 +253,9 @@ fn cue_deadline(
     motion: Motion,
     now: Now,
 ) -> Option<Instant> {
+    if !matches!(role, Role::Own) {
+        return None;
+    }
     let child_moves = agent.is_some_and(|child| {
         matches!(
             bingo_collab::lifecycle::Lifecycle::of_state(child),
@@ -232,11 +267,6 @@ fn cue_deadline(
     });
     if (child_moves && now.motion) || motion.redraw(now.instant) {
         return Some(now.instant + crate::clock::FRAME);
-    }
-    if now.motion
-        && matches!(role, Role::Step { step, .. } if step.state == bingo_sdk::component::StepState::Running)
-    {
-        return Some(crate::spinner::next(now));
     }
     None
 }
@@ -294,6 +324,17 @@ pub struct Blocks {
 }
 
 impl Blocks {
+    /// Walk block coordinates once when collecting visible component requests.
+    pub fn spans(&self) -> impl Iterator<Item = (&ItemId, std::ops::Range<usize>)> {
+        let mut at = 0;
+        self.segments().filter_map(move |segment| {
+            at += usize::from(segment.gap);
+            let start = at;
+            at += segment.lines.len();
+            segment.id.map(|id| (id, start..at))
+        })
+    }
+
     pub fn closing_start(&self) -> usize {
         self.height.saturating_sub(self.tail.len())
     }
@@ -301,7 +342,7 @@ impl Blocks {
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
-        self.roles = Roles::of(state, agents, rows.folds, &rows.answers, &rows.tools);
+        self.roles = Roles::of(agents, rows);
         let mut kept = 0;
         for (at, item) in state.transcript.items().iter().enumerate() {
             let role = self.roles.of_item(&item.id).clone();
@@ -344,7 +385,7 @@ impl Blocks {
                 y += segment.lines.len();
                 (height > 0
                     && segment.id.is_some()
-                    && y > from
+                    && (y > from || (segment.lines.is_empty() && start >= from))
                     && start < from.saturating_add(height))
                 .then_some(index)
             })
@@ -365,12 +406,7 @@ impl Blocks {
             if entry.next.is_none_or(|at| at > rows.now.instant) {
                 continue;
             }
-            let Some(at) = state
-                .transcript
-                .items()
-                .iter()
-                .position(|item| item.id == entry.id)
-            else {
+            let Some(&at) = rows.positions.get(&entry.id) else {
                 continue;
             };
             let item = &state.transcript.items()[at];
@@ -385,7 +421,8 @@ impl Blocks {
         if height == 0 {
             return None;
         }
-        let tail = (self.closing_start() < from.saturating_add(height) && self.height > from)
+        let tail = (self.closing_start() < from.saturating_add(height)
+            && self.height.max(self.closing_start() + 1) > from)
             .then_some(self.tail_next)
             .flatten();
         self.visible(from, height)
@@ -426,7 +463,7 @@ impl Blocks {
             .into_iter()
             .chain(cue_deadline(agent, &place.role, motion, rows.now))
             .min();
-        if drawn.lines.is_empty() {
+        if drawn.lines.is_empty() && next.is_none() {
             // An item with nothing to say is not a block at all — and one that
             // said something until this frame gives its slot back with its
             // rendering, or the stale rows would stand and a blank row with
@@ -601,8 +638,10 @@ impl Blocks {
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> {
         let mut above: Option<&Entry> = None;
         let blocks = self.blocks.iter().map(move |entry| {
-            let gap = above.is_some_and(|above| parted(above, entry));
-            above = Some(entry);
+            let gap = !entry.lines.is_empty() && above.is_some_and(|above| parted(above, entry));
+            if !entry.lines.is_empty() {
+                above = Some(entry);
+            }
             Segment {
                 gap,
                 id: Some(&entry.id),
@@ -642,6 +681,39 @@ mod tests {
     use crate::test_support::*;
     use bingo_sdk::{Event, ItemStatus};
 
+    #[test]
+    fn later_events_keep_an_older_band_revision() {
+        let mut first = user("old", "first turn");
+        first.turn = Some(TurnId::from_raw("old-turn"));
+        let mut state = folded(vec![
+            frame(1, Event::ItemCompleted { item: first }),
+            frame(2, started("trn_1")),
+            frame(
+                3,
+                Event::ItemCompleted {
+                    item: user("new", "second turn"),
+                },
+            ),
+        ]);
+        let mut blocks = cache();
+        let now = later(scene().1, 2000);
+        sync_at(&mut blocks, &state, 80, now);
+        let revision = blocks.blocks[0].revision.clone();
+        let newest = blocks.blocks[1].revision.clone();
+        blocks.blocks[0].lines = vec![Line::from("memo retained")];
+        state.apply(&frame(
+            4,
+            Event::ItemStarted {
+                item: running_tool("step", "Inspect", "tail"),
+            },
+        ));
+        sync_at(&mut blocks, &state, 80, later(now, 1000));
+        assert_eq!(blocks.blocks[0].revision, revision);
+        assert_eq!(blocks.blocks[0].lines[0].to_string(), "memo retained");
+        assert_ne!(blocks.blocks[1].revision, newest);
+        assert!(blocks.blocks[1].lines[0].to_string().contains("3s"));
+    }
+
     fn cache() -> Blocks {
         Blocks::default()
     }
@@ -670,7 +742,7 @@ mod tests {
         let folds = crate::fold::Folds::new();
         let pictures = crate::graphics::Decoded::default();
         let linked = crate::graphics::Linked::default();
-        let rows = Rows::of(state, width, &folds, &[], &pictures, &linked, now);
+        let rows = Rows::of(state, width, &folds, &pictures, &linked, now);
         let height = blocks.sync(state, &Agents::new(), &rows);
         blocks.refresh(state, &Agents::new(), &rows, 0, height);
         blocks.height()
@@ -771,7 +843,7 @@ mod tests {
         let mut linked = crate::graphics::Linked::default();
         let now = scene().1;
         let sync = |blocks: &mut Blocks, linked: &crate::graphics::Linked| {
-            let rows = Rows::of(&state, 80, &folds, &[], &pictures, linked, now);
+            let rows = Rows::of(&state, 80, &folds, &pictures, linked, now);
             blocks.sync(&state, &Agents::new(), &rows);
         };
         sync(&mut blocks, &linked);
@@ -819,6 +891,11 @@ mod tests {
             80,
             later(now, crate::clock::FRAME.as_millis() as i64),
         );
+        assert_eq!(blocks.renders(), 4, "arrival adds no pacing");
+        state.transcript.apply(&bingo_sdk::Event::ItemCompleted {
+            item: assistant("itm_live", "half a second", ItemStatus::Running),
+        });
+        sync_at(&mut blocks, &state, 80, later(now, 40));
         assert_eq!(blocks.renders(), 5, "one block, not four");
     }
 
@@ -981,44 +1058,21 @@ mod tests {
         assert!(blocks.tail(1)[0].contains("boom"), "{:?}", blocks.tail(1));
     }
 
-    /// The flash owes every frame it lasts, and one more: the frame that
-    /// replaces it with the resting form. Owing for longer keeps the whole
-    /// surface awake for the rest of the run; owing for less leaves the
-    /// flashed rendering on the screen with nothing coming to relieve it.
     #[test]
-    fn a_flash_owes_frames_until_its_resting_form_is_drawn() {
+    fn an_answer_has_no_surface_pacing_or_landing_deadline() {
         let mut state = state();
-        state.transcript = vec![assistant("itm_1", "half a s", ItemStatus::Running)]
-            .into_iter()
-            .collect();
         let mut blocks = cache();
         let (_, now) = scene();
-        sync_at(&mut blocks, &state, 60, now);
-        assert!(blocks.moving(), "an answer still arriving is moving");
-
-        // It finishes, so its own words move for the frames after (§6).
-        state.transcript = vec![assistant("itm_1", "half a second", ItemStatus::Completed)]
-            .into_iter()
-            .collect();
-        sync_at(&mut blocks, &state, 60, now);
-        assert!(blocks.moving(), "the completion is still landing");
-        sync_at(&mut blocks, &state, 60, later(now, 16));
-        assert!(blocks.moving(), "and has not run out halfway through");
-
-        // Past the landing: this sync draws the rest, and owes nothing after.
-        let landed = transcript::LANDING.as_millis() as i64;
-        sync_at(&mut blocks, &state, 60, later(now, landed));
-        assert!(
-            !blocks.moving(),
-            "the resting form is the frame just drawn: nothing more is owed"
-        );
-        let settled = blocks.renders();
-        sync_at(&mut blocks, &state, 60, later(now, 5_000));
-        assert_eq!(
-            blocks.renders(),
-            settled,
-            "and a block at rest is never drawn again"
-        );
+        for status in [ItemStatus::Running, ItemStatus::Completed] {
+            state.transcript = vec![assistant("itm_1", "whole answer", status)]
+                .into_iter()
+                .collect();
+            sync_at(&mut blocks, &state, 60, now);
+            assert!(!blocks.moving(), "arrival is the only pacing");
+            let rendered = blocks.renders();
+            sync_at(&mut blocks, &state, 60, later(now, 5000));
+            assert_eq!(blocks.renders(), rendered);
+        }
     }
 
     #[test]
@@ -1041,7 +1095,7 @@ mod refresh_tests {
     use bingo_sdk::Event;
 
     #[test]
-    fn round4_rowed_running_call_keeps_its_pulse_deadline() {
+    fn rowed_running_call_keeps_its_pulse_deadline() {
         crate::theme::with(crate::painted::daylight(), || {
             for replacement in [
                 Some((true, false)),
@@ -1073,18 +1127,36 @@ mod refresh_tests {
                     ui.shown.deadline().is_some(),
                     "replacement: {replacement:?}"
                 );
-                let before = ui.shown.blocks.blocks[0].lines[0].spans[0].style.fg;
+                let before = ui.shown.blocks.blocks[0].lines[0]
+                    .spans
+                    .iter()
+                    .find(|span| !span.content.trim().is_empty())
+                    .unwrap()
+                    .content
+                    .to_string();
                 draw_tree(80, 24, &tree, &mut ui, later(now, 500));
-                let after = ui.shown.blocks.blocks[0].lines[0].spans[0].style.fg;
+                let after = ui.shown.blocks.blocks[0].lines[0]
+                    .spans
+                    .iter()
+                    .find(|span| !span.content.trim().is_empty())
+                    .unwrap()
+                    .content
+                    .to_string();
                 assert_ne!(before, after, "replacement: {replacement:?}");
                 draw_tree(80, 24, &tree, &mut ui, still(later(now, 1000)));
-                assert_eq!(ui.shown.deadline(), None);
+                assert_eq!(
+                    ui.shown.deadline(),
+                    Some(crate::clock::next_tick(
+                        later(now, 1000),
+                        Duration::from_secs(1)
+                    ))
+                );
             }
         });
     }
 
     #[test]
-    fn round4_refresh_growth_repositions_the_inline_ask() {
+    fn refresh_growth_repositions_the_inline_ask() {
         let state = folded(vec![
             frame(
                 1,
@@ -1142,7 +1214,7 @@ mod refresh_tests {
     }
 
     #[test]
-    fn round3_refresh_can_remove_the_first_of_two_expiring_entries() {
+    fn refresh_can_remove_the_first_of_two_expiring_entries() {
         let mut state = folded(vec![
             frame(
                 1,
@@ -1173,7 +1245,7 @@ mod refresh_tests {
         let folds = crate::fold::Folds::new();
         let pictures = crate::graphics::Decoded::default();
         let linked = crate::graphics::Linked::default();
-        let rows = Rows::of(&state, 80, &folds, &[], &pictures, &linked, now);
+        let rows = Rows::of(&state, 80, &folds, &pictures, &linked, now);
         let before = blocks.renders();
         blocks.refresh(&state, &Agents::new(), &rows, 0, blocks.height());
         assert_eq!(blocks.blocks.len(), 1);
@@ -1182,7 +1254,7 @@ mod refresh_tests {
     }
 
     #[test]
-    fn round3_refresh_growth_updates_height_and_followed_bottom() {
+    fn refresh_growth_updates_height_and_followed_bottom() {
         let state = folded(
             (0..30)
                 .map(|i| {

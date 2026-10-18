@@ -15,18 +15,6 @@
 use std::time::{Duration, Instant};
 
 use jiff::Timestamp;
-use jiff::tz::TimeZone;
-
-/// The zone a wall-clock time is said in: the terminal's own. Under test it is
-/// UTC, so a snapshot that shows an hour reads the same on every machine.
-pub fn zone() -> TimeZone {
-    if cfg!(test) {
-        TimeZone::UTC
-    } else {
-        TimeZone::system()
-    }
-}
-
 /// One frame of motion: thirty a second (§6).
 pub const FRAME: Duration = Duration::from_millis(33);
 
@@ -60,6 +48,15 @@ impl Now {
     /// How long this frame is past a deadline the kernel stated.
     pub fn past(&self, when: Timestamp) -> Duration {
         self.wall.duration_since(when).unsigned_abs()
+    }
+
+    /// Convert a supplied wall deadline using this frame's paired clocks.
+    pub fn deadline(&self, when: Timestamp) -> Instant {
+        self.instant
+            + when
+                .duration_since(self.wall)
+                .max(jiff::SignedDuration::ZERO)
+                .unsigned_abs()
     }
 
     /// Whether a wall-clock deadline has arrived.
@@ -239,7 +236,6 @@ pub fn prog(now: Now, at_ms: i64, ms: u64) -> f64 {
 }
 
 // These weights are shared by the next screen milestones.
-#[allow(dead_code)]
 pub fn shimmer(now: Now, column: usize, columns: usize) -> f64 {
     if !now.motion {
         return 0.0;

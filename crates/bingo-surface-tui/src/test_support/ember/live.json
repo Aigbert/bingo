@@ -1,0 +1,165 @@
+[
+  {
+    "kind": "turn",
+    "id": 1,
+    "prompt": "看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉",
+    "chips": [],
+    "t0": -10000000,
+    "state": "done",
+    "open": false,
+    "row": -1,
+    "well": -1,
+    "items": [
+      {
+        "k": "think",
+        "at": -10000000,
+        "ms": 1400,
+        "text": "steer 和 queue 是两条路：steer 在下一步落地，queue 等这一轮结束。吞消息多半出在两条路交汇的地方。"
+      },
+      {
+        "k": "narr",
+        "at": -9998550,
+        "text": "先看 queue.rs，再看谁在调用 drain() 和 reset()。"
+      },
+      {
+        "k": "step",
+        "at": -9998500,
+        "tool": "read",
+        "arg": "crates/bingo-core/src/session/queue.rs",
+        "st": "ok",
+        "tail": [],
+        "end": -9998250,
+        "res": "214 lines"
+      },
+      {
+        "k": "step",
+        "at": -9998150,
+        "tool": "grep",
+        "arg": "drain|reset",
+        "st": "ok",
+        "tail": [],
+        "end": -9997950,
+        "res": "9 hits in 3 files"
+      },
+      {
+        "k": "step",
+        "at": -9997850,
+        "tool": "read",
+        "arg": "crates/bingo-core/src/turn/loop.rs",
+        "st": "ok",
+        "tail": [],
+        "end": -9997550,
+        "res": "486 lines"
+      }
+    ],
+    "reply": {
+      "at": -9997400,
+      "blocks": [
+        {
+          "p": "问题不在 `drain()`，在 `reset()`：每一轮开始时，它把 `queue` 整个清空了。"
+        },
+        {
+          "code": "pub fn reset(&mut self) {\n    self.queue.clear();   // 排着的消息在这里丢了\n    self.steer = None;\n}",
+          "lang": "rust"
+        },
+        {
+          "p": "你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 `reset()` 把还没发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。"
+        }
+      ]
+    },
+    "error": null,
+    "si": 9,
+    "paused": false,
+    "pauseAt": 0,
+    "pausedMs": 0,
+    "endAt": -9995840,
+    "answer": null
+  },
+  {
+    "kind": "turn",
+    "id": 2,
+    "prompt": "修好它，加一个回归测试",
+    "chips": [],
+    "t0": -2600,
+    "state": "live",
+    "open": false,
+    "row": -1,
+    "well": -1,
+    "items": [
+      {
+        "k": "think",
+        "at": -2600,
+        "ms": 700,
+        "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+      },
+      {
+        "k": "narr",
+        "at": -1800,
+        "text": "先改 reset()，再补一个回归测试。"
+      },
+      {
+        "k": "step",
+        "at": -1700,
+        "tool": "read",
+        "arg": "crates/bingo-core/src/session/queue.rs",
+        "st": "ok",
+        "tail": [],
+        "end": -1500,
+        "res": "214 lines"
+      },
+      {
+        "k": "step",
+        "at": -1400,
+        "tool": "glob",
+        "arg": "crates/bingo-core/tests/*.rs",
+        "st": "ok",
+        "tail": [],
+        "end": -1250,
+        "res": "6 files"
+      },
+      {
+        "k": "step",
+        "at": -1100,
+        "tool": "edit",
+        "arg": "crates/bingo-core/src/session/queue.rs",
+        "st": "ok",
+        "tail": [],
+        "end": -800,
+        "res": "",
+        "add": 1,
+        "del": 1
+      },
+      {
+        "k": "step",
+        "at": -550,
+        "tool": "write",
+        "arg": "crates/bingo-core/tests/queue_steer.rs",
+        "st": "ok",
+        "tail": [],
+        "end": -200,
+        "res": "",
+        "add": 20,
+        "del": 0
+      },
+      {
+        "k": "step",
+        "at": 0,
+        "tool": "bash",
+        "arg": "cargo test -p bingo-core queue",
+        "st": "run",
+        "tail": [
+          "   Compiling bingo-core v0.6.3 (crates/bingo-core)"
+        ]
+      }
+    ],
+    "reply": null,
+    "error": null,
+    "si": 12,
+    "paused": false,
+    "pauseAt": 0,
+    "pausedMs": 0,
+    "endAt": 0,
+    "answer": null,
+    "title": "fixture"
+  }
+]

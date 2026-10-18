@@ -6,7 +6,7 @@
 use bingo_sdk::{Event, ItemStatus};
 use ratatui::style::Style;
 
-use super::{screen, style_of};
+use super::screen;
 use crate::clock::Now;
 use crate::test_support::*;
 use crate::theme;
@@ -19,7 +19,7 @@ use crate::tree::Tree;
 fn just_landed(ok: bool, ui: &mut crate::ui::Ui, now: Now) -> Tree {
     let mut state = folded(vec![
         frame(1, started("trn_1")),
-        started_tool(2, loose(running_tool("itm_1", "Bash", "compiling…"))),
+        started_tool(2, loose(running_tool("itm_1", "bash", "compiling…"))),
     ]);
     crate::painted::painted(80, 24, &solo(&state), ui, now);
     let output = match ok {
@@ -34,7 +34,7 @@ fn just_landed(ok: bool, ui: &mut crate::ui::Ui, now: Now) -> Tree {
         Event::ItemCompleted {
             item: loose(tool(
                 "itm_1",
-                "Bash",
+                "bash",
                 serde_json::json!({"command": "cargo test"}),
                 Some(output),
                 match ok {
@@ -50,7 +50,7 @@ fn just_landed(ok: bool, ui: &mut crate::ui::Ui, now: Now) -> Tree {
 /// The runs of the row a call landed on, so the light crossing its name can
 /// be told from the one style it rests in.
 fn landed_runs(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> Vec<(String, Style)> {
-    crate::painted::painted(80, 24, tree, ui, now).row("Bash")
+    crate::painted::painted(80, 24, tree, ui, now).row("bash")
 }
 
 /// The one bold frame a completion used to wear lasted 33 ms, which is below
@@ -58,86 +58,34 @@ fn landed_runs(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> Vec<(String, St
 /// light crosses the row's name instead, over six frames, and the row is at
 /// rest on the seventh — where "at rest" is exactly the row it always was.
 #[test]
-fn a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh() {
-    let (mut ui, now) = mid_turn();
+fn a_completion_lands_only_its_mark_for_420_ms() {
+    let (mut ui, now) = scene();
     let done = just_landed(true, &mut ui, now);
-    crate::theme::with(crate::painted::truecolor(), || {
-        let sweeping = landed_runs(&done, &mut ui, now);
-        assert!(
-            sweeping.len() > 3,
-            "the name is drawn cell by cell while the light is on it: {sweeping:#?}"
-        );
-        let bullet = sweeping.first().map(|(_, style)| *style);
-        assert_eq!(
-            bullet,
-            Some(theme::as_drawn(theme::good())),
-            "and the bullet only says it finished, with no frame of weight"
-        );
-        assert_ne!(
-            landed_runs(&done, &mut ui, later(now, 99)),
-            sweeping,
-            "the light has moved along halfway through"
-        );
-        assert_eq!(
-            landed_runs(&done, &mut ui, later(now, 198)),
-            vec![
-                (" ▍ ".to_string(), theme::as_drawn(theme::good())),
-                ("Bash".to_string(), theme::as_drawn(theme::bold())),
-                ("(cargo test)".to_string(), theme::as_drawn(theme::text())),
-            ],
-            "and on the seventh frame it is the row it always was"
-        );
+    theme::with(crate::painted::truecolor(), || {
+        let fresh = landed_runs(&done, &mut ui, now);
+        let halfway = landed_runs(&done, &mut ui, later(now, 210));
+        let settled = landed_runs(&done, &mut ui, later(now, 420));
+        assert_ne!(fresh, halfway);
+        assert_ne!(halfway, settled);
+        assert_eq!(settled, landed_runs(&done, &mut ui, still(later(now, 420))));
     });
-    assert_eq!(
-        landed_runs(&done, &mut ui, still(now)),
-        landed_runs(&done, &mut ui, still(later(now, 198))),
-        "a still surface draws the settled row from the first frame"
-    );
 }
 
-/// The one moment §6 had no cue for at all. A failure flares and cools into
-/// the words behind it over twelve frames — never a shake: §3's "nothing
-/// jumps" outranks it, and the rise was withdrawn on 2026-09-02 for it.
 #[test]
-fn a_failure_flares_and_cools_into_the_words_behind_it() {
-    let (mut ui, now) = mid_turn();
+fn a_failure_keeps_its_bad_verb_after_the_mark_lands() {
+    let (mut ui, now) = scene();
     let failed = just_landed(false, &mut ui, now);
-    crate::theme::with(crate::painted::truecolor(), || {
-        let mut name = |ms| {
-            landed_runs(&failed, &mut ui, later(now, ms))
-                .into_iter()
-                .find(|(text, _)| text.contains("Bash"))
-                .map(|(_, style)| style)
-                .expect("the row's name")
-        };
-        let landed = name(0);
-        assert_eq!(
-            landed,
-            theme::as_drawn(theme::cooling(0.0).patch(theme::bold())),
-            "it lands in `bad`"
-        );
-        assert_ne!(name(198), landed, "and cools out of it");
-        assert_eq!(
-            name(396),
-            theme::as_drawn(theme::bold()),
-            "into the row's own words, twelve frames on"
-        );
-        assert_eq!(
-            style_of(&failed, &mut ui, later(now, 396), " ▍ "),
-            theme::as_drawn(theme::bad()),
-            "the bullet stays `bad`: what cooled is how fresh it is"
-        );
+    theme::with(crate::painted::truecolor(), || {
+        for at in [now, later(now, 210), later(now, 420)] {
+            let runs = landed_runs(&failed, &mut ui, at);
+            assert!(
+                runs.iter().any(|(text, style)| text.contains("bash")
+                    && *style == theme::as_drawn(theme::bad()))
+            );
+        }
     });
-    assert_eq!(
-        landed_runs(&failed, &mut ui, still(now)),
-        landed_runs(&failed, &mut ui, still(later(now, 396))),
-        "and a still surface draws the settled row from the first frame"
-    );
 }
 
-// ---- a block arriving ---------------------------------------------------
-
-/// Which row of a screen carries `needle`.
 fn row_of(screen: &str, needle: &str) -> usize {
     screen
         .lines()
@@ -145,12 +93,6 @@ fn row_of(screen: &str, needle: &str) -> usize {
         .unwrap_or_else(|| panic!("no row carries {needle:?}"))
 }
 
-/// §3's "nothing jumps" outranks §6's cue: a block arriving takes exactly its
-/// own room and the screen holds still from the frame it lands on. The rise
-/// was withdrawn on 2026-09-02 (§10) — it put its two blank rows under the
-/// newest block, which a bottom-anchored viewport turns into the whole
-/// transcript jumping up two rows and walking back over three frames, once
-/// per block.
 #[test]
 fn a_new_block_takes_its_own_room_and_walks_nowhere_after_it() {
     let (mut ui, now) = mid_turn();
@@ -178,8 +120,8 @@ fn a_new_block_takes_its_own_room_and_walks_nowhere_after_it() {
         .collect();
     assert_eq!(
         row_of(&frames[0], "first"),
-        was - 1,
-        "short transcripts grow upward from the dock"
+        was - 2,
+        "the answer and its preceding blank row grow short transcripts grow upward from the dock"
     );
     for (at, drawn) in frames.iter().enumerate().skip(1) {
         assert_eq!(

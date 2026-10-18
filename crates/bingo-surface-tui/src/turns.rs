@@ -1,143 +1,89 @@
-//! Which part each item plays in its turn (ADR-0095 §6–§8): a step's row
-//! while the turn runs, one folded line once it is over, the stop line where
-//! the person stopped it. Worked out once per sync from the items and the
-//! fold map, so the row that draws and the request that asks for a drawing
-//! read the same answer.
-
+//! Each step retains its row throughout the turn (ADR-0097).
+use crate::ask::receipts::Answers;
+use crate::fold::Fold;
+use crate::paths;
+use crate::tree::Agents;
+use bingo_sdk::component::{LedgerProps, Props, Step, StepState, ledger::Marks};
+use bingo_sdk::{DecisionKind, Item, ItemBody, ItemId, ItemStatus, SessionState, Upshot};
 use std::collections::BTreeMap;
 
-use bingo_sdk::component::{
-    LedgerProps, Props, Step, StepState, TurnEnd, TurnFoldProps, ledger::Marks,
-};
-use bingo_sdk::{
-    DecisionKind, Item, ItemBody, ItemId, ItemStatus, SessionState, Upshot, view::Tone,
-};
-
-use crate::ask::receipts::Answers;
-use crate::fold::{self, Fold, Folds};
-use crate::tree::Agents;
-use crate::{paths, thoughts};
-
-/// What one item draws as, within its turn.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum Role {
-    /// The item's own drawing: everything outside a turn's steps.
     #[default]
     Own,
-    /// Folded away under its turn's line.
     Hidden,
-    /// A step's row; `opened` when it stands under an opened turn's line,
-    /// which is when its output hangs under it.
-    Step { step: Step, opened: bool },
-    /// The first step or thought of a finished turn holds its line, and under
-    /// the line the part it plays when the turn is opened.
-    Fold {
-        fold: TurnFoldProps,
-        then: Option<Box<Role>>,
+    Step {
+        step: Step,
+        opened: bool,
     },
-    /// A thought of an opened turn: its words, dim, under the steps.
-    Thought,
-    /// Where the person stopped the turn: how many of its steps had run.
-    Stop { ran: usize, total: usize },
+    Narration,
 }
 
-/// Every item's role, by id; an item not named plays its own.
 #[derive(Debug, Default)]
 pub struct Roles(BTreeMap<ItemId, Role>);
 
 impl Roles {
-    pub fn of(
-        state: &SessionState,
-        agents: &Agents<'_>,
-        folds: &Folds,
-        answers: &Answers<'_>,
-        tools: &crate::tool_rows::Looks,
-    ) -> Self {
-        let items: Vec<&Item> = state.transcript.items().iter().map(AsRef::as_ref).collect();
-        let replaced = rowed(state);
+    pub fn of(agents: &Agents<'_>, rows: &crate::transcript::Rows<'_>) -> Self {
+        let state = rows.state;
+        let replaced = rowed(&rows.slots);
         let mut roles = BTreeMap::new();
-        for run in items.chunk_by(|a, b| a.turn.is_some() && a.turn == b.turn) {
-            let Some(id) = run.first().and_then(|item| item.turn.as_ref()) else {
+        for item in state.transcript.items() {
+            if item.turn.is_none() && !matches!(item.body, ItemBody::ToolCall { .. }) {
                 continue;
-            };
-            let turn = Turn {
-                items: run,
-                state,
-                agents,
-                replaced: &replaced,
-                answers,
-                tools,
-            };
-            match state.turn.as_ref().is_some_and(|live| &live.id == id) {
-                true => turn.live(&mut roles),
-                false => turn.finished(folds, &mut roles),
             }
+            let role = match &item.body {
+                ItemBody::ToolCall { quiet, output, .. }
+                    if (!*quiet || item.status.failed(output.as_ref()))
+                        && !agents.contains_key(&item.id)
+                        && !replaced.contains(&item.id) =>
+                {
+                    Role::Step {
+                        step: step(item, rows),
+                        opened: rows.folds.get(&item.id) == Some(&Fold::Open),
+                    }
+                }
+                ItemBody::Interruption { .. } | ItemBody::Reasoning { .. } => Role::Hidden,
+                ItemBody::Assistant { .. } if rows.followed.contains(&item.id) => Role::Narration,
+                _ => continue,
+            };
+            roles.insert(item.id.clone(), role);
         }
         Self(roles)
     }
 
     pub fn of_item(&self, id: &ItemId) -> &Role {
-        static OWN: Role = Role::Own;
-        self.0.get(id).unwrap_or(&OWN)
-    }
-
-    /// Whether a step is running: its spinner turns on its own clock.
-    #[cfg(test)]
-    pub fn spinning(&self) -> bool {
-        self.0
-            .values()
-            .any(|role| matches!(role, Role::Step { step, .. } if step.state == StepState::Running))
-    }
-
-    /// The item holding the line `id` is folded or opened under, where a key
-    /// or a click on `id` opens or shuts its turn; `None` for an item that is
-    /// a row of its own.
-    pub fn line_of(&self, state: &SessionState, id: &ItemId) -> Option<ItemId> {
-        match self.of_item(id) {
-            Role::Fold { .. } => Some(id.clone()),
-            Role::Hidden | Role::Thought | Role::Step { opened: true, .. } => {
-                self.holder(state, id)
-            }
-            _ => None,
-        }
-    }
-
-    /// The item holding the line of the turn `id` is part of.
-    fn holder(&self, state: &SessionState, id: &ItemId) -> Option<ItemId> {
-        let turn = state.item(id)?.turn.as_ref()?;
-        state
-            .transcript
-            .items()
-            .iter()
-            .map(AsRef::as_ref)
-            .filter(|item| item.turn.as_ref() == Some(turn))
-            .find(|item| matches!(self.of_item(&item.id), Role::Fold { .. }))
-            .map(|item| item.id.clone())
+        self.0.get(id).unwrap_or(&Role::Own)
     }
 }
 
-/// What an item asks its sites to draw for the part it plays: a step its
-/// row and, opened, what it brought back; a folded line itself and, opened,
-/// the part under it; a thought or a stop its own kind's site. The ids are the
-/// ones the drawing resolves with, so a request and its row meet.
-pub fn requests(item: &Item, role: &Role) -> Vec<(String, Props)> {
+/// Items before the last call are followed by a step, including narration.
+pub fn followed<'a>(items: &[&'a Item]) -> impl Iterator<Item = &'a ItemId> {
+    items
+        .iter()
+        .rev()
+        .skip_while(|item| !matches!(item.body, ItemBody::ToolCall { .. }))
+        .skip(1)
+        .map(|item| &item.id)
+}
+
+pub fn requests(
+    item: &Item,
+    role: &Role,
+    rows: &crate::transcript::Rows<'_>,
+) -> Vec<(String, Props)> {
     match role {
-        Role::Step { step, opened } => std::iter::once(ledger(item, step))
-            .chain(opened.then(|| result(item)).flatten())
+        Role::Step { step, opened } => std::iter::once(ledger(item, step, &rows.answers, rows.now))
+            .chain(
+                crate::component::items::tail(item)
+                    .filter(|props| matches!(props, Props::ToolProgress(_)))
+                    .map(|props| (crate::component::items::id(item), props)),
+            )
+            .chain((*opened).then(|| result(item)).flatten())
             .collect(),
-        Role::Fold { fold, then } => {
-            let under = then.as_deref().map(|then| requests(item, then));
-            std::iter::once(folded(item, fold))
-                .chain(under.into_iter().flatten())
-                .collect()
-        }
-        Role::Thought | Role::Stop { .. } => fact(item).into_iter().collect(),
-        Role::Own | Role::Hidden => Vec::new(),
+        _ => Vec::new(),
     }
 }
 
-/// What a step brought back, as the `ToolResult` site is asked for it under
-/// an opened turn; nothing for a step that brought nothing back.
 pub fn result(item: &Item) -> Option<(String, Props)> {
     match crate::component::items::tail(item)? {
         props @ Props::ToolResult(_) => Some((crate::component::items::id(item), props)),
@@ -145,28 +91,50 @@ pub fn result(item: &Item) -> Option<(String, Props)> {
     }
 }
 
-/// A thought or a stop as its own kind's site is asked for it: `Reasoning`
-/// for the words under an opened turn, `Interruption` for the stop line.
-pub fn fact(item: &Item) -> Option<(String, Props)> {
-    crate::component::items::props(item, false)
-        .map(|props| (crate::component::items::id(item), props))
-}
-
-/// A step's row as its site is asked for it.
-pub fn ledger(item: &Item, step: &Step) -> (String, Props) {
+pub fn ledger(
+    item: &Item,
+    step: &Step,
+    answers: &Answers<'_>,
+    now: crate::clock::Now,
+) -> (String, Props) {
+    let mut step = step.clone();
+    if step.state == StepState::Running {
+        step.elapsed_ms = Some(running_for(item, answers, now).as_millis() as u64 / 1000 * 1000);
+    }
     let props = Props::Ledger(LedgerProps {
-        steps: vec![step.clone()],
+        steps: vec![step],
         marks: marks(),
     });
     (crate::component::items::id(item), props)
 }
 
-/// The marks a turn's rows start with, as this terminal's glyph table has
-/// them: whoever draws the rows draws them with these.
-fn marks() -> Marks {
+/// M202 will move this start to the call's Running frame.
+pub fn running_for(
+    item: &Item,
+    answers: &Answers<'_>,
+    now: crate::clock::Now,
+) -> jiff::SignedDuration {
+    let start = answers
+        .to(&item.id)
+        .iter()
+        .filter(|receipt| matches!(receipt.body, ItemBody::PermissionReceipt { .. }))
+        .map(|receipt| receipt.started_at)
+        .max()
+        .unwrap_or(item.started_at);
+    now.wall
+        .duration_since(start)
+        .max(jiff::SignedDuration::ZERO)
+}
+
+pub fn marks() -> Marks {
     let chrome = crate::theme::glyphs().chrome;
     let [done, asked, running, failed] = chrome.steps.map(str::to_owned);
-    let [folded, open] = chrome.fold.map(str::to_owned);
+    let [folded, open] = if crate::theme::bullet().is_ascii() {
+        [">", "v"]
+    } else {
+        ["▸", "▾"]
+    }
+    .map(str::to_owned);
     Marks {
         done,
         asked,
@@ -177,18 +145,10 @@ fn marks() -> Marks {
     }
 }
 
-/// A finished turn's line as its site is asked for it, by the item holding it.
-pub fn folded(item: &Item, fold: &TurnFoldProps) -> (String, Props) {
-    (item.id.to_string(), Props::TurnFold(fold.clone()))
-}
-
-/// The items a producer drew a row of its own for: those keep their drawing.
-/// A row that only offers actions draws nothing of its own; its actions hang
-/// under the step.
-fn rowed(state: &SessionState) -> Vec<ItemId> {
-    bingo_sdk::slot::placed(state)
-        .into_iter()
-        .filter_map(|placed| match placed.slot {
+fn rowed(slots: &[bingo_sdk::slot::Placed]) -> Vec<ItemId> {
+    slots
+        .iter()
+        .filter_map(|placed| match &placed.slot {
             bingo_sdk::slot::Slot::Row {
                 item,
                 mark,
@@ -203,193 +163,11 @@ fn rowed(state: &SessionState) -> Vec<ItemId> {
                     || badge.is_some()
                     || caption.is_some()
                     || body.is_some();
-                drawn.then_some(item)
+                drawn.then(|| item.clone())
             }
             _ => None,
         })
         .collect()
-}
-
-/// One turn's items, and what deciding their parts reads.
-struct Turn<'a> {
-    items: &'a [&'a Item],
-    state: &'a SessionState,
-    agents: &'a Agents<'a>,
-    replaced: &'a [ItemId],
-    answers: &'a Answers<'a>,
-    tools: &'a crate::tool_rows::Looks,
-}
-
-impl Turn<'_> {
-    /// A running turn: each step its row, no thought a row of its own.
-    fn live(&self, roles: &mut BTreeMap<ItemId, Role>) {
-        let mut steps = Vec::new();
-        for item in self.items {
-            let role = match () {
-                _ if self.is_step(item) => {
-                    let step = step(item, self.state, self.answers, self.tools);
-                    steps.push(step.clone());
-                    Role::Step {
-                        step,
-                        opened: false,
-                    }
-                }
-                _ if thoughts::is_thought(item) => Role::Hidden,
-                _ => continue,
-            };
-            roles.insert(item.id.clone(), role);
-        }
-        self.stops(&steps, roles);
-    }
-
-    /// A turn that is over: one line on its first step or thought, the rest
-    /// under it.
-    fn finished(&self, folds: &Folds, roles: &mut BTreeMap<ItemId, Role>) {
-        let steps: Vec<usize> = (0..self.items.len())
-            .filter(|&at| self.is_step(self.items[at]))
-            .collect();
-        let thought = self.items.iter().any(|item| thoughts::is_thought(item));
-        // The first of the working holds the line, so an opened turn reads
-        // from its line down.
-        let first = |item: &&&Item| self.is_step(item) || thoughts::is_thought(item);
-        let Some(holder) = self.items.iter().position(|item| first(&item)) else {
-            self.stops(&[], roles);
-            return;
-        };
-        let opened = fold::fold_of(folds, self.items[holder]) == Fold::Open;
-        let said = self.steps(&steps);
-        self.stops(&said, roles);
-        let fold = TurnFoldProps {
-            steps: self.news(&steps, said),
-            outcome: self.outcome(),
-            elapsed: self.elapsed(),
-            thought,
-            is_expanded: opened,
-            marks: marks(),
-        };
-        let last_step = steps.last().copied();
-        for (at, item) in self.items.iter().enumerate() {
-            let role = match () {
-                _ if at == holder => Role::Fold {
-                    fold: fold.clone(),
-                    then: opened.then(|| Box::new(self.opened(item))),
-                },
-                _ if self.is_step(item) || thoughts::is_thought(item) => match opened {
-                    true => self.opened(item),
-                    false => Role::Hidden,
-                },
-                _ if !opened && narrates(item, at, last_step) => Role::Hidden,
-                // An answer from before receipts named their step: it is the
-                // working's, and goes where the working goes.
-                _ if !opened && matches!(item.body, ItemBody::PermissionReceipt { .. }) => {
-                    Role::Hidden
-                }
-                _ => continue,
-            };
-            roles.insert(item.id.clone(), role);
-        }
-    }
-
-    /// The stop line, wherever the turn says the person stopped it.
-    fn stops(&self, steps: &[Step], roles: &mut BTreeMap<ItemId, Role>) {
-        let calls = self.items.iter().filter(|item| self.is_step(item));
-        let ran = calls
-            .zip(steps)
-            .filter(|(call, step)| ran(step, self.answers.to(&call.id)))
-            .count();
-        for item in self.items {
-            if matches!(item.body, ItemBody::Interruption { .. }) {
-                let total = steps.len();
-                roles.insert(item.id.clone(), Role::Stop { ran, total });
-            }
-        }
-    }
-
-    /// What an item of an opened turn shows under the line.
-    fn opened(&self, item: &Item) -> Role {
-        match self.is_step(item) {
-            true => Role::Step {
-                step: step(item, self.state, self.answers, self.tools),
-                opened: true,
-            },
-            false => Role::Thought,
-        }
-    }
-
-    fn steps(&self, at: &[usize]) -> Vec<Step> {
-        at.iter()
-            .map(|&at| step(self.items[at], self.state, self.answers, self.tools))
-            .collect()
-    }
-
-    /// The steps as the folded line repeats them: a yes to a permission is
-    /// how the work went on, not news, so only other answers stay.
-    fn news(&self, at: &[usize], steps: Vec<Step>) -> Vec<Step> {
-        at.iter()
-            .zip(steps)
-            .map(
-                |(&at, step)| match granted(self.answers.to(&self.items[at].id)) {
-                    true => Step {
-                        answer: None,
-                        why: None,
-                        elapsed_ms: None,
-                        landed_at: None,
-                        ..step
-                    },
-                    false => step,
-                },
-            )
-            .collect()
-    }
-
-    /// A call the turn made that reads as a step. A call that draws its own
-    /// session, a quiet one, and one a producer drew a row for are not.
-    fn is_step(&self, item: &Item) -> bool {
-        let ItemBody::ToolCall { quiet, output, .. } = &item.body else {
-            return false;
-        };
-        let quietly = *quiet && !item.status.failed(output.as_ref());
-        !quietly && !self.agents.contains_key(&item.id) && !self.replaced.contains(&item.id)
-    }
-
-    fn outcome(&self) -> TurnEnd {
-        let stopped = self
-            .items
-            .iter()
-            .any(|item| matches!(item.body, ItemBody::Interruption { .. }));
-        match stopped {
-            true => TurnEnd::Stopped,
-            false => TurnEnd::Done,
-        }
-    }
-
-    /// From the turn's first item to the last moment any of them moved.
-    fn elapsed(&self) -> u64 {
-        let first = self.items.iter().map(|item| item.started_at).min();
-        let last = self
-            .items
-            .iter()
-            .map(|item| item.completed_at.unwrap_or(item.started_at))
-            .max();
-        match first.zip(last) {
-            Some((first, last)) => {
-                u64::try_from(last.duration_since(first).as_millis()).unwrap_or(0)
-            }
-            None => 0,
-        }
-    }
-}
-
-/// What the model said between its steps: the working, not the answer, which
-/// is what it said after the last of them.
-fn narrates(item: &Item, at: usize, last_step: Option<usize>) -> bool {
-    matches!(item.body, ItemBody::Assistant { .. }) && last_step.is_some_and(|last| at < last)
-}
-
-/// Whether a step had run when its turn ended: it came back, and the person
-/// had not said no to it.
-fn ran(step: &Step, answers: &[&Item]) -> bool {
-    matches!(step.state, StepState::Done | StepState::Failed) && !refused(answers)
 }
 
 /// Whether the person said no to a step.
@@ -406,12 +184,10 @@ fn refused(answers: &[&Item]) -> bool {
 }
 
 /// One call, in the words its row shows.
-pub fn step(
-    item: &Item,
-    state: &SessionState,
-    answers: &Answers<'_>,
-    tools: &crate::tool_rows::Looks,
-) -> Step {
+pub fn step(item: &Item, rows: &crate::transcript::Rows<'_>) -> Step {
+    let state = rows.state;
+    let answers = &rows.answers;
+    let tools = &rows.tools;
     let ItemBody::ToolCall {
         name,
         input,
@@ -432,10 +208,30 @@ pub fn step(
         &state.summary.cwd,
         paths::home(),
     );
-    step.state = step_state(item, state);
+    step.state = if refused(answers.to(&item.id)) {
+        StepState::Skipped
+    } else {
+        step_state(item, state)
+    };
+    step.landed_at = item.completed_at.map(|time| time.as_millisecond());
     step.upshot = output.as_ref().and_then(bingo_sdk::ToolOutput::outcome);
-    step.answer = answer(answers.to(&item.id));
+    step.answer = answer(answers.to(&item.id), input);
+    step.why = why(item, &rows.mode_labels);
     step
+}
+
+fn why(item: &Item, modes: &BTreeMap<String, String>) -> Option<String> {
+    let ItemBody::ToolCall { allowed_by, .. } = &item.body else {
+        return None;
+    };
+    match allowed_by.as_deref()? {
+        bingo_sdk::Reason::Mode { mode } => Some(modes.get(mode).unwrap_or(mode).clone()),
+        bingo_sdk::Reason::Rule {
+            source: Some(bingo_sdk::policy::RuleSource::Session),
+            ..
+        } => Some("session rule".into()),
+        _ => None,
+    }
 }
 
 fn step_state(item: &Item, state: &SessionState) -> StepState {
@@ -457,38 +253,40 @@ fn step_state(item: &Item, state: &SessionState) -> StepState {
     }
 }
 
-/// Whether everything the person answered for the step was a plain yes to a
-/// permission. A yes to a call the person changed first is news.
-fn granted(receipts: &[&Item]) -> bool {
-    !receipts.is_empty()
-        && receipts.iter().all(|receipt| {
-            matches!(
-                receipt.body,
-                ItemBody::PermissionReceipt {
-                    decision: DecisionKind::Allow | DecisionKind::AllowSession,
-                    ..
-                }
-            )
-        })
-}
-
-/// What the person answered when the step asked, in the receipt's words.
-fn answer(receipts: &[&Item]) -> Option<Upshot> {
-    let words: Vec<String> = receipts
+fn answer(receipts: &[&Item], input: &serde_json::Value) -> Option<Upshot> {
+    let words: Vec<_> = receipts
         .iter()
-        .filter_map(|receipt| crate::ask::receipts::label(&receipt.body))
+        .filter_map(|item| match &item.body {
+            ItemBody::PermissionReceipt {
+                decision: DecisionKind::AllowChanged | DecisionKind::AllowChangedSession,
+                ..
+            } => Some("changed by you".to_owned()),
+            ItemBody::QuestionAnswer { answer, .. } => Some(question_result(answer, input)),
+            _ => None,
+        })
         .collect();
-    if words.is_empty() {
-        return None;
-    }
-    Some(Upshot::Words {
-        text: words.join(" \u{b7} "),
-        tone: match refused(receipts) {
-            true => Tone::Bad,
-            false => Tone::Neutral,
-        },
-    })
+    (!words.is_empty()).then(|| Upshot::plain(words.join(crate::theme::glyphs::get("sep"))))
 }
 
 #[cfg(test)]
 mod tests;
+
+// M197 replaces this receipt-string contract with the typed Answer.
+fn question_result(answer: &str, input: &serde_json::Value) -> String {
+    let questions = input.get("questions").and_then(serde_json::Value::as_array);
+    if let Some(questions) = questions {
+        if questions.len() > 1 && !answer.starts_with("skipped") {
+            return format!("{} answers", questions.len());
+        }
+        if let Some(question) = questions.first()
+            && let Some(label) = question
+                .get("header")
+                .or_else(|| question.get("question"))
+                .and_then(serde_json::Value::as_str)
+            && let Some(words) = answer.strip_prefix(&format!("{label}: "))
+        {
+            return words.to_owned();
+        }
+    }
+    answer.to_owned()
+}

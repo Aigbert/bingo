@@ -26,6 +26,7 @@ pub fn props(_state: &SessionState, interaction: &Interaction) -> Option<Props> 
 
 pub struct Site<'a> {
     pub state: &'a SessionState,
+    pub tools: &'a crate::tool_rows::Looks,
     pub ui: &'a crate::ui::Ui,
     pub interaction: &'a Interaction,
     pub agent: Option<&'a str>,
@@ -137,7 +138,7 @@ impl Site<'_> {
             &self.state.summary.cwd,
             width,
             self.room,
-            &crate::tool_rows::Looks::in_ui(self.ui),
+            self.tools,
         );
         if let Props::Permission(props) = props {
             let input = serde_json::to_string_pretty(&props.input).unwrap_or_default();
@@ -165,7 +166,7 @@ impl Site<'_> {
             &self.state.summary.cwd,
             self.width,
             self.room,
-            &crate::tool_rows::Looks::in_ui(self.ui),
+            self.tools,
         );
         rows.push((
             Line::from("mod drawing cannot show the sealed card whole; showing host card"),

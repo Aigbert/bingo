@@ -12,20 +12,10 @@ pub(super) fn placed_row(
     cue: Cue,
     mut block: Block,
 ) -> Block {
-    let bingo_sdk::slot::Slot::Row {
-        mark,
-        title,
-        badge,
-        caption,
-        body,
-        actions,
-        ..
-    } = slot
-    else {
+    let bingo_sdk::slot::Slot::Row { body, actions, .. } = slot else {
         return block;
     };
-    let quiet = matches!(&item.body, ItemBody::ToolCall { quiet: true, output, .. }
-        if !item.status.failed(output.as_ref()));
+    let quiet = quiet(item);
     if let Some(body) = body {
         block.lines.truncate(usize::from(!quiet));
         block.pictures.clear();
@@ -34,22 +24,14 @@ pub(super) fn placed_row(
         block.next = block.next.into_iter().chain(drawn.next).min();
         block.lines.extend(drawn.lines);
     }
-    if !quiet {
-        if let Some(title) = title {
-            let heading = replacement_heading(item, title, badge.as_deref(), rows, cue);
-            block.next = block.next.into_iter().chain(heading.next).min();
-            block
-                .lines
-                .splice(..block.lines.len().min(1), heading.lines);
-        }
-        if let Some(heading) = block.lines.first_mut() {
-            placed_heading(heading, *mark, badge.as_deref().filter(|_| title.is_none()));
-            if let Some(caption) = caption.as_deref().filter(|caption| !caption.is_empty()) {
-                heading
-                    .spans
-                    .push(Span::styled(format!(" {caption}"), theme::text()));
-            }
-        }
+    if let Some(heading) = heading(item, slot, rows, cue) {
+        block.next = block.next.into_iter().chain(heading.next).min();
+        block
+            .lines
+            .splice(..block.lines.len().min(1), heading.lines);
+    }
+    if !quiet && !matches!(item.body, ItemBody::ToolCall { .. }) {
+        decorate_heading(block.lines.first_mut(), slot);
     }
     if !actions.is_empty() {
         let drawn = placed_body(
@@ -62,6 +44,95 @@ pub(super) fn placed_row(
         block.lines.extend(drawn.lines);
     }
     block
+}
+
+fn heading(
+    item: &Item,
+    slot: &bingo_sdk::slot::Slot,
+    rows: &Rows<'_>,
+    cue: Cue,
+) -> Option<crate::views::Drawing> {
+    let bingo_sdk::slot::Slot::Row {
+        mark,
+        title,
+        badge,
+        caption,
+        ..
+    } = slot
+    else {
+        return None;
+    };
+    if quiet(item) {
+        return None;
+    }
+    if matches!(item.body, ItemBody::ToolCall { .. }) {
+        return Some(step_heading(
+            item,
+            *mark,
+            title.as_deref(),
+            badge.as_deref(),
+            caption.as_deref(),
+            rows,
+        ));
+    }
+    title
+        .as_ref()
+        .map(|title| replacement_heading(item, title, badge.as_deref(), rows, cue))
+}
+
+fn quiet(item: &Item) -> bool {
+    matches!(&item.body, ItemBody::ToolCall { quiet: true, output, .. }
+        if !item.status.failed(output.as_ref()))
+}
+
+fn decorate_heading(heading: Option<&mut Line<'static>>, slot: &bingo_sdk::slot::Slot) {
+    let bingo_sdk::slot::Slot::Row {
+        mark,
+        title,
+        badge,
+        caption,
+        ..
+    } = slot
+    else {
+        return;
+    };
+    if let Some(heading) = heading {
+        placed_heading(heading, *mark, badge.as_deref().filter(|_| title.is_none()));
+        if let Some(caption) = caption.as_deref().filter(|caption| !caption.is_empty()) {
+            heading
+                .spans
+                .push(Span::styled(format!(" {caption}"), theme::text()));
+        }
+    }
+}
+
+fn step_heading(
+    item: &Item,
+    mark: Option<char>,
+    title: Option<&str>,
+    badge: Option<&str>,
+    caption: Option<&str>,
+    rows: &Rows<'_>,
+) -> crate::views::Drawing {
+    let mut step = crate::turns::step(item, rows);
+    if let Some(mark) = mark {
+        step.mark = bingo_sdk::look::mark(Some(mark), theme::bullet().is_ascii());
+    }
+    if let Some(title) = title {
+        step.verb = title.to_owned();
+    }
+    if let Some(badge) = badge {
+        step.target = badge.to_owned();
+    }
+    if let Some(caption) = caption {
+        step.target.push(' ');
+        step.target.push_str(caption);
+    }
+    crate::views::marked(
+        &step.drawing(&crate::turns::marks(), rows.width),
+        rows.width,
+        &crate::views::Marks::at(rows.now),
+    )
 }
 
 fn replacement_heading(
@@ -89,36 +160,17 @@ fn placed_heading(heading: &mut Line<'static>, mark: Option<char>, badge: Option
     if let Some(mark) = mark
         && let Some(bullet) = heading.spans.first_mut()
     {
-        bullet.content = format!(" {} ", theme::row_mark(mark)).into();
+        bullet.content = format!(
+            " {} ",
+            bingo_sdk::look::mark(Some(mark), theme::bullet().is_ascii())
+        )
+        .into();
     }
     if let Some(badge) = badge {
         heading
             .spans
             .push(Span::styled(format!(" {badge}"), theme::dim()));
     }
-}
-
-/// The actions a producer offers on a step, under the step's words: the
-/// last row placed on it decides, as it does for a row of its own.
-pub(super) fn actions_under(item: &Item, indent: usize, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let Some(bingo_sdk::slot::Slot::Row { actions, .. }) = rows.placed_on(&item.id).next_back()
-    else {
-        return Vec::new();
-    };
-    if actions.is_empty() {
-        return Vec::new();
-    }
-    let view = bingo_sdk::View::Actions {
-        items: actions.clone(),
-    };
-    let width = rows.width.saturating_sub(indent).max(1);
-    let body = crate::views::marked(&view, width, &crate::views::Marks::default());
-    super::under(
-        Span::raw(" ".repeat(indent)),
-        body.lines,
-        indent,
-        rows.width,
-    )
 }
 
 fn placed_body(view: &bingo_sdk::View, rows: &Rows<'_>) -> crate::views::Drawing {
@@ -168,6 +220,13 @@ pub(crate) mod fixtures {
     }
 
     pub fn with_skill_row(state: SessionState, item: &str, name: &str, args: &str) -> SessionState {
+        if state
+            .transcript
+            .get(&ItemId::from_raw(item))
+            .is_some_and(|item| matches!(item.body, ItemBody::ToolCall { .. }))
+        {
+            panic!("a typed skill row cannot replace a tool call");
+        }
         with_row(
             state,
             bingo_sdk::slot::Slot::Row {
@@ -182,24 +241,16 @@ pub(crate) mod fixtures {
         )
     }
 
-    pub fn with_skill_tool_rows(mut state: SessionState) -> SessionState {
-        let rows: Vec<_> = state
-            .transcript
-            .items()
-            .iter()
-            .filter_map(|item| match &item.body {
-                ItemBody::ToolCall { name, input, .. } if name == "Skill" => Some((
-                    item.id.to_string(),
-                    input["name"].as_str()?.to_string(),
-                    input["arguments"].as_str().unwrap_or_default().to_string(),
-                )),
-                _ => None,
-            })
-            .collect();
-        for (id, name, args) in rows {
-            state = with_skill_row(state, &id, &name, &args);
-        }
-        state
+    #[test]
+    #[should_panic(expected = "a typed skill row cannot replace a tool call")]
+    fn a_skill_tool_cannot_use_a_typed_commands_row() {
+        let state = folded(vec![frame(
+            1,
+            bingo_sdk::Event::ItemStarted {
+                item: running_tool("call", "Skill", "guide"),
+            },
+        )]);
+        with_skill_row(state, "call", "guide", "");
     }
 
     pub fn with_promotions(mut state: SessionState) -> SessionState {
@@ -257,7 +308,7 @@ pub(crate) mod fixtures {
                             mark: Some('❖'),
                             title: Some("Review".into()),
                             badge: Some("sample".into()),
-                            body: None,
+                            body: Some(bingo_sdk::View::text("placed body")),
                             actions: vec![bingo_sdk::ActionItem {
                                 meaning: None,
                                 label: "open".into(),
@@ -274,7 +325,8 @@ pub(crate) mod fixtures {
         ]);
         let (mut ui, now) = scene();
         let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
-        assert!(screen.contains("❖ Review(sample) details"), "{screen}");
+        assert!(screen.contains("Review  sample details"), "{screen}");
         assert!(screen.contains("open"), "{screen}");
+        assert!(screen.contains("placed body"), "{screen}");
     }
 }

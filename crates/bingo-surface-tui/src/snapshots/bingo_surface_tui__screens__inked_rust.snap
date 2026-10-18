@@ -2,8 +2,10 @@
 source: crates/bingo-surface-tui/src/screens.rs
 expression: "inked(\"rust\", RUST)"
 ---
-    ⟨dim⟩// the frame, once⟨comment⟩               ⟨?⟩rust⟨dim⟩
-    ⟨dim⟩pub⟨kw⟩ ⟨text⟩fn⟨kw⟩ ⟨text⟩draw⟨fn⟩(now: Now) -> ⟨text⟩bool⟨kw⟩ {⟨text⟩      ⟨?⟩
-    ⟨dim⟩    ⟨text⟩let⟨kw⟩ ready = ⟨text⟩true⟨kw⟩;⟨text⟩                ⟨?⟩
-    ⟨dim⟩    ready && now.motion⟨text⟩              ⟨?⟩
-    ⟨dim⟩}⟨text⟩                                    ⟨?⟩
+                                                      ⟨well⟩rust⟨dim⟩  ⟨well⟩
+  ⟨well⟩// the frame, once⟨comment⟩                                        ⟨well⟩
+  ⟨well⟩pub⟨kw⟩ ⟨text⟩fn⟨kw⟩ ⟨text⟩draw⟨fn⟩(now: Now) -> ⟨text⟩bool⟨kw⟩ {⟨text⟩                           ⟨well⟩
+  ⟨well⟩    ⟨text⟩let⟨kw⟩ ready = ⟨text⟩true⟨kw⟩;⟨text⟩                                     ⟨well⟩
+  ⟨well⟩    ready && now.motion⟨text⟩                                   ⟨well⟩
+  ⟨well⟩}⟨text⟩                                                         ⟨well⟩
+                                                            ⟨well⟩

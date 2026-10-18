@@ -380,20 +380,17 @@ pub fn work(state: &SessionState) -> String {
     )
 }
 
-/// How long it has been at it: the first item it started to the last it
-/// finished, which is the only clock a client has for somebody else's work.
+/// The finished child's latest turn uses the same waited-out clock as its band.
 pub fn seconds(state: &SessionState) -> i64 {
-    let first = state.transcript.items().first().map(|item| item.started_at);
-    let last = state
-        .transcript
-        .items()
-        .iter()
-        .filter_map(|item| item.completed_at)
-        .max();
-    match (first, last) {
-        (Some(first), Some(last)) => last.duration_since(first).as_secs().max(0),
-        _ => 0,
-    }
+    let Some(item) = state.transcript.items().last() else {
+        return 0;
+    };
+    item.turn
+        .as_ref()
+        .and_then(|turn| {
+            bingo_sdk::transcript::clock(state, turn, item.completed_at.unwrap_or(item.started_at))
+        })
+        .map_or(0, |clock| clock.elapsed.as_secs().max(0))
 }
 
 #[cfg(test)]
@@ -562,16 +559,17 @@ mod tests {
         );
 
         tree.fold.apply(&child_frame(
-            6,
+            10,
             completed("trn_9", bingo_sdk::TurnStatus::Completed),
         ));
         let done = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(
             activity(done).as_deref(),
-            Some("idle · completed · 3 tools · ↓ 140 · 0s")
+            Some("idle · completed · 3 tools · ↓ 140 · 3s")
         );
 
-        tree.fold.apply(&child_frame(7, opened(child_permission())));
+        tree.fold
+            .apply(&child_frame(11, opened(child_permission())));
         let asking = tree.fold.sessions().nth(1).expect("the child");
         assert_eq!(activity(asking).as_deref(), Some("asking"));
     }

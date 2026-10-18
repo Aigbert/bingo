@@ -4,7 +4,8 @@ expression: "text(&out.lines).join(\"\\n\")"
 ---
 Title
 
-Some prose with `code`, a link (https://x.dev) and a soft break.
+Some prose with code, a link
+(https://x.dev) and a soft break.
 
 • one
 • two
@@ -15,11 +16,13 @@ Some prose with `code`, a link (https://x.dev) and a soft break.
 
 │ quoted on two lines
 
-    fn main() {}  rust
+                                  rust  
+  fn main() {}                          
+                                        
 
-crate  tests
-────────────
-sdk       41
+crate   tests
+─────────────
+sdk        41
 
 ────────────────────────────────────────
 last word.

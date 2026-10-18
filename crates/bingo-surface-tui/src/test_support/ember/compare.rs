@@ -55,6 +55,10 @@ fn mismatch(row: &Row, x: u16, buffer: &Buffer, bx: u16, by: u16, spinner: bool)
         ("fg", &row.fg, painted.fg, "fg"),
         ("bg", &row.bg, painted.bg, "bg"),
     ] {
+        // rowInk coalesces equal foreground runs across unpainted spaces.
+        if layer == "fg" && symbol == " " {
+            continue;
+        }
         let Some(token) = parse::token(runs, x) else {
             continue;
         };

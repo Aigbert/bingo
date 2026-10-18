@@ -266,30 +266,8 @@ pub fn ash() -> Style {
 // [`crate::clock`] derived from the clock — and answers with the token at that
 // point. The colour stays here; the timing stays there; a view names neither.
 
-/// The steps a breath is drawn in. Twenty-four bits can show five; the eight
-/// have only the two ends, and a terminal without colour has neither.
-pub const BREATH_STEPS: u8 = 5;
-
-/// How dim a breath goes: 65 % of `presence` (§6).
-const BREATH_FLOOR: f32 = 0.65;
-
 /// What wants a person pulses once a second (§6).
 pub const PULSE: std::time::Duration = std::time::Duration::from_secs(1);
-
-/// bingo breathing — the activity row's sparkle and the input box's border
-/// while a turn runs. `level` is 0 at the bottom of the breath and 1 at the
-/// top of it.
-pub fn breath(level: f32) -> Style {
-    let level = steps(level, BREATH_STEPS);
-    match current().colors {
-        Colors::Plain => Style::new(),
-        Colors::Ansi | Colors::Indexed(_) => two_ways(level, dim(), presence()),
-        Colors::True(palette) => Style::new().fg(scaled(
-            palette.ember(),
-            BREATH_FLOOR + (1.0 - BREATH_FLOOR) * level,
-        )),
-    }
-}
 
 /// A live mark pulsing between `presence` and its glow.
 pub fn pulse(level: f32) -> Style {
@@ -406,23 +384,6 @@ fn two_ways(level: f32, low: Style, high: Style) -> Style {
     }
 }
 
-/// A continuous level, snapped to the steps a ramp is drawn in.
-fn steps(level: f32, steps: u8) -> f32 {
-    let last = f32::from(steps.saturating_sub(1)).max(1.0);
-    (level.clamp(0.0, 1.0) * last).round() / last
-}
-
-/// A colour at a share of its own brightness — how a breath dims without
-/// leaving the hue it belongs to.
-fn scaled(colour: Color, share: f32) -> Color {
-    let Color::Rgb(r, g, b) = colour else {
-        return colour;
-    };
-    let share = share.clamp(0.0, 1.0);
-    let at = |c: u8| (f32::from(c) * share).round() as u8;
-    Color::Rgb(at(r), at(g), at(b))
-}
-
 // ---- syntax inks -------------------------------------------------------
 
 /// What a highlighter may say about a run of code.
@@ -517,7 +478,6 @@ pub fn spendable() -> std::collections::HashSet<Color> {
     for step in 0..=SAMPLES {
         let t = step as f32 / SAMPLES as f32;
         for style in [
-            breath(t),
             pulse(t),
             comet(t),
             landing(t),
@@ -575,16 +535,6 @@ pub fn glyphs() -> &'static Glyphs {
 /// What the model says and does: `▍` at column 1, its text at 3.
 pub fn bullet() -> &'static str {
     glyphs().bullet
-}
-
-/// A producer's one-cell mark follows the terminal's glyph capabilities.
-pub fn row_mark(mark: char) -> String {
-    use unicode_width::UnicodeWidthChar;
-    if mark.width() != Some(1) || (bullet().is_ascii() && !mark.is_ascii()) {
-        bullet().to_string()
-    } else {
-        mark.to_string()
-    }
 }
 
 /// What came back: `⎿` at column 2, its text at 5.

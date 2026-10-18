@@ -113,7 +113,10 @@ fn shell_ran() {
     let (mut ui, now) = scene();
     let state = ran();
     let shut = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(shut.contains("   ▸ 1 step · bash  "), "{shut}");
+    assert!(
+        shut.contains("   $ run     cargo test --workspace"),
+        "{shut}"
+    );
     open_the_turns(&mut ui, &state);
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
@@ -134,7 +137,7 @@ fn shell_and_wake_follow_plugin_order() {
     let (mut ui, now) = scene();
     let mut state = running();
     let at = now.wall + jiff::SignedDuration::from_secs(240);
-    state.apply(&frame(5, pending_wake(&at.to_string())));
+    state.apply(&frame(state.seq.0 + 1, pending_wake(&at.to_string())));
     let screen = draw_tree(120, 40, &solo(&state), &mut ui, now);
     assert!(screen.find("wake in 4m").unwrap() < screen.find("1 shell").unwrap());
     both("shell_and_wake", &solo(&state), &mut ui, now);

@@ -50,6 +50,21 @@ mod thinking;
 /// What a list a cursor walks draws when it outgrows its room (§3).
 mod windows;
 
+fn folded(frames: Vec<bingo_sdk::Frame>) -> bingo_sdk::SessionState {
+    crate::test_support::session(frames)
+}
+
+fn scene() -> (Ui, Now) {
+    let (mut ui, now) = crate::test_support::scene();
+    catalogue(&mut ui);
+    (ui, now)
+}
+
+fn draw_tree(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> String {
+    catalogue(ui);
+    crate::test_support::draw_tree(width, height, tree, ui, now)
+}
+
 /// One scene, at the two sizes every layout rule is written for.
 fn both(name: &str, tree: &Tree, ui: &mut Ui, now: Now) {
     insta::assert_snapshot!(format!("{name}_80x24"), draw_tree(80, 24, tree, ui, now));
@@ -197,9 +212,8 @@ fn streaming() {
 }
 
 /// The same running command, one `esc` later. The row is the only thing that
-/// moved: the verb says what is happening, the hint is gone because the key it
-/// named has been pressed, and the sparkle and the clock carry on until the
-/// kernel's `TurnCompleted` takes the whole row away.
+/// changed: the stream acknowledges the key with `stopping` on this frame,
+/// until the kernel's `TurnCompleted` takes the live row away.
 #[test]
 fn stopping() {
     let state = folded(vec![
@@ -502,7 +516,7 @@ fn a_child_row_while_it_runs() {
 #[test]
 fn a_child_row_when_it_is_done() {
     let mut frames = busy_child("reviewer");
-    frames.push(child_frame(6, completed("trn_9", TurnStatus::Completed)));
+    frames.push(child_frame(10, completed("trn_9", TurnStatus::Completed)));
     let tree = spawned_tree(frames);
     let (mut ui, now) = scene();
     both("child_done", &tree, &mut ui, now);
@@ -511,7 +525,7 @@ fn a_child_row_when_it_is_done() {
 #[test]
 fn a_child_row_that_wants_a_person() {
     let mut frames = busy_child("reviewer");
-    frames.push(child_frame(6, opened(child_permission())));
+    frames.push(child_frame(7, opened(child_permission())));
     let tree = spawned_tree(frames);
     let (mut ui, now) = settled();
     ui.dialog
@@ -523,17 +537,12 @@ fn a_child_row_that_wants_a_person() {
 fn a_child_transcript() {
     let mut frames = busy_child("reviewer");
     frames.push(child_frame(
-        6,
-        Event::ItemCompleted {
-            item: user("itm_9", "review the diff"),
-        },
-    ));
-    frames.push(child_frame(
         7,
         Event::ItemCompleted {
             item: assistant("itm_10", "Two nits, otherwise fine.", ItemStatus::Completed),
         },
     ));
+    frames.push(child_frame(10, completed("trn_9", TurnStatus::Completed)));
     let mut tree = spawned_tree(frames);
     tree.show(&child_id());
     let (mut ui, now) = mid_turn();
@@ -880,6 +889,7 @@ fn inked(lang: &str, code: &str) -> String {
 fn token(style: ratatui::style::Style) -> &'static str {
     use crate::theme;
     for (name, spent) in [
+        ("well", theme::ground("well").unwrap_or_default()),
         ("kw", theme::ink(theme::Ink::Keyword)),
         ("str", theme::ink(theme::Ink::String)),
         ("num", theme::ink(theme::Ink::Number)),

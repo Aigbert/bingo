@@ -16,7 +16,16 @@ pub fn style(style: Style, ink: Color, motion: Option<&TextMotion>, now: Option<
         TextMotion::Breathe {
             period_ms, depth, ..
         } => clock::breathe(now, Duration::from_millis(*period_ms)) * depth.clamp(0.0, 1.0),
-        TextMotion::Fade { at_ms, ms, .. } => 1.0 - clock::prog(now, *at_ms, *ms),
+        TextMotion::Fade {
+            at_ms, ms, curve, ..
+        } => {
+            let remaining = 1.0 - clock::prog(now, *at_ms, *ms);
+            if *curve == Some(bingo_sdk::view::FadeCurve::EaseOut) {
+                remaining.powi(3)
+            } else {
+                remaining
+            }
+        }
         _ => return style,
     };
     if weight == 0.0 {
@@ -29,7 +38,7 @@ pub fn next(motion: &TextMotion, now: Now) -> Option<Instant> {
     moves(motion, now)?;
     match motion {
         TextMotion::Spin => Some(crate::spinner::next(now)),
-        TextMotion::Breathe { .. } => Some(now.instant + clock::FRAME),
+        TextMotion::Breathe { .. } | TextMotion::Shimmer => Some(now.instant + clock::FRAME),
         TextMotion::Fade { at_ms, ms, .. } if clock::prog(now, *at_ms, *ms) < 1.0 => {
             let until = at_ms.saturating_sub(now.wall.as_millisecond());
             Some(
@@ -62,6 +71,7 @@ fn moves(motion: &TextMotion, now: Now) -> Option<Moving> {
             depth,
         } if *period_ms > 0 && *depth > 0.0 => with,
         TextMotion::Fade { from, .. } => from,
+        TextMotion::Shimmer => "glow",
         _ => return None,
     };
     if !matches!(
@@ -71,4 +81,36 @@ fn moves(motion: &TextMotion, now: Now) -> Option<Moving> {
         return None;
     }
     theme::palette().named(ink).map(Moving::Ink)
+}
+
+pub fn shimmer(lines: &mut [ratatui::text::Line<'static>], now: Option<Now>) {
+    let Some(now) = now.filter(|now| moves(&TextMotion::Shimmer, *now).is_some()) else {
+        return;
+    };
+    let columns = lines.iter().map(|line| line.width()).sum();
+    let mut column = 0;
+    for line in lines {
+        line.spans = line
+            .spans
+            .iter()
+            .flat_map(|span| {
+                span.content
+                    .chars()
+                    .map(|c| {
+                        let ink = span.style.fg.unwrap_or(theme::palette().fg());
+                        let weight = clock::shimmer(now, column, columns);
+                        column += unicode_width::UnicodeWidthChar::width(c).unwrap_or(0);
+                        ratatui::text::Span::styled(
+                            c.to_string(),
+                            span.style.patch(theme::literal(theme::ink::mix(
+                                ink,
+                                theme::palette().glow(),
+                                weight,
+                            ))),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+    }
 }

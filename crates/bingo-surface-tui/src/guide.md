@@ -20,7 +20,7 @@ context from 70%, active agents and shells, with the available keys on the right
   and the model continues; a permission ask is denied and stops the turn. From
   a draft set aside, Escape returns to the ask. **One `esc` on a running turn ends it**: every call in flight is dropped
   where it stands, a shell command's process group with it, and the activity
-  row says `Stopping…` from the frame the key was pressed.
+  row says `stopping` from the frame the key was pressed.
 - `esc esc` — on an empty composer, the turns of this transcript newest first,
   and `⏎` to rewind to one. Offered only where the session has a `/rewind`.
 - `ctrl+c` — interrupt a running turn; with nothing running, clear the input;

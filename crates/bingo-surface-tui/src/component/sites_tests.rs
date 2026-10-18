@@ -59,8 +59,15 @@ fn turn_complete_notice_and_duration_are_separate_ordered_requests() {
             },
         ),
     );
+    closed.seq = bingo_sdk::Seq(3);
     closed.ts = ts() + jiff::SignedDuration::from_secs(2);
-    let mut state = folded(vec![frame(1, started("trn_1")), closed]);
+    let mut prompt = user("prompt", "go");
+    prompt.completed_at = Some(closed.ts);
+    let mut state = folded(vec![
+        frame(1, started("trn_1")),
+        frame(2, Event::ItemCompleted { item: prompt }),
+        closed,
+    ]);
     matched(&mut state);
     let asked = requests(&state);
     let notice = asked
@@ -71,13 +78,7 @@ fn turn_complete_notice_and_duration_are_separate_ordered_requests() {
         .iter()
         .position(|c| *c == Component::TurnDuration)
         .expect("duration");
-    assert!(notice < duration);
-}
-#[test]
-fn working_frame_requests_spinner() {
-    let mut state = folded(vec![frame(1, started("trn_1"))]);
-    matched(&mut state);
-    assert!(requests(&state).contains(&Component::Spinner));
+    assert!(duration < notice);
 }
 
 /// Where each site is drawn in a session a model answers: every item in a
@@ -131,8 +132,18 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         Component::Spinner | Component::TurnProgress => folded(vec![frame(1, started("trn_one"))]),
         Component::TurnDuration => {
             let mut closed = frame(2, completed("trn_one", bingo_sdk::TurnStatus::Completed));
+            closed.seq = bingo_sdk::Seq(3);
             closed.ts = ts() + jiff::SignedDuration::from_secs(2);
-            folded(vec![frame(1, started("trn_one")), closed])
+            {
+                let mut prompt = user("prompt", "go");
+                prompt.turn = Some(bingo_sdk::TurnId::from_raw("trn_one"));
+                prompt.completed_at = Some(closed.ts);
+                folded(vec![
+                    frame(1, started("trn_one")),
+                    frame(2, Event::ItemCompleted { item: prompt }),
+                    closed,
+                ])
+            }
         }
         Component::SessionMode => with_permission_mode("plan"),
         Component::PromptHint
@@ -174,7 +185,18 @@ fn call_site(component: Component) -> bingo_sdk::SessionState {
     };
     match component {
         Component::ToolUse | Component::ToolGroup => completed(SPAWNING),
-        Component::ToolProgress => with_skill_row(running(), "itm_one", "sample", ""),
+        Component::ToolProgress => crate::transcript::slots::fixtures::with_row(
+            running(),
+            bingo_sdk::slot::Slot::Row {
+                item: bingo_sdk::ItemId::from_raw("itm_one"),
+                title: Some("Review".into()),
+                mark: None,
+                badge: None,
+                caption: None,
+                body: None,
+                actions: vec![],
+            },
+        ),
         Component::Ledger => running(),
         _ => completed("itm_one"),
     }
@@ -247,7 +269,7 @@ screen_test!(tool_result_backend, ToolResult);
 screen_test!(tool_group_backend, ToolGroup);
 screen_test!(tool_progress_backend, ToolProgress);
 screen_test!(command_output_backend, CommandOutput);
-screen_test!(spinner_backend, Spinner);
+
 screen_test!(duration_backend, TurnDuration);
 screen_test!(notice_backend, InfoNotice);
 screen_test!(mode_backend, SessionMode);
@@ -392,7 +414,12 @@ fn fact_site(component: Component) -> bingo_sdk::SessionState {
         },
     );
     super::facts::change(&mut record, &props);
-    folded(vec![frame(1, Event::ItemCompleted { item: record })])
+    folded(vec![frame(
+        1,
+        Event::ItemCompleted {
+            item: loose(record),
+        },
+    )])
 }
 
 #[test]
@@ -422,62 +449,6 @@ fn every_known_item_body_has_a_site() {
     }
 }
 
-#[test]
-fn spinner_and_progress_keep_meaning_and_tick_once_per_second() {
-    let mut state = site(Component::Spinner);
-    matched(&mut state);
-    let (mut ui, now) = scene();
-    let tree = solo(&state);
-    draw_tree(80, 24, &tree, &mut ui, later(now, 2000));
-    let spinner = ui
-        .shown
-        .pulls
-        .iter()
-        .find(|key| key.request.component == Component::Spinner)
-        .unwrap();
-    assert_eq!(spinner.request.props["message"], json!(null));
-    assert_eq!(spinner.request.props["suffix"], json!(""));
-    let first = ui
-        .shown
-        .pulls
-        .iter()
-        .find(|key| key.request.component == Component::TurnProgress)
-        .unwrap()
-        .clone();
-    assert!(ui.placed.pulled.request(&first));
-    draw_tree(80, 24, &tree, &mut ui, later(now, 2099));
-    let second = ui
-        .shown
-        .pulls
-        .iter()
-        .find(|key| key.request.component == Component::TurnProgress)
-        .unwrap();
-    assert!(!ui.placed.pulled.request(second));
-    draw_tree(80, 24, &tree, &mut ui, later(now, 3000));
-    let third = ui
-        .shown
-        .pulls
-        .iter()
-        .find(|key| key.request.component == Component::TurnProgress)
-        .unwrap();
-    assert!(ui.placed.pulled.request(third));
-    ui.stop_asked = state.turn.as_ref().map(|turn| turn.id.clone());
-    draw_tree(80, 24, &tree, &mut ui, later(now, 3000));
-    let spinner = ui
-        .shown
-        .pulls
-        .iter()
-        .find(|key| key.request.component == Component::Spinner)
-        .unwrap();
-    assert_eq!(
-        spinner.request.props["message"],
-        json!(crate::activity::STOPPING)
-    );
-    assert_ne!(
-        spinner.request.props["word"],
-        spinner.request.props["message"]
-    );
-}
 screen_test!(reasoning_backend, Reasoning);
 screen_test!(compaction_backend, Compaction);
 screen_test!(rewind_backend, Rewind);
@@ -487,12 +458,11 @@ screen_test!(permissionreceipt_backend, PermissionReceipt);
 screen_test!(asset_backend, Asset);
 screen_test!(shellrun_backend, ShellRun);
 screen_test!(action_backend, Action);
-screen_test!(turnprogress_backend, TurnProgress);
+
 screen_test!(sessionstatus_backend, SessionStatus);
 screen_test!(toast_backend, Toast);
 screen_test!(welcome_backend, Welcome);
 screen_test!(ledger_backend, Ledger);
-screen_test!(turn_fold_backend, TurnFold);
 
 #[test]
 fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
@@ -693,7 +663,7 @@ fn sealed_site(component: Component) -> bingo_sdk::SessionState {
 }
 
 #[test]
-fn round3_flattened_toast_has_no_motion_deadline() {
+fn flattened_toast_has_no_motion_deadline() {
     let mut state = site(Component::Toast);
     matched(&mut state);
     let (mut ui, now) = scene();

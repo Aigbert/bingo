@@ -69,7 +69,7 @@ fn own(site: &super::sealed::Site<'_>, interaction: &Interaction, width: usize) 
         &site.state.summary.cwd,
         width,
         site.room.saturating_sub(1),
-        &crate::tool_rows::Looks::in_ui(site.ui),
+        site.tools,
     )
 }
 

@@ -133,7 +133,6 @@ mod viewer;
 mod views;
 mod welcome;
 mod window;
-mod worked;
 mod wrap;
 
 use std::sync::Arc;

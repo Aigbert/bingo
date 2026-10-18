@@ -23,7 +23,8 @@ pub fn splice(
     frame: &mut Layout,
     area: Rect,
     now: crate::clock::Now,
-) -> Option<(usize, usize, Drawing)> {
+    tools: &crate::tool_rows::Looks,
+) -> Option<Drawing> {
     if !inline(tree, ui) {
         return None;
     }
@@ -31,6 +32,7 @@ pub fn splice(
     let agent = (owner.summary.id != *tree.view()).then(|| tree::name(owner));
     let drawing = Site {
         state: owner,
+        tools,
         ui,
         now,
         interaction,
@@ -55,8 +57,8 @@ pub fn splice(
     {
         dim(&mut drawing);
     }
-    let (at, removed) = position(tree, frame, drawing.rows.len())?;
-    Some((at, removed, drawing))
+    position(tree, frame, drawing.rows.len())?;
+    Some(drawing)
 }
 
 pub fn position(tree: &Tree, frame: &mut Layout, count: usize) -> Option<(usize, usize)> {
@@ -127,40 +129,6 @@ pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
             drawing.options
         },
     });
-}
-
-pub fn activity(tree: &Tree, ui: &Ui) -> Option<Line<'static>> {
-    let (owner, open) = tree.open_interaction()?;
-    let name = match &open.kind {
-        InteractionKind::Permission { summary, .. } => summary.clone(),
-        InteractionKind::Form { title, .. } => title.clone().unwrap_or_else(|| "form".into()),
-        _ => "a question".into(),
-    };
-    let waiting = if ui.dialog.aside {
-        format!("{name} is waiting for you")
-    } else {
-        "waiting for you".into()
-    };
-    let mut asks: Vec<_> = tree
-        .sessions()
-        .flat_map(|s| s.interactions.iter().map(move |i| (s, i)))
-        .collect();
-    asks.sort_by_key(|(_, open)| (open.opened_at, &open.id));
-    let queue = if asks.len() > 1 {
-        let rest = asks
-            .iter()
-            .filter(|(_, i)| i.id != open.id)
-            .map(|(s, _)| tree::name(s))
-            .collect::<Vec<_>>()
-            .join(", ");
-        format!(" · 1/{} ◆ {} · then {rest}", asks.len(), tree::name(owner))
-    } else {
-        String::new()
-    };
-    Some(Line::from(Span::styled(
-        format!(" ▍ {waiting}{queue}"),
-        theme::presence(),
-    )))
 }
 
 fn fit(

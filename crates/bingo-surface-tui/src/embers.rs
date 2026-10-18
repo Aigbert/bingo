@@ -73,13 +73,13 @@ impl Embers {
         flight.births.drain(..extra);
     }
 
-    pub fn row(
+    pub fn drawing(
         &self,
         state: &bingo_sdk::SessionState,
         now: crate::clock::Now,
         width: usize,
         foot: bool,
-    ) -> ratatui::text::Line<'static> {
+    ) -> crate::views::Drawing {
         let Some(flight) = self.0.get(&state.summary.id) else {
             return Default::default();
         };
@@ -91,7 +91,16 @@ impl Embers {
         {
             return Default::default();
         }
-        air(&flight.births, now.instant, now.motion, width)
+        let births = alive(&flight.births, now.instant, now.motion);
+        let next = births
+            .iter()
+            .map(|born| (*born + LIFE).min(now.instant + crate::clock::FRAME))
+            .min();
+        let line = air(&births, now.instant, now.motion, width);
+        crate::views::Drawing {
+            lines: (!births.is_empty()).then_some(line).into_iter().collect(),
+            next,
+        }
     }
 }
 

@@ -42,8 +42,7 @@ fn entrance(ui: &mut Ui, key: crate::pulled::Key, now: Now) {
 
 fn welcome_entrance(state: &SessionState, ui: &mut Ui, now: Now, width: usize) {
     let measurements = Default::default();
-    let rows =
-        crate::transcript::Rows::of(state, width, &ui.folds, &[], &measurements, &ui.linked, now);
+    let rows = crate::transcript::Rows::of(state, width, &ui.folds, &measurements, &ui.linked, now);
     let key = crate::component::welcome::request(&rows).unwrap();
     entrance(ui, key, now);
 }

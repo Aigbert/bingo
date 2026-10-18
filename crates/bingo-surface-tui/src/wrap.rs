@@ -6,10 +6,8 @@ use unicode_width::UnicodeWidthStr;
 mod units;
 use units::{Unit, units};
 
-/// The width prose is wrapped to inside a region `width` columns wide: the
-/// whole of it, or the narrower line a person asked for (`tui.measure`,
-/// [`crate::settings`]; design §7). The number is theirs — this crate names
-/// none of its own.
+/// Narrow a region to the person's `tui.measure`. Prose applies its own
+/// 100-cell cap inside that region (ADR-0097 §3).
 pub fn measure(width: usize, cap: Option<usize>) -> usize {
     cap.map_or(width, |cap| width.min(cap))
 }

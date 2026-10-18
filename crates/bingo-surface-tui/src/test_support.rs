@@ -12,11 +12,13 @@ use bingo_sdk::{
 use jiff::Timestamp;
 use serde_json::{Value, json};
 
+mod catalogue;
 mod external;
 mod pressed;
 mod rendered;
 mod worked;
 
+pub use catalogue::catalogue;
 pub use external::agent_call;
 pub use worked::*;
 
@@ -100,13 +102,6 @@ pub fn child_summary(title: &str) -> SessionSummary {
 pub fn announced(title: &str) -> Event {
     Event::SessionUpdated {
         summary: child_summary(title),
-    }
-}
-
-pub fn child_frame(seq: u64, event: Event) -> Frame {
-    Frame {
-        session: child_id(),
-        ..frame(seq, event)
     }
 }
 
@@ -271,6 +266,7 @@ pub fn child_permission() -> Interaction {
     Interaction {
         id: InteractionId::from_raw("int_2"),
         session: child_id(),
+        turn: Some(TurnId::from_raw("trn_9")),
         ..permission(Some("Edit(src/)"), None)
     }
 }
@@ -315,17 +311,14 @@ pub fn open_the_turns(ui: &mut Ui, state: &SessionState) {
 
 /// `folds` with every finished turn's line opened.
 pub fn turns_opened(state: &SessionState, folds: &crate::fold::Folds) -> crate::fold::Folds {
-    let answers = crate::ask::receipts::Answers::of(state);
-    let roles = crate::turns::Roles::of(
-        state,
-        &Default::default(),
-        folds,
-        &answers,
-        &Default::default(),
-    );
+    let pictures = Default::default();
+    let linked = Default::default();
+    let rows = crate::transcript::Rows::of(state, 80, folds, &pictures, &linked, scene().1);
+    let roles = crate::turns::Roles::of(&Default::default(), &rows);
     let mut opened = folds.clone();
     for item in state.transcript.items() {
-        if matches!(roles.of_item(&item.id), crate::turns::Role::Fold { .. }) {
+        if item.turn.is_some() && matches!(roles.of_item(&item.id), crate::turns::Role::Step { .. })
+        {
             opened.insert(item.id.clone(), crate::fold::Fold::Open);
         }
     }
@@ -754,7 +747,11 @@ pub fn notice(level: Level, text: &str) -> Event {
 pub fn long_transcript(items: usize) -> SessionState {
     let mut state = state();
     state.transcript = (0..items)
-        .map(|i| user(&format!("itm_{i}"), &format!("line {i}")))
+        .map(|i| {
+            let mut item = user(&format!("itm_{i}"), &format!("line {i}"));
+            item.turn = Some(bingo_sdk::TurnId::from_raw(format!("turn_{i}")));
+            item
+        })
         .collect();
     state
 }
@@ -937,38 +934,12 @@ pub fn posted(seq: u64, id: &str, principal: &str, text: &str) -> Frame {
     )
 }
 
-/// A sub-session that has run a while: three tool calls and some tokens
-/// spent, which is what its row in the parent's transcript reports.
-pub fn busy_child(title: &str) -> Vec<Frame> {
-    let mut summary = child_summary(title);
-    summary.usage = Usage {
-        input_tokens: 1_100,
-        output_tokens: 140,
-        ..Usage::default()
-    };
-    let mut frames = vec![
-        child_frame(1, Event::SessionUpdated { summary }),
-        child_frame(2, started("trn_9")),
-    ];
-    for i in 1..=3 {
-        frames.push(child_frame(
-            2 + i,
-            Event::ItemCompleted {
-                item: tool(
-                    &format!("itm_{i}"),
-                    "Read",
-                    json!({ "file_path": "src/lib.rs" }),
-                    Some(ToolOutput::text("Read 3 lines")),
-                    ItemStatus::Completed,
-                ),
-            },
-        ));
-    }
-    frames
-}
-
-pub use crate::transcript::slots::fixtures::{
-    with_promotions, with_row, with_skill_row, with_skill_tool_rows,
-};
+pub use crate::transcript::slots::fixtures::{with_promotions, with_row, with_skill_row};
 
 pub mod ember;
+
+mod session;
+pub use session::session;
+
+mod children;
+pub use children::{busy_child, child_frame};
