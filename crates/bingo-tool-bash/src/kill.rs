@@ -12,7 +12,7 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema,
+    Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -51,12 +51,7 @@ impl KillShellTool {
 impl Tool for KillShellTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '×',
-                ascii: Some('x'),
-                verb: "stop".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('×', "stop").ascii('x')),
             name: "KillShell".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<KillArgs>(),

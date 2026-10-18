@@ -13,7 +13,8 @@ use async_trait::async_trait;
 use bingo_sdk::{
     Attachment, CatalogKind, Delivery, Driver, Effort, ErrorCode, HostHandle, Input, IntentId,
     KernelError, OpenOptions, ParentLink, SessionId, SessionSelector, SessionSpec, SessionSummary,
-    Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema,
+    Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
+    input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -418,12 +419,7 @@ fn seated(name: &str, session: &SessionId) -> String {
 impl Tool for SpawnAgentTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "spawn".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "spawn")),
             name: SPAWN_AGENT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SpawnArgs>(),

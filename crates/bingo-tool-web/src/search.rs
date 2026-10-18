@@ -8,7 +8,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema};
+use bingo_sdk::{
+    Reads, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
@@ -67,16 +69,9 @@ impl WebSearchTool {
 #[async_trait]
 impl Tool for WebSearchTool {
     fn spec(&self) -> ToolSpec {
+        let look = ToolLook::new('»', "web").ascii('>');
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '»',
-                ascii: Some('>'),
-                verb: "web".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "query".into(),
-                    reads: bingo_sdk::Reads::Text,
-                }),
-            }),
+            look: Some(look.target("query", Reads::Text)),
             name: "WebSearch".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SearchArgs>(),

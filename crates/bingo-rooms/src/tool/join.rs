@@ -6,7 +6,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    KernelError, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, input_schema,
+    KernelError, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec,
+    input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -76,12 +77,7 @@ pub struct SeatTool;
 impl Tool for SeatTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "seat".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "seat")),
             name: SEAT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SeatArgs>(),

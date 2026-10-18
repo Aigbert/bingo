@@ -2,7 +2,9 @@
 //! moment it is asked for — this plugin keeps no list of its own.
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema};
+use bingo_sdk::{
+    Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
@@ -34,12 +36,7 @@ pub struct TaskListTool;
 impl Tool for TaskListTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '#',
-                ascii: None,
-                verb: "plan".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('#', "plan")),
             name: "TaskList".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<ListArgs>(),

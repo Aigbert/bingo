@@ -10,8 +10,8 @@
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    AuthStatus, CatalogEntry, CatalogKind, Tool, ToolContext, ToolError, ToolOutput, ToolSpec,
-    ToolTraits, input_schema,
+    AuthStatus, CatalogEntry, CatalogKind, Tool, ToolContext, ToolError, ToolLook, ToolOutput,
+    ToolSpec, ToolTraits, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -148,12 +148,7 @@ pub struct ListModelsTool;
 impl Tool for ListModelsTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "models".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "models")),
             name: "ListModels".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<ModelsArgs>(),

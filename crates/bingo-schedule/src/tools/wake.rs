@@ -5,7 +5,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema};
+use bingo_sdk::{
+    Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
+};
 use jiff::tz::TimeZone;
 use jiff::{SignedDuration, Timestamp};
 use schemars::JsonSchema;
@@ -181,12 +183,7 @@ fn written(span: SignedDuration) -> String {
 impl Tool for WakeTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '∞',
-                ascii: Some('^'),
-                verb: "wake".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('∞', "wake").ascii('^')),
             name: "Wake".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Ask>(),

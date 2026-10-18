@@ -6,7 +6,9 @@
 use std::path::Path;
 
 use async_trait::async_trait;
-use bingo_sdk::{Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, View, input_schema};
+use bingo_sdk::{
+    Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, View, input_schema,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
@@ -57,12 +59,7 @@ pub struct CloseRoomTool;
 impl Tool for CloseRoomTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "close".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "close")),
             name: CLOSE_ROOM.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<CloseRoomArgs>(),

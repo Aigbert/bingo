@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use async_trait::async_trait;
 use bingo_sdk::{
     Answer, AnswerSpec, InteractionKind, Question, QuestionOption, Tool, ToolContext, ToolError,
-    ToolOutput, ToolSpec, ToolTraits, input_schema,
+    ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -225,12 +225,7 @@ fn lines(args: &AskArgs, answers: Vec<Answer>) -> Result<Vec<String>, ToolError>
 impl Tool for AskUserQuestionTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '?',
-                ascii: None,
-                verb: "ask".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('?', "ask")),
             name: "AskUserQuestion".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<AskArgs>(),

@@ -10,8 +10,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Delivery, Driver, Input, IntentId, Origin, Subject, Tool, ToolContext, ToolError, ToolOutput,
-    ToolSpec, ToolTraits, View, input_schema,
+    Delivery, Driver, Input, IntentId, Origin, Subject, Tool, ToolContext, ToolError, ToolLook,
+    ToolOutput, ToolSpec, ToolTraits, View, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -135,12 +135,7 @@ pub struct MessageTool;
 impl Tool for MessageTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "send".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "send")),
             name: SEND_MESSAGE.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<MessageArgs>(),

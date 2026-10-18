@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Preview, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, View,
-    input_schema,
+    Preview, Reads, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec,
+    ToolTraits, View, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -60,15 +60,7 @@ fn existing(path: &Path, read: io::Result<String>) -> Result<Option<String>, Too
 impl Tool for WriteTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '+',
-                ascii: None,
-                verb: "write".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "file_path".into(),
-                    reads: bingo_sdk::Reads::Path,
-                }),
-            }),
+            look: Some(ToolLook::new('+', "write").target("file_path", Reads::Path)),
             name: "Write".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<WriteArgs>(),

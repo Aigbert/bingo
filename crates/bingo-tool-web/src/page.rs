@@ -16,7 +16,9 @@ use async_trait::async_trait;
 // same noun, and naming it so keeps the two apart at every use.
 use bingo_loopback::page as served;
 use bingo_loopback::{Answer, Loopback, LoopbackError, Token, browser, serve};
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema};
+use bingo_sdk::{
+    Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
@@ -96,12 +98,7 @@ impl ShowPageTool {
 impl Tool for ShowPageTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '↓',
-                ascii: Some('v'),
-                verb: "show".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('?', "show")),
             name: "ShowPage".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<PageArgs>(),

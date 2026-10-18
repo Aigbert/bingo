@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema,
+    Reads, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
+    input_schema,
 };
 use globset::GlobMatcher;
 use grep_regex::{RegexMatcher, RegexMatcherBuilder};
@@ -300,15 +301,7 @@ fn noun(mode: OutputMode) -> &'static str {
 impl Tool for GrepTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '/',
-                ascii: None,
-                verb: "search".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "pattern".into(),
-                    reads: bingo_sdk::Reads::Text,
-                }),
-            }),
+            look: Some(ToolLook::new('/', "search").target("pattern", Reads::Text)),
             name: "Grep".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<GrepArgs>(),

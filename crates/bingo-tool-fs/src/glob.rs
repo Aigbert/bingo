@@ -7,7 +7,8 @@ use std::time::SystemTime;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema,
+    Reads, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
+    input_schema,
 };
 use globset::GlobMatcher;
 use schemars::JsonSchema;
@@ -85,15 +86,7 @@ fn newest_first(found: &mut [(SystemTime, PathBuf)]) {
 impl Tool for GlobTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '*',
-                ascii: None,
-                verb: "find".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "pattern".into(),
-                    reads: bingo_sdk::Reads::Path,
-                }),
-            }),
+            look: Some(ToolLook::new('*', "find").target("pattern", Reads::Path)),
             name: "Glob".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<GlobArgs>(),

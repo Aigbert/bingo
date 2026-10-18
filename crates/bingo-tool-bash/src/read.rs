@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    ResultLimit, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits,
+    ResultLimit, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
     input_schema,
 };
 use schemars::JsonSchema;
@@ -51,12 +51,7 @@ impl BashOutputTool {
 impl Tool for BashOutputTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '$',
-                ascii: None,
-                verb: "output".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('$', "output")),
             name: "BashOutput".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<OutputArgs>(),

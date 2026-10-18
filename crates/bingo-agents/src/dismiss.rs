@@ -8,7 +8,7 @@ use std::path::Path;
 use async_trait::async_trait;
 use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
-    ErrorCode, HostHandle, KernelError, SessionId, Subject, Tool, ToolContext, ToolError,
+    ErrorCode, HostHandle, KernelError, SessionId, Subject, Tool, ToolContext, ToolError, ToolLook,
     ToolOutput, ToolSpec, ToolTraits, input_schema,
 };
 use schemars::JsonSchema;
@@ -76,12 +76,7 @@ pub struct DismissAgentTool;
 impl Tool for DismissAgentTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "dismiss".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "dismiss")),
             name: DISMISS_AGENT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<DismissArgs>(),

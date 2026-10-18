@@ -2,7 +2,9 @@
 //! itself so the model never has to pick an id.
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema};
+use bingo_sdk::{
+    Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
@@ -40,12 +42,7 @@ pub struct TaskCreateTool;
 impl Tool for TaskCreateTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '#',
-                ascii: None,
-                verb: "plan".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('#', "plan")),
             name: "TaskCreate".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<CreateArgs>(),

@@ -14,8 +14,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSource, ToolSpec, ToolTraits, View,
-    input_schema,
+    Reads, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSource, ToolSpec,
+    ToolTraits, View, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -103,15 +103,7 @@ async fn read(path: &Path) -> Result<Vec<u8>, ToolError> {
 impl Tool for SendFile {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "send".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "path".into(),
-                    reads: bingo_sdk::Reads::Path,
-                }),
-            }),
+            look: Some(ToolLook::new('@', "send").target("path", Reads::Path)),
             name: SEND_FILE.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SendFileArgs>(),
@@ -436,7 +428,7 @@ mod look_tests {
                 verb: "send".into(),
                 target: Some(bingo_sdk::Target {
                     field: "path".into(),
-                    reads: bingo_sdk::Reads::Path
+                    reads: Reads::Path
                 }),
             })
         );

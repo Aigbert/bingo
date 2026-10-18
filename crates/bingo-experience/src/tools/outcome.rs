@@ -6,7 +6,9 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema};
+use bingo_sdk::{
+    Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
+};
 use jiff::Timestamp;
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -50,12 +52,7 @@ impl ExperienceOutcomeTool {
 impl Tool for ExperienceOutcomeTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '√',
-                ascii: Some('!'),
-                verb: "recall".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('√', "recall").ascii('!')),
             name: "ExperienceOutcome".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Outcomes>(),

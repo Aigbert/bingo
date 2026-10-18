@@ -2,7 +2,9 @@
 //! the model reads and recovers from, not a failed call.
 
 use async_trait::async_trait;
-use bingo_sdk::{Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema};
+use bingo_sdk::{
+    Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
+};
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde_json::Value;
@@ -51,12 +53,7 @@ pub struct TaskUpdateTool;
 impl Tool for TaskUpdateTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '#',
-                ascii: None,
-                verb: "plan".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('#', "plan")),
             name: "TaskUpdate".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<UpdateArgs>(),

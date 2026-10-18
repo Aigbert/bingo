@@ -7,7 +7,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Preview, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, View, input_schema,
+    Preview, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, View,
+    input_schema,
 };
 use jiff::Timestamp;
 use schemars::JsonSchema;
@@ -219,12 +220,7 @@ impl ExperienceCommitTool {
 impl Tool for ExperienceCommitTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '√',
-                ascii: Some('!'),
-                verb: "recall".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('√', "recall").ascii('!')),
             name: "ExperienceCommit".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Commit>(),

@@ -7,7 +7,7 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Effort, ErrorCode, KernelError, SessionChange, Subject, Tool, ToolContext, ToolError,
+    Effort, ErrorCode, KernelError, SessionChange, Subject, Tool, ToolContext, ToolError, ToolLook,
     ToolOutput, ToolSpec, ToolTraits, input_schema,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
@@ -106,12 +106,7 @@ fn said(level: Option<Effort>, whose: Option<&str>) -> String {
 impl Tool for SetThinkingTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "think".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "thinking")),
             name: "SetThinking".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SetThinkingArgs>(),

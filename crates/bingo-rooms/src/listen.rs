@@ -11,7 +11,7 @@ use std::path::Path;
 use async_trait::async_trait;
 use bingo_sdk::{
     ErrorCode, HostHandle, KernelError, SessionId, SessionSummary, Subject, Tool, ToolContext,
-    ToolError, ToolOutput, ToolSpec, input_schema,
+    ToolError, ToolLook, ToolOutput, ToolSpec, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -49,12 +49,7 @@ pub struct ListenTool;
 impl Tool for ListenTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "listen".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "listen")),
             name: LISTEN.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<ListenArgs>(),

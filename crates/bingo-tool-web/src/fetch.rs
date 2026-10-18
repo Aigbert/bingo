@@ -9,8 +9,8 @@ use std::path::Path;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Preview, ResultLimit, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits,
-    input_schema,
+    Preview, Reads, ResultLimit, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput,
+    ToolSpec, ToolTraits, input_schema,
 };
 use futures::StreamExt;
 use reqwest::{Client, Response, header};
@@ -146,16 +146,9 @@ async fn read_capped(response: Response) -> Result<Vec<u8>, ToolError> {
 #[async_trait]
 impl Tool for WebFetchTool {
     fn spec(&self) -> ToolSpec {
+        let look = ToolLook::new('↓', "fetch").ascii('v');
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '↓',
-                ascii: Some('v'),
-                verb: "fetch".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "url".into(),
-                    reads: bingo_sdk::Reads::Path,
-                }),
-            }),
+            look: Some(look.target("url", Reads::Path)),
             name: "WebFetch".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<FetchArgs>(),

@@ -1,8 +1,7 @@
 {
   "ShowPage": {
-    "mark": "↓",
-    "verb": "show",
-    "ascii": "v"
+    "mark": "?",
+    "verb": "show"
   },
   "WebFetch": {
     "mark": "↓",

@@ -10,8 +10,8 @@ use async_trait::async_trait;
 use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
     Attachment, ErrorCode, Event, HostHandle, IntentId, IntentOutcome, InterruptScope, KernelError,
-    SessionId, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, TurnStatus,
-    input_schema,
+    SessionId, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
+    TurnStatus, input_schema,
 };
 use futures::StreamExt;
 use schemars::JsonSchema;
@@ -156,12 +156,7 @@ pub struct StopAgentTool;
 impl Tool for StopAgentTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "stop".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "stop")),
             name: STOP_AGENT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<StopArgs>(),

@@ -9,7 +9,7 @@ use std::sync::{Arc, Weak};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    ContentPart, Image, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits,
+    ContentPart, Image, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
 };
 use rmcp::model::{CallToolRequestParams, CallToolResult, ContentBlock, JsonObject};
 use serde_json::Value;
@@ -90,12 +90,7 @@ fn input_schema(schema: &JsonObject) -> Value {
 }
 
 fn look(server: &str) -> bingo_sdk::ToolLook {
-    bingo_sdk::ToolLook {
-        mark: '◊',
-        ascii: Some('%'),
-        verb: server.into(),
-        target: None,
-    }
+    ToolLook::new('◊', server).ascii('%')
 }
 
 /// What a catalogue may show beside the tool: which server it came from.

@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Preview, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, input_schema,
+    Preview, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -44,12 +44,7 @@ impl ExperienceForgetTool {
 impl Tool for ExperienceForgetTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '√',
-                ascii: Some('!'),
-                verb: "recall".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('√', "recall").ascii('!')),
             name: "ExperienceForget".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Forget>(),

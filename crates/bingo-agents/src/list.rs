@@ -5,8 +5,8 @@
 use async_trait::async_trait;
 use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{
-    SessionSummary, Tone, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, TreeNode,
-    View, input_schema,
+    SessionSummary, Tone, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
+    TreeNode, View, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -145,12 +145,7 @@ pub struct ListAgentsTool;
 impl Tool for ListAgentsTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '@',
-                ascii: None,
-                verb: "list".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('@', "list")),
             name: "ListAgents".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<ListArgs>(),

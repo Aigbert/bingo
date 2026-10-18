@@ -51,8 +51,8 @@ use std::time::Duration;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Command, ContentPart, Contribution, Plugin, PluginError, PluginManifest, Registrar,
-    ResultLimit, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits,
+    Command, ContentPart, Contribution, Plugin, PluginError, PluginManifest, Reads, Registrar,
+    ResultLimit, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
     input_schema,
 };
 use schemars::JsonSchema;
@@ -353,15 +353,7 @@ fn description() -> String {
 impl Tool for BashTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '$',
-                ascii: None,
-                verb: "run".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "command".into(),
-                    reads: bingo_sdk::Reads::Command,
-                }),
-            }),
+            look: Some(ToolLook::new('$', "run").target("command", Reads::Command)),
             name: "Bash".into(),
             description: description(),
             input_schema: input_schema::<BashArgs>(),

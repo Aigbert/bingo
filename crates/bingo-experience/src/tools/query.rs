@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, View, input_schema,
+    Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits, View, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -51,12 +51,7 @@ impl ExperienceQueryTool {
 impl Tool for ExperienceQueryTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '√',
-                ascii: Some('!'),
-                verb: "recall".into(),
-                target: None,
-            }),
+            look: Some(ToolLook::new('√', "recall").ascii('!')),
             name: "ExperienceQuery".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Query>(),

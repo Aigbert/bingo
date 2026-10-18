@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    ContentPart, Image, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits,
-    bytes::words, input_schema,
+    ContentPart, Image, Reads, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput,
+    ToolSpec, ToolTraits, bytes::words, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -163,16 +163,9 @@ fn render(text: &str, offset: Option<usize>, limit: Option<usize>) -> String {
 #[async_trait]
 impl Tool for ReadTool {
     fn spec(&self) -> ToolSpec {
+        let look = ToolLook::new('¶', "read").ascii('<');
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '¶',
-                ascii: Some('<'),
-                verb: "read".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "file_path".into(),
-                    reads: bingo_sdk::Reads::Path,
-                }),
-            }),
+            look: Some(look.target("file_path", Reads::Path)),
             name: "Read".into(),
             description: description(),
             input_schema: input_schema::<ReadArgs>(),

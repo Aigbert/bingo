@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use async_trait::async_trait;
 use bingo_sdk::{
-    Preview, Subject, Tool, ToolContext, ToolError, ToolOutput, ToolSpec, ToolTraits, View,
-    input_schema,
+    Preview, Reads, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec,
+    ToolTraits, View, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -101,16 +101,9 @@ fn summary(path: &Path, count: usize) -> String {
 #[async_trait]
 impl Tool for EditTool {
     fn spec(&self) -> ToolSpec {
+        let look = ToolLook::new('±', "edit").ascii('~');
         ToolSpec {
-            look: Some(bingo_sdk::ToolLook {
-                mark: '±',
-                ascii: Some('~'),
-                verb: "edit".into(),
-                target: Some(bingo_sdk::Target {
-                    field: "file_path".into(),
-                    reads: bingo_sdk::Reads::Path,
-                }),
-            }),
+            look: Some(look.target("file_path", Reads::Path)),
             name: "Edit".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<EditArgs>(),
