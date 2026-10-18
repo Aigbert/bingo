@@ -46,6 +46,7 @@ struct Row {
 pub struct Capture {
     pub entry: Entry,
     rows: Vec<Row>,
+    spinner_cells: Vec<(u16, u16)>,
 }
 
 impl Capture {
@@ -61,13 +62,23 @@ impl Capture {
         let text = std::fs::read_to_string(root.join(format!("{name}.txt"))).unwrap();
         let inks = std::fs::read_to_string(root.join(format!("{name}.ink"))).unwrap();
         let rows = parse::rows(&text, &inks);
-        let capture = Self { entry, rows };
+        let capture = Self {
+            entry,
+            rows,
+            spinner_cells: Vec::new(),
+        };
         let (width, height) = capture.entry.size.split_once('x').expect("capture size");
         assert_eq!(
             capture.size(),
             Rect::new(0, 0, width.parse().unwrap(), height.parse().unwrap())
         );
         capture
+    }
+
+    /// Spinner locations in capture coordinates: (row, column).
+    pub fn spinners(mut self, cells: &[(u16, u16)]) -> Self {
+        self.spinner_cells = cells.to_vec();
+        self
     }
 
     pub fn size(&self) -> Rect {
@@ -136,7 +147,7 @@ pub fn assert_regions(
 ) {
     let area = match band {
         Band::Frame => buffer.area,
-        Band::Stream => regions.transcript,
+        Band::Stream => regions.above(),
         Band::Footer => regions.status,
         Band::Dock => [regions.composer, regions.hints, regions.palette]
             .into_iter()

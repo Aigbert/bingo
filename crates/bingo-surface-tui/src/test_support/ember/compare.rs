@@ -18,7 +18,14 @@ pub(super) fn compare(
     for y in 0..expected.height {
         let row = &capture.rows[usize::from(expected.y + y)];
         for x in 0..expected.width {
-            if let Some(reason) = mismatch(row, x, buffer, area.x + x, area.y + y) {
+            if let Some(reason) = mismatch(
+                row,
+                x,
+                buffer,
+                area.x + x,
+                area.y + y,
+                capture.spinner_cells.contains(&(expected.y + y, x)),
+            ) {
                 return Err(report(capture, band, buffer, area, (x, y), &reason));
             }
         }
@@ -26,22 +33,28 @@ pub(super) fn compare(
     Ok(())
 }
 
-fn mismatch(row: &Row, x: u16, buffer: &Buffer, bx: u16, by: u16) -> Option<String> {
+fn mismatch(row: &Row, x: u16, buffer: &Buffer, bx: u16, by: u16, spinner: bool) -> Option<String> {
     let symbol = &row.cells[usize::from(x)];
     let cell = &buffer[(bx, by)];
-    if !symbol.is_empty() && !same_symbol(symbol, cell.symbol()) {
+    if !(symbol.is_empty()
+        || symbol == cell.symbol()
+        || spinner && same_spinner(symbol, cell.symbol()))
+    {
         return Some(format!(
             "character: expected {symbol:?}, rendered {:?}",
             cell.symbol()
         ));
     }
-    // Ratatui clears the continuation cell of a wide glyph; its foreground is the leader's.
-    let fg = if symbol.is_empty() && x > 0 {
-        buffer[(bx - 1, by)].fg
+    // A terminal paints both inks of a wide glyph from its leading cell.
+    let painted = if symbol.is_empty() && x > 0 {
+        &buffer[(bx - 1, by)]
     } else {
-        cell.fg
+        cell
     };
-    for (layer, runs, color, reset) in [("fg", &row.fg, fg, "fg"), ("bg", &row.bg, cell.bg, "bg")] {
+    for (layer, runs, color, reset) in [
+        ("fg", &row.fg, painted.fg, "fg"),
+        ("bg", &row.bg, painted.bg, "bg"),
+    ] {
         let Some(token) = parse::token(runs, x) else {
             continue;
         };
@@ -83,9 +96,16 @@ fn mismatch(row: &Row, x: u16, buffer: &Buffer, bx: u16, by: u16) -> Option<Stri
     None
 }
 
-fn same_symbol(expected: &str, actual: &str) -> bool {
-    expected == actual
-        || ["⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏", "-\\|/"].iter().any(|frames| {
+fn same_spinner(expected: &str, actual: &str) -> bool {
+    [theme::glyphs::GU, theme::glyphs::GA]
+        .iter()
+        .filter_map(|table| {
+            table
+                .iter()
+                .find(|(name, _)| *name == "spin")
+                .map(|(_, frames)| *frames)
+        })
+        .any(|frames| {
             expected.chars().count() == 1
                 && actual.chars().count() == 1
                 && frames.contains(expected)

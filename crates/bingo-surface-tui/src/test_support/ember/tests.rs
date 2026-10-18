@@ -84,7 +84,10 @@ fn wide_cells_reset_inks_and_spinner_sets_compare_as_terminal_cells() {
         )
         .is_err()
     );
-    let rows = parse::rows("# fixture\n你⠋ \n", "00 fg 0-1 fg · 2 glow\n00 bg 0-3 bg");
+    let rows = parse::rows(
+        "# fixture\n你⠋ \n",
+        "00 fg 0-1 fg · 2 glow\n00 bg 0-1 you · 2-3 bg",
+    );
     let capture = Capture {
         entry: Entry {
             file: "fixture".into(),
@@ -96,9 +99,42 @@ fn wide_cells_reset_inks_and_spinner_sets_compare_as_terminal_cells() {
             after: vec![],
         },
         rows,
+        spinner_cells: vec![(0, 2)],
     };
     let mut buffer = Buffer::empty(Rect::new(0, 0, 4, 1));
-    buffer.set_string(0, 0, "你", Style::default());
+    buffer.set_string(0, 0, "你", Style::new().bg(theme::LIGHT.you()));
+    buffer[(1, 0)].reset();
     buffer.set_string(2, 0, "⠼", Style::new().fg(theme::LIGHT.glow()));
     assert_band(&capture, Band::Frame, &buffer);
+}
+
+#[test]
+fn ordinary_punctuation_is_not_a_spinner() {
+    let mut capture = Capture::load("done");
+    capture.rows = parse::rows("# fixture\nbingo-core\n", "");
+    capture.spinner_cells.clear();
+    let mut buffer = Buffer::empty(Rect::new(0, 0, 10, 1));
+    buffer.set_string(0, 0, "bingo|core", Style::default());
+    assert!(compare::compare(&capture, Band::Frame, &buffer, buffer.area).is_err());
+    capture = capture.spinners(&[(0, 5)]);
+    assert_band(&capture, Band::Frame, &buffer);
+    buffer[(5, 0)].set_symbol("⠋");
+    assert!(compare::compare(&capture, Band::Frame, &buffer, buffer.area).is_err());
+}
+
+#[test]
+fn stream_regions_include_activity_and_strip() {
+    let mut capture = Capture::load("done");
+    capture.rows = parse::rows("# fixture\na\nb\nc\nf\n", "");
+    let mut buffer = Buffer::empty(Rect::new(0, 0, 1, 4));
+    for (y, ch) in ["a", "b", "c", "f"].into_iter().enumerate() {
+        buffer[(0, y as u16)].set_symbol(ch);
+    }
+    let regions = crate::frame::Regions {
+        transcript: Rect::new(0, 0, 1, 1),
+        activity: Rect::new(0, 1, 1, 1),
+        strip: Rect::new(0, 2, 1, 1),
+        ..Default::default()
+    };
+    assert_regions(&capture, Band::Stream, &buffer, &regions);
 }
