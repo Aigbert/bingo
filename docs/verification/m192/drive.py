@@ -60,7 +60,7 @@ def drive(width, height):
             await_text("/ commands")
             stem = f"light-{width}x{height}"
             for extension, escapes in (("txt", False), ("ansi", True)):
-                text = pane(escapes)
+                text = pane(escapes).replace(work.name, "m192-drive-XXXXXXXX")
                 if escapes:
                     assert "38;2;" in text, "The drive must capture truecolor ink"
                 (OUT / f"{stem}.{extension}").write_text(text)
