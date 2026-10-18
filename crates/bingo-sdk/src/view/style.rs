@@ -3,6 +3,12 @@ use super::*;
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TextStyle {
+    /// An Ember ground, filled to the available width.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ground: Option<String>,
+    /// A surface-clock animation; the author never needs to redraw it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub motion: Option<TextMotion>,
     /// A colour name or `#rrggbb`; the surface may adjust it to its theme.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
@@ -32,6 +38,9 @@ pub struct TextStyle {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct BoxStyle {
+    /// An Ember ground, filled across the box including padding.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ground: Option<String>,
     /// A question owner's editing state, on the root of a drawn question;
     /// the choices' labels and the answer stay the host's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -211,4 +220,23 @@ pub struct Spacing {
     /// Rows inside the box above and below.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub padding_y: Option<u16>,
+}
+
+/// Declarative motion on the surface clock, with a reduced-motion still form.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum TextMotion {
+    Breathe {
+        with: String,
+        #[serde(rename = "periodMs")]
+        period_ms: u64,
+        depth: f64,
+    },
+    Spin,
+    Fade {
+        from: String,
+        #[serde(rename = "atMs")]
+        at_ms: i64,
+        ms: u64,
+    },
 }
