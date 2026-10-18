@@ -34,18 +34,18 @@ for size in '100 32' '80 24'; do
   printf '%s\n' 'a file for the look drive' > "$WORK/$width/cwd/note.txt"
   cat > "$WORK/$width/script.json" <<'JSON'
 {"responses":[
- {"steps":[{"toolCall":{"name":"Read","input":{"file_path":"note.txt"}}}]},
+ {"steps":[{"toolCall":{"name":"Bash","input":{"command":"cat note.txt"}}}]},
  {"steps":[{"delay":{"ms":3000}},{"text":"The look drive is done."}]},
  {"steps":[{"delay":{"ms":60000}},{"text":"This turn should be stopped."}]}
 ]}
 JSON
   HOME="$WORK/$width/home" XDG_DATA_HOME="$WORK/$width/data" tmux -L "$SOCKET" -f /dev/null new-session -d -s drive -x "$width" -y "$height" -c "$WORK/$width/cwd" \
-    "env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL HOME='$WORK/$width/home' XDG_DATA_HOME='$WORK/$width/data' XDG_CONFIG_HOME='$WORK/$width/config' BINGO_FAKE_SCRIPT='$WORK/$width/script.json' '$BIN' --cwd '$WORK/$width/cwd'"
+    "env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL HOME='$WORK/$width/home' XDG_DATA_HOME='$WORK/$width/data' XDG_CONFIG_HOME='$WORK/$width/config' BINGO_FAKE_SCRIPT='$WORK/$width/script.json' '$BIN' --cwd '$WORK/$width/cwd' --allowed-tools 'Bash(cat:*)'"
   await_text '/ commands'
-  tmux -L "$SOCKET" send-keys -t drive -l 'read note.txt'
+  tmux -L "$SOCKET" send-keys -t drive -l 'run cat note.txt'
   tmux -L "$SOCKET" send-keys -t drive Enter
   await_text 'esc stop'
-  await_text '✓ read note.txt'
+  await_text '✓ run cat note.txt'
   pane > "$ROOT/docs/verification/m194a/live-${width}x${height}.txt"
   await_text 'The look drive is done.'
   await_idle

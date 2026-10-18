@@ -1,7 +1,7 @@
- bingo▍ /var/…/T/tmp.jXgVXQpKnw/100/cwd                               read note.txt · session 01M5
+ bingo▍ /var/…/T/tmp.e3Q7npDmHo/100/cwd                            run cat note.txt · session 01M5
 
- › read note.txt
-   ✓ read note.txt
+ › run cat note.txt
+   ✓ run cat note.txt                                                                           ok
 
 
 

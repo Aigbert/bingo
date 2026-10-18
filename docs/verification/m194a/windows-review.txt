@@ -1,0 +1,67 @@
+cargo check -p bingo-agents --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.93s
+
+cargo check -p bingo-channels --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.70s
+
+cargo check -p bingo-experience --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.91s
+
+cargo check -p bingo-mcp --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+
+cargo check -p bingo-mod-hello --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.69s
+
+cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `rquickjs-sys v0.14.0`
+warning: rquickjs-sys@0.14.0: clang: error: no such file or directory: '/DWIN32_LEAN_AND_MEAN'
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+
+cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+
+cargo check -p bingo-provider-acp --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.68s
+
+cargo check -p bingo-rooms --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.80s
+
+cargo check -p bingo-schedule --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.96s
+
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.90s
+
+cargo check -p bingo-skills --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.26s
+
+cargo check -p bingo-surface-rpc --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.44s
+
+cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+
+cargo check -p bingo-tasks --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.86s
+
+cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.23s
+
+cargo check -p bingo-tool-fs --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+
+cargo check -p bingo-tool-web --all-targets --target x86_64-pc-windows-msvc
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+
+Windows checks: 12 passed, 7 failed

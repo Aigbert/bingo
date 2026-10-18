@@ -1,10 +1,10 @@
- bingo▍ /var/…/T/tmp.jXgVXQpKnw/100/cwd                               read note.txt · session 01M5
+ bingo▍ /var/…/T/tmp.e3Q7npDmHo/100/cwd                            run cat note.txt · session 01M5
 
- › read note.txt
-   ▸ 1 step · read                                                                              3s
+ › run cat note.txt
+   ▸ 1 step · run ok                                                                            3s
  ▍ The look drive is done.
 
- ▍ Worked for 3s · done 17:13
+ ▍ Worked for 3s · done 18:05
 
 
 

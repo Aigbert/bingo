@@ -227,12 +227,12 @@ Choices and plan clarifications:
 - A2 needed the SDK's approved workspace dependency edge, missing from its manifest.
   No package or version was added. "Short string" was unspecified: the fallback is
   nonempty, single-line, at most 120 Unicode scalar values, in JSON object order.
-- Omitted tools: BashOutput `$` / output; ShowPage `↓` (`v`) / show; OpenRoom `@` /
+- Omitted tools: BashOutput `$` / output; ShowPage `?` / show; OpenRoom `@` /
   open; Listen `@` / listen; ListModels `@` / models; SendFile `@` / send (path `path`);
   HelloProgress `#` / progress. Channels uses the collaboration family; the fixture
   uses the progress/planning family. Pictures still registers no tool.
 - Other agent verbs at `@`: SpawnAgent spawn, ListAgents list, SendMessage send,
-  StopAgent stop, DismissAgent dismiss, SetThinking think.
+  StopAgent stop, DismissAgent dismiss, SetThinking thinking.
 - ACP kinds declare Read `¶` (`<`), Edit `±` (`~`), Delete `×` (`x`), Move `→` (`>`),
   Search `/`, Execute `$`, Think/Other `•` (`-`), Fetch `↓` (`v`); verbs are the kind,
   targets the title as text. These choices are pinned beside CallKind.
@@ -244,3 +244,89 @@ Choices and plan clarifications:
 - An existing OpenAI auth test failed with the inherited environment key (Env versus
   Setting), and failed once more alone. Removing the four provider key/base-URL env
   variables made the final full workspace run pass; its test was not changed.
+
+### Review fixes
+
+Review fixes 1–12 (2026-10-18), on `m194a-tool-look`:
+
+- [x] **1, 12 / A4–A5:** core switches, MCP connections, JS registration and both
+  reload paths, and plugin-rpc lifecycle/list changes announce Tools. The real JS
+  `$.tool.register` integration test pins its look in the catalogue and waits for
+  the late-registration event. Workspace test output:
+  ```text
+  host::tests::catalogue::plugin_changes_invalidate_the_tools_catalogue ... ok
+  a_late_mcp_connection_announces_the_tools_catalogue ... ok
+  a_registered_tool_is_prefixed_and_offered_by_the_catalogue ... ok
+  connection::tests::changed_tools_notify_the_catalogue_after_updating_the_list ... ok
+  ```
+- [x] **2, 4, 5, 9 / A2, A6:** `tool_rows.rs` decodes one transient map per
+  transcript sync; steps, asks, pager titles and child rows share its resolver.
+  Tools replies invalidate rendered blocks. SDK catalogue accessors and `Tier::of`
+  replace surface JSON trait reads; the ACP bridge uses the same accessor.
+  `cargo test -p bingo-surface-tui`: `1377 passed; 0 failed`. New tests pin multiline
+  commands, long URLs, the ask's mark/verb/reads/tier and the ASCII non-call fallback.
+  Rows retain existing first-line/path elision; the resolver and pager keep full targets.
+- [x] **3, 6, 7 / A3:** `testing::tool_looks` checks marks, ASCII twins, nonempty verbs
+  and target fields against input-schema properties. All nine pinned crate tests
+  pass with only their relevant settings; every declaration uses the constructors.
+  Corrected the choices above: ShowPage `?` / show; SetThinking `@` / thinking.
+- [x] **8, 10 / A1, A6:** documented Step fields and Tools' role in `CATALOGUES`.
+  `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk`, then
+  `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods -p bingo-plugin-rpc -p bingo-surface-rpc`
+  pass. Regeneration changes Step descriptions in `schema/plugin.json`,
+  `schema/rpc.json` and TS `wire.ts`; other schemas and props remain identical.
+  `node --test sdk/typescript/src/*.test.ts`: `tests 33; pass 33; fail 0`.
+- [x] **Print/RPC:** unchanged black-box tests pass: CLI `306 passed`, RPC `104 passed`,
+  PTY `19 passed`, all `0 failed`. Both provider request equality tests pass.
+
+Final native gates, serial, all exit 0 (provider key/base-URL environment removed
+for workspace tests as in the original verification):
+
+```text
+cargo fmt --all -- --check                         # no output
+cargo check --workspace --all-targets --locked     # Finished `dev` profile
+cargo clippy --workspace --all-targets --locked -- -D warnings
+                                                 # Finished `dev` profile
+cargo test --workspace --locked                   # 6407 passed; 0 failed; 0 ignored
+                                                 # sum of 121 test/doc-test groups
+scripts/check_discipline.sh                       # discipline ok
+cargo deny check                                 # advisories ok, bans ok, licenses ok, sources ok
+```
+
+`scripts/budget.sh` (exit 0; no dependency added during review):
+
+```text
+dependencies (unique, normal): 423 (max  423)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 13 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+test binaries: 186
+budget ok
+```
+
+- [ ] **Windows:** ran all 18 changed Rust crates plus the RPC schema owner,
+  serially: `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`.
+  `Windows checks: 12 passed, 7 failed`. Channels, MCP, mods, plugin-rpc, surface-tui,
+  tool-fs and tool-web stop in native dependencies: aws-lc-sys lacks `stdlib.h` /
+  `windows.h`; mods also fails in rquickjs-sys because the available compiler cannot
+  consume MSVC flags (`/DWIN32_LEAN_AND_MEAN`). These crates remain unverified for
+  Windows; no build was bypassed. [Per-crate output](../verification/m194a/windows-review.txt).
+
+- [x] **11 / Drive:** `docs/verification/m194a/drive.sh` now requires
+  `✓ run cat note.txt`, which the fallback cannot produce. It grants
+  `Bash(cat:*)` for the fixture, with the fake provider, temporary HOME/data/cwd and
+  an owned `m194-drive-*` socket. The six verification captures were refreshed.
+  ```text
+  100x32: live, done, stopped passed
+  80x24: live, done, stopped passed
+  ```
+  `TUI_SMOKE_SOCKET_PREFIX=m194-drive scripts/tui-smoke.sh`: `tui-smoke ok` (exit 0).
+  Both drives remove their servers and temporary files.
+
+Scope clarifications: the review expands A6 beyond `turns::step` to its other
+call views, and A5 needs notifications at the actual JS/RPC mutation sites as
+well as the three named announcements. No prototype conflict was found; no
+Part B work, theme file, `theme::row_mark`, Ember scene capture or TUI snapshot
+was changed. The combined gates/checks criterion stays open only for the Windows
+native-toolchain blocker above; nothing requested in review was omitted.
