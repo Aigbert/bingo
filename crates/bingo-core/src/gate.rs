@@ -125,39 +125,86 @@ fn receipt_for(
     }
 }
 
-/// Decide one call: hooks, then the policy, then a person when the answer is `Ask`.
+/// A decision made at the call's position in the round, before any ask.
+pub(crate) enum Decided {
+    Settled(Box<Gated>),
+    Ask(Box<Waiting>),
+}
+
+pub(crate) struct Waiting {
+    call: ToolCall,
+    traits: ToolTraits,
+    scope: Option<String>,
+    reason: Reason,
+    blocked: Option<String>,
+    notices: Vec<ItemBody>,
+}
+
+/// The standalone gate uses the same decision and asking steps as a round.
 pub async fn gate_call(input: GateInput<'_>, prompter: &dyn GatePrompter) -> Gated {
+    let decided = decide(&input).await;
+    ask(input, decided, prompter).await
+}
+
+pub(crate) async fn decide(input: &GateInput<'_>) -> Decided {
+    check(input, false).await
+}
+
+async fn check(input: &GateInput<'_>, changed: bool) -> Decided {
+    let report = crate::chain::Report::default();
     let hook_cx = HookContext {
         item: Some(input.item.clone()),
         ..input.hook_cx.clone()
     };
     let input = GateInput {
+        session: input.session,
+        cwd: input.cwd,
+        item: input.item,
+        call: input.call.clone(),
+        tool: input.tool.clone(),
+        policy: input.policy,
+        links: input.links,
+        hooks: input.hooks,
         hook_cx: &hook_cx,
-        ..input
     };
-    recheck(input, prompter).await
+    let checked = crate::chain::run::<crate::chain::tool::Check>(
+        input.links,
+        Next::new(|call| Box::pin(crate::chain::tool::check_kernel(call, &input))),
+        &hook_cx,
+        input.call.clone(),
+        report.clone(),
+    )
+    .await;
+    let mut decided = match checked {
+        Ok(checked) => resolve_check(checked, &input, changed),
+        Err(error) => Decided::Settled(Box::new(Gated::denied(
+            input.call.clone(),
+            ToolTraits::default(),
+            error.message,
+        ))),
+    };
+    match &mut decided {
+        Decided::Settled(gated) => gated.notices = report.take(),
+        Decided::Ask(waiting) => waiting.notices = report.take(),
+    }
+    decided
 }
 
-async fn recheck(mut input: GateInput<'_>, prompter: &dyn GatePrompter) -> Gated {
-    let report = crate::chain::Report::default();
+pub(crate) async fn ask(
+    mut input: GateInput<'_>,
+    mut decided: Decided,
+    prompter: &dyn GatePrompter,
+) -> Gated {
     let mut changed = false;
     let mut asked = None;
+    let mut notices = Vec::new();
     loop {
-        let checked = crate::chain::run::<crate::chain::tool::Check>(
-            input.links,
-            Next::new(|call| Box::pin(crate::chain::tool::check_kernel(call, &input))),
-            input.hook_cx,
-            input.call.clone(),
-            report.clone(),
-        )
-        .await;
-        let result = match checked {
-            Ok(checked) => resolve_check(checked, &input, prompter, changed, &mut asked).await,
-            Err(error) => Ok(Gated::denied(
-                input.call.clone(),
-                ToolTraits::default(),
-                error.message,
-            )),
+        let result = match decided {
+            Decided::Settled(gated) => Ok(*gated),
+            Decided::Ask(mut waiting) => {
+                notices.append(&mut waiting.notices);
+                ask_waiting(*waiting, &input, prompter, &mut asked).await
+            }
         };
         match result {
             Ok(mut result) => {
@@ -173,12 +220,14 @@ async fn recheck(mut input: GateInput<'_>, prompter: &dyn GatePrompter) -> Gated
                         asked,
                     ));
                 }
-                result.notices = report.take();
+                notices.append(&mut result.notices);
+                result.notices = notices;
                 return result;
             }
             Err(call) => {
                 input.call = call;
                 changed = true;
+                decided = check(&input, true).await;
             }
         }
     }
@@ -198,13 +247,7 @@ fn changed_decision(receipt: Option<&ItemBody>) -> DecisionKind {
     }
 }
 
-async fn resolve_check(
-    checked: CheckResult,
-    input: &GateInput<'_>,
-    prompter: &dyn GatePrompter,
-    changed: bool,
-    asked: &mut Option<Asked>,
-) -> Result<Gated, ToolCall> {
+fn resolve_check(checked: CheckResult, input: &GateInput<'_>, changed: bool) -> Decided {
     let CheckResult { call, decision } = checked;
     let traits = input
         .tool
@@ -217,7 +260,7 @@ async fn resolve_check(
             if changed {
                 result.allowed_by = None;
             }
-            return Ok(result);
+            return Decided::Settled(Box::new(result));
         }
         Decision::Deny { reason } => {
             let message = match &reason {
@@ -225,12 +268,36 @@ async fn resolve_check(
                 reason => format!("Permission denied ({})", describe(reason)),
             };
             if !changed {
-                return Ok(Gated::denied(call, traits, message));
+                return Decided::Settled(Box::new(Gated::denied(call, traits, message)));
             }
             (None, reason, Some(message))
         }
         Decision::Ask { scope, reason } => (scope, reason, None),
     };
+    Decided::Ask(Box::new(Waiting {
+        call,
+        traits,
+        scope,
+        reason,
+        blocked,
+        notices: Vec::new(),
+    }))
+}
+
+async fn ask_waiting(
+    waiting: Waiting,
+    input: &GateInput<'_>,
+    prompter: &dyn GatePrompter,
+    asked: &mut Option<Asked>,
+) -> Result<Gated, ToolCall> {
+    let Waiting {
+        call,
+        traits,
+        scope,
+        reason,
+        blocked,
+        ..
+    } = waiting;
     let Some(tool) = &input.tool else {
         return Ok(Gated::denied(call, traits, "tool not found".into()));
     };
