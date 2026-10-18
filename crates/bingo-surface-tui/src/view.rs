@@ -26,7 +26,7 @@ const COMPOSER_ROWS: usize = 8;
 const MENU_ROWS: usize = 8;
 
 /// One render path for the whole tree: it paints the session in view and
-/// derives everything about the others — the counts on the status line, the
+/// derives everything about the others — the counts in the footer, the
 /// `↳` rows, the switcher — from their states.
 pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let area = frame.area();
@@ -194,7 +194,7 @@ fn scrollbar(ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
     }
     let size = ((h * h) as f64 / frame.height as f64).round().max(1.0) as usize;
     let top = (frame.top as f64 / (frame.height - h) as f64 * (h - size) as f64).round() as u16;
-    let fresh = now.since(since) < std::time::Duration::from_millis(900);
+    let fresh = now.since(since) < crate::scroll::FLASH;
     if ui.scroll.following() && !fresh {
         return;
     }
@@ -203,9 +203,6 @@ fn scrollbar(ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
         if let Some(cell) = frame.buffer_mut().cell_mut((area.right() - 1, area.y + y)) {
             cell.set_symbol("▕").set_style(ink);
         }
-    }
-    if fresh {
-        frame.wake(Some(since + std::time::Duration::from_millis(900)));
     }
 }
 
@@ -524,9 +521,6 @@ fn over(frame: &mut Layout, region: Rect, lines: Vec<Line<'static>>) {
 /// The tail of the transcript, or the window the scroll keys parked on. What
 /// it drew is left in [`crate::layout::Layout`] for the next key to read.
 fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
-    if area.height == 0 {
-        return;
-    }
     let rows = area.height as usize;
     let state = tree.viewed();
     welcome::render(state, ui, frame, area, now);
@@ -534,6 +528,9 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
         blocks.sync(state, agents, rows);
     });
     let mut inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
+    if area.height == 0 {
+        return;
+    }
     transcript_window(tree, ui, frame, rows, now);
     let height = frame.blocks.height();
     let visible = frame.visible_lines(rows);
@@ -2147,7 +2144,6 @@ mod placement_tests {
                 frame.buffer.cell((79, 9)).unwrap().symbol() == "▕",
                 ms < 900
             );
-            assert_eq!(frame.deadline().is_some(), ms < 900);
         }
     }
     #[test]
@@ -2250,23 +2246,7 @@ mod placement_tests {
         );
         assert_eq!(layout.deadline(), Some(later(now, 1100).instant));
     }
-
-    #[test]
-    fn a_zero_height_ask_keeps_its_deadline() {
-        let now = scene().1;
-        let mut layout = Layout::default();
-        let next = Some(later(now, 100).instant);
-        crate::ask::drawing::place(
-            &mut layout,
-            crate::component::sealed::Drawing {
-                next,
-                rows: vec![(Line::raw("ask"), None)],
-                options: vec![],
-                actions: vec![],
-            },
-            0,
-            Rect::new(0, 0, 80, 0),
-        );
-        assert_eq!(layout.deadline(), next);
-    }
 }
+
+#[cfg(test)]
+mod part_deadlines;

@@ -14,6 +14,7 @@ use crate::clock::{self, Anim};
 
 /// How long the transcript takes to reach where a key sent it (§6).
 pub const EASE: Duration = Duration::from_millis(100);
+pub const FLASH: Duration = Duration::from_millis(900);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scroll {
@@ -66,11 +67,17 @@ impl Scroll {
     }
 
     pub fn next_change(&self, now: crate::clock::Now) -> Option<Instant> {
-        let Self::Held { since, from, to } = self else {
-            return None;
+        let flash = self
+            .touched()
+            .map(|at| at + FLASH)
+            .filter(|at| *at > now.instant);
+        let ease = match self {
+            Self::Held { since, from, to } if from != to && self.moving(now.instant) => {
+                Some((now.instant + clock::FRAME).min(*since + EASE))
+            }
+            _ => None,
         };
-        (from != to && self.moving(now.instant))
-            .then(|| (now.instant + crate::clock::FRAME).min(*since + EASE))
+        ease.into_iter().chain(flash).min()
     }
 
     /// Move `lines` towards the top of the transcript, or towards its foot

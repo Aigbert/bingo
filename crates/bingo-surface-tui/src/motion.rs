@@ -776,6 +776,5 @@ fn the_rhythms_are_the_ones_the_design_names() {
     assert_eq!(crate::transcript::COMET, Duration::from_millis(180));
     assert_eq!(theme::PULSE, Duration::from_secs(1));
     assert_eq!(crate::ui::NOTICE, Duration::from_millis(2700));
-    assert_eq!(crate::ui::NOTICE, std::time::Duration::from_millis(2700));
     assert_eq!(crate::ui::SWITCH, FRAME * 2);
 }

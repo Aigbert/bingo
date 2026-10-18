@@ -405,10 +405,15 @@ fn needs_you_names_one_two_or_many_with_their_inks() {
             "◆ 3 need you",
         ][count - 1];
         assert_eq!(line.to_string(), expected);
+        if count > 2 {
+            let count = line
+                .spans
+                .iter()
+                .find(|span| span.content == "3")
+                .expect("the count");
+            assert_eq!(count.style, super::ink("amber"));
+        }
         for span in &line.spans {
-            if count > 2 && span.content == "3" {
-                assert_eq!(span.style, super::ink("amber"));
-            }
             if ["reviewer", "tester"].contains(&span.content.as_ref()) {
                 assert_eq!(
                     span.style,

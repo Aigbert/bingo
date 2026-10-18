@@ -185,17 +185,20 @@ pub enum Scope<'a> {
 /// activity row says it in words (M82), so the two can
 /// never disagree about a session they both count.
 pub fn count(tree: &Tree, wants: Wants, scope: Scope<'_>) -> Option<usize> {
+    let n = matching(tree, wants, scope).len();
+    (n > 0).then_some(n)
+}
+
+pub fn matching<'a>(tree: &'a Tree, wants: Wants, scope: Scope<'_>) -> Vec<Row<'a>> {
     let within = covered(tree, scope);
-    let n = tree
-        .rows()
-        .iter()
+    tree.rows()
+        .into_iter()
         .filter(|row| within.contains(&row.session))
         .filter(|row| match wants {
             Wants::Attention => row.attention,
             Wants::Running => row.status == Some(Lifecycle::Working),
         })
-        .count();
-    (n > 0).then_some(n)
+        .collect()
 }
 
 /// The sessions a scope covers, resolved once for the whole count rather than

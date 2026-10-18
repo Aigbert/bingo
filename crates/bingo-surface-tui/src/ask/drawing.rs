@@ -29,7 +29,7 @@ pub fn splice(
     }
     let (owner, interaction) = tree.open_interaction()?;
     let agent = (owner.summary.id != *tree.view()).then(|| tree::name(owner));
-    let mut drawing = Site {
+    let drawing = Site {
         state: owner,
         ui,
         now,
@@ -39,6 +39,7 @@ pub fn splice(
         room: area.height as usize,
     }
     .rows(&mut frame.pulls, false);
+    let mut drawing = frame.collect(drawing);
     if !matches!(interaction.kind, InteractionKind::Permission { .. }) {
         drawing.rows.insert(0, (asking(), None));
     }
@@ -93,8 +94,7 @@ fn dim(drawing: &mut Drawing) {
     }
 }
 
-pub fn place(frame: &mut Layout, drawing: Drawing, at: usize, area: Rect) {
-    let mut drawing = frame.collect(drawing);
+pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
     let Some(row) = at.checked_sub(frame.top) else {
         return;
     };

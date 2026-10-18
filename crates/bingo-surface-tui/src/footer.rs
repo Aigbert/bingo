@@ -193,23 +193,19 @@ fn crew(tree: &Tree, now: Now) -> Drawing {
 }
 fn needs_you(tree: &Tree) -> Drawing {
     use crate::tree::{Scope, Wants};
-    let Some(count) = crate::tree::count(tree, Wants::Attention, Scope::Others) else {
+    let rows = crate::tree::matching(tree, Wants::Attention, Scope::Others);
+    let count = rows.len();
+    if count == 0 {
         return Drawing::default();
-    };
+    }
     let mut spans = vec![Span::styled(
         format!("{} ", theme::glyphs::get("pin")),
         ink("amberGlow"),
     )];
-    let others = crate::tree::covered(tree, Scope::Others);
     if count > 2 {
         spans.push(Span::styled(count.to_string(), ink("amber")));
     } else {
-        for (index, row) in tree
-            .rows()
-            .into_iter()
-            .filter(|row| row.attention && others.contains(&row.session))
-            .enumerate()
-        {
+        for (index, row) in rows.into_iter().enumerate() {
             if index > 0 {
                 spans.push(Span::styled(", ", ink("amber")));
             }

@@ -233,7 +233,7 @@ pub fn bad() -> Style {
     foreground("bad").unwrap_or_default()
 }
 
-/// The `⏵⏵` on the status line, and links — the one cool colour.
+/// The `⏵⏵` in the footer, and links — the one cool colour.
 pub fn mode() -> Style {
     foreground("plan").unwrap_or_default()
 }
