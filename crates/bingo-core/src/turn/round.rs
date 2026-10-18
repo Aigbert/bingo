@@ -1,6 +1,6 @@
 //! A round walks once; each decision belongs to the call it has reached.
 
-use super::{HookSet, TurnConfig, TurnHost, emit_and_fold, mint, racing};
+use super::{HookSet, TurnConfig, TurnHost, emit_and_fold, mint, racing, record};
 use std::future::Future;
 use std::sync::Arc;
 
@@ -255,8 +255,7 @@ impl Round<'_> {
     }
 
     fn record(&mut self, body: ItemBody) {
-        let item = mint(self.id, self.number, body, ItemStatus::Completed);
-        emit_and_fold(self.transcript, self.host, Event::ItemCompleted { item });
+        record(self.transcript, self.host, self.id, self.number, body);
     }
 
     async fn record_receipt(&mut self, body: Option<ItemBody>) -> bool {

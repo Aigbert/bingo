@@ -246,6 +246,19 @@ fn emit_and_fold(transcript: &mut Transcript, host: &dyn TurnHost, event: Event)
     host.emit(event);
 }
 
+fn record(
+    transcript: &mut Transcript,
+    host: &dyn TurnHost,
+    turn: &TurnId,
+    round: u32,
+    body: ItemBody,
+) -> ItemId {
+    let item = mint(turn, round, body, ItemStatus::Completed);
+    let id = item.id.clone();
+    emit_and_fold(transcript, host, Event::ItemCompleted { item });
+    id
+}
+
 impl Turn<'_> {
     /// Round trips until one closes the turn.
     async fn respond(&mut self) -> TurnStatus {
@@ -285,19 +298,8 @@ impl Turn<'_> {
         Some(())
     }
 
-    fn fresh(&self, body: ItemBody, status: ItemStatus) -> Item {
-        mint(&self.id, self.round, body, status)
-    }
-
     fn record(&mut self, body: ItemBody) -> ItemId {
-        let item = self.fresh(body, ItemStatus::Completed);
-        let id = item.id.clone();
-        emit_and_fold(
-            &mut self.transcript,
-            self.host,
-            Event::ItemCompleted { item },
-        );
-        id
+        record(&mut self.transcript, self.host, &self.id, self.round, body)
     }
 
     fn user_piece(&mut self, parts: Vec<ContentPart>, surface: String) {
