@@ -69,10 +69,10 @@ Drawing them is M194 part B's.
 
 ## Exit criteria
 
-- [ ] Schema or fixture tests for each new field land before the code that fills it. The
+- [x] Schema or fixture tests for each new field land before the code that fills it. The
       regenerated schemas and TypeScript types are committed.
-- [ ] A journal from before M201 replays unchanged. A journal with the fields round-trips.
-- [ ] Core tests, one per path:
+- [x] A journal from before M201 replays unchanged. A journal with the fields round-trips.
+- [x] Core tests, one per path:
   - an edit inside the cwd in `acceptEdits` records the mode;
   - any call in `bypassPermissions` records the mode;
   - a call allowed by a rule added with "yes for this session" records the rule and its
@@ -80,16 +80,16 @@ Drawing them is M194 part B's.
   - a settings allow rule records its settings source;
   - a hook's allow records the hook;
   - a read-only call and an asked call record nothing on the call.
-- [ ] A permission ask and a question answered after a wait record `asked_at` equal to the
+- [x] A permission ask and a question answered after a wait record `asked_at` equal to the
       interaction's `opened_at`.
-- [ ] Clock unit tests:
+- [x] Clock unit tests:
   - no asks;
   - one closed ask, subtracted;
   - an open ask freezes the clock at its `opened_at`;
   - a stopped turn;
   - a receipt without `asked_at` subtracts nothing;
   - the newest turn and an older one read alike.
-- [ ] Read tests: `N lines` for a whole read and for a partial read of the same file, and `W×H`
+- [x] Read tests: `N lines` for a whole read and for a partial read of the same file, and `W×H`
       for a picture.
 - [ ] `--print` and RPC black-box tests pass. A test that pins whole JSON is re-pinned only for
       the new optional fields, and each such test is named in Verified.
@@ -112,3 +112,37 @@ Drawing them is M194 part B's.
   `Decision::Allow { reason: Hook }`. If it does not, say what it is and record that instead.
 - **Item time.** The clock assumes a turn's first item starts when the turn does. Check this
   against the kernel and say what you find.
+
+## Verified
+
+- [x] Contracts precede producers: `6e0d5cc2` and `28ca9900`; schemas/types accompany their fields.
+- [x] `BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --lib --test why_and_time --locked` → exit 0; optional interruption timestamp round-trips; old item fixtures omit new fields.
+- [x] Schema generators: plugin-rpc `--lib` → `132 passed`; surface-rpc `--lib schema` → `6 passed`; mods `--lib schema_and_types_are_generated_from_the_same_rows` → `1 passed` (each with `BINGO_UPDATE_SCHEMA=1`, `--locked`).
+- [x] `cargo test -p bingo --test kernel provenance --locked` → three real-ladder reads failed before B1, then `3 passed`; bypass/settings/session reads have no reason.
+- [x] `cargo test -p bingo-core -p bingo-permissions --lib --locked` → core `682 passed`; permissions `114 passed` in final targeted runs; deny/ask precedence and untrusted reads remain intact.
+- [x] B2/B3: `cargo test -p bingo-core --lib session::tests::receipts --locked` → four failures before fixes; final core run passes all six receipt/stop/wait tests, with immediate-denial feedback preserved.
+- [x] `cargo test -p bingo-sdk --test turn_clock --test why_and_time --locked` → `11 passed`, `2 passed`; interruption clock test failed before the fix. No production clock caller.
+- [x] `cargo test -p bingo-tool-fs -p bingo-store-jsonl --lib --locked` → `91 passed`, `74 passed`; singular-line and original-dimensions tests both failed before fixes.
+- [x] Store replay plants the recorded pre-M201 `frames-v1.jsonl`, folds five items, omits new fields, retains a 6,039 µs clock, and leaves journal bytes unchanged.
+- [x] `node --test sdk/typescript/src/*.test.ts` → `tests 33`, `pass 33`, `fail 0`; deleted the vacuous provenance test, leaving plugin-kit's expected count unchanged.
+- [x] `cargo fmt --all -- --check` → exit 0; `scripts/check_discipline.sh` → `discipline ok` (existing warnings).
+- [x] `scripts/budget.sh` → `dependencies (unique, normal): 423 (max 423)`, `budget ok`; no dependency added; target/debug 15 GB exceeds the soft 5 GB limit.
+- [x] `cargo deny check` → `advisories ok, bans ok, licenses ok, sources ok`.
+- [ ] `cargo check --workspace --all-targets --locked` → exit 101: TUI `transcript.rs:424` pattern must ignore the new field (E0027).
+- [ ] `cargo clippy --workspace --all-targets --locked -- -D warnings` → exit 101, same pattern.
+- [ ] `cargo test --workspace --locked` → exit 101, same pattern; no wall-clock test failure.
+- [ ] `cargo test -p bingo --test cli --test rpc --test kernel --test plugin_kit --locked` → exit 101, same pattern; no black-box re-pins.
+- Windows: `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked` → sdk/core/store-jsonl/agents/checkpoints/context/rooms exit 0.
+- Windows: permissions → tree-sitter headers; pictures/tool-fs/print/tui → aws-lc-sys headers; bingo → aws-lc-sys/rquickjs-sys headers (exit 101, accepted host limits).
+- Shapes: `allowedBy: Option<Box<Reason>>` reuses policy provenance compactly; optional `Rule.source` distinguishes settings/session. Trusted reads retain ReadOnly unless a hook allows them.
+- Shapes: optional `askedAt` on receipts/questions/interruptions preserves the opening instant; existing item time supplies the end. Absence is omitted; no duration is stored.
+- B2 withdraws actor approval receipts and reconciliation: the gate writes one final receipt with the settling interaction and first opening time. Deny/question answers retain dev's actor writers; exact interaction-id dedup never rewrites receipts.
+- Allow receipts again follow the ack; `a_permission_is_answered_once_and_late_answers_are_rejected` restores dev's expectation. An edited call asked again then denied retains that final ask's own opening time in the actor's Deny receipt.
+- B3 replaces cancellation receipts with an interruption timestamp: the running turn holds the earliest open ask only until the actor stamps the interruption, including dropped turns. Explicit question Cancel still means skipped; interrupted asks add no answer to context.
+- B4/clock helpers split marking Running, selecting items/end/waits/deadline; overlapping waits and skew clamping are unchanged.
+- Read reports total lines (including partial reads), singular `1 line`, and original file dimensions using the existing header reader; model parts are unchanged.
+- Deleted the one-reader reason fixture; core tests use an inline opaque mode, and the binary tests cover the real bypass ladder. Hook allows on reads still record Hook.
+- Plan findings retained: legacy HookOutcome has no Allow; a full tool.check interceptor does. Input items precede TurnStarted slightly, so the clock follows the specified first-item start.
+- Other surfaces unchanged: ACP bridge/shape::refused carries refusal text; channel-adapter question::ladder carries permission summaries; neither renders automatic allow provenance or turn duration. Feishu's footer uses usage.
+- Scope: accepted TUI compatibility remains; new interruption literals receive None. One additional `{ marker, .. }` pattern is prepared in `/tmp/m201-interruption-pattern.patch`, awaiting the exact-scope exception requested from the user.
+- Owed: apply that pattern, rewrite history once (including folding TUI literals into the field commit), then repeat full gates/black-box checks. No history rewrite has occurred during fixes.
