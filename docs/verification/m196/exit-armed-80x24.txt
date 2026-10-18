@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   work until stopped                                                  stopped
+
+▍  [image 1]                                                           stopped
+
+
+   ▍Reply, or / for commands
+
+   ctrl+c again to quit                   ctrl+o details   / commands   ? keys

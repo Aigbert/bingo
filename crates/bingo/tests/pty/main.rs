@@ -543,7 +543,7 @@ fn a_bang_line_runs_the_shell_and_leaves_its_output_in_the_transcript() {
     let mut terminal = Terminal::open(&[]);
     terminal.wait_for("/ commands");
     terminal.send(b"!echo landed\r");
-    terminal.wait_for("$ echo landed");
+    terminal.wait_for("! echo landed");
     // The line, and under it what it wrote.
     terminal.wait_count("landed", 2);
     let screen = terminal.screen();
@@ -719,4 +719,22 @@ fn count(haystack: &[u8], needle: &[u8]) -> usize {
         .windows(needle.len())
         .filter(|w| *w == needle)
         .count()
+}
+
+#[test]
+fn stopping_returns_a_queued_line_to_the_input() {
+    const SLOW: &str = r#"{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"Too late."}]}]}"#;
+    let mut terminal = Terminal::opened(&[], SLOW, Answers::Da1Only);
+    terminal.wait_for("/ commands");
+    terminal.send(b"work until stopped\r");
+    terminal.wait_for("esc stop");
+    terminal.send(b"then update CHANGELOG\t");
+    terminal.wait_for("edit queued");
+    terminal.send(&[0x1b]);
+    terminal.wait_for("what you queued is back in the input");
+    let screen = terminal.screen();
+    let input = screen.lines().nth(usize::from(ROWS - 3)).unwrap();
+    assert!(input.contains("then update CHANGELOG"), "{screen}");
+    terminal.send(&[0x15, 0x04]);
+    terminal.leave();
 }

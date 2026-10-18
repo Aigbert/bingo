@@ -19,7 +19,12 @@ command -v tmux >/dev/null || { echo "tui-smoke: tmux is required"; exit 1; }
 [ -x "$BIN" ] || { echo "tui-smoke: build first (cargo build): $BIN"; exit 1; }
 
 WORK=$(mktemp -d)
-SOCKET="${TUI_SMOKE_SOCKET_PREFIX:-bingo-smoke}-${WORK##*/}"
+SOCKET="${TUI_SMOKE_SOCKET:-${TUI_SMOKE_SOCKET_PREFIX:-bingo-smoke}-${WORK##*/}}"
+if tmux -L "$SOCKET" list-sessions >/dev/null 2>&1; then
+  rm -rf "$WORK"
+  echo "tui-smoke: socket already in use: $SOCKET" >&2
+  exit 1
+fi
 cleanup() {
   tmux -L "$SOCKET" kill-server 2>/dev/null || true
   rm -rf "$WORK"
@@ -331,9 +336,9 @@ finish
 step 'a notice expires and ctrl+c twice exits the idle composer'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys C-c
-await 'ctrl+c again to exit'
+await 'ctrl+c again to quit'
 # It holds its window and goes on its own: nothing is pressed to dismiss it.
-vanish 'ctrl+c again to exit'
+vanish 'ctrl+c again to quit'
 await 'fake-1'
 keys C-c C-c
 left

@@ -1,0 +1,24 @@
+
+
+
+
+
+
+   ! echo shell-landed
+
+       shell-landed
+
+
+   run the test command
+   $ run     sleep 3; printf 'test result: ok. 2 passed; 0 fai…  in background
+
+   The shell is in background.
+
+   ✓ sleep 3; printf 'test result: ok. 2 passed; 0 f… finished in the background
+
+   The background tests passed.
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands
+
+   fake-1                                 ctrl+o details   / commands   ? keys
