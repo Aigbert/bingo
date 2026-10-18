@@ -1,55 +1,48 @@
 //! Close the unfinished segment of a recovered journal.
 
-use super::*;
+use bingo_sdk::*;
+use jiff::Timestamp;
 
-/// A resumed journal may end inside a turn the old process never
-/// finished. Its questions can no longer be answered and its turn is
-/// lost; both are said before anything new happens.
-pub(super) async fn recover(actor: &mut Actor) -> Result<(), KernelError> {
-    let open: Vec<InteractionId> = actor
-        .state
-        .interactions
+/// Lost questions and a lost turn close before the resumed session does new work.
+pub(super) fn frames(
+    interactions: &[Interaction],
+    turn: Option<&LiveTurn>,
+    transcript: &Transcript,
+    at: Timestamp,
+) -> Vec<Event> {
+    let mut frames: Vec<_> = interactions
         .iter()
-        .map(|i| i.id.clone())
+        .map(|ask| Event::InteractionCancelled {
+            id: ask.id.clone(),
+            reason: CancelReason::SessionClosed,
+        })
         .collect();
-    for id in open {
-        actor
-            .publish(
-                Event::InteractionCancelled {
-                    id,
-                    reason: CancelReason::SessionClosed,
-                },
-                None,
-            )
-            .await?;
+    if let Some(turn) = turn {
+        frames.extend(interrupt_items(transcript.open_items(&turn.id), at));
+        frames.push(Event::TurnCompleted {
+            turn: turn.id.clone(),
+            status: TurnStatus::Failed {
+                error: KernelError::new(ErrorCode::TurnLost, "the process ended during this turn"),
+            },
+            usage: turn.usage,
+        });
     }
-    if let Some(turn) = actor.state.turn.clone() {
-        recover_items(actor, &turn.id).await?;
-        actor
-            .publish(
-                Event::TurnCompleted {
-                    turn: turn.id,
-                    status: TurnStatus::Failed {
-                        error: KernelError::new(
-                            ErrorCode::TurnLost,
-                            "the process ended during this turn",
-                        ),
-                    },
-                    usage: turn.usage,
-                },
-                None,
-            )
-            .await?;
-    }
-    Ok(())
+    frames
 }
 
-async fn recover_items(actor: &mut Actor, turn: &TurnId) -> Result<(), KernelError> {
-    let open: Vec<_> = actor.state.transcript.open_items(turn).cloned().collect();
-    for mut item in open {
+/// Close every open item, including unfinished text, at the supplied instant.
+pub(super) fn interrupt_items<'a>(
+    open: impl Iterator<Item = &'a Item>,
+    at: Timestamp,
+) -> Vec<Event> {
+    open.map(|item| {
+        let mut item = item.clone();
         item.status = ItemStatus::Interrupted;
-        item.completed_at = Some(Timestamp::now());
-        actor.record_item(item).await?;
-    }
-    Ok(())
+        item.completed_at = Some(at);
+        Event::ItemCompleted { item }
+    })
+    .collect()
 }
+
+#[cfg(test)]
+mod tests;

@@ -164,8 +164,7 @@ async fn closing_with_an_ask_agrees_in_outcome_hooks_and_journal() {
     agrees(Some(permission()), true).await;
 }
 
-#[tokio::test]
-async fn resumed_pending_calls_close_before_the_lost_turn() {
+fn lost_call_journal() -> Vec<Frame> {
     let turn = TurnId::from_raw("lost");
     let mut frames = vec![
         journal_frame(
@@ -204,6 +203,10 @@ async fn resumed_pending_calls_close_before_the_lost_turn() {
         );
         frames.push(journal_frame(index as u64 + 3, Event::ItemStarted { item }));
     }
+    frames
+}
+
+async fn resume_stopped(frames: Vec<Frame>) -> (SessionState, Vec<Frame>) {
     let mailbox = resume(frames, None, Services::none(), |_| {
         Arc::new(config(
             ScriptedProvider::new(vec![]),
@@ -213,6 +216,15 @@ async fn resumed_pending_calls_close_before_the_lost_turn() {
     })
     .unwrap();
     let (state, _) = mailbox.attach().await.unwrap();
+    let journal = events_of(&mailbox).await;
+    mailbox.close(CloseReason::Client);
+    mailbox.wait_closed().await;
+    (state, journal)
+}
+
+#[tokio::test]
+async fn resumed_pending_calls_close_before_the_lost_turn() {
+    let (state, journal) = resume_stopped(lost_call_journal()).await;
     let calls: Vec<_> = state
         .transcript
         .items()
@@ -225,7 +237,6 @@ async fn resumed_pending_calls_close_before_the_lost_turn() {
             .iter()
             .all(|item| item.status == ItemStatus::Interrupted && item.completed_at.is_some())
     );
-    let journal = events_of(&mailbox).await;
     let done = journal
         .iter()
         .position(|frame| matches!(frame.event, Event::TurnCompleted { .. }))
@@ -238,6 +249,55 @@ async fn resumed_pending_calls_close_before_the_lost_turn() {
             .count(),
         2
     );
-    mailbox.close(CloseReason::Client);
-    mailbox.wait_closed().await;
+}
+
+#[tokio::test]
+async fn resuming_the_same_journal_twice_adds_no_recovery_frames() {
+    let (first, journal) = resume_stopped(lost_call_journal()).await;
+    let before = journal.len();
+    let (second, journal) = resume_stopped(journal).await;
+    assert!(
+        journal[before..].iter().all(|frame| !matches!(
+            frame.event,
+            Event::ItemCompleted { .. }
+                | Event::InteractionCancelled { .. }
+                | Event::TurnCompleted { .. }
+        )),
+        "the second resume wrote recovery frames"
+    );
+    assert_eq!(first.transcript, second.transcript);
+    assert_eq!(first.turn, second.turn);
+    assert_eq!(first.last_turn, second.last_turn);
+    assert_eq!(first.interactions, second.interactions);
+    assert!(
+        recovery::frames(
+            &second.interactions,
+            second.turn.as_ref(),
+            &second.transcript,
+            Timestamp::now(),
+        )
+        .is_empty(),
+        "recovery has nothing left to publish"
+    );
+}
+
+#[tokio::test]
+async fn resuming_partway_through_recovery_never_closes_an_item_twice() {
+    let (first, mut journal) = resume_stopped(lost_call_journal()).await;
+    let done = journal
+        .iter()
+        .position(|frame| matches!(frame.event, Event::TurnCompleted { .. }))
+        .unwrap();
+    journal.truncate(done);
+    let before = journal.len();
+    let (second, journal) = resume_stopped(journal).await;
+    assert!(
+        journal[before..]
+            .iter()
+            .all(|frame| !matches!(frame.event, Event::ItemCompleted { .. })),
+        "recovery closed a terminal item twice"
+    );
+    assert_eq!(first.transcript, second.transcript);
+    assert_eq!(first.turn, second.turn);
+    assert_eq!(first.interactions, second.interactions);
 }

@@ -180,11 +180,11 @@ pub(super) async fn close_dropped_turn(
     actor: &mut Actor,
     turn: &TurnId,
 ) -> Result<TurnOutcome, KernelError> {
-    let open: Vec<_> = actor.state.transcript.open_items(turn).cloned().collect();
-    for mut item in open {
-        item.status = ItemStatus::Interrupted;
-        item.completed_at = Some(jiff::Timestamp::now());
-        actor.publish(Event::ItemCompleted { item }, None).await?;
+    for event in super::recovery::interrupt_items(
+        actor.state.transcript.open_items(turn),
+        jiff::Timestamp::now(),
+    ) {
+        actor.publish(event, None).await?;
     }
     let asked_at = actor
         .running

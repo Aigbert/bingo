@@ -367,7 +367,14 @@ impl Actor {
         self.restate_context(false).await?;
         self.restate_extensions().await?;
         self.refresh_config().await?;
-        recovery::recover(self).await?;
+        for event in recovery::frames(
+            &self.state.interactions,
+            self.state.turn.as_ref(),
+            &self.state.transcript,
+            Timestamp::now(),
+        ) {
+            self.publish(event, None).await?;
+        }
         self.observe_named(
             bingo_sdk::catalogue::SESSION_START,
             json!({"session":self.id}),
@@ -906,6 +913,7 @@ impl Actor {
         if self.state.closed {
             return Ok(Flow::Stop);
         }
+        // Remembering the ask first makes cancel-before-close safe (ADR-0039 §1).
         self.remember_stopped_ask();
         if let Some(running) = &self.running {
             running.cancel.cancel();
