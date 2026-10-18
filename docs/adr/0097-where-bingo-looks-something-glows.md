@@ -79,7 +79,7 @@ unknown. The traits that pick a row's tier (`read_only`, `edit`) already belong 
    - In a room every `@name` is owed an answer until they speak.
 10. **Motion has a budget.** While working, only the side light, the comet and the spinner
     move. Each animation is a pure function of the clock with a still form under reduced motion,
-    and each mark has an ASCII twin.
+    and each mark has an ASCII twin. The caret rests after 10 s without a key.
 11. **Colour.** M73 holds for prose: body text is the terminal's foreground, and
     muted/dim/faint are blends of the detected foreground and background. Chrome takes Ember's
     hex pairs (ember, glow, amber, good, bad, plan, auto, code and six crew colours), chosen by

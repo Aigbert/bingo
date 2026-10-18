@@ -63,13 +63,13 @@ pub fn draw(props: &Props, at: Option<usize>, width: usize, height: u16) -> Vec<
         .skip(start)
         .take(room)
         .map(|(i, (label, _))| {
-            Line::from(crate::status::clip(
-                vec![ratatui::text::Span::raw(format!(
+            crate::layout::grid::fit(
+                Line::from(vec![ratatui::text::Span::raw(format!(
                     " {} {label}",
                     if i == at { "❯" } else { " " }
-                ))],
+                ))]),
                 width,
-            ))
+            )
         })
         .collect()
 }

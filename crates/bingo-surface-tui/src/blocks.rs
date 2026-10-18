@@ -1070,7 +1070,7 @@ mod refresh_tests {
                 let (mut ui, now) = scene();
                 draw_tree(80, 24, &tree, &mut ui, now);
                 assert!(
-                    ui.shown.next_frame.is_some(),
+                    ui.shown.deadline().is_some(),
                     "replacement: {replacement:?}"
                 );
                 let before = ui.shown.blocks.blocks[0].lines[0].spans[0].style.fg;
@@ -1078,7 +1078,7 @@ mod refresh_tests {
                 let after = ui.shown.blocks.blocks[0].lines[0].spans[0].style.fg;
                 assert_ne!(before, after, "replacement: {replacement:?}");
                 draw_tree(80, 24, &tree, &mut ui, still(later(now, 1000)));
-                assert_eq!(ui.shown.next_frame, None);
+                assert_eq!(ui.shown.deadline(), None);
             }
         });
     }

@@ -12,12 +12,12 @@ pub(super) fn cycle_mode(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Eff
         ui.notify(Level::Warn, UNKNOWN_MODE, now.instant);
         return Vec::new();
     };
-    vec![step]
+    vec![Effect::CycleMode(step)]
 }
 
 /// The policy's own mode, from its description: the only cycle whose step
 /// may be the person's typed line, and the one that wins over any other.
-fn policy_step(state: &SessionState) -> Option<Effect> {
+fn policy_step(state: &SessionState) -> Option<bingo_sdk::Input> {
     bingo_sdk::slot::described(state)
         .into_iter()
         .find_map(|placed| Some(mode_step(&placed.plugin, next_mode(placed.slot)?)))
@@ -25,12 +25,12 @@ fn policy_step(state: &SessionState) -> Option<Effect> {
 
 /// A mode some other plugin placed is its own word: pressed as its placer,
 /// so it can never stand for the person.
-fn placed_step(state: &SessionState) -> Option<Effect> {
+fn placed_step(state: &SessionState) -> Option<bingo_sdk::Input> {
     bingo_sdk::slot::placed(state)
         .into_iter()
         .find_map(|placed| {
             let action = next_mode(placed.slot)?;
-            Some(Effect::Submit(crate::pressed(&placed.plugin, action)))
+            Some(crate::pressed(&placed.plugin, action))
         })
 }
 
@@ -48,12 +48,12 @@ fn next_mode(slot: bingo_sdk::slot::Slot) -> Option<bingo_sdk::Action> {
 /// The cycle is this surface's own key, and the one thing it types is a
 /// `/permission` line naming a mode: that line is the person's. A mode the
 /// policy made name anything else is the policy's word, not the person's.
-fn mode_step(placer: &str, action: bingo_sdk::Action) -> Effect {
+fn mode_step(placer: &str, action: bingo_sdk::Action) -> bingo_sdk::Input {
     match action.args.as_str() {
         Some(mode) if action.name == PERMISSION && is_mode_word(mode) => {
-            Effect::Run(format!("/{PERMISSION} {mode}"))
+            bingo_sdk::Input::text(format!("/{PERMISSION} {mode}"), crate::origin())
         }
-        _ => Effect::Submit(crate::pressed(placer, action)),
+        _ => crate::pressed(placer, action),
     }
 }
 

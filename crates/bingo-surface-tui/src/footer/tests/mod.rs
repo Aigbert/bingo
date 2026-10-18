@@ -123,16 +123,14 @@ fn fixture(capture: &Capture) -> (SessionState, Ui) {
         );
     }
     if capture.entry.scene == "mode" {
-        let (value, label, at) = if capture.entry.file == "mode-later" {
+        let (value, _label, at) = if capture.entry.file == "mode-later" {
             ("bypassPermissions", "bypass permissions", 3400)
         } else {
             ("plan", "plan", 2000)
         };
         apply(&mut state, at, permission_view(value));
         let now = capture.now();
-        ui.notify(
-            Level::Info,
-            format!("permission mode: {label}"),
+        ui.notify_mode(
             now.instant - std::time::Duration::from_millis((capture.entry.moment_ms - at) as u64),
         );
     }
@@ -247,4 +245,131 @@ fn m193_hidden_footer_animation_never_schedules() {
         draw(&ui, 80, later(now, 200)).next,
         Some(now.instant + std::time::Duration::from_millis(2400))
     );
+}
+
+#[test]
+fn round2_a_mode_shaped_sentence_is_only_a_plain_notice() {
+    let (mut ui, now) = scene();
+    let state = folded(vec![frame(1, permission_view("plan"))]);
+    let text = "permission mode: plan";
+    ui.notify(Level::Info, text, now.instant);
+    let lines = super::draw(
+        &solo(&state),
+        &ui,
+        &mut Default::default(),
+        100,
+        later(now, 200),
+    );
+    assert!(lines.lines[0].to_string().contains(text));
+    assert!(
+        edge(&state, &ui, now)
+            .0
+            .content()
+            .iter()
+            .all(|c| c.symbol() == " ")
+    );
+}
+
+#[test]
+fn round2_the_mode_toast_reads_the_placed_meaning() {
+    let (mut ui, now) = scene();
+    let slot = json!({"kind":"mode","current":"plan","modes":[{"label":"plan","meaning":"the policy changed this sentence","action":{"name":"permission","args":"plan"}}]});
+    let state = folded(vec![frame(
+        1,
+        extended("policy", "mode", json!({"slots":[slot]})),
+    )]);
+    ui.notify_mode(now.instant);
+    let drawn = super::draw(
+        &solo(&state),
+        &ui,
+        &mut Default::default(),
+        100,
+        later(now, 200),
+    );
+    assert!(
+        drawn.lines[0]
+            .to_string()
+            .contains("the policy changed this sentence")
+    );
+}
+
+#[test]
+fn round2_the_idle_caret_rests_and_carries_no_deadline() {
+    let (mut ui, now) = scene();
+    let tree = solo(&state());
+    let rest = later(now, 10_001);
+    let screen = drawn(80, 24, &tree, &mut ui, rest);
+    let y = ui.shown.regions.composer.y + 1;
+    assert_eq!(
+        screen.buffer()[(3, y)].fg,
+        crate::theme::caret_ink(still(rest), "glow", "you")
+            .unwrap()
+            .fg
+            .unwrap()
+    );
+    assert!(ui.shown.deadline().is_none());
+}
+
+#[test]
+fn round2_reduced_activity_wakes_for_its_first_row() {
+    let (mut ui, now) = scene();
+    let tree = solo(&folded(vec![frame(1, started("turn"))]));
+    draw_tree(80, 24, &tree, &mut ui, still(now));
+    assert_eq!(ui.shown.regions.activity.height, 0);
+    assert_eq!(
+        ui.shown.deadline(),
+        Some(now.instant + std::time::Duration::from_millis(300))
+    );
+    draw_tree(80, 24, &tree, &mut ui, still(later(now, 300)));
+    assert!(ui.shown.regions.activity.height > 0);
+}
+
+#[test]
+fn round2_the_latest_edge_flash_wins() {
+    let (mut ui, now) = scene();
+    let state = folded(vec![
+        frame(1, permission_view("plan")),
+        frame(2, started("turn")),
+        frame(3, completed("turn", TurnStatus::Completed)),
+    ]);
+    ui.notify_mode(now.instant - std::time::Duration::from_millis(100));
+    let newer_end = crate::dock::edge(&solo(&state), &ui, 80, still(now));
+    assert_eq!(
+        newer_end.lines[0].spans[0].style,
+        crate::theme::blended("good", "you", 0.2).unwrap()
+    );
+    ui.notify_mode(later(now, 100).instant);
+    let newer_mode = crate::dock::edge(&solo(&state), &ui, 80, still(later(now, 100)));
+    assert_eq!(
+        newer_mode.lines[0].spans[0].style,
+        crate::theme::blended("plan", "you", 0.2).unwrap()
+    );
+}
+
+#[test]
+fn round2_a_countdown_wakes_only_when_its_words_change() {
+    use std::time::Duration;
+    let epsilon = Duration::from_nanos(1);
+    for (remaining, change) in [(125, 5), (3605, 5), (90_000, 3600), (59, 0)] {
+        assert_eq!(
+            super::countdown_change(Duration::from_secs(remaining)),
+            Duration::from_secs(change) + epsilon
+        );
+    }
+}
+
+#[test]
+fn round2_needs_you_replaces_crew_lamps_before_the_model() {
+    let tree = folded_tree(vec![
+        child_frame(1, announced("reviewer")),
+        child_frame(2, opened(child_permission())),
+    ]);
+    let (ui, now) = scene();
+    let line = super::line(&tree, &ui, 120, now).to_string();
+    assert!(
+        line.trim_start().starts_with("◆ reviewer needs you"),
+        "{line}"
+    );
+    assert!(!line.contains("agents"));
+    assert!(!line.contains("ctrl+g"));
 }

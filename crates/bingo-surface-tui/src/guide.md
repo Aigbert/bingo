@@ -5,9 +5,9 @@ both a terminal. It holds no session state — it folds the same frames every
 other client folds and derives what it draws at render time — so what a person
 sees here, a `--print` run or an IM chat on the same session can see too.
 
-The screen is the transcript, an input box that never moves, and one status
-line: the permission mode, `N needs you` and `N running` while they are true,
-where you are, the window used against the whole, and the model.
+The screen has three bands: the stream, the dock with its state edge and input,
+and the footer. The footer names who needs you, the model, non-default mode,
+context from 70%, active agents and shells, with the available keys on the right.
 
 ## The keys
 

@@ -717,7 +717,7 @@ fn round3_flattened_toast_has_no_motion_deadline() {
     );
     crate::theme::with(crate::painted::daylight(), || {
         let toast = crate::toast::components(&ui, &state, now, 80, &mut frame.pulls).unwrap();
-        assert_eq!(toast.text, "still words");
-        assert_eq!(frame.next_frame, None);
+        assert_eq!(toast.plain().unwrap().text, "still words");
+        assert_eq!(frame.deadline(), None);
     });
 }

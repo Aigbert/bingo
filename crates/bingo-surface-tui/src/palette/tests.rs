@@ -469,7 +469,9 @@ async fn choosing_the_mode_key_replays_shift_tab_after_closing() {
         .press(&mut ui, &state, key(KeyCode::Enter), now)
         .await;
     assert!(!active(&ui));
-    assert!(matches!(&effects[0], Effect::Run(line) if line.starts_with("/permission ")));
+    assert!(
+        matches!(&effects[0], Effect::CycleMode(Input::Text { text, .. }) if text.starts_with("/permission "))
+    );
 }
 
 #[test]
@@ -555,7 +557,7 @@ fn a_trust_line_nobody_vouched_for_stays_unsent() {
             assert_eq!(submits(&effects), vouched, "{value}");
             let said = ui
                 .notice()
-                .is_some_and(|notice| notice.text.contains("type it yourself"));
+                .is_some_and(|notice| notice.plain().unwrap().text.contains("type it yourself"));
             assert_eq!(said, !vouched, "{value}");
         }
     }

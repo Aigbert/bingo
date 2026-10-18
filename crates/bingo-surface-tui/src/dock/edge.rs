@@ -22,7 +22,6 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
         .unwrap_or_default();
         return sampled(
             super::line(ink, width),
-            now,
             now.motion.then_some(now.instant + clock::FRAME),
         );
     }
@@ -39,8 +38,11 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
             .unwrap_or_else(|| "glow".into());
         return comet(width, now.past(turn.started_at), &ink, now);
     }
-    if let Some(age) = mode::changed(state, ui, now)
-        && age < Duration::from_millis(900)
+    if let Some(age) = mode::changed(ui, now)
+        && state
+            .last_turn
+            .as_ref()
+            .is_none_or(|turn| age <= now.past(turn.ended_at))
     {
         return flash(width, mode::current(state).flash_ink(), age, 900, now);
     }
@@ -55,7 +57,7 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
     Drawing::still(vec![Line::default()])
 }
 
-fn sampled(line: Line<'static>, _: Now, next: Option<std::time::Instant>) -> Drawing {
+fn sampled(line: Line<'static>, next: Option<std::time::Instant>) -> Drawing {
     Drawing {
         lines: vec![line],
         next,
@@ -76,7 +78,6 @@ fn flash(width: usize, ink: &str, age: Duration, ms: u64, now: Now) -> Drawing {
     let end = now.instant + length - age;
     sampled(
         line,
-        now,
         Some(if now.motion {
             (now.instant + clock::FRAME).min(end)
         } else {
@@ -110,5 +111,5 @@ pub(super) fn comet(width: usize, age: Duration, ink: &str, now: Now) -> Drawing
             )
         })
         .collect::<Vec<_>>();
-    sampled(Line::from(spans), now, Some(now.instant + clock::FRAME))
+    sampled(Line::from(spans), Some(now.instant + clock::FRAME))
 }

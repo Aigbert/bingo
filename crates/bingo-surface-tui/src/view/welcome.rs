@@ -23,13 +23,11 @@ pub(super) fn render(
     )
     .components(&ui.placed.pulled)
     .saying(ui.welcome.update.as_deref())
-    .entrance(area.height, ui.welcome.resume.as_ref())
-    .opening(None);
+    .entrance(ui.welcome.resume.as_ref());
     if let Some(key) = crate::component::welcome::request(&rows) {
         frame.pulls.push(key);
     }
     let drawing = crate::component::welcome::draw(&rows);
-    let _ = rows.opening;
     let lines = frame.collect(drawing);
     frame.render_widget(Paragraph::new(lines), area);
 }

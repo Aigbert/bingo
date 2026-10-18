@@ -40,6 +40,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if key.kind == KeyEventKind::Release {
         return Vec::new();
     }
+    ui.keyed_at = now.instant;
     ui.prepare(&tree.viewed().summary.cwd);
     if key == KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL) && ui.composer.is_empty() {
         return vec![Effect::Exit];
@@ -780,7 +781,7 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
             let (total, rows) = ui.transcript();
             ui.scroll.home(total, rows, now.instant)
         }
-        KeyCode::End if ui.composer.is_empty() => ui.scroll.end(),
+        KeyCode::End if ui.composer.is_empty() => ui.scroll.end(now.instant),
         KeyCode::Home => ui.composer.home(),
         KeyCode::End => ui.composer.end(),
         KeyCode::Backspace => edit(ui, |c| c.backspace()),
@@ -895,8 +896,7 @@ fn send(
 ) -> Vec<Effect> {
     // The gesture is answered on its own frame, whatever the line turns out
     // to be and whatever the kernel makes of it (§6).
-    ui.sent = Some(now.instant);
-    ui.scroll.end();
+    ui.scroll.end(now.instant);
     if let Some(effects) = crate::palette::command(ui, &text, now) {
         return effects;
     }
@@ -1298,7 +1298,7 @@ mod tests {
             let effects = press(&mut ui, &placed(next.clone()), shift(KeyCode::BackTab), now);
             assert_eq!(
                 effects,
-                vec![Effect::Submit(bingo_sdk::Input::action(
+                vec![Effect::CycleMode(bingo_sdk::Input::action(
                     next,
                     bingo_sdk::Origin::surface("plugin:policy")
                 ))]
@@ -1335,7 +1335,10 @@ mod tests {
         let (mut ui, now) = scene();
         assert_eq!(
             press(&mut ui, &policy, shift(KeyCode::BackTab), now),
-            vec![Effect::Run("/permission acceptEdits".into())]
+            vec![Effect::CycleMode(bingo_sdk::Input::text(
+                "/permission acceptEdits",
+                crate::origin()
+            ))]
         );
         let mut unnamed = state();
         unnamed.config.plugins.insert("aaa".into(), described);
@@ -1343,7 +1346,7 @@ mod tests {
         assert!(
             !press(&mut ui, &unnamed, shift(KeyCode::BackTab), now)
                 .iter()
-                .any(|effect| matches!(effect, Effect::Run(_))),
+                .any(|effect| matches!(effect, Effect::CycleMode(bingo_sdk::Input::Text { .. }))),
             "a config slice the kernel did not name as the policy never types for the person"
         );
         let mut alone = state();
@@ -1354,7 +1357,7 @@ mod tests {
         let (mut ui, now) = scene();
         assert_eq!(
             press(&mut ui, &alone, shift(KeyCode::BackTab), now),
-            vec![Effect::Submit(bingo_sdk::Input::action(
+            vec![Effect::CycleMode(bingo_sdk::Input::action(
                 bingo_sdk::Action {
                     name: "permission".into(),
                     args: "bypassPermissions".into(),
@@ -1382,7 +1385,10 @@ mod tests {
                     shift(KeyCode::BackTab),
                     now
                 ),
-                vec![Effect::Run(format!("/permission {next}"))],
+                vec![Effect::CycleMode(bingo_sdk::Input::text(
+                    format!("/permission {next}"),
+                    crate::origin()
+                ))],
                 "{mode}"
             );
             assert!(ui.notice.is_none(), "{mode}");
@@ -1394,7 +1400,11 @@ mod tests {
         for state in [state(), with_permission_mode("acceptedits")] {
             let (mut ui, now) = scene();
             assert!(press(&mut ui, &state, shift(KeyCode::BackTab), now).is_empty());
-            assert!(ui.notice().iter().any(|n| n.text == UNKNOWN_MODE));
+            assert!(
+                ui.notice()
+                    .iter()
+                    .any(|n| n.plain().unwrap().text == UNKNOWN_MODE)
+            );
         }
     }
 
@@ -2074,7 +2084,7 @@ mod tests {
         for _ in 0..3 {
             on_mouse(&mut ui, &solo(&state), wheel(false, 10, 5), now);
         }
-        assert_eq!(ui.scroll, crate::scroll::Scroll::Tail);
+        assert!(ui.scroll.following());
     }
 
     /// The way back to the foot (M95) answers a click as `end` answers a
@@ -2091,14 +2101,10 @@ mod tests {
         let pill = ui.shown.foot.expect("a held transcript draws the pill");
 
         on_mouse(&mut ui, &solo(&state), click(pill.x - 1, pill.y), settled);
-        assert_ne!(
-            ui.scroll,
-            crate::scroll::Scroll::Tail,
-            "the air beside it is air"
-        );
+        assert!(!ui.scroll.following(), "the air beside it is air");
 
         on_mouse(&mut ui, &solo(&state), click(pill.x + 1, pill.y), settled);
-        assert_eq!(ui.scroll, crate::scroll::Scroll::Tail);
+        assert!(ui.scroll.following());
         render(&state, &mut ui, settled);
         assert!(ui.shown.foot.is_none(), "at the foot the row is air again");
     }
@@ -2620,7 +2626,8 @@ mod tests {
         assert!(ui.focus.selection().is_none(), "copying lets it go");
         assert!(ui.select.dragging.is_none());
         assert_eq!(
-            ui.notice().map(|notice| notice.text.clone()),
+            ui.notice()
+                .map(|notice| notice.plain().unwrap().text.clone()),
             Some(format!("copied {} lines", rows + 3))
         );
     }
@@ -2985,7 +2992,11 @@ mod tests {
         ] {
             let (mut ui, now) = scene();
             assert!(press(&mut ui, &state, ctrl('b'), now).is_empty());
-            assert!(ui.notice().iter().any(|n| n.text == NOTHING_RUNNING));
+            assert!(
+                ui.notice()
+                    .iter()
+                    .any(|n| n.plain().unwrap().text == NOTHING_RUNNING)
+            );
         }
     }
 
@@ -3070,18 +3081,10 @@ mod tests {
             total - rows - rows,
             "a page is the screenful being read"
         );
-        assert_ne!(
-            ui.scroll,
-            crate::scroll::Scroll::Tail,
-            "pgup releases the tail"
-        );
+        assert!(!ui.scroll.following(), "pgup releases the tail");
 
         press(&mut ui, &state, key(KeyCode::PageDown), settled);
-        assert_eq!(
-            ui.scroll,
-            crate::scroll::Scroll::Tail,
-            "and pgdn at the foot takes it back"
-        );
+        assert!(ui.scroll.following(), "and pgdn at the foot takes it back");
     }
 
     #[test]
@@ -3097,15 +3100,11 @@ mod tests {
             0
         );
         press(&mut ui, &state, key(KeyCode::End), now);
-        assert_eq!(ui.scroll, crate::scroll::Scroll::Tail);
+        assert!(ui.scroll.following());
 
         write(&mut ui, &state, "a line", now);
         press(&mut ui, &state, key(KeyCode::Home), now);
-        assert_eq!(
-            ui.scroll,
-            crate::scroll::Scroll::Tail,
-            "a draft keeps home for the caret"
-        );
+        assert!(ui.scroll.following(), "a draft keeps home for the caret");
     }
 
     #[test]
@@ -3127,7 +3126,7 @@ mod tests {
         let (mut ui, now) = scene();
         press(&mut ui, &state(), key(KeyCode::PageUp), now);
         line(&mut ui, &state(), "hello", now);
-        assert_eq!(ui.scroll, crate::scroll::Scroll::Tail);
+        assert!(ui.scroll.following());
     }
 
     #[test]
@@ -3297,8 +3296,8 @@ mod m148 {
                 badge: None,
                 caption: None,
                 body: Some(bingo_sdk::View::text("table")),
-                    meaning: None,
                 actions: vec![ActionItem {
+                    meaning: None,
                     label: "Tick".into(),
                     key: None,
                     action: Action {

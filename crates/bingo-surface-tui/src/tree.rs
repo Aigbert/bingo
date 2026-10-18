@@ -168,7 +168,6 @@ impl Tree {
 
 /// What a counted session is doing.
 pub enum Wants {
-    #[allow(dead_code)] // M200 restores the needs-you lead.
     Attention,
     Running,
 }
@@ -177,10 +176,9 @@ pub enum Wants {
 /// counts: what "somebody else is at it" means depends on who is asking.
 #[derive(Clone, Copy)]
 pub enum Scope<'a> {
-    /// Every session but the one on screen — the status line's sense. The
+    /// Every session but the one on screen — the footer's sense. The
     /// session in view speaks for itself: its turn is the activity row and
     /// its card is the brightest thing on the screen.
-    #[allow(dead_code)] // M200 restores navigation among other sessions.
     Others,
     /// The sessions hanging under this one, however deep — the activity
     /// row's sense. A child looking up at a running parent is not waiting on
@@ -189,8 +187,8 @@ pub enum Scope<'a> {
 }
 
 /// How many of them there are, and nothing at all where there are none. The
-/// one reading of "somebody else is at it": the status line counts it into
-/// its middle and the activity row says it in words (M82), so the two can
+/// one reading of "somebody else is at it": the footer counts it and the
+/// activity row says it in words (M82), so the two can
 /// never disagree about a session they both count.
 pub fn count(tree: &Tree, wants: Wants, scope: Scope<'_>) -> Option<usize> {
     let within = covered(tree, scope);

@@ -8,10 +8,8 @@ fn screen(area: Rect) -> Terminal<TestBackend> {
 }
 
 fn layout(area: Rect, symbol: &str) -> Layout {
-    let mut layout = Layout {
-        canvas: Canvas::new(area),
-        ..Layout::default()
-    };
+    let mut layout = Layout::default();
+    layout.canvas = Canvas::new(area);
     for cell in &mut layout.canvas.buffer.content {
         cell.set_symbol(symbol);
     }

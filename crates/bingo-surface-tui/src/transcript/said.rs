@@ -122,13 +122,13 @@ fn member_row(members: &[String], rows: &Rows<'_>) -> Vec<Line<'static>> {
     }
     super::under(
         Span::raw("  "),
-        vec![Line::from(crate::status::clip(
-            vec![Span::styled(
+        vec![crate::layout::grid::fit(
+            Line::from(vec![Span::styled(
                 format!("members: {}", members.join(", ")),
                 theme::dim(),
-            )],
+            )]),
             rows.measured().saturating_sub(2),
-        ))],
+        )],
         2,
         rows.measured(),
     )

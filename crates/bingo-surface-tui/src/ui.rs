@@ -43,40 +43,43 @@ pub const EXIT_WINDOW: Duration = Duration::from_secs(2);
 /// A transcript that has just been stepped into crossfades through dim over
 /// this long: two frames (§6).
 pub const SWITCH: Duration = Duration::from_millis(2 * FRAME.as_millis() as u64);
-/// One light along the input box's border when a line is sent: six frames
-/// (§6). The most repeated gesture in the surface, and the only motion that
-/// answers a person rather than reporting the model.
-#[cfg(test)]
-pub const IGNITION: Duration = Duration::from_millis(6 * FRAME.as_millis() as u64);
 
-/// A message that is not transcript: an ack, a warning, a hint.
+/// A message or a mode-key acknowledgement; the latter owns no session words.
 #[derive(Clone, Debug)]
-pub struct Notice {
-    pub level: Level,
-    pub text: String,
-    /// What it is about, said after it in dim: the line a refused intent
-    /// carried, so a person sees which of theirs came back.
-    pub about: Option<String>,
-    /// When it was said. Its life runs on the wall clock from here, drawn
-    /// or not: a moment that has passed is dropped, never replayed
-    /// (ADR-0095 §2).
-    said: Instant,
+pub enum NoticeKind {
+    Message(bingo_sdk::component::KeyToast),
+    Mode,
 }
-
-impl Notice {
-    fn lifetime(&self) -> Duration {
-        if self.text.starts_with("permission mode: ") {
-            Duration::from_millis(3100)
-        } else {
-            NOTICE
+impl NoticeKind {
+    pub fn hold(&self) -> Duration {
+        match self {
+            Self::Message(_) => Duration::from_millis(2400),
+            Self::Mode => Duration::from_millis(2800),
         }
     }
+}
+pub const TOAST_FADE: Duration = Duration::from_millis(300);
 
+#[derive(Clone, Debug)]
+pub struct Notice {
+    pub kind: NoticeKind,
+    said: Instant,
+}
+impl Notice {
+    pub fn new(kind: NoticeKind, said: Instant) -> Self {
+        Self { kind, said }
+    }
+    pub fn plain(&self) -> Option<&bingo_sdk::component::KeyToast> {
+        match &self.kind {
+            NoticeKind::Message(text) => Some(text),
+            NoticeKind::Mode => None,
+        }
+    }
     pub(crate) fn said(&self) -> Instant {
         self.said
     }
     pub(crate) fn gone(&self, now: Instant) -> bool {
-        now.saturating_duration_since(self.said) >= self.lifetime()
+        now.saturating_duration_since(self.said) >= self.kind.hold() + TOAST_FADE
     }
     #[cfg(test)]
     pub fn strength(&self, now: Now) -> f32 {
@@ -249,6 +252,7 @@ pub struct Ui {
     /// The one notice being said: the latest wins the slot, and nothing waits
     /// behind it (ADR-0095 §2).
     pub notice: Option<Notice>,
+    pub keyed_at: Instant,
     /// A command's `View`, shown until the next key.
     pub block: Option<View>,
     pub embers: crate::embers::Embers,
@@ -262,11 +266,6 @@ pub struct Ui {
     /// When the session in view was last stepped into: what the transcript
     /// crossfades from.
     pub switched: Option<Instant>,
-    /// When a line was last sent: what the box's border sweeps from. A fact
-    /// about the gesture, like [`Ui::switched`] and [`Ui::stop_asked`] — the
-    /// session's own stream says what became of the line, and this says only
-    /// that a person pressed the key.
-    pub sent: Option<Instant>,
     /// The frame as the last draw left it.
     pub shown: Layout,
     /// The pictures the transcript has turned into pixels. A memo of work
@@ -300,18 +299,18 @@ impl Ui {
         self.placed.panes.sync(state, &mut self.controls.focus);
     }
 
-    pub fn new(history: Vec<String>, _now: Instant) -> Self {
+    pub fn new(history: Vec<String>, now: Instant) -> Self {
         Self {
             controls: controls::Controls::new(history),
             placed: Placed::default(),
             scroll: Scroll::default(),
             notice: None,
+            keyed_at: now,
             block: None,
             embers: crate::embers::Embers::default(),
             folds: Folds::new(),
             focused: true,
             switched: None,
-            sent: None,
             shown: Layout::default(),
             decoded: Decoded::default(),
             linked: Linked::default(),
@@ -335,12 +334,15 @@ impl Ui {
     /// replaces the one being said, and nothing is queued to be said later.
     fn say(&mut self, level: Level, text: String, about: Option<String>, now: Instant) {
         self.placed.toasts.discard();
-        self.notice = Some(Notice {
-            level,
-            text,
-            about,
-            said: now,
-        });
+        self.notice = Some(Notice::new(
+            NoticeKind::Message(bingo_sdk::component::KeyToast { level, text, about }),
+            now,
+        ));
+    }
+
+    pub fn notify_mode(&mut self, now: Instant) {
+        self.placed.toasts.discard();
+        self.notice = Some(Notice::new(NoticeKind::Mode, now));
     }
 
     pub fn sync_toasts(&mut self, state: &bingo_sdk::SessionState, now: Now) -> bool {
@@ -362,7 +364,10 @@ impl Ui {
     /// turn out to be wrong — a passthrough that answered after the probe gave
     /// up (M60 brick 2) — and a wrong word left standing is worse than none.
     pub fn withdraw(&mut self, text: &str) {
-        if self.notice().is_some_and(|notice| notice.text == text) {
+        if self
+            .notice()
+            .is_some_and(|notice| notice.plain().is_some_and(|plain| plain.text == text))
+        {
             self.notice = None;
         }
     }
@@ -374,18 +379,6 @@ impl Ui {
             self.notice = None;
         }
         self.focus.expire(now);
-    }
-
-    /// How far the light along the box's border has come since a line was
-    /// sent, or nothing at all once it has passed — and nothing where nothing
-    /// may move (§6).
-    #[cfg(test)]
-    pub fn sending(&self, now: Now) -> Option<f32> {
-        let sent = self.sent.filter(|_| now.motion)?;
-        match crate::clock::Anim::new(sent, IGNITION).progress(now.instant) {
-            done if done >= 1.0 => None,
-            come => Some(come),
-        }
     }
 
     /// Whether the transcript is still crossfading into the session a person
@@ -570,7 +563,7 @@ mod tests {
     }
 
     fn said(ui: &Ui) -> Option<&str> {
-        ui.notice().map(|n| n.text.as_str())
+        ui.notice().map(|n| n.plain().unwrap().text.as_str())
     }
 
     fn life() -> i64 {

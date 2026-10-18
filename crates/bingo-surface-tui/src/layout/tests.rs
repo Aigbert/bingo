@@ -34,8 +34,8 @@ fn layout_is_pure_and_idle_has_no_deadline() {
     assert_eq!(a.canvas, b.canvas);
     assert_eq!(a.regions, b.regions);
     assert_eq!(a.cells, b.cells);
-    assert_eq!(a.next_frame, None);
-    assert_eq!(b.next_frame, None);
+    assert_eq!(a.deadline(), None);
+    assert_eq!(b.deadline(), None);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn layout_schedules_exit_at_its_deadline() {
     let now = still(now);
     ui.armed = Some(now.instant);
     let frame = layout(Layout::default(), &solo(&state()), &ui, SIZE, now);
-    assert_eq!(frame.next_frame, Some(now.instant + crate::ui::EXIT_WINDOW));
+    assert_eq!(frame.deadline(), Some(now.instant + crate::ui::EXIT_WINDOW));
 }
 
 #[test]
@@ -79,7 +79,7 @@ fn layout_schedules_a_scroll_sample() {
         since: now.instant,
     };
     let frame = layout(Layout::default(), &solo(&state()), &ui, SIZE, now);
-    assert_eq!(frame.next_frame, Some(now.instant + crate::clock::FRAME));
+    assert_eq!(frame.deadline(), Some(now.instant + crate::clock::FRAME));
 }
 
 #[test]
@@ -161,7 +161,7 @@ fn layout_countdown_changes_at_the_deadline_it_reports() {
     )]);
     let tree = solo(&state);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
-    let due = first.next_frame.expect("countdown");
+    let due = first.deadline().expect("countdown");
     assert_eq!(
         due,
         now.instant + std::time::Duration::from_millis(250) + std::time::Duration::from_nanos(1)
@@ -185,13 +185,13 @@ fn layout_notice_sleeps_through_its_hold_and_expires() {
     ui.notify(bingo_sdk::Level::Info, "hello", now.instant);
     let tree = solo(&state());
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
-    assert_eq!(first.next_frame, Some(now.instant + crate::ui::NOTICE));
+    assert_eq!(first.deadline(), Some(now.instant + crate::ui::NOTICE));
     let held = later(now, 100);
     let frame = layout(first, &tree, &ui, SIZE, held);
-    assert_eq!(frame.next_frame, Some(now.instant + crate::ui::NOTICE));
+    assert_eq!(frame.deadline(), Some(now.instant + crate::ui::NOTICE));
     ui.expire(later(now, 5000));
     assert_eq!(
-        layout(frame, &tree, &ui, SIZE, later(now, 5000)).next_frame,
+        layout(frame, &tree, &ui, SIZE, later(now, 5000)).deadline(),
         None
     );
 }
@@ -201,32 +201,26 @@ fn layout_running_turn_schedules_each_motion_sample() {
     let (ui, now) = mid_turn();
     let tree = solo(&folded(vec![frame(1, started("trn_1"))]));
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
-    assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
+    assert_eq!(first.deadline(), Some(now.instant + crate::clock::FRAME));
     let later_sample = later(now, 140);
     let next = layout(first, &tree, &ui, SIZE, later_sample);
     assert_eq!(
-        next.next_frame,
+        next.deadline(),
         Some(later_sample.instant + crate::clock::FRAME)
     );
 }
 
 #[test]
-fn layout_layer_send_and_drag_report_their_own_deadlines() {
+fn layout_layer_and_drag_report_their_own_deadlines() {
     let (mut ui, now) = scene();
     let tree = solo(&state());
     ui.focus
         .show(crate::ui::Open::Rewind(Default::default()), now.instant);
     let first = layout(Layout::default(), &tree, &ui, SIZE, now);
-    assert_eq!(first.next_frame, Some(now.instant + crate::clock::FRAME));
+    assert_eq!(first.deadline(), Some(now.instant + crate::clock::FRAME));
     let arrived = later(now, 200);
-    assert_eq!(layout(first, &tree, &ui, SIZE, arrived).next_frame, None);
-    ui.sent = Some(arrived.instant);
-    let first = layout(Layout::default(), &tree, &ui, SIZE, arrived);
-    assert_eq!(
-        first.next_frame, None,
-        "the retired send border has no deadline"
-    );
-    ui.sent = None;
+    let first = layout(first, &tree, &ui, SIZE, arrived);
+    assert_eq!(first.deadline(), None);
     ui.start_selection(crate::select::Cell::default());
     ui.select.dragging = Some(crate::select::Dragging {
         edge: crate::select::Edge::Above(0),
@@ -234,11 +228,11 @@ fn layout_layer_send_and_drag_report_their_own_deadlines() {
     });
     let first = layout(first, &tree, &ui, SIZE, arrived);
     assert_eq!(
-        first.next_frame,
+        first.deadline(),
         Some(arrived.instant + crate::select::EDGE_PACE)
     );
     ui.focus = crate::focus::Focus::Search(crate::search::Search::open());
-    assert_eq!(layout(first, &tree, &ui, SIZE, arrived).next_frame, None);
+    assert_eq!(layout(first, &tree, &ui, SIZE, arrived).deadline(), None);
     ui.drag_step(arrived);
     assert!(ui.select.dragging.is_none());
 }
@@ -279,7 +273,7 @@ fn round3_idle_nonterminal_item_schedules_nothing() {
         );
         assert!(drawn.blocks.height() > 0);
         assert_eq!(
-            drawn.next_frame,
+            drawn.deadline(),
             motion.then_some(now.instant + crate::clock::FRAME),
             "only the visible caret schedules, motion={motion}"
         );

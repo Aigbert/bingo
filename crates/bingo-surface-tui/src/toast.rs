@@ -1,4 +1,4 @@
-//! Latest wins; the fixed KeyBar row never queues or replays a toast.
+//! Latest wins; the footer never queues or replays a toast.
 use crate::{
     clock::Now,
     ui::{NOTICE, Ui},
@@ -86,22 +86,6 @@ impl State {
         let toast = placed(state).into_iter().find(|toast| &toast.key == key)?;
         (now.instant < *said + NOTICE && toast.until > now.wall).then_some((toast, *said))
     }
-    #[cfg(test)]
-    pub fn next(&self, state: &SessionState, now: Now) -> Option<Instant> {
-        let (toast, said) = self.active(state, now)?;
-        Some((said + NOTICE).min(now.instant + remaining(toast.until, now)))
-    }
-    #[cfg(test)]
-    pub fn lines(
-        &self,
-        state: &SessionState,
-        now: Now,
-        _: usize,
-    ) -> Vec<ratatui::text::Line<'static>> {
-        self.active(state, now)
-            .map(|(toast, _)| vec![ratatui::text::Line::from(toast.text)])
-            .unwrap_or_default()
-    }
 }
 fn remaining(until: jiff::Timestamp, now: Now) -> Duration {
     if until > now.wall {
@@ -110,33 +94,21 @@ fn remaining(until: jiff::Timestamp, now: Now) -> Duration {
         Duration::ZERO
     }
 }
-pub fn current(ui: &Ui, state: &SessionState, now: Now) -> Option<bingo_sdk::component::KeyToast> {
+pub fn current(ui: &Ui, state: &SessionState, now: Now) -> Option<crate::ui::Notice> {
     let notice = ui.notice().filter(|notice| !notice.gone(now.instant));
-    let placed = ui.placed.toasts.active(state, now);
-    if let Some((toast, said)) = placed
+    if let Some((toast, said)) = ui.placed.toasts.active(state, now)
         && notice.is_none_or(|notice| said > notice.said())
     {
-        return Some(bingo_sdk::component::KeyToast {
-            about: None,
-            text: toast.text,
-            level: bingo_sdk::Level::Info,
-        });
+        return Some(crate::ui::Notice::new(
+            crate::ui::NoticeKind::Message(bingo_sdk::component::KeyToast {
+                about: None,
+                text: toast.text,
+                level: bingo_sdk::Level::Info,
+            }),
+            said,
+        ));
     }
-    notice.map(|notice| bingo_sdk::component::KeyToast {
-        text: notice.text.clone(),
-        level: notice.level,
-        about: notice.about.clone(),
-    })
-}
-
-pub fn age(ui: &Ui, state: &SessionState, now: Now) -> Option<Duration> {
-    let notice = ui.notice().filter(|notice| !notice.gone(now.instant));
-    if let Some((_, said)) = ui.placed.toasts.active(state, now)
-        && notice.is_none_or(|notice| said > notice.said())
-    {
-        return Some(now.since(said));
-    }
-    notice.map(|notice| now.since(notice.said()))
+    notice.cloned()
 }
 
 pub fn components(
@@ -145,15 +117,18 @@ pub fn components(
     now: Now,
     width: usize,
     pulls: &mut Vec<crate::pulled::Key>,
-) -> Option<bingo_sdk::component::KeyToast> {
-    let mut toast = current(ui, state, now)?;
+) -> Option<crate::ui::Notice> {
+    let mut notice = current(ui, state, now)?;
+    let crate::ui::NoticeKind::Message(toast) = &mut notice.kind else {
+        return Some(notice);
+    };
     let Some((placed, _)) = ui
         .placed
         .toasts
         .active(state, now)
         .filter(|(placed, _)| placed.text == toast.text)
     else {
-        return Some(toast);
+        return Some(notice);
     };
     let props = bingo_sdk::component::Props::Toast(bingo_sdk::component::ToastProps {
         text: placed.text,
@@ -183,7 +158,7 @@ pub fn components(
         .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(" · ");
-    Some(toast)
+    Some(notice)
 }
 
 #[cfg(test)]
@@ -210,7 +185,11 @@ mod tests {
         ui.sync_toasts(&state, later(now, 100));
         assert!(ui.notice().is_none());
         assert_eq!(
-            super::current(&ui, &state, later(now, 100)).unwrap().text,
+            super::current(&ui, &state, later(now, 100))
+                .unwrap()
+                .plain()
+                .unwrap()
+                .text,
             "latest"
         );
         state.signals.clear();
@@ -252,8 +231,8 @@ mod tests {
             !toasts.sync(&state, after),
             "an expired toast rings no more"
         );
-        assert!(toasts.next(&state, after).is_none());
-        assert!(toasts.lines(&state, after, 80).is_empty());
+        assert!(toasts.active(&state, after).is_none());
+        assert!(toasts.active(&state, after).is_none());
     }
 
     #[test]
@@ -307,11 +286,7 @@ mod tests {
         assert!(!crate::pane::placed(&state).is_empty());
         assert!(ui.placed.toasts.sync(&state, now));
         assert!(!ui.placed.toasts.sync(&state, later(now, 6000)));
-        assert!(ui.placed.toasts.next(&state, later(now, 6000)).is_none());
-        assert_eq!(
-            ui.placed.toasts.lines(&state, later(now, 6000), 80).len(),
-            0
-        );
+        assert!(ui.placed.toasts.active(&state, later(now, 6000)).is_none());
         state
             .signals
             .get_mut("counter")
@@ -323,12 +298,6 @@ mod tests {
             .retain(|slot| slot["kind"] != "pane");
         assert!(crate::pane::placed(&state).is_empty());
         ui.placed.toasts.sync(&state, later(now, 6000));
-        assert_eq!(ui.placed.toasts.next(&state, later(now, 6000)), None);
-        assert!(
-            ui.placed
-                .toasts
-                .lines(&state, later(now, 10000), 80)
-                .is_empty()
-        );
+        assert!(ui.placed.toasts.active(&state, later(now, 6000)).is_none());
     }
 }

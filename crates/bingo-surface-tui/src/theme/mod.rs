@@ -256,10 +256,6 @@ fn tinted(fg: Style, tint: fn(Palette) -> Color) -> Style {
     }
 }
 
-#[cfg(test)]
-pub fn rule_style() -> Style {
-    foreground("faint").unwrap_or_default()
-}
 pub fn ash() -> Style {
     foreground("muted").unwrap_or_default()
 }
@@ -511,15 +507,7 @@ pub fn spendable() -> std::collections::HashSet<Color> {
             out.insert(colour);
         }
     };
-    for style in [
-        presence(),
-        glow(),
-        good(),
-        bad(),
-        mode(),
-        rule_style(),
-        ash(),
-    ] {
+    for style in [presence(), glow(), good(), bad(), mode(), ash()] {
         keep(style);
     }
     for index in 0..6 {
@@ -707,15 +695,12 @@ pub fn ground(name: &str) -> Option<Style> {
         .map(|color| depth::ground(name, color))
 }
 
-#[allow(dead_code)]
 pub fn blended(from: &str, to: &str, weight: f64) -> Option<Style> {
     let palette = palette();
     let color = ink::mix(palette.named(from)?, palette.named(to)?, weight);
     Some(depth::foreground(from, color))
 }
 
-// The composer adopts this fade when its Ember layout lands.
-#[allow(dead_code)]
 pub fn caret_ink(now: crate::clock::Now, base: &str, ground: &str) -> Option<Style> {
     blended(base, ground, crate::clock::caret_fade(now))
 }

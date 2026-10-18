@@ -5,6 +5,15 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::pictures;
 
+pub const COLUMN: usize = crate::layout::grid::TX;
+pub const CARET_REST: std::time::Duration = std::time::Duration::from_secs(10);
+
+pub fn width(width: usize) -> usize {
+    width
+        .saturating_sub(COLUMN + crate::layout::grid::RM + 1)
+        .max(1)
+}
+
 pub mod fill;
 pub mod strip;
 

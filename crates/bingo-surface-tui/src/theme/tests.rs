@@ -95,9 +95,7 @@ fn tints_follow_the_ground_without_recolouring_prose_or_accents() {
         ..ask
     };
     assert!(follows(indexed));
-    with(detect(indexed, Some(reference_ground(true))), || {
-        assert_eq!(rule_style().fg, Some(nearest(LIGHT.faint())));
-    });
+    with(detect(indexed, Some(reference_ground(true))), || {});
 }
 
 #[test]
@@ -121,7 +119,6 @@ fn chrome_has_light_pairs_and_fixed_xterm_nearest_colours() {
             },
             || {
                 assert!(matches!(presence().fg, Some(Color::Indexed(_))));
-                assert!(matches!(rule_style().fg, Some(Color::Indexed(_))));
                 assert_eq!(text().fg, Some(Color::Reset));
                 assert_eq!(dim().fg, Some(nearest(palette.dim())));
             },
@@ -157,10 +154,10 @@ fn every_token_is_spent_where_the_design_says() {
                 "activity.rs",
                 "composer/drawing.rs",
                 "dialog.rs",
-                "foot.rs",
                 "form.rs",
                 "markdown.rs",
                 "pager.rs",
+                "pill.rs",
                 "preview.rs",
                 "rewind.rs",
                 "search.rs",
@@ -198,7 +195,6 @@ fn every_token_is_spent_where_the_design_says() {
                 "preview.rs",
                 "rewind.rs",
                 "search.rs",
-                "status.rs",
                 "transcript.rs",
                 "transcript/output.rs",
                 "transcript/pictured.rs",

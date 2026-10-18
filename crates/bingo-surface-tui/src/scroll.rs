@@ -15,11 +15,10 @@ use crate::clock::{self, Anim};
 /// How long the transcript takes to reach where a key sent it (§6).
 pub const EASE: Duration = Duration::from_millis(100);
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scroll {
     /// At the bottom, following what arrives.
-    #[default]
-    Tail,
+    Tail(Option<Instant>),
     /// Held, easing from one line to another since an instant.
     Held {
         from: usize,
@@ -28,13 +27,26 @@ pub enum Scroll {
     },
 }
 
+impl Default for Scroll {
+    fn default() -> Self {
+        Self::Tail(None)
+    }
+}
+
 impl Scroll {
+    pub fn touched(&self) -> Option<Instant> {
+        match self {
+            Self::Tail(at) => *at,
+            Self::Held { since, .. } => Some(*since),
+        }
+    }
+
     /// The first transcript line to draw, for a transcript of `total` lines in
     /// a region `rows` tall.
     pub fn top(&self, total: usize, rows: usize, now: Instant) -> usize {
         let bottom = bottom(total, rows);
         match self {
-            Scroll::Tail => bottom,
+            Scroll::Tail(_) => bottom,
             Scroll::Held { from, to, since } => eased(*from, *to, *since, now).min(bottom),
         }
     }
@@ -42,13 +54,13 @@ impl Scroll {
     /// Whether what arrives is shown as it arrives — the transcript is at its
     /// foot and the person is writing, not reading back.
     pub fn following(&self) -> bool {
-        matches!(self, Scroll::Tail)
+        matches!(self, Scroll::Tail(_))
     }
 
     /// Whether the frame after this one would draw it somewhere else.
     pub fn moving(&self, now: Instant) -> bool {
         match self {
-            Scroll::Tail => false,
+            Scroll::Tail(_) => false,
             Scroll::Held { since, .. } => now.saturating_duration_since(*since) < EASE,
         }
     }
@@ -80,7 +92,7 @@ impl Scroll {
     pub fn target(&self, total: usize, rows: usize) -> usize {
         let bottom = bottom(total, rows);
         match self {
-            Scroll::Tail => bottom,
+            Scroll::Tail(_) => bottom,
             Scroll::Held { to, .. } => (*to).min(bottom),
         }
     }
@@ -116,14 +128,14 @@ impl Scroll {
     }
 
     /// The foot of it, following again.
-    pub fn end(&mut self) {
-        *self = Scroll::Tail;
+    pub fn end(&mut self, now: Instant) {
+        *self = Scroll::Tail(Some(now));
     }
 
     fn hold(&mut self, from: usize, to: usize, total: usize, rows: usize, now: Instant) {
         let bottom = bottom(total, rows);
         *self = if to >= bottom {
-            Scroll::Tail
+            Scroll::Tail(Some(now))
         } else {
             Scroll::Held {
                 from: from.min(bottom),
@@ -178,7 +190,7 @@ mod tests {
         let now = Instant::now();
         assert_eq!(at(&scroll, now), 80);
         assert_eq!(scroll.top(140, ROWS, now), 120, "the tail moved with it");
-        assert_eq!(scroll, Scroll::Tail);
+        assert!(scroll.following());
         assert!(!scroll.moving(now));
     }
 
@@ -238,7 +250,7 @@ mod tests {
             60,
             "forty lines arrived and the line being read did not move"
         );
-        assert_ne!(scroll, Scroll::Tail);
+        assert!(!scroll.following());
     }
 
     #[test]
@@ -247,11 +259,11 @@ mod tests {
         let mut scroll = Scroll::default();
         scroll.by(ROWS as isize, TOTAL, ROWS, now);
         scroll.by(-(ROWS as isize), TOTAL, ROWS, now + EASE);
-        assert_eq!(scroll, Scroll::Tail, "a page down at the foot is the tail");
+        assert!(scroll.following(), "a page down at the foot is the tail");
 
         scroll.by(3, TOTAL, ROWS, now);
-        scroll.end();
-        assert_eq!(scroll, Scroll::Tail);
+        scroll.end(now);
+        assert!(scroll.following());
     }
 
     #[test]
@@ -268,7 +280,7 @@ mod tests {
         let now = Instant::now();
         let mut scroll = Scroll::default();
         scroll.by(10, 5, ROWS, now);
-        assert_eq!(scroll, Scroll::Tail);
+        assert!(scroll.following());
         assert_eq!(scroll.top(5, ROWS, now), 0);
     }
 
@@ -295,7 +307,7 @@ mod tests {
         let mut scroll = Scroll::default();
         for line in [80, 90, 99] {
             scroll.reveal(line, TOTAL, ROWS, now);
-            assert_eq!(scroll, Scroll::Tail, "line {line} is on the last screen");
+            assert!(scroll.following(), "line {line} is on the last screen");
         }
     }
 
@@ -325,7 +337,7 @@ mod tests {
             "one line, not a third of a screen"
         );
         scroll.reveal(99, TOTAL, ROWS, now + 2 * EASE);
-        assert_eq!(scroll, Scroll::Tail, "the last line is the tail again");
+        assert!(scroll.following(), "the last line is the tail again");
     }
 
     /// A run's far end walks a line at a time while the ease of the last step

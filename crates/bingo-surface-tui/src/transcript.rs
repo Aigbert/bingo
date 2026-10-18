@@ -118,10 +118,6 @@ pub struct Rows<'a> {
     /// (`tui.measure`, [`crate::settings`]; design §7). Nothing at all is the
     /// region's own width, so the transcript fills the terminal it is in.
     pub measure: Option<usize>,
-    /// Which second of the opening this frame is (M70, M72): the piece plays
-    /// *inside* the welcome box and lands on it, so the box is derived from the
-    /// second rather than drawn twice. Nothing at all once it is over.
-    pub opening: Option<f32>,
     pub entrance: crate::welcome::Entrance<'a>,
 }
 
@@ -152,7 +148,6 @@ impl<'a> Rows<'a> {
             answers: crate::ask::receipts::Answers::of(state),
             update: None,
             measure: None,
-            opening: None,
             entrance: crate::welcome::Entrance::default(),
         }
     }
@@ -172,14 +167,9 @@ impl<'a> Rows<'a> {
         Self { update, ..self }
     }
 
-    /// Which second of the opening this frame is, while it plays.
-    pub fn opening(self, opening: Option<f32>) -> Self {
-        Self { opening, ..self }
-    }
-
-    pub fn entrance(self, height: u16, resume: Option<&'a bingo_sdk::SessionSummary>) -> Self {
+    pub fn entrance(self, resume: Option<&'a bingo_sdk::SessionSummary>) -> Self {
         Self {
-            entrance: crate::welcome::Entrance { height, resume },
+            entrance: crate::welcome::Entrance { resume },
             ..self
         }
     }

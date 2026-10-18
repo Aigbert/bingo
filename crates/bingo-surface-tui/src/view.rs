@@ -16,7 +16,7 @@ use crate::frame::{self, Demand, Regions};
 use crate::tree::{self, Tree};
 use crate::ui::{Card, Open, Ui};
 use crate::{
-    activity, composer as prompt, dialog, foot, graphics, layers, mentions, pager, rewind, search,
+    activity, composer as prompt, dialog, graphics, layers, mentions, pager, pill, rewind, search,
     select, theme, transcript, views, window, wrap,
 };
 
@@ -31,8 +31,8 @@ const MENU_ROWS: usize = 8;
 pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let area = frame.area();
     let state = tree.viewed();
-    let draft = ui.composer.layout(inner_width(state, area.width as usize));
-    let strip = strip(state, ui, &frame.measurements, area.width);
+    let draft = ui.composer.layout(prompt::width(area.width as usize));
+    let strip = strip(ui, &frame.measurements, area.width);
     let activity = activity::components(tree, ui, area.width as usize, now, &mut frame.pulls);
     let activity_next = activity.next;
     let mut activity = activity.lines;
@@ -42,12 +42,10 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let palette = palette(tree, ui, frame, now);
     let mut regions = frame::regions(area, demand(&draft, &strip, &activity, &palette));
     grow(frame, &mut regions, now);
-    if regions.activity.height > 0 {
-        activity = frame.collect(views::Drawing {
-            lines: activity,
-            next: activity_next,
-        });
-    }
+    activity = frame.collect(views::Drawing {
+        lines: activity,
+        next: activity_next,
+    });
     frame.seating = crate::pane::seating(ui, state, regions.transcript);
     regions.transcript = frame.seating.transcript;
     pull_activity(state, ui, frame, regions.activity);
@@ -123,26 +121,15 @@ fn palette(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'stat
 }
 
 /// The draft's thumbnails, measured and rendered once for this frame.
-fn strip(
-    state: &SessionState,
-    ui: &Ui,
-    measured: &graphics::Decoded,
-    width: u16,
-) -> graphics::Band {
+fn strip(ui: &Ui, measured: &graphics::Decoded, width: u16) -> graphics::Band {
     strip::rows(
         &ui.pictures,
         ui.composer.text(),
         &ui.linked,
         graphics::chosen(),
         measured,
-        u16::try_from(inner_width(state, usize::from(width))).unwrap_or(u16::MAX),
+        u16::try_from(prompt::width(usize::from(width))).unwrap_or(u16::MAX),
     )
-}
-
-/// The text measure after the prompt tag.
-fn inner_width(state: &SessionState, width: usize) -> usize {
-    let _ = state;
-    width.saturating_sub(6).max(1)
 }
 
 /// Persistent session facts keep their row in every focus state.
@@ -178,7 +165,7 @@ fn grow(frame: &mut Layout, regions: &mut Regions, now: Now) {
     regions.strip.y += extra;
     regions.transcript.height += extra;
     frame.growth = Some(growth);
-    frame.next_frame = frame.next_frame.into_iter().chain(growth.next(now)).min();
+    frame.wake(growth.next(now));
 }
 fn render_pill(ui: &Ui, frame: &mut Layout, area: Rect) {
     if ui.scroll.following() || area.height == 0 {
@@ -190,7 +177,7 @@ fn render_pill(ui: &Ui, frame: &mut Layout, area: Rect) {
     if below == 0 {
         return;
     }
-    if let Some(pill) = foot::pill(below, area.width as usize) {
+    if let Some(pill) = pill::pill(below, area.width as usize) {
         let row = Rect {
             y: area.bottom() - 1,
             height: 1,
@@ -202,7 +189,7 @@ fn render_pill(ui: &Ui, frame: &mut Layout, area: Rect) {
     }
 }
 fn scrollbar(ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
-    let crate::scroll::Scroll::Held { since, .. } = ui.scroll else {
+    let Some(since) = ui.scroll.touched() else {
         return;
     };
     let h = usize::from(area.height);
@@ -212,6 +199,9 @@ fn scrollbar(ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
     let size = ((h * h) as f64 / frame.height as f64).round().max(1.0) as usize;
     let top = (frame.top as f64 / (frame.height - h) as f64 * (h - size) as f64).round() as u16;
     let fresh = now.since(since) < std::time::Duration::from_millis(900);
+    if ui.scroll.following() && !fresh {
+        return;
+    }
     let ink = theme::foreground(if fresh { "dim" } else { "faint" }).unwrap_or_default();
     for y in top..(top + size as u16).min(area.height) {
         if let Some(cell) = frame.buffer_mut().cell_mut((area.right() - 1, area.y + y)) {
@@ -219,11 +209,7 @@ fn scrollbar(ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
         }
     }
     if fresh {
-        frame.next_frame = frame
-            .next_frame
-            .into_iter()
-            .chain(Some(since + std::time::Duration::from_millis(900)))
-            .min();
+        frame.wake(Some(since + std::time::Duration::from_millis(900)));
     }
 }
 
@@ -400,7 +386,7 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
         room: room + 1,
     }
     .rows(&mut frame.pulls, opening(interaction, now).moving());
-    frame.next_frame = frame.next_frame.into_iter().chain(drawing.next).min();
+    frame.wake(drawing.next);
     let rows = wrapped_card_rows(std::mem::take(&mut drawing.rows), width);
     let rows = fitted_answers(rows, ui.dialog.focus, room);
     let lines: Vec<Line<'static>> = rows.iter().map(|(line, _)| line.clone()).collect();
@@ -573,7 +559,7 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
         .into_iter()
         .filter_map(|range| frame.blocks.next_change(range.start, range.len()))
         .min();
-    frame.next_frame = frame.next_frame.into_iter().chain(next).min();
+    frame.wake(next);
     component_requests(state, ui, frame, area);
     crate::component::closing::requests(state, ui, frame, area.width, area.height, now);
     let mut shown = if let Some((at, removed, drawing)) = &inline {
@@ -634,7 +620,7 @@ fn with_transcript_rows(
     .in_tree(tree)
     .components(&ui.placed.pulled)
     .saying(ui.welcome.update.as_deref())
-    .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
+    .entrance(ui.welcome.resume.as_ref())
     .measuring(ui.measure);
     rows_config.tools = crate::tool_rows::Looks::in_ui(ui);
     draw(&mut frame.blocks, &tree.agents(), &rows_config);
@@ -837,6 +823,7 @@ fn render_draft(
         ui.composer.is_empty(),
         usize::from(area.height),
         active,
+        ui.keyed_at,
         Now {
             motion: now.motion && active,
             ..now
@@ -2141,5 +2128,30 @@ mod tests {
             assert_eq!(placeholder_rows(&screen), 0, "{screen}");
             assert!(screen.contains("[image 1]"), "{screen}");
         });
+    }
+}
+
+#[cfg(test)]
+mod review_tests {
+    use super::*;
+    use crate::test_support::{later, scene, still};
+
+    #[test]
+    fn round2_the_scrollbar_stays_for_nine_hundred_ms_at_the_end() {
+        let (mut ui, now) = scene();
+        ui.scroll.end(now.instant);
+        let area = Rect::new(0, 0, 80, 10);
+        for ms in [0, 899, 900] {
+            let mut frame = Layout::default();
+            frame.canvas = crate::layout::Canvas::new(area);
+            frame.height = 100;
+            frame.top = 90;
+            scrollbar(&ui, &mut frame, area, still(later(now, ms)));
+            assert_eq!(
+                frame.buffer.cell((79, 9)).unwrap().symbol() == "▕",
+                ms < 900
+            );
+            assert_eq!(frame.deadline().is_some(), ms < 900);
+        }
     }
 }

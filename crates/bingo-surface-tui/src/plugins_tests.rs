@@ -258,9 +258,9 @@ fn a_trust_line_nobody_vouched_for_is_refused() {
         let refused = crate::plugins::result(&mut ui, &tree, &answer(line), false, now);
         assert!(!submits(refused), "{line}");
         assert!(
-            ui.notice().is_some_and(
-                |notice| notice.text.contains(line) && notice.text.contains("type it yourself")
-            ),
+            ui.notice()
+                .is_some_and(|notice| notice.plain().unwrap().text.contains(line)
+                    && notice.plain().unwrap().text.contains("type it yourself")),
             "{line}"
         );
         assert!(submits(crate::plugins::result(

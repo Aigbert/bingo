@@ -85,7 +85,7 @@ async fn a_catalogue_error_keeps_startup_and_typing_available() {
         run.ui
             .notice()
             .iter()
-            .any(|notice| notice.text.contains("offline"))
+            .any(|notice| notice.plain().unwrap().text.contains("offline"))
     );
     run.terminal_event(Term::Key(typed('a')));
     assert_eq!(run.ui.composer.text(), "a");
@@ -146,7 +146,12 @@ async fn a_stalled_initial_catalogue_fails_at_its_overall_deadline() {
     assert_eq!(start.elapsed(), COMMAND_WAIT);
     assert!(!run.typeahead.catalogue_pending);
     assert!(run.typeahead.is_empty());
-    assert!(run.ui.notice().iter().any(|n| n.text.contains("timed out")));
+    assert!(
+        run.ui
+            .notice()
+            .iter()
+            .any(|n| n.plain().unwrap().text.contains("timed out"))
+    );
 }
 
 #[tokio::test]

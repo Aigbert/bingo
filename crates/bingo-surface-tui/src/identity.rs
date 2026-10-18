@@ -1,6 +1,6 @@
 //! M149's visible contracts, before their implementation.
 use crate::test_support::*;
-use crate::{activity, theme, welcome};
+use crate::{activity, theme};
 use bingo_sdk::{Event, ItemStatus};
 use ratatui::style::Color;
 
@@ -40,15 +40,6 @@ fn caret_phase_styles() {
         ui.stop_asked = state.turn.as_ref().map(|turn| turn.id.clone());
         assert_eq!(mark(&state, &ui, now).style, theme::dim());
     });
-}
-
-#[test]
-fn opening_wordmark_and_frames() {
-    let rows = welcome::lines(&state(), 80, None);
-    assert!(
-        rows.is_empty(),
-        "the header wordmark is retired; M199 owns Welcome"
-    );
 }
 
 #[test]

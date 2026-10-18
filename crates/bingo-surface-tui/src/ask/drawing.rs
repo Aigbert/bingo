@@ -102,7 +102,7 @@ pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
     if height == 0 {
         return;
     }
-    frame.next_frame = frame.next_frame.into_iter().chain(drawing.next).min();
+    frame.wake(drawing.next);
     let rect = Rect::new(area.x, y, area.width, height);
     drawing.place(rect);
     frame.card_actions = drawing.actions;

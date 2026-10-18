@@ -23,13 +23,6 @@ const ACTIVITY_AFTER: std::time::Duration = std::time::Duration::from_millis(300
 /// What the activity row's verb becomes once a person has asked the turn to
 /// stop: bingo's own words are for what it chose to do, and this it did not.
 pub const STOPPING: &str = "Stopping";
-/// One breath of bingo's presence while it is thinking: the pace between the
-/// other two, and the one a turn starts at (§6).
-#[cfg(test)]
-const BREATH: std::time::Duration = std::time::Duration::from_millis(1600);
-/// The breath while words are arriving: quicker, because something is.
-#[cfg(test)]
-const BREATH_ARRIVING: std::time::Duration = std::time::Duration::from_millis(900);
 /// The breath while a tool holds the turn: slower, because the waiting is
 /// somebody else's and the row says so.
 const BREATH_BLOCKED: std::time::Duration = std::time::Duration::from_millis(2200);
@@ -489,26 +482,6 @@ fn breathing_at(period: std::time::Duration, now: Now) -> ratatui::style::Style 
         true => theme::breath(clock::breath(now, period)),
         false => theme::presence(),
     }
-}
-
-/// How fast it breathes: the rhythm is what the turn is *doing*, so a pulse
-/// says more than "a turn is running", which the row's presence already says
-/// (§6). Words arriving are quick, a tool holding the turn is slow, and
-/// thinking is the pace between them.
-///
-/// The phase is the wall clock's own turn of the period ([`clock::breath`]),
-/// so a change of period changes where in the breath this frame lands. That
-/// step is the state change itself, which is the one moment §6 allows a cue
-/// to move — and it happens at most twice in a turn.
-#[cfg(test)]
-pub(crate) fn breath_of(state: &SessionState) -> std::time::Duration {
-    if state.transcript.items().iter().any(|item| arriving(item)) {
-        return BREATH_ARRIVING;
-    }
-    if state.transcript.items().iter().any(|item| blocking(item)) {
-        return BREATH_BLOCKED;
-    }
-    BREATH
 }
 
 /// Whether an item is an answer still being said.

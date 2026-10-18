@@ -74,12 +74,17 @@ fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> D
         pulls: &mut frame.pulls,
         now,
     };
+    let lead = needs_you(tree);
+    let needs = !lead.lines.is_empty();
     let mut parts = vec![
+        lead,
         model(tree.viewed(), &mut site),
         mode(tree.viewed(), &mut site),
     ];
     parts.push(context(tree.viewed()));
-    parts.push(crew(tree, now));
+    if !needs {
+        parts.push(crew(tree, now));
+    }
     parts.extend(slots(tree.viewed(), now));
     fit(parts, room)
 }
@@ -87,7 +92,7 @@ fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> D
 fn model(state: &bingo_sdk::SessionState, site: &mut Site<'_>) -> Drawing {
     site.draw(
         "SessionStatus",
-        &Props::SessionStatus(crate::status::session_facts(state)),
+        &Props::SessionStatus(session_facts(state)),
         |props, _| {
             let Props::SessionStatus(props) = props else {
                 return Vec::new();
@@ -186,6 +191,58 @@ fn crew(tree: &Tree, now: Now) -> Drawing {
         next: now.motion.then_some(now.instant + clock::FRAME),
     }
 }
+fn needs_you(tree: &Tree) -> Drawing {
+    use crate::tree::{Scope, Wants};
+    let Some(count) = crate::tree::count(tree, Wants::Attention, Scope::Others) else {
+        return Drawing::default();
+    };
+    let mut spans = vec![Span::styled(
+        format!("{} ", theme::glyphs::get("pin")),
+        ink("amberGlow"),
+    )];
+    if count > 2 {
+        spans.push(Span::styled(count.to_string(), ink("amber")));
+    } else {
+        for (index, row) in tree
+            .rows()
+            .into_iter()
+            .filter(|row| row.attention && row.session != tree.view())
+            .enumerate()
+        {
+            if index > 0 {
+                spans.push(Span::styled(", ", ink("amber")));
+            }
+            let color = if row.session == tree.root_id() {
+                "glow".to_owned()
+            } else {
+                format!("crew{}", crate::face::face(&row.name).hue())
+            };
+            spans.push(Span::styled(row.name, ink(&color)));
+        }
+    }
+    spans.push(Span::styled(
+        if count == 1 {
+            " needs you"
+        } else {
+            " need you"
+        },
+        ink("amber"),
+    ));
+    Drawing::still(vec![Line::from(spans)])
+}
+
+fn countdown_change(remaining: Duration) -> Duration {
+    let seconds = remaining.as_secs();
+    let unit = match seconds {
+        0..60 => 1,
+        60..3600 => 60,
+        3600..86400 => 3600,
+        _ => 86400,
+    };
+    (remaining - Duration::from_secs(seconds / unit * unit) + Duration::from_nanos(1))
+        .min(remaining)
+}
+
 fn slots(state: &bingo_sdk::SessionState, now: Now) -> Vec<Drawing> {
     bingo_sdk::slot::placed(state)
         .into_iter()
@@ -200,12 +257,7 @@ fn slots(state: &bingo_sdk::SessionState, now: Now) -> Vec<Drawing> {
                         clock::span(at.duration_since(now.wall).unsigned_abs())
                     ),
                     Some(
-                        now.instant
-                            + Duration::from_nanos(
-                                (at.duration_since(now.wall).unsigned_abs().as_nanos()
-                                    % 1_000_000_000) as u64
-                                    + 1,
-                            ),
+                        now.instant + countdown_change(at.duration_since(now.wall).unsigned_abs()),
                     ),
                 ),
                 Some(_) => return None,
@@ -250,3 +302,33 @@ pub(super) fn ink(name: &str) -> ratatui::style::Style {
 
 #[cfg(test)]
 mod tests;
+
+pub(crate) fn session_facts(
+    state: &bingo_sdk::SessionState,
+) -> bingo_sdk::component::SessionStatusProps {
+    bingo_sdk::component::SessionStatusProps {
+        title: state.summary.title.clone(),
+        cwd: state.summary.cwd.clone(),
+        provider: state.summary.provider.clone(),
+        model: state.summary.model.clone(),
+        model_scope: state.summary.model_scope,
+        effort: state.summary.effort,
+        context: state.context,
+        usage: state.summary.usage,
+    }
+}
+
+#[cfg(test)]
+pub fn line(
+    tree: &crate::tree::Tree,
+    ui: &crate::ui::Ui,
+    width: usize,
+    now: crate::clock::Now,
+) -> ratatui::text::Line<'static> {
+    let mut frame = crate::layout::Layout::default();
+    crate::footer::draw(tree, ui, &mut frame, width, now)
+        .lines
+        .into_iter()
+        .next()
+        .unwrap_or_default()
+}

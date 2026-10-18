@@ -166,19 +166,6 @@ fn absent_rooms_have_no_tab() {
 mod live;
 
 #[test]
-fn a_strip_click_without_the_mod_opens_conversations() {
-    let (mut ui, now) = scene();
-    let state = state();
-    let effects = crate::crew::open(&mut ui, &solo(&state), now);
-    assert!(matches!(
-        effects.as_slice(),
-        [crate::effect::Effect::ListStored]
-    ));
-    assert!(matches!(ui.focus.open(), crate::ui::Open::Palette(open)
-        if open.first == component::PaletteOpen::Sessions));
-}
-
-#[test]
 fn crew_tab_switch_reaches_the_mod_without_taking_focus_keys() {
     let mut state = state();
     placed(&mut state, draw::tree(&Panel::default(), &rows(), &[], 18));

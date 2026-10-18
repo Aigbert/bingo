@@ -76,16 +76,9 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
     {
         return effects;
     }
-    if ui
-        .shown
-        .crew
-        .is_some_and(|area| area.contains(Position::new(mouse.column, mouse.row)))
-    {
-        return crate::crew::open(ui, tree, now);
-    }
     // The way back to the foot answers a click as `end` answers a key.
     if on_foot(ui, mouse) {
-        ui.scroll.end();
+        ui.scroll.end(now.instant);
         return Vec::new();
     }
     // A picture is a thing to click before it is part of a block: a click on

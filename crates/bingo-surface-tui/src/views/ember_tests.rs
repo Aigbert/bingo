@@ -285,7 +285,7 @@ fn a_cached_mod_row_animates_without_a_new_view_or_event() {
         let (mut ui, now) = scene();
         draw_tree(100, 32, &solo(&state), &mut ui, now);
         let a = ui.shown.canvas.buffer.clone();
-        assert!(ui.shown.next_frame.is_some());
+        assert!(ui.shown.deadline().is_some());
         draw_tree(100, 32, &solo(&state), &mut ui, later(now, 900));
         assert_ne!(
             a, ui.shown.canvas.buffer,
@@ -437,12 +437,12 @@ fn a_breathing_row_off_screen_neither_redraws_nor_schedules() {
             .span(&bingo_sdk::ItemId::from_raw("user"))
             .unwrap();
         assert!(end <= ui.shown.top);
-        assert_eq!(ui.shown.next_frame, Some(now.instant + crate::clock::FRAME));
+        assert_eq!(ui.shown.deadline(), Some(now.instant + crate::clock::FRAME));
         let renders = ui.shown.blocks.renders();
         draw_tree(80, 24, &tree, &mut ui, later(now, 900));
         assert_eq!(ui.shown.blocks.renders(), renders);
         assert_eq!(
-            ui.shown.next_frame,
+            ui.shown.deadline(),
             Some(later(now, 900).instant + crate::clock::FRAME)
         );
         ui.scroll.home(
@@ -452,7 +452,7 @@ fn a_breathing_row_off_screen_neither_redraws_nor_schedules() {
         );
         draw_tree(80, 24, &tree, &mut ui, later(now, 900));
         assert!(ui.shown.blocks.renders() > renders);
-        assert!(ui.shown.next_frame.is_some());
+        assert!(ui.shown.deadline().is_some());
     });
 }
 

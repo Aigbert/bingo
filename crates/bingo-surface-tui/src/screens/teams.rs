@@ -338,8 +338,4 @@ async fn the_palette_roster_has_identical_keyboard_and_crew_doors() {
     crate::input::on_key(&mut keyboard, &tree, ctrl('r'), now);
     let screen = fixture.paint_tree(&mut keyboard, &tree, now, 80, 24).await;
     assert!(screen.contains("reviewer"), "{screen}");
-    assert!(
-        keyboard.shown.crew.is_none(),
-        "crew-strip click targets are retired"
-    );
 }

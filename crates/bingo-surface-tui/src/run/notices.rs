@@ -41,8 +41,8 @@ mod tests {
     fn what_the_probe_found_is_said_once_when_the_run_opens() {
         let ui = opened(|ui| raise(ui, Some(graphics::PASSTHROUGH_UNHEARD), Instant::now()));
         let said = ui.notice().expect("a notice");
-        assert_eq!(said.text, graphics::PASSTHROUGH_UNHEARD);
-        assert_eq!(said.level, Level::Info);
+        assert_eq!(said.plain().unwrap().text, graphics::PASSTHROUGH_UNHEARD);
+        assert_eq!(said.plain().unwrap().level, Level::Info);
     }
 
     #[test]

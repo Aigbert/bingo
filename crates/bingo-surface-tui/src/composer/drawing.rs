@@ -12,8 +12,14 @@ pub fn draw(
     empty: bool,
     rows: usize,
     active: bool,
+    keyed_at: std::time::Instant,
     now: clock::Now,
 ) -> Drawing {
+    let rest = keyed_at + super::CARET_REST;
+    let now = clock::Now {
+        motion: now.motion && now.instant < rest,
+        ..now
+    };
     let overflow = usize::from(layout.lines.len() > 8 && rows >= 9);
     let count = rows.saturating_sub(overflow).min(8);
     let start = layout.lines.len().saturating_sub(count);
@@ -29,7 +35,7 @@ pub fn draw(
     let mut lines = Vec::new();
     if overflow > 0 {
         lines.push(Line::from(vec![
-            Span::raw("   "),
+            Span::raw(" ".repeat(super::COLUMN)),
             Span::styled(
                 format!("{} {start} lines above", theme::glyphs::get("ell")),
                 ink("dim"),
@@ -37,7 +43,7 @@ pub fn draw(
         ]));
     }
     for (index, text) in layout.lines.iter().enumerate().skip(start).take(count) {
-        let mut spans = vec![Span::raw("   ")];
+        let mut spans = vec![Span::raw(" ".repeat(super::COLUMN))];
         if !props.tag.is_empty() {
             spans.push(Span::styled(props.tag.clone(), theme::text()));
         }
@@ -58,7 +64,7 @@ pub fn draw(
     Drawing {
         lines,
         next: (active && now.motion && layout.cursor.0 >= start && count > 0)
-            .then_some(now.instant + clock::FRAME),
+            .then_some((now.instant + clock::FRAME).min(rest)),
     }
 }
 
@@ -134,16 +140,29 @@ mod tests {
         );
         let layout = editor.layout(30);
         let props = ComposerProps::default();
-        let drawn = draw(&layout, &props, false, 9, true, now);
+        let drawn = draw(&layout, &props, false, 9, true, now.instant, now);
         assert_eq!(drawn.lines.len(), 9);
         assert!(drawn.lines[0].to_string().contains("4 lines above"));
         assert!(drawn.lines[1].to_string().contains("line 4"));
         assert!(drawn.lines[8].to_string().contains("line 11▍"));
         assert!(drawn.next.is_some());
-        assert!(draw(&layout, &props, false, 9, false, now).next.is_none());
+        assert!(
+            draw(&layout, &props, false, 9, false, now.instant, now)
+                .next
+                .is_none()
+        );
         assert_eq!(
-            draw(&layout, &props, false, 9, true, still(now)).lines,
-            draw(&layout, &props, false, 9, true, still(later(now, 400))).lines
+            draw(&layout, &props, false, 9, true, now.instant, still(now)).lines,
+            draw(
+                &layout,
+                &props,
+                false,
+                9,
+                true,
+                now.instant,
+                still(later(now, 400))
+            )
+            .lines
         );
     }
 }

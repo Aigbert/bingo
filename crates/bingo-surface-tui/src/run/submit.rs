@@ -43,6 +43,26 @@ impl Run {
         self.release_actions();
     }
 
+    pub(super) fn cycle_mode(&mut self, input: Input) {
+        let Some(handle) = self.session.writer() else {
+            return self.not_yet();
+        };
+        let intent = bingo_sdk::IntentId::mint();
+        self.mine.insert(intent.clone(), super::Submission::Mode);
+        match input {
+            Input::Action { action, origin } => self.enqueue_action(
+                self.session.tree.view().clone(),
+                handle,
+                intent,
+                (action, origin),
+            ),
+            input => {
+                super::typeahead::command_sent(self, intent.clone());
+                handle.submit(intent, input);
+            }
+        }
+    }
+
     pub(super) fn submit(&mut self, input: Input) {
         let Some(handle) = self.session.writer() else {
             return self.not_yet();

@@ -167,12 +167,12 @@ mod tests {
                 &serde_json::json!({"message":format!("permission mode: {mode}")}),
             );
             assert_eq!(
-                run.ui.notice().unwrap().text,
+                run.ui.notice().unwrap().plain().unwrap().text,
                 format!("permission mode: {mode}")
             );
         }
         receipt(&mut run, &serde_json::json!({"message":"saved"}));
-        assert_eq!(run.ui.notice().unwrap().text, "saved");
+        assert_eq!(run.ui.notice().unwrap().plain().unwrap().text, "saved");
     }
 
     #[tokio::test]

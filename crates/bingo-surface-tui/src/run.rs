@@ -163,6 +163,11 @@ fn pasted(data_dir: &std::path::Path, bytes: &[u8]) -> Result<std::path::PathBuf
     bingo_pictures::keep(&dir, &image).map_err(|e| format!("{}: {e}", dir.display()))
 }
 
+enum Submission {
+    Ordinary(Option<String>),
+    Mode,
+}
+
 struct Run {
     detection: crate::render::Detection,
     host: HostHandle,
@@ -172,7 +177,7 @@ struct Run {
     /// The intents this client minted and the line each carried, so an ack
     /// meant for another client is not reported here and a refusal can name
     /// what was refused.
-    mine: HashMap<IntentId, Option<String>>,
+    mine: HashMap<IntentId, Submission>,
     rewind_prompts: surface::Prompts,
     received_asks: HashMap<bingo_sdk::InteractionId, jiff::Timestamp>,
     site_keys: HashMap<IntentId, site_keys::Pending>,
@@ -317,7 +322,10 @@ async fn attach(
         host: host.clone(),
         data_dir: opts.env.data_dir.clone(),
         session: Attached::new(attachment.snapshot, attachment.handle),
-        ui: Ui::new(history::load(&opts.env.data_dir), Instant::now()),
+        ui: Ui::new(
+            history::load(&opts.env.data_dir),
+            crate::clock::Now::real().instant,
+        ),
         mine: HashMap::new(),
         rewind_prompts: Default::default(),
         received_asks: HashMap::new(),
@@ -409,7 +417,7 @@ impl Run {
     fn next_draw(&self) -> Option<Instant> {
         self.ui
             .shown
-            .next_frame
+            .deadline()
             .into_iter()
             .chain(self.behind.then_some(self.painted + TICK))
             .chain(self.ui.actions.deadline())
@@ -608,13 +616,24 @@ impl Run {
             typeahead::drain(self);
             return;
         }
-        let Some(about) = self.mine.remove(intent) else {
+        let Some(submission) = self.mine.remove(intent) else {
             typeahead::drain(self);
             return;
         };
         match outcome {
-            IntentOutcome::Rejected { error } => self.rejected(&error.message, about),
-            IntentOutcome::Applied { result } => surface::receipt(self, result),
+            IntentOutcome::Rejected { error } => self.rejected(
+                &error.message,
+                match submission {
+                    Submission::Ordinary(about) => about,
+                    Submission::Mode => None,
+                },
+            ),
+            IntentOutcome::Applied { result } => {
+                surface::receipt(self, result);
+                if matches!(submission, Submission::Mode) {
+                    self.ui.notify_mode(self.detection.now().instant);
+                }
+            }
             _ => {}
         }
         typeahead::settled(self, intent);
@@ -676,6 +695,7 @@ impl Run {
     fn terminal_event(&mut self, event: Term) {
         match event {
             Term::Key(key) => {
+                self.ui.keyed_at = self.detection.now().instant;
                 let chord = crate::keys::commands::chord(key);
                 let interrupt = chord.as_deref() == Some("ctrl+c")
                     || (chord.as_deref() == Some("esc") && !site_lifecycle::open(&self.ui));
@@ -706,7 +726,10 @@ impl Run {
                 );
                 self.apply(effects);
             }
-            Term::Paste(text) => typeahead::paste(self, text),
+            Term::Paste(text) => {
+                self.ui.keyed_at = self.detection.now().instant;
+                typeahead::paste(self, text);
+            }
             // A window nobody is looking at is the one that may interrupt a
             // person somewhere else on their desktop — and a person who has
             // just come back to this one may have been away turning their
@@ -729,6 +752,7 @@ impl Run {
     fn effect(&mut self, effect: Effect) {
         match effect {
             Effect::Submit(input) => self.submit(input),
+            Effect::CycleMode(input) => self.cycle_mode(input),
             Effect::Run(line) => self.run_line(line),
             Effect::AwaitSiteKey(key) => typeahead::queue(self, key),
             Effect::SiteKey { action, key } => site_keys::send(self, action, key),
@@ -820,7 +844,8 @@ impl Run {
     fn mint(&mut self, about: Option<String>) -> IntentId {
         let intent = IntentId::mint();
         surface::capture(self, &intent, about.as_deref());
-        self.mine.insert(intent.clone(), about);
+        self.mine
+            .insert(intent.clone(), Submission::Ordinary(about));
         intent
     }
 
@@ -1290,33 +1315,75 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn an_idle_surface_draws_nothing_at_all() {
         let mut harness = Harness::new();
-        harness.recorder.motion = Some(false);
+        harness.recorder.motion = Some(true);
         let (host, _) = TestHost::with(vec![]);
-        // A minute passes before each key, on the runtime's virtual clock.
-        let script = vec![key(KeyCode::Right), ctrl('d')];
+        let began = tokio::time::Instant::now().into_std();
         drive(
             &host,
             options(None, harness.home.path()),
             &mut harness.recorder,
-            keys_after(Duration::from_secs(60), script),
+            keys_after(
+                Duration::from_secs(60),
+                vec![key(KeyCode::Right), ctrl('d')],
+            ),
         )
         .await
         .expect("the loop ran");
-        assert_eq!(
-            harness.recorder.frames.len(),
-            4,
-            "one frame for the first of the four things that happened at the \
-             start and one at the frame boundary for the three that landed \
-             inside it, one for the keystroke and one on the way out — and \
-             none at all for the two minutes of waiting between them"
+        for painted in &harness.recorder.painted_at {
+            let age = painted.duration_since(began);
+            assert!(
+                !(Duration::from_secs(10) < age && age < Duration::from_secs(60)),
+                "idle frame at {age:?}"
+            );
+            assert!(
+                !(Duration::from_secs(70) < age && age < Duration::from_secs(120)),
+                "idle frame after key at {age:?}"
+            );
+        }
+        assert!(
+            harness.recorder.painted_at.iter().any(|at| {
+                let age = at.duration_since(began);
+                Duration::from_secs(60) < age && age < Duration::from_secs(70)
+            }),
+            "the key wakes the caret"
         );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn round2_reduced_motion_wakes_the_working_row_without_an_event() {
+        let now = Now {
+            instant: tokio::time::Instant::now().into_std(),
+            ..still(scene().1)
+        };
+        let state = folded(vec![frame(1, started("trn_1"))]);
+        let mut run = idle_in(
+            state,
+            std::sync::Arc::new(TestSession::default()),
+            now.instant,
+        );
+        run.detection.motion = false;
+        let mut screen = Recorder::default();
+        run.paint(&mut screen, Wake::Frame, now).unwrap();
+        assert!(!screen.last().contains("burrowing"));
+        assert_eq!(
+            run.next_draw(),
+            Some(now.instant + Duration::from_millis(300))
+        );
+        tick(run.next_draw()).await;
+        assert_eq!(
+            tokio::time::Instant::now().into_std() - now.instant,
+            Duration::from_millis(300)
+        );
+        run.paint(&mut screen, Wake::Frame, later(now, 300))
+            .unwrap();
+        assert!(screen.last().contains("burrowing"));
     }
 
     /// A turn that answers and finishes, then `wait` of nothing at all before
     /// ctrl+d. Answers with how many frames the run drew.
     async fn frames_of_a_flash(wait: Duration) -> usize {
         let mut harness = Harness::new();
-        harness.recorder.motion = Some(false);
+        harness.recorder.motion = Some(true);
         let frames = vec![
             frame(1, started("trn_1")),
             frame(
@@ -1359,8 +1426,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn the_seconds_after_a_flash_cost_no_frames_at_all() {
         assert_eq!(
-            frames_of_a_flash(Duration::from_secs(2)).await,
-            frames_of_a_flash(Duration::from_secs(4)).await,
+            frames_of_a_flash(Duration::from_secs(12)).await,
+            frames_of_a_flash(Duration::from_secs(14)).await,
             "two more seconds of waiting drew two more seconds of frames"
         );
     }
@@ -1699,8 +1766,10 @@ mod tests {
     #[test]
     fn a_withdrawn_line_comes_back_to_the_composer_with_its_pictures() {
         let mut run = idle(Instant::now());
-        run.mine
-            .insert(IntentId::from_raw("req_1"), Some("/rewind turn_1".into()));
+        run.mine.insert(
+            IntentId::from_raw("req_1"),
+            Submission::Ordinary(Some("/rewind turn_1".into())),
+        );
         let image = Image::from_bytes("image/png", b"png")
             .expect("a small picture")
             .at("/pasted/a.png");
@@ -1730,8 +1799,10 @@ mod tests {
     #[test]
     fn a_line_the_turn_took_first_leaves_the_box_empty_and_says_so() {
         let mut run = idle(Instant::now());
-        run.mine
-            .insert(IntentId::from_raw("req_1"), Some("/rewind turn_1".into()));
+        run.mine.insert(
+            IntentId::from_raw("req_1"),
+            Submission::Ordinary(Some("/rewind turn_1".into())),
+        );
         run.reply(
             Reply::Withdrawn(
                 IntentId::from_raw("req_1"),
@@ -1745,7 +1816,9 @@ mod tests {
         assert!(run.mine.contains_key(&IntentId::from_raw("req_1")));
         assert!(run.ui.composer.is_empty());
         assert_eq!(
-            run.ui.notice().map(|notice| notice.text.clone()),
+            run.ui
+                .notice()
+                .map(|notice| notice.plain().unwrap().text.clone()),
             Some(withdraw::ALREADY_SENT.to_string())
         );
     }
@@ -1776,8 +1849,8 @@ mod tests {
         let run = told_of_update(12);
         assert_eq!(run.ui.welcome.update.as_deref(), Some("0.5.0"));
         let said = run.ui.notice().expect("a notice");
-        assert_eq!(said.level, Level::Info);
-        assert_eq!(said.text, "↑ v0.5.0 is out · bingo update");
+        assert_eq!(said.plain().unwrap().level, Level::Info);
+        assert_eq!(said.plain().unwrap().text, "↑ v0.5.0 is out · bingo update");
     }
 
     /// The hop the loop makes: the work a frame owed is done on a task of its
@@ -1887,7 +1960,8 @@ mod tests {
             run.ui
                 .notice()
                 .iter()
-                .any(|n| n.text.starts_with("missing.png: ") && n.text.contains("could not")),
+                .any(|n| n.plain().unwrap().text.starts_with("missing.png: ")
+                    && n.plain().unwrap().text.contains("could not")),
             "the notice names the mention and says why: {:?}",
             run.ui.notice
         );
@@ -1916,7 +1990,7 @@ mod tests {
             run.ui
                 .notice()
                 .iter()
-                .any(|n| n.text.contains("not a picture")),
+                .any(|n| n.plain().unwrap().text.contains("not a picture")),
             "{:?}",
             run.ui.notice
         );
@@ -1999,8 +2073,8 @@ mod tests {
         let Some(notice) = run.ui.notice() else {
             panic!("one notice: {:?}", run.ui.notice)
         };
-        assert_eq!(notice.level, Level::Info);
-        assert_eq!(notice.text, format!("opened {want}"));
+        assert_eq!(notice.plain().unwrap().level, Level::Info);
+        assert_eq!(notice.plain().unwrap().text, format!("opened {want}"));
     }
 
     /// A path an answer's words named is already a file to open: it is made
@@ -2074,8 +2148,14 @@ mod tests {
         let Some(notice) = run.ui.notice() else {
             panic!("one notice: {:?}", run.ui.notice)
         };
-        assert_eq!(notice.level, Level::Warn);
-        assert!(notice.text.contains(&path.to_string_lossy().into_owned()));
+        assert_eq!(notice.plain().unwrap().level, Level::Warn);
+        assert!(
+            notice
+                .plain()
+                .unwrap()
+                .text
+                .contains(&path.to_string_lossy().into_owned())
+        );
     }
 
     /// A picture the session no longer holds is a warning and not a file: a
@@ -2092,7 +2172,7 @@ mod tests {
         assert!(seen.lock().expect("the record").is_empty());
         assert!(!dir.path().join(crate::viewer::DIR).exists());
         assert_eq!(
-            run.ui.notice().map(|notice| notice.level),
+            run.ui.notice().map(|notice| notice.plain().unwrap().level),
             Some(Level::Warn)
         );
     }
@@ -2399,7 +2479,10 @@ mod tests {
             .expect("the notice is not an error");
         assert!(recorder.copies.is_empty(), "nothing was handed over");
         assert!(
-            run.ui.notice().iter().any(|n| n.text.contains("100 KiB")),
+            run.ui
+                .notice()
+                .iter()
+                .any(|n| n.plain().unwrap().text.contains("100 KiB")),
             "the refusal names the size: {:?}",
             run.ui.notice
         );

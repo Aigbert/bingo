@@ -137,7 +137,7 @@ async fn delayed_handoff(ask: bool) {
     assert_eq!(run.ui.composer.text(), if ask { "" } else { "xy" });
     if ask {
         assert_eq!(
-            run.ui.notice().expect("a notice").text,
+            run.ui.notice().expect("a notice").plain().unwrap().text,
             typeahead::kept_out_notice(2)
         );
     }

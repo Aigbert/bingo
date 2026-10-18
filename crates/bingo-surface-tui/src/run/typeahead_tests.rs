@@ -226,7 +226,9 @@ async fn keys_typed_before_a_dialog_opened_are_never_entered_into_it() {
         assert_eq!(session.submissions().len(), 1, "no key reached the ask");
         assert!(session.answers().is_empty(), "nothing answered the ask");
         assert_eq!(
-            run.ui.notice().map(|notice| notice.text.as_str()),
+            run.ui
+                .notice()
+                .map(|notice| notice.plain().unwrap().text.as_str()),
             Some(typeahead::kept_out_notice(2).as_str())
         );
     }
@@ -346,7 +348,7 @@ async fn queued_pastes_are_kept_out_of_asks() {
             assert!(session.answers().is_empty());
             assert!(session.submitted().is_empty());
             assert_eq!(
-                run.ui.notice().expect("a notice").text,
+                run.ui.notice().expect("a notice").plain().unwrap().text,
                 typeahead::kept_out_notice(1)
             );
         }
@@ -370,7 +372,7 @@ async fn a_set_aside_ask_never_receives_keys_held_in_the_composer() {
     assert!(session.answers().is_empty());
     assert!(run.typeahead.is_empty());
     assert_eq!(
-        run.ui.notice().expect("a notice").text,
+        run.ui.notice().expect("a notice").plain().unwrap().text,
         typeahead::kept_out_notice(1)
     );
 }
@@ -399,7 +401,7 @@ async fn an_unknown_command_never_answers_the_ask_it_set_aside() {
         assert!(run.session.tree.open_interaction().is_some());
         assert!(run.typeahead.is_empty());
         assert_eq!(
-            run.ui.notice().expect("a notice").text,
+            run.ui.notice().expect("a notice").plain().unwrap().text,
             typeahead::kept_out_notice(1)
         );
     }
@@ -475,7 +477,7 @@ async fn held_status_keys_follow_the_pane_handoff_but_never_a_returning_ask() {
         assert_eq!(run.ui.composer.text(), if ask { "" } else { "y" });
         if ask {
             assert_eq!(
-                run.ui.notice().expect("a notice").text,
+                run.ui.notice().expect("a notice").plain().unwrap().text,
                 typeahead::kept_out_notice(1)
             );
         }

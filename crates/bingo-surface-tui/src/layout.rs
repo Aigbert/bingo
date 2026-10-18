@@ -29,7 +29,7 @@ pub struct Layout {
     /// Header measurements move with the block memo, never through a shared UI borrow.
     pub measurements: crate::graphics::Decoded,
     pub canvas: Canvas,
-    pub next_frame: Option<Instant>,
+    next_frame: Option<Instant>,
     #[cfg(test)]
     pub renders: [usize; 4],
     pub regions: Regions,
@@ -47,15 +47,21 @@ pub struct Layout {
     /// ([`crate::graphics::placed::cells`]), so it can never say a picture is
     /// somewhere the screen does not (M56).
     pub cells: Vec<Placed>,
-    /// Where this frame drew the way back to the foot ([`crate::foot`]), when
+    /// Where this frame drew the way back to the foot ([`crate::pill`]), when
     /// the transcript was held: what a click there is answered against.
     pub foot: Option<ratatui::layout::Rect>,
-    pub crew: Option<ratatui::layout::Rect>,
 }
 
 impl Layout {
+    pub fn wake(&mut self, next: Option<Instant>) {
+        self.next_frame = self.next_frame.into_iter().chain(next).min();
+    }
+    pub fn deadline(&self) -> Option<Instant> {
+        self.next_frame
+    }
+
     pub fn collect(&mut self, drawing: crate::views::Drawing) -> Vec<ratatui::text::Line<'static>> {
-        self.next_frame = self.next_frame.into_iter().chain(drawing.next).min();
+        self.wake(drawing.next);
         drawing.lines
     }
 
@@ -174,7 +180,7 @@ fn compose(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> Layo
     count::begin();
     crate::view::compose(tree, ui, &mut next, now);
     count::finish(&mut next);
-    next.next_frame = deadline::next(tree, ui, &next, now);
+    next.wake(deadline::next(tree, ui, &next, now));
     next
 }
 

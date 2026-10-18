@@ -323,6 +323,7 @@ impl TestHost {
 pub struct Recorder {
     pub motion: Option<bool>,
     pub frames: Vec<String>,
+    pub painted_at: Vec<std::time::Instant>,
     pub titles: Vec<String>,
     pub bells: usize,
     /// The bytes handed to the terminal's clipboard, verbatim.
@@ -362,6 +363,7 @@ impl Screen for Recorder {
             .draw(|frame| crate::layout::paint(layout, frame, render))
             .expect("paint");
         self.frames.push(terminal.backend().to_string());
+        self.painted_at.push(tokio::time::Instant::now().into_std());
         Ok(())
     }
 

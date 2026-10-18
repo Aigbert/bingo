@@ -147,11 +147,11 @@ async fn a_missing_control_drops_its_edit_with_the_existing_stale_notice() {
     assert!(run.ui.actions.action().is_none());
     assert!(run.mine.is_empty());
     assert_eq!(
-        run.ui.notice().expect("a notice").text,
+        run.ui.notice().expect("a notice").plain().unwrap().text,
         format!("counter: {}", bingo_sdk::view::STALE_CONTROL)
     );
     assert_eq!(
-        run.ui.notice().expect("a notice").level,
+        run.ui.notice().expect("a notice").plain().unwrap().level,
         Level::Warn,
         "the host's own level"
     );
@@ -306,10 +306,13 @@ async fn an_unkeyed_button_shifted_by_a_redraw_is_stale_not_its_neighbour() {
     let (run, session) = press_b_across_a_shift(false);
     assert_eq!(session.submitted().len(), 1, "A-1 now sits where B was");
     assert_eq!(
-        run.ui.notice().expect("a notice").text,
+        run.ui.notice().expect("a notice").plain().unwrap().text,
         format!("counter: {}", bingo_sdk::view::STALE_CONTROL)
     );
-    assert_eq!(run.ui.notice().expect("a notice").level, Level::Warn);
+    assert_eq!(
+        run.ui.notice().expect("a notice").plain().unwrap().level,
+        Level::Warn
+    );
 }
 
 #[tokio::test]

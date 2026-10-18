@@ -126,26 +126,6 @@ fn calling() -> bingo_sdk::SessionState {
     folded(running_bash())
 }
 
-/// §6's first principle is that every motion reports a state change, and a
-/// breath at one fixed period reports only "a turn is running" — which the
-/// row's presence already says. So the period is what the turn is *doing*.
-#[test]
-fn the_breath_quickens_while_words_arrive_and_slows_while_a_tool_holds_the_turn() {
-    let ms = Duration::from_millis;
-    assert_eq!(crate::activity::breath_of(&answering()), ms(900));
-    assert_eq!(crate::activity::breath_of(&calling()), ms(2_200));
-    assert_eq!(
-        crate::activity::breath_of(&folded(vec![frame(1, started("trn_1"))])),
-        ms(1_600),
-        "thinking is the pace between them, and the one a turn starts at"
-    );
-    assert_eq!(
-        crate::activity::breath_of(&state()),
-        ms(1_600),
-        "and an idle session breathes at the same pace it would think at"
-    );
-}
-
 /// The row is drawn on that period and not on a constant, which is the half
 /// of the cue a unit test cannot see.
 #[test]
@@ -224,76 +204,6 @@ fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
         !screen.contains("bingo▍") && screen.contains("   ▍Ask anything"),
         "{screen}"
     );
-}
-
-// ---- the person's own gesture -------------------------------------------
-
-/// The line the box's border wears, run by run, so a light crossing it can be
-/// told from the one style it rests in.
-fn border_runs(tree: &Tree, ui: &mut crate::ui::Ui, now: Now) -> Vec<Style> {
-    crate::painted::painted(80, 24, tree, ui, now)
-        .at(ui.shown.regions.composer.y)
-        .into_iter()
-        .map(|(_, style)| style)
-        .collect()
-}
-
-/// `⏎` is the most repeated gesture in the whole surface and had no answer at
-/// all: the row simply existed. It runs one light along the box's border now,
-/// over six frames, and the border is back where it was on the seventh. The
-/// row read here is the box's own text row, so the two runs it carries are
-/// the border's left edge and its right — which is the light's first cell and
-/// its last, and so tells the direction as well as the fact.
-#[test]
-fn a_sent_line_runs_one_light_along_the_boxs_border() {
-    let state = state();
-    let tree = solo(&state);
-    let (mut ui, now) = scene();
-    let at_rest = crate::theme::with(crate::painted::truecolor(), || {
-        border_runs(&tree, &mut ui, now)
-    });
-
-    write(&mut ui, &state, "say hello", now);
-    crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now);
-    assert_eq!(ui.sending(now), Some(0.0), "the light starts on the key");
-    crate::theme::with(crate::painted::truecolor(), || {
-        let mut lit = |ms| border_runs(&tree, &mut ui, later(now, ms));
-        assert_eq!(
-            lit(40),
-            at_rest,
-            "sending does not animate a removed border"
-        );
-        assert_eq!(lit(40).last(), at_rest.last(), "and the far edge is not");
-        assert_eq!(lit(150), at_rest, "the prompt stays in place");
-        assert_eq!(lit(150).first(), at_rest.first(), "and the near one is not");
-        assert_eq!(lit(198), at_rest, "back at rest on the seventh frame");
-    });
-
-    // A second `⏎` is a second gesture: the light starts again rather than
-    // carrying on from where the first one had got to.
-    let half = later(now, 100);
-    write(&mut ui, &state, "again", half);
-    crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), half);
-    assert_eq!(ui.sending(half), Some(0.0));
-    assert!(ui.sending(later(now, 298)).is_none(), "and ends six on");
-}
-
-#[test]
-fn a_still_surface_sends_a_line_with_no_light_at_all() {
-    let state = state();
-    let tree = solo(&state);
-    let (mut ui, now) = scene();
-    let at_rest = border_runs(&tree, &mut ui, still(now));
-    write(&mut ui, &state, "say hello", now);
-    crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now);
-    assert_eq!(ui.sending(still(now)), None);
-    for ms in [0i64, 33, 100, 198] {
-        assert_eq!(
-            border_runs(&tree, &mut ui, still(later(now, ms))),
-            at_rest,
-            "at {ms} ms the border is exactly what a still surface draws"
-        );
-    }
 }
 
 // ---- streaming: the comet tail ------------------------------------------
@@ -653,17 +563,17 @@ fn a_refused_line_is_named_after_the_reason_that_refused_it() {
 // ---- what wants a person ------------------------------------------------
 
 #[test]
-fn what_wants_a_person_alternates_on_the_second() {
+fn the_footer_holds_attention_words_still() {
     let tree = folded_tree(vec![
         child_frame(1, announced("reviewer")),
         child_frame(2, opened(child_permission())),
     ]);
     let (ui, now) = scene();
-    let first = crate::status::line(&tree, &ui, 80, now);
-    assert_eq!(first, crate::status::line(&tree, &ui, 80, later(now, 1000)));
+    let first = crate::footer::line(&tree, &ui, 80, now);
+    assert_eq!(first, crate::footer::line(&tree, &ui, 80, later(now, 1000)));
     assert!(
-        !first.to_string().contains("reviewer"),
-        "the needs-you lead belongs to M200"
+        first.to_string().contains("◆ reviewer needs you"),
+        "the needs-you lead names the waiting child"
     );
 }
 

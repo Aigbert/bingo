@@ -1,6 +1,6 @@
 //! M150's face and screen contracts, exercised before implementation.
 use crate::test_support::*;
-use crate::{face, painted, status, theme};
+use crate::{face, footer, painted, theme};
 use bingo_sdk::{Event, Level};
 
 fn crew() -> crate::tree::Tree {
@@ -93,15 +93,15 @@ fn strip_names_the_work_and_yields_to_notices() {
     let tree = crew();
     let (mut ui, now) = scene();
     for width in [80, 120] {
-        let wide = status::line(&tree, &ui, width, now).to_string();
+        let wide = footer::line(&tree, &ui, width, now).to_string();
         assert!(wide.contains("●● 2 agents"), "{wide}");
         assert!(!wide.contains("reviewer"));
     }
     ui.notify(Level::Info, "saved", now.instant);
-    let notice = status::line(&tree, &ui, 120, later(now, 1000)).to_string();
+    let notice = footer::line(&tree, &ui, 120, later(now, 1000)).to_string();
     assert!(notice.contains("saved") && !notice.contains("2 agents"));
     assert!(
-        status::line(&tree, &ui, 120, later(now, 4133))
+        footer::line(&tree, &ui, 120, later(now, 4133))
             .to_string()
             .contains("2 agents")
     );
@@ -238,13 +238,12 @@ fn strip_scopes_overflows_finishes_and_clicks() {
             family: "session".into(),
         }));
     draw_tree(120, 40, &tree, &mut ui, now);
-    assert!(ui.shown.crew.is_none(), "the old strip has no click target");
     tree.fold.apply(&child_frame(
         20,
         completed("trn_9", bingo_sdk::TurnStatus::Completed),
     ));
     assert!(
-        !status::line(&tree, &scene().0, 120, now)
+        !footer::line(&tree, &scene().0, 120, now)
             .to_string()
             .contains("reviewer")
     );
@@ -274,12 +273,11 @@ fn a_placed_status_outranks_crew_until_it_expires() {
             ),
         ),
     ));
-    let placed = status::line(&tree, &ui, 120, now).to_string();
+    let placed = footer::line(&tree, &ui, 120, now).to_string();
     assert!(placed.contains("scheduled") && !placed.contains("reviewer"));
     draw_tree(120, 40, &tree, &mut ui, now);
-    assert!(ui.shown.crew.is_none(), "the old strip has no click target");
     assert!(
-        status::line(&tree, &ui, 120, later(now, 2001))
+        footer::line(&tree, &ui, 120, later(now, 2001))
             .to_string()
             .contains("2 agents")
     );

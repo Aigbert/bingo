@@ -364,9 +364,39 @@ async fn a_composer_action_preserves_an_existing_draft_and_explains_why() {
         );
         assert_eq!(run.ui.composer.text(), "my unfinished draft");
         assert_eq!(
-            run.ui.notice().unwrap().text,
+            run.ui.notice().unwrap().plain().unwrap().text,
             format!("composer has a draft; clear it to use {}", text.trim())
         );
         assert!(session.submissions().is_empty());
     }
+}
+
+#[tokio::test]
+async fn round2_only_the_key_acknowledgement_creates_a_mode_notice() {
+    let now = scene().1;
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(state(), session.clone(), now.instant);
+    run.cycle_mode(Input::text("/permission plan", crate::origin()));
+    run.run_line("/permission plan".into());
+    let submitted = session.submissions();
+    let receipt = IntentOutcome::Applied {
+        result: json!({"message":"permission mode: plan"}),
+    };
+    run.ack(&submitted[1].0, &receipt);
+    assert_eq!(
+        run.ui.notice().unwrap().plain().unwrap().text,
+        "permission mode: plan"
+    );
+    run.ack(&IntentId::from_raw("other-client"), &receipt);
+    assert!(run.ui.notice().unwrap().plain().is_some());
+    run.ack(&submitted[0].0, &receipt);
+    assert!(matches!(
+        run.ui.notice().unwrap().kind,
+        crate::ui::NoticeKind::Mode
+    ));
+    run.ack(&submitted[1].0, &receipt);
+    assert!(matches!(
+        run.ui.notice().unwrap().kind,
+        crate::ui::NoticeKind::Mode
+    ));
 }
