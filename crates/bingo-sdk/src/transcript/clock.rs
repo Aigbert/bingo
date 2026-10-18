@@ -35,7 +35,8 @@ impl Ends {
 }
 
 /// Read the same clock for live, newest and historical turns. An evicted or
-/// empty turn has no clock. Old receipts without `asked_at` imply no wait.
+/// empty turn has no clock. Held receipts leave their wait on the call;
+/// unstamped old receipts contribute no wait of their own.
 pub fn clock(state: &SessionState, turn: &TurnId, now: Timestamp) -> Option<TurnClock> {
     let items: Vec<_> = state
         .transcript
@@ -56,6 +57,11 @@ pub fn call_wait(item: &Item) -> Option<(Timestamp, Option<Timestamp>)> {
         return None;
     };
     Some((asked_at?, began_at.or(item.completed_at)))
+}
+
+/// Whether the call still owns a wait that has not ended.
+pub fn call_waiting(item: &Item) -> bool {
+    call_wait(item).is_some_and(|(_, end)| end.is_none())
 }
 
 /// Measure one turn's ordered items, subtracting the union of recorded waits.

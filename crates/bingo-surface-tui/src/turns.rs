@@ -216,16 +216,13 @@ fn step_state(item: &Item, state: &SessionState) -> Option<StepState> {
     else {
         return None;
     };
-    let asked = || {
-        bingo_sdk::transcript::call_wait(item).is_some_and(|(_, end)| end.is_none())
-            || state
-                .interactions
-                .iter()
-                .any(|open| open.item.as_ref() == Some(&item.id))
-    };
+    if let Some(live) = bingo_sdk::transcript::live_call(item, &state.interactions) {
+        return Some(match live {
+            bingo_sdk::transcript::LiveCall::Asked => StepState::Asked,
+            bingo_sdk::transcript::LiveCall::Running => StepState::Running,
+        });
+    }
     Some(match item.status {
-        ItemStatus::Pending | ItemStatus::Running if asked() => StepState::Asked,
-        ItemStatus::Running => StepState::Running,
         ItemStatus::Pending => return None,
         ItemStatus::Interrupted if asked_at.is_some() || began_at.is_some() => StepState::Stopped,
         ItemStatus::Interrupted => return None,

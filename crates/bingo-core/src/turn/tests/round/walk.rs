@@ -84,8 +84,7 @@ impl TurnHost for Person {
                     .item
                     .as_ref()
                     .and_then(|id| transcript.get(id))
-                    .and_then(bingo_sdk::transcript::call_wait)
-                    .is_some_and(|(_, end)| end.is_none()),
+                    .is_some_and(bingo_sdk::transcript::call_waiting),
             },
             answer: answer
                 .await

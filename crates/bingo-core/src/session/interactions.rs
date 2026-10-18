@@ -183,14 +183,14 @@ impl Actor {
         Some(self.fresh(open.turn.clone(), None, body))
     }
 
+    // The call owns this wait, so receipts and Interruption omit it rather than count it twice.
     fn held(&self, open: &Interaction) -> bool {
         matches!(open.kind, InteractionKind::Permission { .. })
             && open
                 .item
                 .as_ref()
                 .and_then(|id| self.state.transcript.get(id))
-                .and_then(bingo_sdk::transcript::call_wait)
-                .is_some_and(|(_, end)| end.is_none())
+                .is_some_and(bingo_sdk::transcript::call_waiting)
     }
 
     pub(super) fn remember_stopped_ask(&self) {

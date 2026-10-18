@@ -1,8 +1,10 @@
 //! The client and model orders over shared transcript items.
 
+mod call;
 pub(crate) mod checkpoint;
+pub use call::{LiveCall, live_call};
 mod clock;
-pub use clock::{Ends, TurnClock, call_wait, clock, clock_of, next_second};
+pub use clock::{Ends, TurnClock, call_wait, call_waiting, clock, clock_of, next_second};
 mod find;
 mod turns;
 pub use find::{Match, find, text};
