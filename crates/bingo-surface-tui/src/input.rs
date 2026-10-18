@@ -2701,17 +2701,19 @@ mod tests {
                     bingo_sdk::ItemStatus::Completed,
                     bingo_sdk::ItemBody::ToolCall {
                         allowed_by: None,
+                        asked_at: None,
+                        began_at: None,
                         call_id: "call_1".into(),
                         name: "Read".into(),
                         input: serde_json::json!({ "file_path": "shot.png" }),
-                        output: Some(bingo_sdk::ToolOutput {
+                        output: Some(Box::new(bingo_sdk::ToolOutput {
                             parts: vec![bingo_sdk::ContentPart::Image(
                                 bingo_pictures::testing::png(100, 200),
                             )],
                             display: None,
                             is_error: false,
                             upshot: None,
-                        }),
+                        })),
                         progress: None,
                         duration_ms: Some(3),
                         quiet: false,

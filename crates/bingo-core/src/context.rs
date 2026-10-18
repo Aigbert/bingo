@@ -145,7 +145,7 @@ impl Folder {
                 input,
                 output,
                 ..
-            } => self.tool_call(round, call_id, name, input, output.as_ref()),
+            } => self.tool_call(round, call_id, name, input, output.as_deref()),
             // A cut the endpoint made in a context of its own: the row says
             // it happened, and there is no summary to hand anybody because
             // the endpoint kept what it kept (ADR-0055 §3).
@@ -421,10 +421,12 @@ mod tests {
                 call_id: call.into(),
                 name: "Read".into(),
                 input: serde_json::json!({"file_path": "x"}),
-                output: output.map(ToolOutput::text),
+                output: output.map(ToolOutput::text).map(Box::new),
                 progress: None,
                 duration_ms: None,
                 allowed_by: None,
+                asked_at: None,
+                began_at: None,
                 quiet: false,
             },
         )

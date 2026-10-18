@@ -1379,6 +1379,13 @@ export type Item = {
 export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<ContentPart>; [key: string]: unknown; } | { "kind": "assistant"; "text": string; [key: string]: unknown; } | { "kind": "reasoning"; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; [key: string]: unknown; } | {
   /** The policy that answered without opening an ask. */
   "allowedBy"?: (Reason | null);
+  /**
+   * When the call's own ask opened. Its wait runs until `began_at`, or
+   * until `completed_at` for a call that never ran.
+   */
+  "askedAt"?: (string | null);
+  /** When the call began running. */
+  "beganAt"?: (string | null);
   "callId": string;
   "durationMs"?: (number | null);
   "input": unknown;
@@ -2229,6 +2236,13 @@ export type InteractionId = string;
 export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<ContentPart>; [key: string]: unknown; } | { "kind": "assistant"; "text": string; [key: string]: unknown; } | { "kind": "reasoning"; "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; [key: string]: unknown; } | {
   /** The policy that answered without opening an ask. */
   "allowedBy"?: (Reason | null);
+  /**
+   * When the call's own ask opened. Its wait runs until `began_at`, or
+   * until `completed_at` for a call that never ran.
+   */
+  "askedAt"?: (string | null);
+  /** When the call began running. */
+  "beganAt"?: (string | null);
   "callId": string;
   "durationMs"?: (number | null);
   "input": unknown;

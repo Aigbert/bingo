@@ -201,6 +201,8 @@ fn lost_call_journal() -> Vec<Frame> {
                 duration_ms: None,
                 progress: None,
                 allowed_by: None,
+                asked_at: None,
+                began_at: None,
                 quiet: false,
             },
             status,
@@ -236,7 +238,7 @@ fn lost_ask_journal() -> Vec<Frame> {
         ..
     } = &mut first.body
     {
-        *output = Some(ToolOutput::text("done"));
+        *output = Some(Box::new(ToolOutput::text("done")));
         *duration_ms = Some(1);
     }
     frames.push(journal_frame(5, Event::ItemCompleted { item: first }));

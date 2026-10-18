@@ -15,6 +15,8 @@ fn unfinished_items_close_at_the_given_instant() {
                 duration_ms: None,
                 progress: None,
                 allowed_by: None,
+                asked_at: None,
+                began_at: None,
                 quiet: false,
             },
             ItemStatus::Pending,

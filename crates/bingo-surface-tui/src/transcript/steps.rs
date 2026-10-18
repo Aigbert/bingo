@@ -249,7 +249,7 @@ mod tests {
         if let ItemBody::ToolCall { output, .. } = &mut call.body {
             let mut value = bingo_sdk::ToolOutput::text("one\ntwo\nthree");
             value.display = Some(bingo_sdk::View::text("one\ntwo\nthree"));
-            *output = Some(value);
+            *output = Some(Box::new(value));
         }
         let state = folded(vec![
             frame(1, started("trn_1")),

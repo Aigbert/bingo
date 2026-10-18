@@ -2955,6 +2955,20 @@
               ],
               "description": "The policy that answered without opening an ask."
             },
+            "askedAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "When the call's own ask opened. Its wait runs until `began_at`, or\nuntil `completed_at` for a call that never ran."
+            },
+            "beganAt": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "When the call began running."
+            },
             "callId": {
               "type": "string"
             },

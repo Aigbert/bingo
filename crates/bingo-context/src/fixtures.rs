@@ -43,10 +43,12 @@ pub fn tool(id: &str, name: &str, input: &str, output: Option<&str>) -> Item {
             call_id: format!("call_{id}"),
             name: name.to_string(),
             input: serde_json::from_str(input).unwrap_or(serde_json::Value::Null),
-            output: output.map(ToolOutput::text),
+            output: output.map(ToolOutput::text).map(Box::new),
             progress: None,
             duration_ms: None,
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             quiet: false,
         },
     )

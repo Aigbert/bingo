@@ -82,7 +82,7 @@ fn heading(
 
 fn quiet(item: &Item) -> bool {
     matches!(&item.body, ItemBody::ToolCall { quiet: true, output, .. }
-        if !item.status.failed(output.as_ref()))
+        if !item.status.failed(output.as_deref()))
 }
 
 fn decorate_heading(heading: Option<&mut Line<'static>>, slot: &bingo_sdk::slot::Slot) {
@@ -143,7 +143,7 @@ fn replacement_heading(
     cue: Cue,
 ) -> crate::views::Drawing {
     let failed = match &item.body {
-        ItemBody::ToolCall { output, .. } => item.status.failed(output.as_ref()),
+        ItemBody::ToolCall { output, .. } => item.status.failed(output.as_deref()),
         _ => false,
     };
     let landing = match item.body {

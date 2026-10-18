@@ -318,15 +318,17 @@ mod tests {
 
         let read = ItemBody::ToolCall {
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             call_id: "call_1".into(),
             name: "Read".into(),
             input: serde_json::json!({}),
-            output: Some(ToolOutput {
+            output: Some(Box::new(ToolOutput {
                 parts: vec![ContentPart::Image(image("shot"))],
                 display: None,
                 is_error: false,
                 upshot: None,
-            }),
+            })),
             progress: None,
             duration_ms: None,
             quiet: false,
@@ -342,6 +344,8 @@ mod tests {
         assert!(
             pictures_of(&ItemBody::ToolCall {
                 allowed_by: None,
+                asked_at: None,
+                began_at: None,
                 call_id: "call_1".into(),
                 name: "Read".into(),
                 input: serde_json::json!({}),

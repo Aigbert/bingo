@@ -311,7 +311,7 @@ impl Renderer {
         let title = external
             .as_ref()
             .map_or(name.as_str(), |c| c.title.as_str());
-        self.tool_done(item, title, output.as_ref(), *duration_ms, err)
+        self.tool_done(item, title, output.as_deref(), *duration_ms, err)
     }
 
     /// The verdict line, then what a person would have seen (ADR-0013 §2):

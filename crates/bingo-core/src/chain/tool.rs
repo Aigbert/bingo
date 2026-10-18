@@ -252,6 +252,8 @@ mod item_tests {
             progress: None,
             duration_ms: None,
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             quiet: false,
         };
         transcript.apply(&Event::ItemCompleted { item });

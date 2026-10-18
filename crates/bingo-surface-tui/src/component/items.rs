@@ -28,7 +28,7 @@ pub fn props(item: &Item, expanded: bool) -> Option<Props> {
             tool: name.clone(),
             input: input.clone(),
             is_running: !item.status.is_terminal(),
-            is_errored: item.status.failed(output.as_ref()),
+            is_errored: item.status.failed(output.as_deref()),
             is_interrupted: item.status == ItemStatus::Interrupted,
             output: output
                 .as_ref()
@@ -78,7 +78,7 @@ pub fn changed(item: &Item, props: &Props) -> Item {
         ) => {
             *name = props.tool.clone();
             *input = props.input.clone();
-            *output = props.output.as_ref().map(output_of);
+            *output = props.output.as_ref().map(output_of).map(Box::new);
             item.status = status(props);
         }
         (
@@ -157,7 +157,7 @@ pub fn tail(item: &Item) -> Option<Props> {
             })
         });
     }
-    output.as_ref().map(|output| {
+    output.as_deref().map(|output| {
         Props::ToolResult(ToolResultProps {
             tool_use_id: call_id.to_string(),
             tool: name.clone(),

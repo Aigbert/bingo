@@ -7073,6 +7073,20 @@
                       }
                     ]
                   },
+                  "askedAt": {
+                    "description": "When the call's own ask opened. Its wait runs until `began_at`, or\nuntil `completed_at` for a call that never ran.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "beganAt": {
+                    "description": "When the call began running.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "callId": {
                     "type": "string"
                   },
@@ -12913,6 +12927,20 @@
                       {
                         "type": "null"
                       }
+                    ]
+                  },
+                  "askedAt": {
+                    "description": "When the call's own ask opened. Its wait runs until `began_at`, or\nuntil `completed_at` for a call that never ran.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "beganAt": {
+                    "description": "When the call began running.",
+                    "type": [
+                      "string",
+                      "null"
                     ]
                   },
                   "callId": {

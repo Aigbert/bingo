@@ -725,10 +725,12 @@ pub(crate) mod tests {
                 call_id: "call_1".into(),
                 name: name.into(),
                 input: json!({ "file_path": "Cargo.toml" }),
-                output,
+                output: output.map(Box::new),
                 progress: None,
                 duration_ms: Some(12),
                 allowed_by: None,
+                asked_at: None,
+                began_at: None,
                 quiet: false,
             },
         )

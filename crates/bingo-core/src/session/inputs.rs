@@ -407,6 +407,8 @@ impl Actor {
             progress: None,
             duration_ms: None,
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             quiet,
         };
         let mut item = self.fresh(Some(turn.clone()), None, body);
@@ -452,7 +454,7 @@ impl Actor {
             ..
         } = &mut item.body
         {
-            *output = Some(outcome.output);
+            *output = Some(Box::new(outcome.output));
             *duration_ms = Some(outcome.duration_ms);
             *progress = None;
         }

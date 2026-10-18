@@ -12,7 +12,9 @@ fn tool_result(out: &Output, tool: &str) -> bingo_sdk::ToolOutput {
         .into_iter()
         .filter_map(|f| match f.event {
             Event::ItemCompleted { item } => match item.body {
-                bingo_sdk::ItemBody::ToolCall { name, output, .. } if name == tool => output,
+                bingo_sdk::ItemBody::ToolCall { name, output, .. } if name == tool => {
+                    output.map(|output| *output)
+                }
                 _ => None,
             },
             _ => None,

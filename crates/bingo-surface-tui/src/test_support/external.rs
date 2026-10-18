@@ -43,14 +43,16 @@ pub fn agent_call(id: &str, text: &str, fields: Value) -> Item {
         },
         ItemBody::ToolCall {
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             call_id: call.call_id,
             name: call.name,
             input: call.input,
-            output: Some(if failed {
+            output: Some(Box::new(if failed {
                 ToolOutput::error(text)
             } else {
                 ToolOutput::text(text)
-            }),
+            })),
             progress: None,
             duration_ms: None,
             quiet: false,

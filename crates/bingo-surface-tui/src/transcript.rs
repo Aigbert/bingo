@@ -552,8 +552,8 @@ fn called(item: &Item, agents: &Agents<'_>, fold: Fold, rows: &Rows<'_>) -> crat
     else {
         return crate::views::Drawing::default();
     };
-    if *quiet && !item.status.failed(output.as_ref()) {
-        return quiet_call(output.as_ref(), rows);
+    if *quiet && !item.status.failed(output.as_deref()) {
+        return quiet_call(output.as_deref(), rows);
     }
     match agents.get(&item.id) {
         Some(child) => child_row(child, name, input, rows).into(),

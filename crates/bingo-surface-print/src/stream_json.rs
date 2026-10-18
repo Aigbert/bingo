@@ -204,8 +204,8 @@ impl Encoder {
             } => Some(tool_result(
                 scope,
                 call_id,
-                output.as_ref(),
-                item.status.failed(output.as_ref()),
+                output.as_deref(),
+                item.status.failed(output.as_deref()),
             )),
             ItemBody::Shell {
                 command,

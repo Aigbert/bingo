@@ -491,11 +491,20 @@ pub enum ItemBody {
         /// The policy that answered without opening an ask.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         allowed_by: Option<Box<crate::policy::Reason>>,
+        /// When the call's own ask opened. Its wait runs until `began_at`, or
+        /// until `completed_at` for a call that never ran.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(with = "Option<String>")]
+        asked_at: Option<Timestamp>,
+        /// When the call began running.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schemars(with = "Option<String>")]
+        began_at: Option<Timestamp>,
         call_id: String,
         name: String,
         input: Value,
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        output: Option<ToolOutput>,
+        output: Option<Box<ToolOutput>>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         progress: Option<String>,
         #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -6,6 +6,8 @@ use serde_json::{Value, json};
 #[test]
 fn optional_provenance_and_ask_times_round_trip() {
     for body in [
+        json!({"kind":"toolCall","callId":"c","name":"Edit","input":{},
+            "askedAt":"2026-10-18T00:00:01Z","beganAt":"2026-10-18T00:00:02Z"}),
         json!({"kind":"interruption","marker":"stopped","askedAt":"2026-10-18T00:00:01Z"}),
         json!({"kind":"toolCall","callId":"c","name":"Edit","input":{},
             "allowedBy":{"kind":"mode","mode":"acceptEdits"}}),
@@ -56,6 +58,16 @@ fn old_items_and_rule_reasons_remain_unchanged() {
     ] {
         replay(serde_json::from_str(text).unwrap());
     }
+    let old: ItemBody =
+        serde_json::from_str(include_str!("../fixtures/record/item/toolCall.json")).unwrap();
+    assert!(matches!(
+        old,
+        ItemBody::ToolCall {
+            asked_at: None,
+            began_at: None,
+            ..
+        }
+    ));
     let wire = json!({"kind":"rule","rule":"Edit"});
     let reason: Reason = serde_json::from_value(wire.clone()).unwrap();
     assert_eq!(serde_json::to_value(reason).unwrap(), wire);

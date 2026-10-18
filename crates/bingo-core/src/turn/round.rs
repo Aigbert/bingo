@@ -226,7 +226,7 @@ impl Round<'_> {
                 ..
             } = &mut item.body
             {
-                *output = Some(outcome.output.clone());
+                *output = Some(Box::new(outcome.output.clone()));
                 *duration_ms = Some(outcome.duration_ms);
                 *progress = None;
             }

@@ -78,10 +78,12 @@ mod tests {
             call_id: "bash".into(),
             name: "Bash".into(),
             input: serde_json::json!({"command":"echo hello"}),
-            output: Some(bingo_sdk::ToolOutput::text("hello")),
+            output: Some(Box::new(bingo_sdk::ToolOutput::text("hello"))),
             progress: None,
             duration_ms: None,
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             quiet: false,
         };
         state

@@ -224,10 +224,12 @@ mod tests {
             call_id: "c1".into(),
             name: crate::post::SEND_MESSAGE.into(),
             input,
-            output: Some(output),
+            output: Some(Box::new(output)),
             progress: None,
             duration_ms: None,
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             quiet: false,
         })
     }

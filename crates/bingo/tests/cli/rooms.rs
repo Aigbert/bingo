@@ -37,7 +37,9 @@ fn tool_result(frames: &[Frame], tool: &str) -> bingo_sdk::ToolOutput {
         .iter()
         .filter_map(|frame| match &frame.event {
             Event::ItemCompleted { item } => match &item.body {
-                ItemBody::ToolCall { name, output, .. } if name == tool => output.clone(),
+                ItemBody::ToolCall { name, output, .. } if name == tool => {
+                    output.as_deref().cloned()
+                }
                 _ => None,
             },
             _ => None,

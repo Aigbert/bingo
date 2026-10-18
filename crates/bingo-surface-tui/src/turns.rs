@@ -33,7 +33,7 @@ impl Roles {
             }
             let role = match &item.body {
                 ItemBody::ToolCall { quiet, output, .. }
-                    if (!*quiet || item.status.failed(output.as_ref()))
+                    if (!*quiet || item.status.failed(output.as_deref()))
                         && !agents.contains_key(&item.id)
                         && !replaced.contains(&item.id) =>
                 {
@@ -201,7 +201,7 @@ pub fn step(item: &Item, rows: &crate::transcript::Rows<'_>) -> Step {
         step_state(item, state)
     };
     step.landed_at = item.completed_at.map(|time| time.as_millisecond());
-    step.upshot = output.as_ref().and_then(bingo_sdk::ToolOutput::outcome);
+    step.upshot = output.as_deref().and_then(bingo_sdk::ToolOutput::outcome);
     step.answer = answer(answers.to(&item.id), input);
     step.why = why(item, &rows.mode_labels);
     step
@@ -235,7 +235,7 @@ fn step_state(item: &Item, state: &SessionState) -> StepState {
         ItemStatus::Pending | ItemStatus::Running if asked() => StepState::Asked,
         ItemStatus::Pending | ItemStatus::Running => StepState::Running,
         ItemStatus::Interrupted => StepState::Stopped,
-        status if status.failed(output.as_ref()) => StepState::Failed,
+        status if status.failed(output.as_deref()) => StepState::Failed,
         _ => StepState::Done,
     }
 }

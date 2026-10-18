@@ -297,10 +297,14 @@ fn search_reads_full_results_reasoning_and_only_retained_items() {
         call_id: "c".into(),
         name: "Read".into(),
         input: serde_json::json!({"file_path":"file"}),
-        output: Some(ToolOutput::text("one\ntwo\nthree\nfour\nfive\nFORK")),
+        output: Some(Box::new(ToolOutput::text(
+            "one\ntwo\nthree\nfour\nfive\nFORK",
+        ))),
         progress: None,
         duration_ms: None,
         allowed_by: None,
+        asked_at: None,
+        began_at: None,
         quiet: false,
     };
     let mut reasoning = item(2, String::new());
@@ -429,6 +433,8 @@ fn search_caps_results_and_reads_tool_input_as_lines() {
         progress: None,
         duration_ms: None,
         allowed_by: None,
+        asked_at: None,
+        began_at: None,
         quiet: false,
     };
     let transcript = [row].into_iter().collect();

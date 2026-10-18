@@ -200,10 +200,12 @@ impl Turn<'_> {
             call_id: tool.call_id,
             name: tool.name,
             input: tool.input,
-            output: output.clone(),
+            output: output.clone().map(Box::new),
             progress: None,
             duration_ms: None,
             allowed_by: None,
+            asked_at: None,
+            began_at: None,
             quiet: false,
         };
         let mut item =
