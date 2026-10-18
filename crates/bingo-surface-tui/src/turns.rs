@@ -331,6 +331,9 @@ impl Turn<'_> {
                 |(&at, step)| match granted(self.answers.to(&self.items[at].id)) {
                     true => Step {
                         answer: None,
+                        why: None,
+                        elapsed_ms: None,
+                        landed_at: None,
                         ..step
                     },
                     false => step,

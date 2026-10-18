@@ -56,3 +56,17 @@ case!(text);
 case!(acp);
 case!(acp_ascii);
 case!(colon_name);
+
+#[test]
+fn standalone_marks_follow_the_row_contract() {
+    for (mark, ascii, expected) in [
+        (Some('¶'), false, '¶'),
+        (Some('¶'), true, '-'),
+        (Some('界'), false, '•'),
+        (Some('\0'), false, '•'),
+        (None, false, '•'),
+        (Some('/'), true, '/'),
+    ] {
+        assert_eq!(look::mark(mark, ascii), expected);
+    }
+}

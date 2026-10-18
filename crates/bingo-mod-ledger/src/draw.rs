@@ -100,6 +100,9 @@ mod tests {
             state,
             upshot,
             answer: None,
+            why: None,
+            elapsed_ms: None,
+            landed_at: None,
         }
     }
 

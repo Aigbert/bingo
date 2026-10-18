@@ -8046,6 +8046,19 @@
         {
           "type": "object",
           "properties": {
+            "kind": {
+              "type": "string",
+              "const": "shimmer"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "description": "A moving glow across the text's cells, still in the base ink under reduced motion."
+        },
+        {
+          "type": "object",
+          "properties": {
             "from": {
               "type": "string"
             },
@@ -8058,6 +8071,16 @@
               "format": "uint64",
               "minimum": 0
             },
+            "curve": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FadeCurve"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "fade"
@@ -8068,7 +8091,8 @@
             "from",
             "atMs",
             "ms"
-          ]
+          ],
+          "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink."
         }
       ],
       "description": "Declarative motion on the surface clock, with a reduced-motion still form."
@@ -8080,6 +8104,13 @@
         "session"
       ],
       "description": "Where the matched permission rule was installed."
+    },
+    "FadeCurve": {
+      "type": "string",
+      "enum": [
+        "easeOut"
+      ],
+      "description": "The progress curve of a text fade."
     }
   },
   "manifest": {

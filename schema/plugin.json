@@ -3622,6 +3622,13 @@
         "value"
       ]
     },
+    "FadeCurve": {
+      "type": "string",
+      "enum": [
+        "easeOut"
+      ],
+      "description": "The progress curve of a text fade."
+    },
     "Fetch": {
       "type": "object",
       "properties": {
@@ -10391,7 +10398,31 @@
               "type": "null"
             }
           ],
-          "description": "What the person answered when the step asked: `you: yes`."
+          "description": "What the person answered: a question response or `changed by you`."
+        },
+        "why": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Why the step ran without asking, such as `accept edits`."
+        },
+        "elapsedMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0,
+          "description": "Elapsed milliseconds; the surface truncates these to whole seconds."
+        },
+        "landedAt": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "description": "When the result arrived; the drawing declares its landing motion."
         }
       },
       "required": [
@@ -10422,6 +10453,11 @@
           "type": "string",
           "const": "stopped",
           "description": "Was in flight when the person stopped the turn."
+        },
+        {
+          "type": "string",
+          "const": "skipped",
+          "description": "The person refused the call before it ran."
         }
       ],
       "description": "What a step is doing, as far as the turn has come."
@@ -10627,6 +10663,19 @@
         {
           "type": "object",
           "properties": {
+            "kind": {
+              "type": "string",
+              "const": "shimmer"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "description": "A moving glow across the text's cells, still in the base ink under reduced motion."
+        },
+        {
+          "type": "object",
+          "properties": {
             "from": {
               "type": "string"
             },
@@ -10639,6 +10688,16 @@
               "format": "uint64",
               "minimum": 0
             },
+            "curve": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/FadeCurve"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "fade"
@@ -10649,7 +10708,8 @@
             "from",
             "atMs",
             "ms"
-          ]
+          ],
+          "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink."
         }
       ],
       "description": "Declarative motion on the surface clock, with a reduced-motion still form."

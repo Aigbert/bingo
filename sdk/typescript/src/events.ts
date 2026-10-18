@@ -117,6 +117,8 @@ export type Align = ("flex-start" | "center" | "flex-end" | "stretch");
 export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome" | "Ledger" | "TurnFold");
 export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type Direction = ("row" | "column");
+/** The progress curve of a text fade. */
+export type FadeCurve = ("easeOut");
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");
 export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
 /** A question owner's editing projection; sealed labels remain the host's. */
@@ -132,7 +134,7 @@ export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<K
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | unknown);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "atMs": number; "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
@@ -636,6 +638,8 @@ export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plu
 export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type Direction = ("row" | "column");
+/** The progress curve of a text fade. */
+export type FadeCurve = ("easeOut");
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -673,7 +677,7 @@ export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<K
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "atMs": number; "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /**
@@ -1331,6 +1335,8 @@ export type DecisionKind = ("allowChanged" | "allowChangedSession" | "allow" | "
 export type Direction = ("row" | "column");
 /** Reasoning effort, in the vocabulary providers converge on. */
 export type Effort = ("minimal" | "low" | "medium" | "high" | "xHigh" | "max");
+/** The progress curve of a text fade. */
+export type FadeCurve = ("easeOut");
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -1445,7 +1451,7 @@ export type Target = { "field": string; "reads": Reads; [key: string]: unknown; 
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "atMs": number; "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a tool reads on a surface; never sent to a model. */
@@ -2194,6 +2200,8 @@ export type ComposerProps = { "placeholder": string; "tag": string; [key: string
 export type ContentPart = ({ "text": string; "type": "text"; [key: string]: unknown; } | Image | { "id": string; "input": unknown; "name": string; "type": "toolUse"; [key: string]: unknown; } | { "isError"?: boolean; "parts": Array<ContentPart>; "toolUseId": string; "type": "toolResult"; [key: string]: unknown; } | { "providerMetadata"?: { [key: string]: { [key: string]: unknown; }; }; "text": string; "type": "reasoning"; [key: string]: unknown; });
 export type DecisionKind = ("allowChanged" | "allowChangedSession" | "allow" | "allowSession" | "deny");
 export type Direction = ("row" | "column");
+/** The progress curve of a text fade. */
+export type FadeCurve = ("easeOut");
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -2263,7 +2271,7 @@ export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "atMs": number; "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /**

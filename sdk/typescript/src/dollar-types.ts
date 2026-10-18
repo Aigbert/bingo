@@ -385,6 +385,8 @@ export type EnvSet = {
   [key: string]: unknown;
 };
 export type Extend = { "key": string; "session": SessionId; "value": unknown; [key: string]: unknown; };
+/** The progress curve of a text fade. */
+export type FadeCurve = ("easeOut");
 export type Fetch = {
   /** The request body, as text. */
   "body"?: (string | null);
@@ -854,7 +856,7 @@ export type Target = { "field": string; "reads": Reads; [key: string]: unknown; 
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "atMs": number; "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
 export type Timer = {
   "callback": string;
   /** Milliseconds. */

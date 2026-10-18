@@ -20,6 +20,8 @@ pub enum StepState {
     Failed,
     /// Was in flight when the person stopped the turn.
     Stopped,
+    /// The person refused the call before it ran.
+    Skipped,
 }
 
 /// The catalogue's baseline: only a trusted read-only tool is a lookup.
@@ -58,9 +60,18 @@ pub struct Step {
     /// What the tool said the call came to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upshot: Option<Upshot>,
-    /// What the person answered when the step asked: `you: yes`.
+    /// What the person answered: a question response or `changed by you`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer: Option<Upshot>,
+    /// Why the step ran without asking, such as `accept edits`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub why: Option<String>,
+    /// Elapsed milliseconds; the surface truncates these to whole seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elapsed_ms: Option<u64>,
+    /// When the result arrived; the drawing declares its landing motion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub landed_at: Option<i64>,
 }
 
 /// How a turn ended, for its folded line. A failed turn ends `done` here:
@@ -100,7 +111,7 @@ impl Marks {
             StepState::Done => &self.done,
             StepState::Asked => &self.asked,
             StepState::Running => &self.running,
-            StepState::Failed | StepState::Stopped => &self.failed,
+            StepState::Failed | StepState::Stopped | StepState::Skipped => &self.failed,
         }
     }
 }
@@ -140,7 +151,7 @@ impl Step {
             StepState::Running => Ink::Presence,
             StepState::Asked => Ink::Glow,
             StepState::Done => Ink::Good,
-            StepState::Failed | StepState::Stopped => Ink::Bad,
+            StepState::Failed | StepState::Stopped | StepState::Skipped => Ink::Bad,
         }
     }
 
@@ -156,7 +167,9 @@ impl Step {
             StepState::Asked => Some(said("needs you", Tone::Attention)),
             StepState::Done => self.upshot.clone(),
             StepState::Failed => self.upshot.clone().or(Some(said("failed", Tone::Bad))),
-            StepState::Stopped => self.upshot.clone().or(Some(said("stopped", Tone::Bad))),
+            StepState::Stopped | StepState::Skipped => {
+                self.upshot.clone().or(Some(said("stopped", Tone::Bad)))
+            }
         }
     }
 
@@ -385,6 +398,9 @@ mod tests {
             state,
             upshot,
             answer: None,
+            why: None,
+            elapsed_ms: None,
+            landed_at: None,
         }
     }
     fn text(pieces: &[Piece]) -> String {
@@ -605,3 +621,5 @@ mod tests {
         assert_eq!(elapsed(7_500_000), "2h 5m");
     }
 }
+
+mod draw;

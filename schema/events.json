@@ -1403,6 +1403,20 @@
                 ]
               },
               {
+                "description": "A moving glow across the text's cells, still in the base ink under reduced motion.",
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "shimmer"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink.",
                 "type": "object",
                 "properties": {
                   "from": {
@@ -1417,6 +1431,16 @@
                     "format": "uint64",
                     "minimum": 0
                   },
+                  "curve": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/FadeCurve"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "fade"
@@ -1429,6 +1453,13 @@
                   "ms"
                 ]
               }
+            ]
+          },
+          "FadeCurve": {
+            "description": "The progress curve of a text fade.",
+            "type": "string",
+            "enum": [
+              "easeOut"
             ]
           },
           "Tone": {
@@ -3927,6 +3958,20 @@
                 ]
               },
               {
+                "description": "A moving glow across the text's cells, still in the base ink under reduced motion.",
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "shimmer"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink.",
                 "type": "object",
                 "properties": {
                   "from": {
@@ -3941,6 +3986,16 @@
                     "format": "uint64",
                     "minimum": 0
                   },
+                  "curve": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/FadeCurve"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "fade"
@@ -3953,6 +4008,13 @@
                   "ms"
                 ]
               }
+            ]
+          },
+          "FadeCurve": {
+            "description": "The progress curve of a text fade.",
+            "type": "string",
+            "enum": [
+              "easeOut"
             ]
           },
           "Tone": {
@@ -8755,6 +8817,20 @@
                 ]
               },
               {
+                "description": "A moving glow across the text's cells, still in the base ink under reduced motion.",
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "shimmer"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink.",
                 "type": "object",
                 "properties": {
                   "from": {
@@ -8769,6 +8845,16 @@
                     "format": "uint64",
                     "minimum": 0
                   },
+                  "curve": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/FadeCurve"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "fade"
@@ -8781,6 +8867,13 @@
                   "ms"
                 ]
               }
+            ]
+          },
+          "FadeCurve": {
+            "description": "The progress curve of a text fade.",
+            "type": "string",
+            "enum": [
+              "easeOut"
             ]
           },
           "Tone": {
@@ -12443,6 +12536,20 @@
                 ]
               },
               {
+                "description": "A moving glow across the text's cells, still in the base ink under reduced motion.",
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "shimmer"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink.",
                 "type": "object",
                 "properties": {
                   "from": {
@@ -12457,6 +12564,16 @@
                     "format": "uint64",
                     "minimum": 0
                   },
+                  "curve": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/FadeCurve"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "fade"
@@ -12469,6 +12586,13 @@
                   "ms"
                 ]
               }
+            ]
+          },
+          "FadeCurve": {
+            "description": "The progress curve of a text fade.",
+            "type": "string",
+            "enum": [
+              "easeOut"
             ]
           },
           "Tone": {

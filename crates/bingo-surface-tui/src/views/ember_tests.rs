@@ -147,6 +147,7 @@ fn fades_finish_and_nested_spinners_wake_on_their_own_beat() {
         let fade = view(TextStyle {
             color: Some("good".into()),
             motion: Some(Box::new(TextMotion::Fade {
+                curve: None,
                 from: "glow".into(),
                 at_ms: now.wall.as_millisecond(),
                 ms: 420,
@@ -338,6 +339,7 @@ fn breathe_and_fade_resolve_inks_before_converting_depth() {
                             depth: 1.0,
                         },
                         TextMotion::Fade {
+                            curve: None,
                             from: "glow".into(),
                             at_ms: 0,
                             ms: 900,
@@ -467,6 +469,7 @@ fn round3_unknown_motion_ink_has_no_deadline() {
                 depth: 1.0,
             },
             TextMotion::Fade {
+                curve: None,
                 from: "nonsense".into(),
                 at_ms: now.wall.as_millisecond(),
                 ms: 900,

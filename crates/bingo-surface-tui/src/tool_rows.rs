@@ -58,6 +58,9 @@ pub fn resolve(name: &str, input: &Value, tools: &Looks, ascii: bool) -> Step {
         state: StepState::Done,
         upshot: None,
         answer: None,
+        why: None,
+        elapsed_ms: None,
+        landed_at: None,
     }
 }
 

@@ -426,7 +426,10 @@
           },
           "mark": "•",
           "reads": "text",
-          "tier": "change"
+          "tier": "change",
+          "elapsedMs": 2000,
+          "landedAt": 10000,
+          "why": "session rule"
         }
       ],
       "marks": {

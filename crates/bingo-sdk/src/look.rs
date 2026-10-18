@@ -23,7 +23,16 @@ pub fn row(name: &str, input: &Value, declared: Option<&ToolLook>, ascii: bool) 
         .flatten();
     let declared = declared.or(external.as_ref());
     RowLook {
-        mark: mark(declared, ascii),
+        mark: mark(
+            declared.map(|look| {
+                if ascii {
+                    look.ascii.unwrap_or(look.mark)
+                } else {
+                    look.mark
+                }
+            }),
+            ascii,
+        ),
         verb: declared
             .map(|look| look.verb.clone())
             .unwrap_or_else(|| name.to_lowercase()),
@@ -43,15 +52,10 @@ fn external_look(name: &str, input: &Value) -> Option<ToolLook> {
     .map(|call| call.kind.look())
 }
 
-fn mark(declared: Option<&ToolLook>, ascii: bool) -> char {
+/// Resolve a one-cell mark for the surface's character set.
+/// Pass the declared ASCII twin when one is available under ASCII.
+pub fn mark(declared: Option<char>, ascii: bool) -> char {
     declared
-        .map(|look| {
-            if ascii {
-                look.ascii.unwrap_or(look.mark)
-            } else {
-                look.mark
-            }
-        })
         .filter(|mark| mark.width() == Some(1) && (!ascii || mark.is_ascii()))
         .unwrap_or(if ascii { '-' } else { '•' })
 }

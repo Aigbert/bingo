@@ -422,6 +422,8 @@ export type EnvSet = {
 export type ErrorCode = (("SESSION_NOT_FOUND" | "SESSION_LOCKED" | "SESSION_CLOSED" | "INTERACTION_CLOSED" | "NOT_READY" | "STALE_GENERATION" | "NOT_INITIALIZED" | "INVALID_INPUT" | "PERMISSION_DENIED" | "TOOL_NOT_FOUND" | "TOOL_FAILED" | "PROVIDER_UNAVAILABLE" | "AUTH_REQUIRED" | "RATE_LIMITED" | "CONTEXT_OVERFLOW" | "TIMEOUT" | "OFFLINE" | "SERVER_ERROR" | "TURN_LOST" | "TURN_BUDGET_EXHAUSTED" | "UNSUPPORTED" | "INTERNAL") | "INTERRUPTED" | "PROTOCOL_LIMIT" | "NOT_FOUND" | "STORAGE");
 export type Event = ({ "summary": SessionSummary; "type": "sessionUpdated"; [key: string]: unknown; } | { "reason": CloseReason; "type": "sessionClosed"; [key: string]: unknown; } | { "inputs": Array<ItemId>; "origin": TurnOrigin; "turn": TurnId; "type": "turnStarted"; [key: string]: unknown; } | { "attempt": number; "delayMs": number; "dropped": Array<ItemId>; "max": number; "reason": string; "turn": TurnId; "type": "turnRetrying"; [key: string]: unknown; } | { "context": ContextUsage; "turn": TurnId; "type": "turnUsage"; "usage": Usage; [key: string]: unknown; } | { "context"?: (ContextUsage | null); "type": "contextChanged"; [key: string]: unknown; } | { "plugin": string; "turn"?: (TurnId | null); "type": "usageCharged"; "usage": Usage; [key: string]: unknown; } | { "status": TurnStatus; "turn": TurnId; "type": "turnCompleted"; "usage": Usage; [key: string]: unknown; } | { "item": Item; "type": "itemStarted"; [key: string]: unknown; } | { "data": string; "item": ItemId; "kind": DeltaKind; "n": number; "type": "itemDelta"; [key: string]: unknown; } | { "item": Item; "type": "itemUpdated"; [key: string]: unknown; } | { "item": Item; "type": "itemCompleted"; [key: string]: unknown; } | { "entries": Array<QueueEntry>; "revision": number; "type": "queueChanged"; [key: string]: unknown; } | { "interaction": Interaction; "type": "interactionOpened"; [key: string]: unknown; } | { "answer": Answer; "by": ResolvedBy; "id": InteractionId; "type": "interactionResolved"; [key: string]: unknown; } | { "id": InteractionId; "reason": CancelReason; "type": "interactionCancelled"; [key: string]: unknown; } | { "intent": IntentId; "outcome": IntentOutcome; "type": "intentAck"; [key: string]: unknown; } | { "boundary": ItemId; "generation": number; "kept": Array<ItemId>; "summary": ItemId; "type": "compacted"; [key: string]: unknown; } | { "dropped": Array<ItemId>; "filesRestored": Array<string>; "generation": number; "toTurn": TurnId; "type": "rewound"; [key: string]: unknown; } | { "config": ConfigView; "type": "configChanged"; [key: string]: unknown; } | { "kind": string; "type": "catalogChanged"; [key: string]: unknown; } | { "code": string; "level": Level; "text": string; "type": "notice"; [key: string]: unknown; } | { "kind": string; "payload": unknown; "plugin": string; "type": "extension"; [key: string]: unknown; } | { "requests": Array<string>; "type": "invalidated"; [key: string]: unknown; } | { "kind": string; "payload": unknown; "plugin": string; "type": "signal"; [key: string]: unknown; } | { "from": Seq; "to": Seq; "type": "lagged"; [key: string]: unknown; } | { [key: string]: unknown; });
 export type Extend = { "key": string; "session": SessionId; "value": unknown; [key: string]: unknown; };
+/** The progress curve of a text fade. */
+export type FadeCurve = ("easeOut");
 export type Fetch = {
   /** The request body, as text. */
   "body"?: (string | null);
@@ -1347,8 +1349,12 @@ export type StateValue = { "value": unknown; "version": number; [key: string]: u
 export type StatusProps = { "config"?: ConfigView; "context"?: (ContextUsage | null); "selected"?: (string | null); "summary"?: SessionSummary; [key: string]: unknown; };
 /** One tool call of a turn, in the words a row shows. */
 export type Step = {
-  /** What the person answered when the step asked: `you: yes`. */
+  /** What the person answered: a question response or `changed by you`. */
   "answer"?: (Upshot | null);
+  /** Elapsed milliseconds; the surface truncates these to whole seconds. */
+  "elapsedMs"?: (number | null);
+  /** When the result arrived; the drawing declares its landing motion. */
+  "landedAt"?: (number | null);
   /** The declared one-cell mark, resolved for the surface character set. */
   "mark": string;
   /** How to render the target, absent when the call has no target. */
@@ -1362,10 +1368,12 @@ export type Step = {
   "upshot"?: (Upshot | null);
   /** What the step does, one lowercase word: `read`, `run`. */
   "verb": string;
+  /** Why the step ran without asking, such as `accept edits`. */
+  "why"?: (string | null);
   [key: string]: unknown;
 };
 /** What a step is doing, as far as the turn has come. */
-export type StepState = (("running" | "done" | "failed") | "asked" | "stopped");
+export type StepState = (("running" | "done" | "failed") | "asked" | "stopped" | "skipped");
 export type StopResult = ("complete" | { "continue": { "origin": string; "reason": string; [key: string]: unknown; }; });
 export type Submit = {
   /** What to submit, as a person would type it. */
@@ -1382,7 +1390,7 @@ export type Target = { "field": string; "reads": Reads; [key: string]: unknown; 
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "atMs": number; "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
 export type Tier = ("tighten" | "rewrite" | "full");
 /** The catalogue's baseline: only a trusted read-only tool is a lookup. */
 export type Tier2 = ("lookup" | "change");

@@ -237,22 +237,35 @@ pub enum TextMotion {
         depth: f64,
     },
     Spin,
+    /// A moving glow across the text's cells, still in the base ink under reduced motion.
+    Shimmer,
+    /// Blend from `from` to the text ink. An absent curve advances linearly;
+    /// `easeOut` slows cubically into the final ink.
     Fade {
         from: String,
         #[serde(rename = "atMs")]
         at_ms: i64,
         ms: u64,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        curve: Option<FadeCurve>,
     },
     #[serde(skip)]
     #[schemars(skip)]
     Other(serde_json::Value),
 }
 
+/// The progress curve of a text fade.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum FadeCurve {
+    EaseOut,
+}
+
 impl<'de> Deserialize<'de> for TextMotion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = serde_json::Value::deserialize(deserializer)?;
         if let Some(kind) = value.get("kind").and_then(serde_json::Value::as_str)
-            && !matches!(kind, "breathe" | "spin" | "fade")
+            && !matches!(kind, "breathe" | "spin" | "shimmer" | "fade")
         {
             return Ok(Self::Other(value));
         }
