@@ -103,7 +103,8 @@ When bingo needs a yes, the dock asks in the input's place:
   `crates/bingo-tool-bash/src/lib.rs` (`preview`) and `src/stakes{.rs,/tests.rs}`.
 - Data side also adapts the SDK policy trait and existing preview consumers, tests old
   journals in `bingo-store-jsonl`, and records wire compatibility in `docs/guide/rpc.md`.
-  No dependencies are added; the synchronous preview uses the existing process-tree helper
+  The permission preview is boxed to keep the enlarged enum below Clippy’s size limit;
+  its wire shape is unchanged. No dependencies are added. The synchronous preview uses the existing process-tree helper
   on a scoped thread with a Tokio runtime and one 500 ms deadline.
 
 ## Exit criteria
@@ -112,7 +113,7 @@ When bingo needs a yes, the dock asks in the input's place:
       `ask-bash`, `ask-bash-change`, `ask-bash-editing`, `caution`, `caution-no`, `question`,
       `question-preview`, `question-ticked`, `question-second`, `question-answered`,
       `small-ask-edit` and `ascii-ask-edit`.
-- [ ] Contract tests: a permission with a string caution and with a `Caution` both read, and
+- [x] Contract tests: a permission with a string caution and with a `Caution` both read, and
       `Stakes` round-trips. An old journal fixture loads.
 - [ ] Unit tests:
   - the guard swallows ⏎ at 399 ms and takes it at 400;
@@ -120,7 +121,7 @@ When bingo needs a yes, the dock asks in the input's place:
   - a caution starts on No and offers no session rung;
   - the scope words for each rule form;
   - the force-push stakes from a temporary repository, and none when git fails.
-- [ ] Black-box: `--print` and RPC still answer permissions as before. The added fields are
+- [x] Black-box: `--print` and RPC still answer permissions as before. The added fields are
       additive in the schemas.
 - [ ] Gates and checks as in M192. tmux drive at 100×32 and 80×24: an edit ask, a bash ask
       changed first, a no with a reason, a force push in a temporary repository, and a two-tab
@@ -138,3 +139,111 @@ Forms (`form.rs`); the sign-in sheet (M198); a teammate's ask waiting in its own
 - **A git call in a preview.** It is bounded, local refs only, and never touches the network.
   A stale remote-tracking ref lists what was true at the last fetch, so the line says
   `only <remote>/<branch> has`, as the capture does.
+
+## Verified (data side)
+
+Scope: brick 4's data only. Bricks 1–3 and 5–7, drawing, captures and tmux drives are
+left for the later UI job; the mixed UI exit criteria above remain unchecked.
+
+- [x] Contracts first: the new fixture test was written and run before implementation.
+  `cargo test -p bingo-sdk --test caution --locked` initially failed with E0432/E0026
+  (missing `Caution`, `Stakes`, and `stakes`); after implementation:
+  `test result: ok. 3 passed; 0 failed` (both caution forms, stakes/old commands,
+  and optional schema fields).
+- [x] Old journal: `cargo test -p bingo-store-jsonl an_old_string_caution_journal_loads --locked`:
+  `test journal::compatibility::an_old_string_caution_journal_loads ... ok`;
+  `test result: ok. 1 passed; 0 failed`.
+- [x] No session rung and act propagation:
+  `cargo test -p bingo-core gate::tests --locked`: `8 passed; 0 failed`, including
+  `a_policy_caution_keeps_its_act_and_drops_the_session_scope` and
+  `destructive_input_has_caution_and_no_session_answer`.
+- [x] Named patterns: `cargo test -p bingo-permissions caution --locked`:
+  `3 passed; 0 failed`, including `every_pattern_names_its_act_and_reason`.
+- [x] Local stakes: `cargo test -p bingo-tool-bash stakes:: --locked`:
+  `7 passed; 0 failed`. Real commits and `refs/remotes/origin/dev` prove all seven
+  are counted and only five shown; singular/zero, non-force commands, missing refs,
+  failed spawn/exit, timeout and calls inside Tokio are covered. A partial clone with a
+  missing commit remains unfetched, even though its local bare remote can supply it.
+- [x] Regeneration (each command used `BINGO_UPDATE_SCHEMA=1`, run sequentially):
+  `cargo test -p bingo-sdk --lib --locked`;
+  `cargo test -p bingo-surface-rpc --lib --locked`;
+  `cargo test -p bingo-plugin-rpc --lib --locked`;
+  `cargo test -p bingo-mods dollar::tests::schema_and_types --locked`.
+  Their schema/type generation tests passed. A JSON comparison against `git show dev:<file>`
+  restored only the old caution type and removed the added stakes field/definitions in memory:
+  `schema/{dollar,plugin,rpc}.json: unchanged after removing optional stakes and restoring the old caution shape`.
+
+Implementation notes and plan gaps:
+- The plan names an RPC guide that did not exist in this checkout; added `docs/guide/rpc.md`.
+- Full Clippy initially rejected the enlarged permission variant (`large_enum_variant`,
+  312 bytes versus 80). Boxing its optional preview fixes the Rust layout without changing
+  JSON; existing consumers only dereference the box and read `caution.reason`.
+- `Tool::preview` is synchronous. A scoped thread supplies the existing `bingo-process::tree`
+  helper with its own Tokio runtime and one 500 ms deadline. It streams stdout without
+  clipping the count; `--no-lazy-fetch` also fails closed on an older Git. No dependency was added.
+- The generator also refreshed unrelated old amendments in frozen `schema/plugin-2.json`;
+  restored that historical file from Git, retaining only current schema/type regeneration.
+- The prototype, plan and caution capture agree; no capture or prototype was changed.
+
+- [x] Windows checks attempted for every touched crate, sequentially, using
+  `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`:
+
+  | Crate | Output / status |
+  | --- | --- |
+  | `bingo-sdk` | `Finished dev profile` in 7.52s; exit 0 |
+  | `bingo-core` | `Finished dev profile` in 17.11s; exit 0 |
+  | `bingo-tool-bash` | `Finished dev profile` in 6.12s; exit 0 |
+  | `bingo-store-jsonl` | `Finished dev profile` in 0.69s; exit 0 |
+  | `bingo-permissions` | tree-sitter: `fatal error: 'stdio.h' file not found`; tree-sitter-bash: `'stdlib.h' file not found`; exit 101 |
+  | `bingo-channel-adapter` | aws-lc-sys: `fatal error: 'stdlib.h' file not found`, `'windows.h' file not found`; exit 101 |
+  | `bingo-surface-tui` | aws-lc-sys: same missing Windows CRT/SDK headers; exit 101 |
+  | `bingo` | aws-lc-sys: same missing Windows CRT/SDK headers; exit 101 |
+
+- [ ] Full Windows verification: the last four crates remain blocked on this Mac's
+  missing Windows C toolchain. The Rust target is installed. No stubs or host headers
+  were substituted; these crates are not claimed Windows-verified.
+
+Environment failure: the first full workspace test stopped at
+`bingo-provider-openai::tests::a_claimed_api_key_reaches_the_provider`:
+`left: Ready { from: Some(Env) }; right: Ready { from: Some(Setting) }`.
+The required isolated rerun with
+`cargo test -p bingo-provider-openai --lib tests::a_claimed_api_key_reaches_the_provider --locked -- --exact`
+failed identically. Removing `OPENAI_API_KEY` only from the test process environment made
+that exact test pass (`1 passed; 0 failed`); provider code was not changed. Full-suite
+verification below uses that same environment isolation.
+
+- [x] Permission black boxes, from the final full workspace run:
+
+  ```text
+  test asking::a_permission_a_rule_could_silence_offers_the_session_rung ... ok
+  test asking::a_permission_no_rule_could_silence_offers_no_session_rung ... ok
+  test stream_json::a_permission_is_asked_of_the_host_and_an_allow_runs_the_tool ... ok
+  test stream_json::a_denied_permission_stops_the_tool_and_the_turn_goes_on ... ok
+  test rpc::a_permission_is_answered_over_the_wire_and_the_tool_runs ... ok
+  ```
+
+- [x] Final native gates, all run sequentially after the no-fetch change:
+
+  | Command | Output / status |
+  | --- | --- |
+  | `cargo fmt --all -- --check` | No output; exit 0 |
+  | `cargo check --workspace --all-targets --locked` | `Finished dev profile` in 2.42s; exit 0 |
+  | `cargo clippy --workspace --all-targets --locked -- -D warnings` | `Finished dev profile` in 4.37s; exit 0 |
+  | `env -u OPENAI_API_KEY cargo test --workspace --locked` | Exit 0; aggregate of 120 reported test results: **6369 passed; 0 failed; 0 ignored** |
+  | `scripts/check_discipline.sh` | `discipline ok`; exit 0 |
+  | `scripts/budget.sh` | Output below; exit 0 |
+  | `cargo deny check` | `advisories ok, bans ok, licenses ok, sources ok`; exit 0 |
+
+  ```text
+  dependencies (unique, normal): 423 (max  423)
+  warm cargo check -p bingo-core: 1s (max  20s)
+  relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+  target/debug: 9 GB (soft max  5)
+  warn: target/debug exceeds the soft limit
+  test binaries: 145
+  budget ok
+  ```
+
+The budget's disk limit is soft. Discipline retains non-fatal function/record/snapshot
+warnings, including this appended verification record's length. The full test run also
+passes all 19 existing PTY smoke tests; no Ember capture was generated or edited.

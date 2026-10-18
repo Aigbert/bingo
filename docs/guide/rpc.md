@@ -27,6 +27,7 @@ A command preview may additionally carry optional `stakes`:
 Absent stakes are omitted. Bash computes them only for an explicit force push of one
 remote and branch. The count includes every commit in the local remote-tracking ref
 that the local branch lacks; items retain the first five log lines. This lookup has a
-500 ms deadline, never fetches, and supplies no stakes on failure. Remote-tracking refs
+500 ms deadline, never fetches, and supplies no stakes on failure (including an older Git
+that lacks `--no-lazy-fetch`). Remote-tracking refs
 can be stale. All other wire changes are additive; generated schemas and TypeScript
 SDK types describe the new fields.
