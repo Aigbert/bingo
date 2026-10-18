@@ -1,12 +1,14 @@
-//! One decision, seven steps, one function each.
+//! One ordered policy ladder; explicit constraints precede automatic allows.
 //!
 //! 1. the tool's own confirmation — this call is a person's to take
 //! 2. a deny rule
 //! 3. a write into a sensitive directory
-//! 4. `bypassPermissions`
-//! 5. an allow rule
-//! 6. an ask rule
-//! 7. what the mode does when no rule decided
+//! 4. an ask rule
+//! 5. a trusted read-only call
+//! 6. a session allow rule
+//! 7. `bypassPermissions`
+//! 8. a settings allow rule
+//! 9. what the mode does when no rule decided
 //!
 //! Steps 1 and 3 stand before the mode, so no mode and no allow rule can
 //! silence them. Two modes then bound whatever the ladder said: `plan` may not
@@ -15,6 +17,7 @@
 
 use std::path::{Path, PathBuf};
 
+use bingo_sdk::policy::RuleSource;
 use bingo_sdk::{Decision, Reason, Subject, ToolTraits};
 
 use crate::mode::Mode;
@@ -36,11 +39,15 @@ pub struct Request<'a> {
 }
 
 pub fn decide(req: &Request<'_>, rules: &Rules) -> Decision {
-    let decision = with_scope(req, rules, steps(req, rules));
+    decide_with_session(req, rules, &[])
+}
+
+pub(crate) fn decide_with_session(req: &Request<'_>, rules: &Rules, session: &[Rule]) -> Decision {
+    let decision = with_scope(req, rules, steps(req, rules, session));
     limit_by_mode(req, decision)
 }
 
-fn steps(req: &Request<'_>, rules: &Rules) -> Decision {
+fn steps(req: &Request<'_>, rules: &Rules, session: &[Rule]) -> Decision {
     // An ask rule is a person saying "always check with me": it outranks the
     // allow rules and survives bypassPermissions, like confirm and sensitive
     // paths do. Only a deny rule sits above it.
@@ -48,8 +55,10 @@ fn steps(req: &Request<'_>, rules: &Rules) -> Decision {
         .or_else(|| step_deny_rules(req, rules))
         .or_else(|| step_sensitive_path(req))
         .or_else(|| step_ask_rules(req, rules))
+        .or_else(|| step_read_only(req))
+        .or_else(|| step_allow_rules(req, session, RuleSource::Session))
         .or_else(|| step_bypass(req))
-        .or_else(|| step_allow_rules(req, rules))
+        .or_else(|| step_allow_rules(req, &rules.allow, RuleSource::Settings))
         .unwrap_or_else(|| step_mode_default(req))
 }
 
@@ -67,7 +76,7 @@ fn step_confirm(req: &Request<'_>) -> Option<Decision> {
 fn step_deny_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
     first_match(&rules.deny, req.call, MatchMode::Any, &req.context()).map(|rule| Decision::Deny {
         reason: Reason::Rule {
-            source: None,
+            source: Some(RuleSource::Settings),
             rule: rule.raw().to_string(),
         },
     })
@@ -88,7 +97,7 @@ fn step_sensitive_path(req: &Request<'_>) -> Option<Decision> {
     })
 }
 
-/// 5. The user asked for no gate.
+/// The user asked for no gate.
 fn step_bypass(req: &Request<'_>) -> Option<Decision> {
     (req.mode == Mode::BypassPermissions).then(|| Decision::Allow {
         reason: Reason::Mode {
@@ -97,15 +106,13 @@ fn step_bypass(req: &Request<'_>) -> Option<Decision> {
     })
 }
 
-/// 6. An allow rule, read the narrow way: every subject and every sub-command.
-fn step_allow_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
-    first_match(&rules.allow, req.call, MatchMode::All, &req.context()).map(|rule| {
-        Decision::Allow {
-            reason: Reason::Rule {
-                source: None,
-                rule: rule.raw().to_string(),
-            },
-        }
+/// An allow rule, read the narrow way: every subject and every sub-command.
+fn step_allow_rules(req: &Request<'_>, rules: &[Rule], source: RuleSource) -> Option<Decision> {
+    first_match(rules, req.call, MatchMode::All, &req.context()).map(|rule| Decision::Allow {
+        reason: Reason::Rule {
+            rule: rule.raw().to_string(),
+            source: Some(source),
+        },
     })
 }
 
@@ -113,18 +120,24 @@ fn step_allow_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
 fn step_ask_rules(req: &Request<'_>, rules: &Rules) -> Option<Decision> {
     first_match(&rules.ask, req.call, MatchMode::Any, &req.context()).map(|rule| Decision::Ask {
         reason: Reason::Rule {
-            source: None,
+            source: Some(RuleSource::Settings),
             rule: rule.raw().to_string(),
         },
         scope: None,
     })
 }
 
-/// 7. Nothing named this call; the mode decides.
+fn step_read_only(req: &Request<'_>) -> Option<Decision> {
+    trusted_read_only(req.traits).then_some(Decision::Allow {
+        reason: Reason::ReadOnly,
+    })
+}
+
+/// Nothing named this call; the mode decides.
 fn step_mode_default(req: &Request<'_>) -> Decision {
     match req.mode {
         Mode::AcceptEdits => accept_edits_default(req),
-        // `bypassPermissions` never reaches here (step 4). `plan` and `dontAsk`
+        // `bypassPermissions` never reaches here. `plan` and `dontAsk`
         // read like `default` and differ only in what `limit_by_mode` then does
         // with the answer.
         Mode::Default | Mode::Plan | Mode::DontAsk | Mode::BypassPermissions => trait_default(req),
@@ -196,7 +209,7 @@ fn silencing_rule(req: &Request<'_>, rules: &Rules) -> Option<String> {
     let candidate = scope::narrowest(req.call, req.cwd, req.home)?;
     let mut widened = rules.clone();
     widened.allow.push(Rule::parse(&candidate)?);
-    matches!(steps(req, &widened), Decision::Allow { .. }).then_some(candidate)
+    matches!(steps(req, &widened, &[]), Decision::Allow { .. }).then_some(candidate)
 }
 
 /// What the mode cannot honour, it denies. `plan` is a ceiling, not a default:
@@ -474,6 +487,30 @@ pub(crate) mod tests {
             outside.extra_dirs(&["/elsewhere"]).kind(),
             Kind::Allow,
             "a directory the user named is inside"
+        );
+    }
+
+    #[test]
+    fn automatic_modes_name_the_permission_they_used() {
+        assert_eq!(
+            Probe::write("/work/project/x")
+                .mode(Mode::AcceptEdits)
+                .decide(),
+            Decision::Allow {
+                reason: Reason::Mode {
+                    mode: "acceptEdits".into()
+                }
+            }
+        );
+        assert_eq!(
+            Probe::bash("anything")
+                .mode(Mode::BypassPermissions)
+                .decide(),
+            Decision::Allow {
+                reason: Reason::Mode {
+                    mode: "bypassPermissions".into()
+                }
+            }
         );
     }
 
@@ -842,5 +879,27 @@ pub(crate) mod tests {
                 .scope(),
             None
         );
+    }
+    #[test]
+    fn read_only_still_obeys_deny_and_ask_rules_before_automatic_allows() {
+        let read = Probe::read("Cargo.toml")
+            .mode(Mode::BypassPermissions)
+            .allow(&["Read"]);
+        assert_eq!(read.clone().deny(&["Read"]).kind(), Kind::Deny);
+        assert_eq!(read.ask(&["Read"]).kind(), Kind::Ask);
+        let untrusted = Probe::tool(
+            "Read",
+            ToolTraits {
+                read_only: true,
+                ..Default::default()
+            },
+        );
+        assert_eq!(untrusted.clone().kind(), Kind::Ask);
+        assert!(matches!(
+            untrusted.mode(Mode::BypassPermissions).decide(),
+            Decision::Allow {
+                reason: Reason::Mode { .. }
+            }
+        ));
     }
 }

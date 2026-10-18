@@ -174,13 +174,6 @@ impl PermissionsPolicy {
             extra_dirs: &self.extra_dirs,
         }
     }
-
-    /// The configured tables, plus whatever this session's person accepted.
-    fn rules_for(&self, session: &SessionId) -> Rules {
-        let mut rules = self.rules.clone();
-        rules.allow.extend(self.sessions.rules(session));
-        rules
-    }
 }
 
 fn parse_table(lines: &[String]) -> Result<Vec<Rule>, PluginError> {
@@ -211,7 +204,11 @@ impl PermissionPolicy for PermissionsPolicy {
     }
 
     async fn decide(&self, input: PolicyInput<'_>) -> Decision {
-        decide::decide(&self.request(input), &self.rules_for(input.session))
+        decide::decide_with_session(
+            &self.request(input),
+            &self.rules,
+            &self.sessions.rules(input.session),
+        )
     }
 
     /// A question no tool defines is the mode's alone to answer: no rule
@@ -491,16 +488,53 @@ mod tests {
             )
             .await;
 
-        assert!(matches!(
+        assert_eq!(
             ask_about(&policy, &mine, "cargo build").await,
-            Decision::Allow { .. }
-        ));
+            Decision::Allow {
+                reason: bingo_sdk::Reason::Rule {
+                    rule: "Bash(cargo:*)".into(),
+                    source: Some(bingo_sdk::policy::RuleSource::Session),
+                }
+            }
+        );
         assert!(
             matches!(
                 ask_about(&policy, &theirs, "cargo build").await,
                 Decision::Ask { .. }
             ),
             "another session never inherits the answer"
+        );
+    }
+
+    #[tokio::test]
+    async fn settings_rules_keep_their_source() {
+        let policy = policy(json!({"permissions":{"allow":["Bash(cargo:*)"]}}));
+        let session = SessionId::from_raw("mine");
+        assert_eq!(
+            ask_about(&policy, &session, "cargo test").await,
+            Decision::Allow {
+                reason: bingo_sdk::Reason::Rule {
+                    rule: "Bash(cargo:*)".into(),
+                    source: Some(bingo_sdk::policy::RuleSource::Settings),
+                }
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn session_rules_answer_before_bypass_as_in_the_prototype() {
+        let policy = policy(json!({"permissions":{"allow":["Bash(cargo:*)"]}}));
+        let session = SessionId::from_raw("mine");
+        policy.sessions.install(&session, "Bash(cargo:*)");
+        policy.choose_mode(&session, Mode::BypassPermissions);
+        assert_eq!(
+            ask_about(&policy, &session, "cargo test").await,
+            Decision::Allow {
+                reason: bingo_sdk::Reason::Rule {
+                    rule: "Bash(cargo:*)".into(),
+                    source: Some(bingo_sdk::policy::RuleSource::Session),
+                }
+            }
         );
     }
 
