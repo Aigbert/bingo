@@ -197,7 +197,6 @@ fn indexed_and_session_clocks_agree_across_waits_and_finished_turns() {
             s.transcript.apply(&Event::ItemCompleted { item });
         }
     }
-    live(&mut s, "open");
     s.interactions.push(serde_json::from_value(json!({
         "id":"ask","session":"s","turn":"open","openedAt":at(5500),
         "kind":{"kind":"question","question":"Where?","options":[],"freeText":true,"multi":false},
@@ -219,13 +218,13 @@ fn indexed_and_session_clocks_agree_across_waits_and_finished_turns() {
             .filter(|item| item.turn.as_ref() == Some(&id))
             .map(AsRef::as_ref)
             .collect();
-        for clock in [
+        for measured in [
             clock_of(&items, Ends::of(&s, &id), at(9000)),
             clock(&s, &id, at(9000)),
         ] {
-            let clock = clock.unwrap();
+            let measured = measured.unwrap();
             assert_eq!(
-                (clock.elapsed.as_millis(), clock.next_second),
+                (measured.elapsed.as_millis(), measured.next_second),
                 (elapsed, next)
             );
         }
