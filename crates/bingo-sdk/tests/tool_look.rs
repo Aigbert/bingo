@@ -41,3 +41,27 @@ fn malformed_looks_are_refused_with_a_message() {
         assert!(error.to_string().contains(message), "{error}");
     }
 }
+
+#[test]
+fn catalogue_accessors_read_typed_facts_and_fail_closed() {
+    use bingo_sdk::{CatalogEntry, ToolTraits, component::Tier};
+    let look = ToolLook::new('¶', "read")
+        .ascii('<')
+        .target("file_path", Reads::Path);
+    let mut entry = CatalogEntry {
+        id: "Read".into(),
+        label: "Read".into(),
+        meta: json!({"look": look, "traits": ToolTraits::read_only()}),
+    };
+    assert_eq!(entry.look(), Some(look));
+    assert_eq!(Tier::of(entry.traits().as_ref()), Tier::Lookup);
+    entry.meta["traits"]["trusted"] = json!(false);
+    assert_eq!(Tier::of(entry.traits().as_ref()), Tier::Change);
+    entry.meta["traits"]["trusted"] = json!("true");
+    assert!(entry.traits().is_none());
+    assert_eq!(Tier::of(entry.traits().as_ref()), Tier::Change);
+    entry.meta = Value::Null;
+    assert!(entry.look().is_none());
+    assert_eq!(Tier::of(entry.traits().as_ref()), Tier::Change);
+    assert_eq!(Tier::of(Some(&ToolTraits::edit())), Tier::Change);
+}

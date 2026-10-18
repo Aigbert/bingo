@@ -278,6 +278,30 @@ pub struct ToolLook {
     pub target: Option<Target>,
 }
 
+impl ToolLook {
+    pub fn new(mark: char, verb: impl Into<String>) -> Self {
+        Self {
+            mark,
+            ascii: None,
+            verb: verb.into(),
+            target: None,
+        }
+    }
+
+    pub fn ascii(mut self, mark: char) -> Self {
+        self.ascii = Some(mark);
+        self
+    }
+
+    pub fn target(mut self, field: impl Into<String>, reads: Reads) -> Self {
+        self.target = Some(Target {
+            field: field.into(),
+            reads,
+        });
+        self
+    }
+}
+
 fn look_verb<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
     let verb = String::deserialize(deserializer)?;
     if verb.trim().is_empty() {

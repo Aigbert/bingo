@@ -325,6 +325,18 @@ pub struct CatalogEntry {
     pub meta: Value,
 }
 
+impl CatalogEntry {
+    /// The tool owner's declared row look, if well formed.
+    pub fn look(&self) -> Option<crate::ToolLook> {
+        serde_json::from_value(self.meta.get("look")?.clone()).ok()
+    }
+
+    /// Baseline tool properties; malformed or absent facts remain unknown.
+    pub fn traits(&self) -> Option<crate::ToolTraits> {
+        serde_json::from_value(self.meta.get("traits")?.clone()).ok()
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Catalog {

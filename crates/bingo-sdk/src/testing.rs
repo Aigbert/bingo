@@ -198,8 +198,10 @@ mod tests;
 mod api;
 mod calls;
 mod host;
+mod looks;
 mod scripts;
 mod table;
+pub use looks::tool_looks;
 
 pub use calls::HostCall;
 pub use host::TestHost;

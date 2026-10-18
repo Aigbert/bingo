@@ -30,14 +30,27 @@ pub enum Tier {
     Change,
 }
 
+impl Tier {
+    /// Unknown or untrusted traits cannot make a row a lookup.
+    pub fn of(traits: Option<&crate::ToolTraits>) -> Self {
+        match traits {
+            Some(traits) if traits.trusted && traits.read_only => Self::Lookup,
+            _ => Self::Change,
+        }
+    }
+}
+
 /// One tool call of a turn, in the words a row shows.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Step {
+    /// The declared one-cell mark, resolved for the surface character set.
     pub mark: char,
+    /// How to render the target, absent when the call has no target.
     pub reads: Option<crate::Reads>,
+    /// The catalogue baseline: only trusted read-only tools are lookups.
     pub tier: Tier,
-    /// What the step does, one lowercase word: `read`, `bash`.
+    /// What the step does, one lowercase word: `read`, `run`.
     pub verb: String,
     /// What it does it to, shortened for one row.
     pub target: String,

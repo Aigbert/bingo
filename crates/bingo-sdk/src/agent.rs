@@ -102,15 +102,12 @@ impl CallKind {
             Self::Fetch => ('↓', Some('v')),
             Self::Other => ('•', Some('-')),
         };
-        crate::ToolLook {
-            mark,
-            ascii,
-            verb: self.as_str().into(),
-            target: Some(crate::Target {
-                field: "title".into(),
-                reads: crate::Reads::Text,
-            }),
+        let mut look =
+            crate::ToolLook::new(mark, self.as_str()).target("title", crate::Reads::Text);
+        if let Some(ascii) = ascii {
+            look = look.ascii(ascii);
         }
+        look
     }
 
     pub fn writes(self) -> bool {
