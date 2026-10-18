@@ -372,7 +372,7 @@ async fn a_composer_action_preserves_an_existing_draft_and_explains_why() {
 }
 
 #[tokio::test]
-async fn round2_only_the_key_acknowledgement_creates_a_mode_notice() {
+async fn only_the_key_acknowledgement_creates_a_mode_notice() {
     let now = scene().1;
     let session = Arc::new(TestSession::default());
     let mut run = tests::idle_in(state(), session.clone(), now.instant);
@@ -399,4 +399,22 @@ async fn round2_only_the_key_acknowledgement_creates_a_mode_notice() {
         run.ui.notice().unwrap().kind,
         crate::ui::NoticeKind::Mode
     ));
+}
+
+#[tokio::test]
+async fn a_refused_mode_key_names_the_command_it_submitted() {
+    let now = scene().1;
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(state(), session.clone(), now.instant);
+    run.cycle_mode(Input::text("/permission plan", crate::origin()));
+    run.ack(
+        &session.submissions()[0].0,
+        &IntentOutcome::Rejected {
+            error: KernelError::new(bingo_sdk::ErrorCode::InvalidInput, "refused"),
+        },
+    );
+    assert_eq!(
+        run.ui.notice().unwrap().plain().unwrap().about.as_deref(),
+        Some("/permission plan")
+    );
 }

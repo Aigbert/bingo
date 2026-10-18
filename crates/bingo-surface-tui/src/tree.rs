@@ -121,12 +121,6 @@ impl Tree {
         self.fold.mark_read(&id);
     }
 
-    /// Something, anywhere in the tree, needs a person.
-    #[cfg(test)]
-    pub fn attention(&self) -> bool {
-        self.sessions().any(SessionState::attention)
-    }
-
     /// One ask at a time, ordered by arrival across the tree.
     /// The handle routes the answer back to the session that opened it.
     pub fn open_interaction(&self) -> Option<(&SessionState, &Interaction)> {
@@ -478,7 +472,6 @@ mod tests {
         tree.fold.apply(&child_frame(1, announced("reviewer")));
         tree.fold.apply(&child_frame(2, opened(child_permission())));
         assert_eq!(tree.rows().iter().filter(|row| row.attention).count(), 1);
-        assert!(tree.attention());
         let (owner, _) = tree.open_interaction().expect("the child's prompt");
         assert_eq!(owner.summary.id, child_id());
 

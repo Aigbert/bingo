@@ -93,15 +93,17 @@ fn strip_names_the_work_and_yields_to_notices() {
     let tree = crew();
     let (mut ui, now) = scene();
     for width in [80, 120] {
-        let wide = footer::line(&tree, &ui, width, now).to_string();
+        let wide =
+            footer::draw(&tree, &ui, &mut Default::default(), width, now).lines[0].to_string();
         assert!(wide.contains("●● 2 agents"), "{wide}");
         assert!(!wide.contains("reviewer"));
     }
     ui.notify(Level::Info, "saved", now.instant);
-    let notice = footer::line(&tree, &ui, 120, later(now, 1000)).to_string();
+    let notice = footer::draw(&tree, &ui, &mut Default::default(), 120, later(now, 1000)).lines[0]
+        .to_string();
     assert!(notice.contains("saved") && !notice.contains("2 agents"));
     assert!(
-        footer::line(&tree, &ui, 120, later(now, 4133))
+        footer::draw(&tree, &ui, &mut Default::default(), 120, later(now, 4133)).lines[0]
             .to_string()
             .contains("2 agents")
     );
@@ -243,7 +245,7 @@ fn strip_scopes_overflows_finishes_and_clicks() {
         completed("trn_9", bingo_sdk::TurnStatus::Completed),
     ));
     assert!(
-        !footer::line(&tree, &scene().0, 120, now)
+        !footer::draw(&tree, &scene().0, &mut Default::default(), 120, now).lines[0]
             .to_string()
             .contains("reviewer")
     );
@@ -273,11 +275,11 @@ fn a_placed_status_outranks_crew_until_it_expires() {
             ),
         ),
     ));
-    let placed = footer::line(&tree, &ui, 120, now).to_string();
+    let placed = footer::draw(&tree, &ui, &mut Default::default(), 120, now).lines[0].to_string();
     assert!(placed.contains("scheduled") && !placed.contains("reviewer"));
     draw_tree(120, 40, &tree, &mut ui, now);
     assert!(
-        footer::line(&tree, &ui, 120, later(now, 2001))
+        footer::draw(&tree, &ui, &mut Default::default(), 120, later(now, 2001)).lines[0]
             .to_string()
             .contains("2 agents")
     );

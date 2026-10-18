@@ -64,7 +64,7 @@ async fn refresh_preserves_a_draft_and_only_own_opener_receipt_refocuses() {
     };
     run.ack(&IntentId::mint(), &outcome);
     assert!(matches!(run.ui.focus, Focus::Composer));
-    let intent = run.mint(Some("/status".into()));
+    let intent = run.mint(crate::run::Submission::Ordinary(Some("/status".into())));
     run.ack(&intent, &outcome);
     draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
     assert!(matches!(run.ui.focus, Focus::Pane(_)));
@@ -181,7 +181,7 @@ async fn opener_receipt_consumes_the_pending_initial_focus() {
     run.frame(&frame(1, publication(true)), &mut screen)
         .unwrap();
     run.ui.sync_panes(run.session.tree.viewed());
-    let intent = run.mint(Some("/open-keys".into()));
+    let intent = run.mint(crate::run::Submission::Ordinary(Some("/open-keys".into())));
     run.ack(
         &intent,
         &IntentOutcome::Applied {
@@ -212,7 +212,7 @@ async fn opener_receipt_addresses_held_keys_before_releasing_them() {
         run.ui.sync_panes(run.session.tree.viewed());
         draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
         run.ui.focus = Focus::Composer;
-        let intent = run.mint(Some("/open-keys".into()));
+        let intent = run.mint(crate::run::Submission::Ordinary(Some("/open-keys".into())));
         typeahead::command_sent(&mut run, intent.clone());
         run.terminal_event(Term::Key(typed('x')));
         assert_eq!(run.typeahead.len(), 1);
@@ -246,7 +246,7 @@ async fn queued_opener_refocuses_only_when_its_final_receipt_arrives() {
     draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
     run.ui.focus = Focus::Composer;
     run.ui.composer.set("draft");
-    let intent = run.mint(Some("/open-keys".into()));
+    let intent = run.mint(crate::run::Submission::Ordinary(Some("/open-keys".into())));
     run.ack(&intent, &IntentOutcome::Queued { position: 1 });
     run.frame(&frame(2, publication(true)), &mut screen)
         .unwrap();
@@ -268,7 +268,7 @@ async fn queued_opener_refocuses_only_when_its_final_receipt_arrives() {
 async fn queued_opener_releases_typeahead_but_keeps_its_final_receipt() {
     let now = still(scene().1);
     let mut run = tests::idle(now.instant);
-    let intent = run.mint(Some("/open-keys".into()));
+    let intent = run.mint(crate::run::Submission::Ordinary(Some("/open-keys".into())));
     typeahead::command_sent(&mut run, intent.clone());
     run.terminal_event(Term::Key(typed('a')));
     assert_eq!(run.typeahead.len(), 1);

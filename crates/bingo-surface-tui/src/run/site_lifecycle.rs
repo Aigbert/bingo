@@ -90,7 +90,7 @@ fn close_action(view: &View) -> Option<bingo_sdk::Action> {
 
 fn send_close(run: &mut Run, session: SessionId, action: bingo_sdk::Action) {
     if let Some(handle) = run.session.handles.get(&session).cloned() {
-        let intent = run.mint(None);
+        let intent = run.mint(crate::run::Submission::Ordinary(None));
         // Retirement belongs to this drawing, even after its site has closed.
         let origin = crate::pulled_signature(&action.name);
         run.ui

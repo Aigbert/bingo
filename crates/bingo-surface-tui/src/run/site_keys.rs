@@ -39,7 +39,7 @@ pub(super) fn send(run: &mut Run, action: bingo_sdk::Action, key: KeyEvent) {
         .find(|pane| pane.key == focus)
         .map(|pane| (pane.plugin, pane.id));
     let handle = run.session.handles.get(&session).cloned();
-    let intent = run.mint(None);
+    let intent = run.mint(crate::run::Submission::Ordinary(None));
     run.site_keys.insert(
         intent.clone(),
         Pending {

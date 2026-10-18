@@ -190,7 +190,9 @@ mod tests {
             let mut run = super::super::tests::idle_in(state, session, now.instant);
             run.ui.composer.set(draft);
             if own {
-                let intent = run.mint(Some("/rewind trn_1 conversation".into()));
+                let intent = run.mint(crate::run::Submission::Ordinary(Some(
+                    "/rewind trn_1 conversation".into(),
+                )));
                 if queued {
                     run.ack(&intent, &IntentOutcome::Queued { position: 1 });
                 }
@@ -249,7 +251,7 @@ mod pane_receipt_tests {
         };
         run.ack(&IntentId::mint(), &outcome);
         assert_eq!(run.session.tree.view(), &root);
-        let intent = run.mint(None);
+        let intent = run.mint(crate::run::Submission::Ordinary(None));
         run.ack(&intent, &outcome);
         assert_eq!(run.session.tree.root_id(), &root);
         assert_eq!(run.session.tree.view(), &child);

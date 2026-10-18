@@ -37,23 +37,31 @@ impl std::ops::DerefMut for Ui {
 }
 
 /// A toast has one wall-clock window, whether the surface draws it or not.
-pub const NOTICE: Duration = Duration::from_millis(2700);
+pub const NOTICE: Duration = TOAST_HOLD.saturating_add(TOAST_FADE);
+const TOAST_HOLD: Duration = Duration::from_millis(2400);
 /// A second ctrl+c within this window leaves.
 pub const EXIT_WINDOW: Duration = Duration::from_secs(2);
 /// A transcript that has just been stepped into crossfades through dim over
 /// this long: two frames (§6).
 pub const SWITCH: Duration = Duration::from_millis(2 * FRAME.as_millis() as u64);
 
+#[derive(Clone, Debug)]
+pub struct Message {
+    pub about: Option<String>,
+    pub text: String,
+    pub level: Level,
+}
+
 /// A message or a mode-key acknowledgement; the latter owns no session words.
 #[derive(Clone, Debug)]
 pub enum NoticeKind {
-    Message(bingo_sdk::component::KeyToast),
+    Message(Message),
     Mode,
 }
 impl NoticeKind {
     pub fn hold(&self) -> Duration {
         match self {
-            Self::Message(_) => Duration::from_millis(2400),
+            Self::Message(_) => TOAST_HOLD,
             Self::Mode => Duration::from_millis(2800),
         }
     }
@@ -69,7 +77,7 @@ impl Notice {
     pub fn new(kind: NoticeKind, said: Instant) -> Self {
         Self { kind, said }
     }
-    pub fn plain(&self) -> Option<&bingo_sdk::component::KeyToast> {
+    pub fn plain(&self) -> Option<&Message> {
         match &self.kind {
             NoticeKind::Message(text) => Some(text),
             NoticeKind::Mode => None,
@@ -335,7 +343,7 @@ impl Ui {
     fn say(&mut self, level: Level, text: String, about: Option<String>, now: Instant) {
         self.placed.toasts.discard();
         self.notice = Some(Notice::new(
-            NoticeKind::Message(bingo_sdk::component::KeyToast { level, text, about }),
+            NoticeKind::Message(Message { level, text, about }),
             now,
         ));
     }

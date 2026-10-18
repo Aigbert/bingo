@@ -165,7 +165,7 @@ fn pasted(data_dir: &std::path::Path, bytes: &[u8]) -> Result<std::path::PathBuf
 
 enum Submission {
     Ordinary(Option<String>),
-    Mode,
+    Mode(Option<String>),
 }
 
 struct Run {
@@ -624,13 +624,12 @@ impl Run {
             IntentOutcome::Rejected { error } => self.rejected(
                 &error.message,
                 match submission {
-                    Submission::Ordinary(about) => about,
-                    Submission::Mode => None,
+                    Submission::Ordinary(about) | Submission::Mode(about) => about,
                 },
             ),
             IntentOutcome::Applied { result } => {
                 surface::receipt(self, result);
-                if matches!(submission, Submission::Mode) {
+                if matches!(submission, Submission::Mode(_)) {
                     self.ui.notify_mode(self.detection.now().instant);
                 }
             }
@@ -693,9 +692,13 @@ impl Run {
     }
 
     fn terminal_event(&mut self, event: Term) {
+        if matches!(event, Term::Paste(_))
+            || matches!(&event, Term::Key(key) if key.kind != crossterm::event::KeyEventKind::Release)
+        {
+            self.ui.keyed_at = self.detection.now().instant;
+        }
         match event {
             Term::Key(key) => {
-                self.ui.keyed_at = self.detection.now().instant;
                 let chord = crate::keys::commands::chord(key);
                 let interrupt = chord.as_deref() == Some("ctrl+c")
                     || (chord.as_deref() == Some("esc") && !site_lifecycle::open(&self.ui));
@@ -727,7 +730,6 @@ impl Run {
                 self.apply(effects);
             }
             Term::Paste(text) => {
-                self.ui.keyed_at = self.detection.now().instant;
                 typeahead::paste(self, text);
             }
             // A window nobody is looking at is the one that may interrupt a
@@ -805,7 +807,7 @@ impl Run {
         };
         let session = self.session.tree.viewed().summary.id.clone();
         self.discard_actions(&[session]);
-        let intent = self.mint(None);
+        let intent = self.mint(Submission::Ordinary(None));
         handle.interrupt(intent, InterruptScope::Head);
     }
 
@@ -841,11 +843,13 @@ impl Run {
 
     /// An intent of this client's own, and the line it carried when it had
     /// one — which is what a refusal of it says it was about.
-    fn mint(&mut self, about: Option<String>) -> IntentId {
+    fn mint(&mut self, submission: Submission) -> IntentId {
+        let about = match &submission {
+            Submission::Ordinary(about) | Submission::Mode(about) => about,
+        };
         let intent = IntentId::mint();
         surface::capture(self, &intent, about.as_deref());
-        self.mine
-            .insert(intent.clone(), Submission::Ordinary(about));
+        self.mine.insert(intent.clone(), submission);
         intent
     }
 
@@ -1350,7 +1354,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn round2_reduced_motion_wakes_the_working_row_without_an_event() {
+    async fn reduced_motion_wakes_the_working_row_without_an_event() {
         let now = Now {
             instant: tokio::time::Instant::now().into_std(),
             ..still(scene().1)

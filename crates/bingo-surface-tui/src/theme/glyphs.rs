@@ -29,7 +29,7 @@ pub struct Glyphs {
     /// A tick with no box drawn round it: what a form's `Submit` tab wears and
     /// what stands inside a multi-select's own brackets.
     pub tick: &'static str,
-    /// The permission mode on the status line.
+    /// The permission mode in the footer.
     pub mode: &'static str,
     pub chrome: ChromeGlyphs,
     /// A tree node: `[0]` with siblings under it, `[1]` the last one. One

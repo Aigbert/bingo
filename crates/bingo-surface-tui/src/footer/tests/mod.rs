@@ -123,10 +123,10 @@ fn fixture(capture: &Capture) -> (SessionState, Ui) {
         );
     }
     if capture.entry.scene == "mode" {
-        let (value, _label, at) = if capture.entry.file == "mode-later" {
-            ("bypassPermissions", "bypass permissions", 3400)
+        let (value, at) = if capture.entry.file == "mode-later" {
+            ("bypassPermissions", 3400)
         } else {
-            ("plan", "plan", 2000)
+            ("plan", 2000)
         };
         apply(&mut state, at, permission_view(value));
         let now = capture.now();
@@ -248,7 +248,7 @@ fn m193_hidden_footer_animation_never_schedules() {
 }
 
 #[test]
-fn round2_a_mode_shaped_sentence_is_only_a_plain_notice() {
+fn a_mode_shaped_sentence_is_only_a_plain_notice() {
     let (mut ui, now) = scene();
     let state = folded(vec![frame(1, permission_view("plan"))]);
     let text = "permission mode: plan";
@@ -271,7 +271,7 @@ fn round2_a_mode_shaped_sentence_is_only_a_plain_notice() {
 }
 
 #[test]
-fn round2_the_mode_toast_reads_the_placed_meaning() {
+fn the_mode_toast_reads_the_placed_meaning() {
     let (mut ui, now) = scene();
     let slot = json!({"kind":"mode","current":"plan","modes":[{"label":"plan","meaning":"the policy changed this sentence","action":{"name":"permission","args":"plan"}}]});
     let state = folded(vec![frame(
@@ -294,7 +294,7 @@ fn round2_the_mode_toast_reads_the_placed_meaning() {
 }
 
 #[test]
-fn round2_the_idle_caret_rests_and_carries_no_deadline() {
+fn the_idle_caret_rests_and_carries_no_deadline() {
     let (mut ui, now) = scene();
     let tree = solo(&state());
     let rest = later(now, 10_001);
@@ -311,7 +311,7 @@ fn round2_the_idle_caret_rests_and_carries_no_deadline() {
 }
 
 #[test]
-fn round2_reduced_activity_wakes_for_its_first_row() {
+fn reduced_activity_wakes_for_its_first_row() {
     let (mut ui, now) = scene();
     let tree = solo(&folded(vec![frame(1, started("turn"))]));
     draw_tree(80, 24, &tree, &mut ui, still(now));
@@ -325,7 +325,7 @@ fn round2_reduced_activity_wakes_for_its_first_row() {
 }
 
 #[test]
-fn round2_the_latest_edge_flash_wins() {
+fn the_latest_edge_flash_wins() {
     let (mut ui, now) = scene();
     let state = folded(vec![
         frame(1, permission_view("plan")),
@@ -347,7 +347,7 @@ fn round2_the_latest_edge_flash_wins() {
 }
 
 #[test]
-fn round2_a_countdown_wakes_only_when_its_words_change() {
+fn a_countdown_wakes_only_when_its_words_change() {
     use std::time::Duration;
     let epsilon = Duration::from_nanos(1);
     for (remaining, change) in [(125, 5), (3605, 5), (90_000, 3600), (59, 0)] {
@@ -359,17 +359,82 @@ fn round2_a_countdown_wakes_only_when_its_words_change() {
 }
 
 #[test]
-fn round2_needs_you_replaces_crew_lamps_before_the_model() {
+fn needs_you_replaces_crew_lamps_before_the_model() {
     let tree = folded_tree(vec![
         child_frame(1, announced("reviewer")),
         child_frame(2, opened(child_permission())),
     ]);
     let (ui, now) = scene();
-    let line = super::line(&tree, &ui, 120, now).to_string();
+    let line =
+        crate::footer::draw(&tree, &ui, &mut Default::default(), 120, now).lines[0].to_string();
     assert!(
         line.trim_start().starts_with("◆ reviewer needs you"),
         "{line}"
     );
     assert!(!line.contains("agents"));
     assert!(!line.contains("ctrl+g"));
+}
+
+#[test]
+fn needs_you_names_one_two_or_many_with_their_inks() {
+    for count in 1..=3 {
+        let mut frames = Vec::new();
+        for (index, name) in ["reviewer", "tester", "writer"]
+            .into_iter()
+            .take(count)
+            .enumerate()
+        {
+            let id = bingo_sdk::SessionId::from_raw(format!("child-{index}"));
+            let mut summary = child_summary(name);
+            summary.id = id.clone();
+            for (seq, event) in [
+                (1, Event::SessionUpdated { summary }),
+                (2, opened(child_permission())),
+            ] {
+                let mut next = frame(seq, event);
+                next.session = id.clone();
+                frames.push(next);
+            }
+        }
+        let tree = folded_tree(frames);
+        let drawn = super::needs_you(&tree);
+        let line = &drawn.lines[0];
+        let expected = [
+            "◆ reviewer needs you",
+            "◆ reviewer, tester need you",
+            "◆ 3 need you",
+        ][count - 1];
+        assert_eq!(line.to_string(), expected);
+        for span in &line.spans {
+            if count > 2 && span.content == "3" {
+                assert_eq!(span.style, super::ink("amber"));
+            }
+            if ["reviewer", "tester"].contains(&span.content.as_ref()) {
+                assert_eq!(
+                    span.style,
+                    super::ink(&format!("crew{}", crate::face::face(&span.content).hue()))
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn needs_you_calls_the_main_session_bingo_in_glow() {
+    let mut tree = folded_tree(vec![
+        child_frame(1, announced("reviewer")),
+        frame(1, opened(permission(None, None))),
+    ]);
+    tree.show(&child_id());
+    let drawn = super::needs_you(&tree);
+    let line = &drawn.lines[0];
+    assert_eq!(line.to_string(), "◆ bingo needs you");
+    assert_eq!(
+        line.spans
+            .iter()
+            .find(|span| span.content == "bingo")
+            .unwrap()
+            .style,
+        super::ink("glow")
+    );
 }

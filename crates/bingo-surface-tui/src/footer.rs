@@ -200,24 +200,26 @@ fn needs_you(tree: &Tree) -> Drawing {
         format!("{} ", theme::glyphs::get("pin")),
         ink("amberGlow"),
     )];
+    let others = crate::tree::covered(tree, Scope::Others);
     if count > 2 {
         spans.push(Span::styled(count.to_string(), ink("amber")));
     } else {
         for (index, row) in tree
             .rows()
             .into_iter()
-            .filter(|row| row.attention && row.session != tree.view())
+            .filter(|row| row.attention && others.contains(&row.session))
             .enumerate()
         {
             if index > 0 {
                 spans.push(Span::styled(", ", ink("amber")));
             }
-            let color = if row.session == tree.root_id() {
-                "glow".to_owned()
+            let (name, color) = if row.session == tree.root_id() {
+                ("bingo".to_owned(), "glow".to_owned())
             } else {
-                format!("crew{}", crate::face::face(&row.name).hue())
+                let color = format!("crew{}", crate::face::face(&row.name).hue());
+                (row.name, color)
             };
-            spans.push(Span::styled(row.name, ink(&color)));
+            spans.push(Span::styled(name, ink(&color)));
         }
     }
     spans.push(Span::styled(
@@ -300,9 +302,6 @@ pub(super) fn ink(name: &str) -> ratatui::style::Style {
     theme::foreground(name).unwrap_or_default()
 }
 
-#[cfg(test)]
-mod tests;
-
 pub(crate) fn session_facts(
     state: &bingo_sdk::SessionState,
 ) -> bingo_sdk::component::SessionStatusProps {
@@ -319,16 +318,4 @@ pub(crate) fn session_facts(
 }
 
 #[cfg(test)]
-pub fn line(
-    tree: &crate::tree::Tree,
-    ui: &crate::ui::Ui,
-    width: usize,
-    now: crate::clock::Now,
-) -> ratatui::text::Line<'static> {
-    let mut frame = crate::layout::Layout::default();
-    crate::footer::draw(tree, ui, &mut frame, width, now)
-        .lines
-        .into_iter()
-        .next()
-        .unwrap_or_default()
-}
+mod tests;

@@ -569,8 +569,13 @@ fn the_footer_holds_attention_words_still() {
         child_frame(2, opened(child_permission())),
     ]);
     let (ui, now) = scene();
-    let first = crate::footer::line(&tree, &ui, 80, now);
-    assert_eq!(first, crate::footer::line(&tree, &ui, 80, later(now, 1000)));
+    let first = crate::footer::draw(&tree, &ui, &mut Default::default(), 80, now)
+        .lines
+        .remove(0);
+    assert_eq!(
+        first,
+        crate::footer::draw(&tree, &ui, &mut Default::default(), 80, later(now, 1000)).lines[0]
+    );
     assert!(
         first.to_string().contains("◆ reviewer needs you"),
         "the needs-you lead names the waiting child"

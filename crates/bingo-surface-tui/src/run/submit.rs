@@ -14,7 +14,7 @@ use std::path::Path;
 use bingo_pictures::Source;
 use bingo_sdk::{Delivery, Image, Input, Level, Origin, SessionHandle};
 
-use super::{Reply, Run};
+use super::{Reply, Run, Submission};
 use crate::pictures::Held;
 use crate::{complete, history};
 
@@ -47,20 +47,7 @@ impl Run {
         let Some(handle) = self.session.writer() else {
             return self.not_yet();
         };
-        let intent = bingo_sdk::IntentId::mint();
-        self.mine.insert(intent.clone(), super::Submission::Mode);
-        match input {
-            Input::Action { action, origin } => self.enqueue_action(
-                self.session.tree.view().clone(),
-                handle,
-                intent,
-                (action, origin),
-            ),
-            input => {
-                super::typeahead::command_sent(self, intent.clone());
-                handle.submit(intent, input);
-            }
-        }
+        self.send_line(handle, input, Submission::Mode);
     }
 
     pub(super) fn submit(&mut self, input: Input) {
@@ -74,14 +61,8 @@ impl Run {
                 origin,
                 delivery,
             } => self.submit_text(handle, text, images, origin, delivery),
-            Input::Action { action, origin } => {
-                let intent = self.mint(None);
-                self.enqueue_action(
-                    self.session.tree.viewed().summary.id.clone(),
-                    handle,
-                    intent,
-                    (action, origin),
-                );
+            input @ Input::Action { .. } => {
+                self.send_line(handle, input, Submission::Ordinary);
             }
         }
     }
@@ -196,6 +177,7 @@ impl Run {
                 origin,
                 delivery,
             },
+            Submission::Ordinary,
         );
     }
 
@@ -205,21 +187,38 @@ impl Run {
         let Some(handle) = self.session.writer() else {
             return self.not_yet();
         };
-        self.send_line(handle, Input::text(text, crate::origin()));
+        self.send_line(
+            handle,
+            Input::text(text, crate::origin()),
+            Submission::Ordinary,
+        );
     }
 
     /// A refused line comes back named by its words.
-    fn send_line(&mut self, handle: SessionHandle, input: Input) {
+    fn send_line(
+        &mut self,
+        handle: SessionHandle,
+        input: Input,
+        kind: fn(Option<String>) -> Submission,
+    ) {
         let about = match &input {
             Input::Text { text, .. } => Some(text.clone()),
             Input::Action { .. } => None,
         };
         let command = about.as_deref().is_some_and(|text| text.starts_with('/'));
-        let intent = self.mint(about);
+        let intent = self.mint(kind(about));
         if command {
             super::typeahead::command_sent(self, intent.clone());
         }
-        handle.submit(intent, input);
+        match input {
+            Input::Action { action, origin } => self.enqueue_action(
+                self.session.tree.view().clone(),
+                handle,
+                intent,
+                (action, origin),
+            ),
+            input => handle.submit(intent, input),
+        }
     }
 }
 

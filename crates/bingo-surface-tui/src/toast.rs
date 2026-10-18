@@ -100,7 +100,7 @@ pub fn current(ui: &Ui, state: &SessionState, now: Now) -> Option<crate::ui::Not
         && notice.is_none_or(|notice| said > notice.said())
     {
         return Some(crate::ui::Notice::new(
-            crate::ui::NoticeKind::Message(bingo_sdk::component::KeyToast {
+            crate::ui::NoticeKind::Message(crate::ui::Message {
                 about: None,
                 text: toast.text,
                 level: bingo_sdk::Level::Info,
@@ -231,7 +231,6 @@ mod tests {
             !toasts.sync(&state, after),
             "an expired toast rings no more"
         );
-        assert!(toasts.active(&state, after).is_none());
         assert!(toasts.active(&state, after).is_none());
     }
 

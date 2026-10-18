@@ -357,7 +357,7 @@ fn an_unknown_node_inside_a_known_one_folds_in_place() {
 }
 
 #[test]
-fn round2_action_meaning_is_optional_and_round_trips() {
+fn action_meaning_is_optional_and_round_trips() {
     let old = serde_json::json!({"label":"plan", "action":{"name":"permission","args":"plan"}});
     let item: super::ActionItem = serde_json::from_value(old.clone()).unwrap();
     assert_eq!(serde_json::to_value(item).unwrap(), old);
@@ -368,7 +368,7 @@ fn round2_action_meaning_is_optional_and_round_trips() {
 }
 
 #[test]
-fn round2_keybar_has_only_pairs() {
+fn keybar_has_only_pairs() {
     let wire = serde_json::to_value(crate::component::KeyBarProps::default()).unwrap();
     assert_eq!(wire, serde_json::json!({"pairs":[]}));
 }

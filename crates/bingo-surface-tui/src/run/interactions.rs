@@ -38,8 +38,8 @@ pub(super) fn stop_interaction(
     answer: Option<bingo_sdk::Answer>,
 ) {
     run.discard_actions(std::slice::from_ref(&session));
-    let answer = answer.map(|answer| (run.mint(None), answer));
-    let interrupt = run.mint(None);
+    let answer = answer.map(|answer| (run.mint(crate::run::Submission::Ordinary(None)), answer));
+    let interrupt = run.mint(crate::run::Submission::Ordinary(None));
     let stop = move |handle: &SessionHandle| {
         if let Some((intent, answer)) = answer {
             handle.answer(intent, interaction, answer, bingo_sdk::Activation::Keyboard);
@@ -76,6 +76,6 @@ pub(super) fn answer(
     let Some(handle) = run.session.root() else {
         return run.not_yet();
     };
-    let intent = run.mint(None);
+    let intent = run.mint(crate::run::Submission::Ordinary(None));
     handle.answer(intent, interaction, answer, activation);
 }
