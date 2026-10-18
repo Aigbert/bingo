@@ -148,3 +148,38 @@ async fn malformed_tool_looks_refuse_loading_in_words() {
         started.manager.shutdown().await;
     }
 }
+
+#[tokio::test]
+async fn a_failed_start_announces_only_the_plugins_catalogue() {
+    use bingo_sdk::{
+        CatalogKind,
+        testing::{HostCall, TestHost},
+    };
+
+    let home = tempfile::tempdir().unwrap();
+    let root = home.path().join(".bingo/plugins/missing");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(
+        root.join("plugin.json"),
+        json!({
+            "name":"missing", "version":"0.1.0",
+            "entry":{"command":root.join("absent-executable")}
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let project = tempfile::tempdir().unwrap();
+    let host = TestHost::default();
+    let manager = Manager::new(Env::rooted(home.path()), BTreeMap::new(), BTreeSet::new());
+    manager.start(project.path(), host.handle()).await;
+    let changes: Vec<_> = host
+        .calls()
+        .into_iter()
+        .filter_map(|call| match call {
+            HostCall::CatalogChanged { kind } => Some(kind),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(changes, [CatalogKind::Plugins]);
+    manager.shutdown().await;
+}

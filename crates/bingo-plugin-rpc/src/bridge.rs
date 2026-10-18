@@ -630,6 +630,8 @@ impl Bridge {
                 state.failures = 0;
                 state.next_attempt = None;
                 state.failed = None;
+                drop(state);
+                self.catalogues_changed();
             }
             Err(why) => {
                 state.failures += 1;
@@ -639,10 +641,10 @@ impl Bridge {
                     "PLUGIN_UNAVAILABLE",
                     format!("the {} plugin is not running: {why}", self.name),
                 ));
+                drop(state);
+                self.host.catalog_changed(bingo_sdk::CatalogKind::Plugins);
             }
         }
-        drop(state);
-        self.catalogues_changed();
     }
 
     fn catalogues_changed(&self) {
