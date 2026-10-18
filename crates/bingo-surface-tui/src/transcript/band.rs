@@ -91,8 +91,13 @@ fn text(item: &Item) -> String {
     }
 }
 
+fn note(item: &Item) -> bool {
+    matches!(&item.body, ItemBody::User { origin, .. }
+        if origin.principal.is_none() && said::voice(origin) == bingo_sdk::Voice::Note)
+}
+
 fn prompt_lines(item: &Item, text: &str) -> Vec<Line<'static>> {
-    let note = matches!(&item.body, ItemBody::User { origin, .. } if origin.principal.is_none() && said::voice(origin) == bingo_sdk::Voice::Note);
+    let note = note(item);
     let ink = if note { theme::ash() } else { theme::text() };
     let mut lines: Vec<_> = text
         .split('\n')
