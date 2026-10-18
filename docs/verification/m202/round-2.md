@@ -1,0 +1,32 @@
+# M202 round 2 — kernel review fixes
+
+2026-10-19; new commits after `eb08032b`. Brick 6 remains for round 3 after M194.
+
+- **1 — `a64bb3e0`:** `cli/batch.rs` matches completed outputs by command and checks both frame orders.
+  Red: `cargo test -p bingo --test cli batch::two_commands_in_one_step_both_come_back --locked -- --exact`, with old positional assertions plus reversed frames → `batch.rs:66:5`, `[(0, "…second…"), (0, "…first…")]`; `0 passed; 1 failed`. Fixed → `1 passed; 0 failed`.
+  Audit: `rg` for completion events, tool-result envelopes, indexing, `first`/`last`/`nth` in `crates/bingo/tests`, print, RPC, ACP, channels, channel-adapter and channel-feishu tests. Only batch needed a re-pin.
+  Inspected positional candidates: CLI jobs/agents/again/stream_json use separate turns or rounds; ACP knobs use configuration calls; shell uses one command; mods_parity uses folded transcript order; print/RPC/channel fixtures supply explicit frames. No concurrent-completion ordering assumed there.
+- **2 — `8cddd7e5`:** `turn/round.rs` owns `Round<'t>` and its walk methods; `Turn::act` supplies only the borrowed round inputs. Receipt recording moved with the walk; no new Turn impl file or discipline exception.
+  Structural refactor, not a behavioral fix: no behavioral red claimed. `cargo test -p bingo-core --lib --locked` → `706 passed; 0 failed`; the discipline gate checks cohesion unchanged.
+- **3–4 — `638e3b4d`:** `session/recovery.rs` builds events from interactions, live turn, transcript and an explicit instant. Its pure `interrupt_items` closes every open item, including unfinished text; both callers use `publish(event, None)`.
+  Test first: `cargo test -p bingo-core --lib session::recovery --locked`, with the brick returning no frames → `unfinished_items_close_at_the_given_instant`, `recovery/tests.rs:36:5: assertion left == right failed`. Restored implementation passes; the fixture covers Pending ToolCall and Running Assistant, preserving their other fields.
+- **5 — `638e3b4d`:** `Actor::close` explains why remembering the ask makes cancellation before closing interactions safe (ADR-0039 §1). Comment only; no behavioral red claimed. `closing_with_an_ask_agrees_in_outcome_hooks_and_journal` passes in the core suite.
+- **6 — `8cddd7e5`:** Receipt-await comment names the empty-flight invariant and `crate::round::next`'s Ask row. The existing channel-driven test host now asserts that invariant at the instant an ask opens.
+  Red: `cargo test -p bingo-core --lib read_lands_before_edit_asks_and_edit_lands_before_bash_is_reached --locked`, with the Ask row's count guard removed → `walk.rs:34:9: an ask opened with a call in flight`. Guard restored; test passes. No wall-clock release.
+- **7 — `638e3b4d`:** `session/tests/stopped.rs` resumes the same journal twice and also resumes a journal cut between recovered items and TurnCompleted; recovered state is unchanged and terminal items never close twice.
+  Red: `cargo test -p bingo-core --lib session::tests::stopped::resuming_ --locked`, temporarily recovering all transcript items instead of the live turn's open items → `stopped.rs:259:5: the second resume wrote recovery frames`; `stopped.rs:294:5: recovery closed a terminal item twice`; `0 passed; 2 failed`. Restored → both pass in the 706-test core run.
+  Instruction qualification: a full resume necessarily writes normal summary/context/config frames. The test forbids new **recovery** frames, compares transcript/turn/last-turn/interactions, and verifies the pure recovery pass returns no events; it does not suppress normal session opening.
+
+## Gates
+
+- `cargo fmt --all -- --check` → exit 0.
+- `cargo check --workspace --all-targets --locked` → `Finished dev profile`.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings` → `Finished dev profile`.
+- `cargo test --workspace --locked` → 6,525 passed, 0 failed across 125 summaries; core `706 passed`, CLI `309 passed`, RPC integration `104 passed`, RPC wire `43 passed`, print `103 passed`, ACP provider `152 passed`, channels `116 passed`, adapter `35 passed`, Feishu `138 passed`.
+- `scripts/check_discipline.sh` → `cohesion ok`, `discipline ok`; existing long-file/function and snapshot warnings remain.
+- `scripts/budget.sh` → `dependencies (unique, normal): 423 (max 423)`; `relink isolation: touching the TUI recompiled 0 crates for core`; `target/debug: 7 GB (soft max 5)`; `budget ok`. No dependency added.
+- `cargo deny check` → `advisories ok, bans ok, licenses ok, sources ok`.
+- `cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked` → `Finished dev profile`.
+- `cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked` → exit 101 in native cross-toolchain setup: tree-sitter/tree-sitter-bash lack `stdio.h`/`stdlib.h`; aws-lc-sys lacks `stdlib.h`/`windows.h`; rquickjs-sys host Clang rejects `/DWIN32_LEAN_AND_MEAN`, `/std:c11`, `/experimental:c11atomics`. Full binary Windows validation remains blocked there.
+- All Cargo jobs ran sequentially. No incidental or wall-clock test failed; no isolated retry was needed.
+- No round-1 history rewritten; no excluded-crate edits, prototype changes, discipline changes or new packages. Plan remains 150 lines with only two existing Verified lines changed; TUI criterion remains unticked.

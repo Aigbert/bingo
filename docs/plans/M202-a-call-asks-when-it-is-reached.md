@@ -131,7 +131,7 @@ person is asked about a call whose turn has not come.
 
 ## Verified
 
-Round 1, 2026-10-19: bricks 1–5 and 7. Detail: [round-1.md](../verification/m202/round-1.md).
+Round 1: [verification](../verification/m202/round-1.md). Round 2, 2026-10-19: kernel review fixes, [verification](../verification/m202/round-2.md).
 - [x] Table before loop: `cargo test -p bingo-core --lib round --locked` → `17 passed; 0 failed`;
   contract commit `e290a457` precedes the walk. The original esc bug was pinned there too.
 - [x] Kernel: `cargo test --workspace --locked` → `test result: ok. 703 passed; 0 failed`.
@@ -147,4 +147,4 @@ Round 1, 2026-10-19: bricks 1–5 and 7. Detail: [round-1.md](../verification/m2
   Budget retains a 7 GB debug-directory soft warning. Detailed outputs and risk audit are linked above.
 - Departures: remove unused batch entry points; round/recovery own functions to meet cohesion limits.
   Accepted cost: a stop during a second ask counts from that ask. No prototype conflict found.
-- [ ] Brick 6 and its TUI criterion remain for round 2 after M194 part B; both excluded crates are untouched.
+- [ ] Brick 6 and its TUI criterion remain for round 3 after M194 part B; both excluded crates are untouched.
