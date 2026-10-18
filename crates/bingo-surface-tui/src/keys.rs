@@ -31,7 +31,7 @@ pub const BINDINGS: &[Binding] = &[
         // The stack of [`ESCAPES`], in the order it is obeyed; a test holds
         // the two together.
         keys: "esc",
-        description: "sheet → card → dropdown → interrupt → back",
+        description: "sheet → card → dropdown → interrupt → clear → latest → back → rewind → arm rewind",
     },
     Binding {
         keys: "esc esc",

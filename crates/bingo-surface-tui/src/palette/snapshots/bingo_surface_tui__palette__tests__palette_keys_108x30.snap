@@ -21,7 +21,7 @@ expression: screen
 "   /             commands, in this list                                                                     "
 "   ?             keys, in this list                                                                         "
 "   ctrl+r        choose resume                                                                              "
-"   esc           sheet → card → dropdown → interrupt → back                                                 "
+"   esc           sheet → card → dropdown → interrupt → clear → latest → back → rewind → arm rewind          "
 "   ctrl+o        expand result · then all                                                                   "
 "   ctrl+t        tasks band on and off                                                                      "
 "   ctrl+c        stop · clear · twice exits                                                                 "
