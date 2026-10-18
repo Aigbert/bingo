@@ -122,10 +122,9 @@ wordmark and the exit receipt (M199).
 - [x] Bands — `cargo test --workspace --locked`: `m193_capture_dock_and_footer_bands ... ok` (all 11 named captures; dock and footer, exact size/moment/flags, folded session frames).
 - [x] Edge — same command: `m193_edge_comet_end_mode_and_reduced_have_deadlines ... ok` (three comet samples; end 0/550/1100 ms; mode and reduced).
 - [x] Growth — same command: `growth_samples_each_fourteen_ms_step_and_shrinks_at_once ... ok` (3→14, every 14 ms, immediate shrink).
-- [x] Smoke — `TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`; readiness now waits for footer `fake-1`.
-- [x] Drive — `python3 docs/verification/m193/drive.py`: `PASS 100x32` / `PASS 80x24`, each followed by `CLEAN`; idle/live/done, four modes, toast expiry and moving edge; private fake-provider HOME/data/cwd. Text and ANSI captures in `docs/verification/m193/`.
+- [x] Smoke/drive — `TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`; `python3 docs/verification/m193/drive.py`: `PASS 100x32` / `PASS 80x24`, both `CLEAN` (idle/live/modes/toast; fake provider, private HOME/data/cwd; captures in `docs/verification/m193/`).
 - [x] `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked` and `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile` each.
-- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6455 passed; 0 failed; 0 ignored**; TUI 1399, PTY 19. `cargo build -p bingo --locked`: exit 0.
+- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6461 passed; 0 failed; 0 ignored**; TUI 1405, PTY 19. `cargo build -p bingo --locked`: exit 0.
 - [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`, `budget ok` (disk warning); `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
 - [x] Windows — `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: SDK, core, mod-hello, mod-keybar and tool-bash each `Finished dev profile`, exit 0.
 - [ ] Same Windows check for permissions/TUI/bingo: exit 101. Permissions' tree-sitter lacks `stdio.h`/`stdlib.h`; TUI's aws-lc-sys lacks `stdlib.h`/`windows.h`; bingo's rquickjs-sys rejects `/std:c11`. Native-toolchain checks remain owed; no bypass.
@@ -148,3 +147,4 @@ wordmark and the exit receipt (M199).
 - M198 handoff: with the stream bottom-anchored, ui.block/view-table, rewind, plugins and pager overlays cover its newest rows; M198 makes them dock sheets that push the stream up. Unchanged this round.
 - Round 3 — send-scrollbar and zero-height footer/edge/ask regressions fail before and pass after; local notice lifetime/payload, shared submissions, all needs-you paths and review cleanups verified. [Evidence and gates](../verification/m193/review-round3.txt). No Ember capture or .snap changes; no wall-clock retries.
 - Round 4 — welcome/inline-ask collection precedes clipping; Scroll owns flash expiry; four regressions fail without fixes and pass with them, including heights 1–60. Matching rows and all nits fixed; [evidence and gates](../verification/m193/review-round4.txt).
+- Round 5 — clean rebase onto `94daa293`; four sweep mutations fail, six width regressions fail→pass; width/height wakes and all gates rechecked. [Evidence, audit and gates](../verification/m193/review-round5.txt).

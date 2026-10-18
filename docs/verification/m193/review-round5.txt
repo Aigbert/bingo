@@ -1,0 +1,154 @@
+M193 round 5
+
+Rebase: git rebase 94daa293, clean; no conflicts.
+c30b7cab -> ab31817a34b9ece3eba008cbd3cd2623a00b9b03
+
+Regression command:
+cargo test -p bingo-surface-tui --lib --locked view::part_deadlines
+Before (final tests, unmodified production):
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_welcomes_entrance ... ok
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_inline_asks_entrance ... ok
+  test view::part_deadlines::end_and_page_keys_schedule_the_scroll_flash_without_overflow ... ok
+  test view::part_deadlines::clipped_ambient_facts_keep_their_deadlines ... FAILED
+  test view::part_deadlines::a_box_with_no_columns_keeps_its_childs_entrance ... FAILED
+  test view::part_deadlines::a_zero_column_edge_keeps_its_flash_deadline ... FAILED
+  test view::part_deadlines::a_keybar_with_no_columns_keeps_its_entrance ... FAILED
+  test view::part_deadlines::a_toast_keeps_its_deadline_when_the_pairs_fill_the_footer ... FAILED
+  test view::part_deadlines::part_deadlines_do_not_depend_on_terminal_width ... FAILED
+  test view::part_deadlines::part_deadlines_do_not_depend_on_terminal_height ... ok
+  test result: FAILED. 4 passed; 6 failed; 0 ignored; 0 measured; 1395 filtered out; finished in 0.28s
+
+After:
+  test view::part_deadlines::a_box_with_no_columns_keeps_its_childs_entrance ... ok
+  test view::part_deadlines::a_keybar_with_no_columns_keeps_its_entrance ... ok
+  test view::part_deadlines::a_zero_column_edge_keeps_its_flash_deadline ... ok
+  test view::part_deadlines::clipped_ambient_facts_keep_their_deadlines ... ok
+  test view::part_deadlines::a_toast_keeps_its_deadline_when_the_pairs_fill_the_footer ... ok
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_welcomes_entrance ... ok
+  test view::part_deadlines::a_zero_row_transcript_keeps_the_inline_asks_entrance ... ok
+  test view::part_deadlines::end_and_page_keys_schedule_the_scroll_flash_without_overflow ... ok
+  test view::part_deadlines::part_deadlines_do_not_depend_on_terminal_height ... ok
+  test view::part_deadlines::part_deadlines_do_not_depend_on_terminal_width ... ok
+  test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 1395 filtered out; finished in 0.63s
+
+Height-sweep mutations (temporary, restored, never committed):
+cargo test -p bingo-surface-tui --lib --locked \
+  view::part_deadlines::part_deadlines_do_not_depend_on_terminal_height -- --exact
+Each mutation drops only that part's deadline at terminal height 1:
+
+welcome: view/welcome.rs, clear drawing.next before collect
+  assertion `left == right` failed: welcome entrance: height 1, age 0
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1404 filtered out; finished in 0.14s
+
+toast: footer/toast.rs, return next: None
+  assertion `left == right` failed: toast hold: height 1, age 1100
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1404 filtered out; finished in 0.34s
+
+edge: view.rs, clear dock drawing.next before place
+  assertion `left == right` failed: composer edge flash: height 1, age 850
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1404 filtered out; finished in 0.27s
+
+scrollbar: layout/deadline.rs, filter the scroll next_change
+  assertion `left == right` failed: scrollbar flash: height 1, age 790
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1404 filtered out; finished in 0.21s
+
+- Owners are named in OWNERS: welcome 0 -> +10 ms, scroll 790 -> +800,
+  edge 850 -> +883, toast 1100 -> +2200. Heights 1..=60 and widths 0..=160
+  (fixed height 24) each retain the exact same deadlines. No animated transcript
+  rows; caret rested at born +10 s. Each geometry starts settled, excluding growth.
+- The focused toast regression uses width 11: TX 3 + RM 2 leave six columns,
+  exactly the '? keys' pair. The toast gets zero columns but owns +2200 ms.
+- Additional before/after regressions cover clipped ambient countdowns (widths
+  0/1/5/12/120), a zero-column mod KeyBar entrance, a zero-column edge flash,
+  and a zero-column Box's child entrance. Motion is on for entrance/edge/toast;
+  the ambient countdown is tested under reduced motion.
+- Fixture correction before the recorded red run: TestBackend Display panics
+  at width zero, so the test uses drawn() without formatting its buffer. The
+  width-11 toast fixture corrects TX + RM to five columns. Recorded failures
+  are deadline assertions, not those setup mistakes.
+
+Width audit and fixes:
+- Footer/toast: removed width-zero returns; toast samples its lifetime even
+  when right pairs consume all columns. Its fitted characters stay empty.
+- Ambient footer: removed room-zero return; fit folds every fact's next before
+  clipping words, including facts beyond the first one that does not fit.
+  Ambient is deliberately absent while a toast replaces it.
+- Keybar: draws before zero-width clipping; map_lines preserves its next.
+  Native pairs are still; accepted mod answers may carry an entrance.
+- Composer edge: removed width-zero return; state/flash drawing always samples.
+- Pill: width-based omission is still-only, owns no deadline; scroll state owns
+  the ease and 900 ms flash regardless of pill/scrollbar placement.
+- Activity row: no width return; the band folds each drawing via append, and
+  compose collects even at zero rows. Activity slots inherit the Box fix below.
+- AbovePrompt band: collects before truncate/place; only explicit hiding or no
+  render hook omits it. No width guard at the site.
+- Ask: splice collects before fit/place; question and sealed sites have no
+  width early-return. Invalid sealed answers still fall back to their own drawing.
+- Shared Box path: width zero formerly skipped children; now it draws them,
+  retains next and clears lines. Drawing::map_lines no longer drops next when
+  clipping empties lines. Explicit display:none still draws/schedules nothing.
+- Caret: visible input rows still gate its deadline; comment explains why.
+  Its narrow-column guard also means there is no visible caret to animate.
+- FLASH now documents the scrollbar's lit interval. The extra +900 ms wake
+  without overflow and the corrected round-3 record remain unchanged.
+- No transcript row changes; visible_lines still limits their wakes. No Ember
+  capture, prototype, schema, dependency or snapshot changes.
+
+Initial gate attempt: fmt/check/clippy passed, then the workspace test stopped
+at footer::tests::m193_hidden_footer_animation_never_schedules (1404 passed,
+1 failed in TUI). Its width-12 assertion encoded the old behavior this round
+changes: clipping discarded the crew lamp's deadline. Renamed it to
+ambient_deadlines_survive_clipping_but_not_toast_replacement and pinned the
+same FRAME deadline at widths 80 and 12; a replacing toast still owns its wake.
+This is directly affected and deterministic, not a wall-clock failure.
+
+Revised test's red/green check:
+cargo test -p bingo-surface-tui --lib --locked \
+  footer::tests::ambient_deadlines_survive_clipping_but_not_toast_replacement -- --exact
+Before: restored only ab31817a's production footer.rs, retaining the revised test:
+  test footer::tests::ambient_deadlines_survive_clipping_but_not_toast_replacement ... FAILED
+  test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1404 filtered out; finished in 0.14s
+After restoring the fix:
+  test footer::tests::ambient_deadlines_survive_clipping_but_not_toast_replacement ... ok
+  test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1404 filtered out; finished in 0.01s
+
+Final gates on f25a05d5 (one at a time, nothing excluded, all exit 0):
+- cargo fmt --all -- --check: exit 0, no output.
+- cargo check --workspace --all-targets --locked:
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.81s
+- cargo clippy --workspace --all-targets --locked -- -D warnings:
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 9.95s
+- cargo test --workspace --locked (provider credentials unset):
+  123 result lines; 6461 passed; 0 failed; 0 ignored. TUI: 1405; PTY: 19.
+  m193_capture_dock_and_footer_bands ... ok; all 11 owned captures unchanged.
+- scripts/check_discipline.sh: discipline ok (existing advisory warnings).
+- scripts/budget.sh:
+  dependencies (unique, normal): 423 (max  423)
+  warm cargo check -p bingo-core: 0s (max  20s)
+  relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+  target/debug: 15 GB (soft max  5)
+  warn: target/debug exceeds the soft limit
+  test binaries: 195
+  budget ok
+- cargo deny check: advisories ok, bans ok, licenses ok, sources ok.
+No wall-clock retries were needed. Final tests include all regressions and the
+revised ambient test; the initial obsolete assertion is recorded above.
+
+Platform and terminal checks (sequential):
+- cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc:
+  exit 101 in aws-lc-sys 0.44.0; fatal error: 'stdlib.h' file not found;
+  fatal error: 'windows.h' file not found. Known MSVC native-header blocker;
+  no bypass, actual Windows compile remains owed.
+- cargo build -p bingo --locked: exit 0;
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 34.33s
+- TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh:
+  tui-smoke ok; exit 0.
+- python3 docs/verification/m193/drive.py: exit 0;
+  PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+  CLEAN 100x32: owned tmux server stopped; temporary files removed
+  PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+  CLEAN 80x24: owned tmux server stopped; temporary files removed
+Drive text and ANSI artifacts refreshed; sampled done/mode/live/toast captures.
+Text changes are completion times; ANSI changes sample the global ink clock.
+Plan: 150 lines; all prior round lines retained, smoke/drive evidence tightened
+into one line. Full-frame criterion and M198 overlay handoff remain deferred.
