@@ -47,11 +47,31 @@ pub fn clock(state: &SessionState, turn: &TurnId, now: Timestamp) -> Option<Turn
     clock_of(&items, Ends::of(state, turn), now)
 }
 
+/// A call's own wait, still open until it starts or finishes without running.
+pub fn call_wait(item: &Item) -> Option<(Timestamp, Option<Timestamp>)> {
+    let ItemBody::ToolCall {
+        asked_at, began_at, ..
+    } = item.body
+    else {
+        return None;
+    };
+    Some((asked_at?, began_at.or(item.completed_at)))
+}
+
 /// Measure one turn's ordered items, subtracting the union of recorded waits.
 pub fn clock_of(items: &[&Item], ends: Ends, now: Timestamp) -> Option<TurnClock> {
     let start = items.first()?.started_at;
     let (end, ticking) = match ends {
-        Ends::Live { asked } => (asked.unwrap_or(now).max(start), asked.is_none()),
+        Ends::Live { asked } => {
+            let asked = asked
+                .into_iter()
+                .chain(items.iter().filter_map(|item| {
+                    let (asked, end) = call_wait(item)?;
+                    end.is_none().then_some(asked)
+                }))
+                .min();
+            (asked.unwrap_or(now).max(start), asked.is_none())
+        }
         Ends::Over => (
             items
                 .iter()
@@ -73,6 +93,9 @@ fn closed_waits(items: &[&Item], start: Timestamp, end: Timestamp) -> Vec<(Times
     items
         .iter()
         .filter_map(|item| {
+            if let Some((asked, until)) = call_wait(item) {
+                return Some((asked.max(start), until.unwrap_or(end).min(end)));
+            }
             let asked = match item.body {
                 ItemBody::PermissionReceipt { asked_at, .. }
                 | ItemBody::QuestionAnswer { asked_at, .. }
