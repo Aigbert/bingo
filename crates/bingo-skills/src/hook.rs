@@ -97,7 +97,7 @@ mod tests {
     };
 
     #[tokio::test]
-    async fn both_doors_place_the_same_row_and_ignore_old_prompts() {
+    async fn only_the_command_places_a_row_and_ignores_old_prompts() {
         let tree = crate::tests::Tree::new();
         let library = Arc::new(Library::new(bingo_sdk::Env::rooted(tree.root())));
         let host = TestHost::default();
@@ -110,6 +110,12 @@ mod tests {
             )
             .await
             .unwrap();
+        assert!(
+            !host
+                .calls()
+                .iter()
+                .any(|call| matches!(call, HostCall::Extend { .. }))
+        );
         let event: bingo_sdk::Event = serde_json::from_str(include_str!(
             "../../bingo-sdk/fixtures/record/event/itemCompleted.json"
         ))
@@ -149,8 +155,7 @@ mod tests {
                 _ => None,
             })
             .collect();
-        assert_eq!(rows.len(), 2);
-        assert_eq!(rows[0], rows[1]);
+        assert_eq!(rows.len(), 1);
         let slots: Vec<bingo_sdk::slot::Slot> =
             serde_json::from_value(rows[0]["slots"].clone()).unwrap();
         assert_eq!(
