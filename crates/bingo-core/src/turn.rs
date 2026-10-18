@@ -681,7 +681,7 @@ impl Turn<'_> {
 
     /// Walk the calls, then hold the barrier before the next round.
     async fn act(&mut self, finished: &Finished) -> Step {
-        let outcomes = self.run_tools(finished).await;
+        let outcomes = round::run(self, finished).await;
         let stop_after = self.after_tool_hooks(&outcomes).await;
         if self.cancel.is_cancelled() {
             return self.interrupted();

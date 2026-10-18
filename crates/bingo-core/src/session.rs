@@ -367,7 +367,7 @@ impl Actor {
         self.restate_context(false).await?;
         self.restate_extensions().await?;
         self.refresh_config().await?;
-        self.recover().await?;
+        recovery::recover(self).await?;
         self.observe_named(
             bingo_sdk::catalogue::SESSION_START,
             json!({"session":self.id}),
