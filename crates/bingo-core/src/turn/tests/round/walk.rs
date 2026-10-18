@@ -2,11 +2,16 @@ use super::*;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
 
-type Ask = (InteractionKind, oneshot::Sender<Answer>);
+struct Ask {
+    kind: InteractionKind,
+    in_flight: Vec<String>,
+    reply: oneshot::Sender<Answer>,
+}
+type Record = Arc<Mutex<Vec<Event>>>;
 type Releases = Arc<Mutex<HashMap<usize, oneshot::Receiver<()>>>>;
 
 struct Person {
-    recorded: RecordingHost,
+    recorded: Record,
     asks: mpsc::UnboundedSender<Ask>,
     events: mpsc::UnboundedSender<Event>,
 }
@@ -15,8 +20,11 @@ struct Person {
 impl TurnHost for Person {
     fn offered(&self, _: Vec<Arc<dyn Tool>>) {}
     fn emit(&self, event: Event) {
-        self.recorded.emit(event.clone());
-        self.events.send(event).unwrap();
+        self.recorded
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(event.clone());
+        let _ = self.events.send(event);
     }
     async fn absorb(&self) -> Vec<(IntentId, Input)> {
         vec![]
@@ -28,24 +36,40 @@ impl TurnHost for Person {
         _: Vec<AnswerSpec>,
     ) -> Result<crate::gate::Answered, KernelError> {
         let mut transcript = Transcript::new();
-        for event in self.recorded.events() {
-            transcript.apply(&event);
+        for event in self
+            .recorded
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .iter()
+        {
+            transcript.apply(event);
         }
-        assert!(
-            transcript.items().iter().all(|item| {
-                !matches!(item.body, ItemBody::ToolCall { .. })
-                    || item.status != ItemStatus::Running
-            }),
-            "an ask opened with a call in flight"
-        );
+        let in_flight = transcript
+            .items()
+            .iter()
+            .filter_map(|item| match &item.body {
+                ItemBody::ToolCall { name, call_id, .. } if item.status == ItemStatus::Running => {
+                    Some(format!("{name} ({call_id})"))
+                }
+                _ => None,
+            })
+            .collect();
         let (reply, answer) = oneshot::channel();
-        self.asks.send((kind, reply)).unwrap();
+        self.asks
+            .send(Ask {
+                kind,
+                in_flight,
+                reply,
+            })
+            .map_err(|_| KernelError::new(ErrorCode::Interrupted, "test ask receiver closed"))?;
         Ok(crate::gate::Answered {
             ask: crate::gate::Asked {
                 id: InteractionId::mint(),
                 opened_at: Timestamp::now(),
             },
-            answer: answer.await.unwrap(),
+            answer: answer
+                .await
+                .map_err(|_| KernelError::new(ErrorCode::Interrupted, "test answer closed"))?,
         })
     }
 }
@@ -55,7 +79,7 @@ struct Controlled {
     traits: ToolTraits,
     starts: mpsc::UnboundedSender<usize>,
     releases: Releases,
-    host: Arc<Person>,
+    recorded: Record,
 }
 
 #[async_trait]
@@ -74,7 +98,7 @@ impl Tool for Controlled {
         input: serde_json::Value,
         cx: &ToolContext,
     ) -> Result<ToolOutput, ToolError> {
-        assert!(self.host.recorded.events().iter().any(|event| matches!(event,
+        assert!(self.recorded.lock().unwrap().iter().any(|event| matches!(event,
             Event::ItemUpdated { item } if item.id == cx.item && item.status == ItemStatus::Running)));
         let index = input["v"].as_u64().unwrap() as usize;
         let release = self.releases.lock().unwrap().remove(&index).unwrap();
@@ -88,7 +112,7 @@ fn controlled_tools(
     definitions: &[(&str, bool, bool)],
     starts: mpsc::UnboundedSender<usize>,
     releases: Releases,
-    host: &Arc<Person>,
+    recorded: &Record,
 ) -> Vec<Arc<dyn Tool>> {
     definitions
         .iter()
@@ -103,14 +127,14 @@ fn controlled_tools(
                 },
                 starts: starts.clone(),
                 releases: releases.clone(),
-                host: host.clone(),
+                recorded: recorded.clone(),
             }) as Arc<dyn Tool>
         })
         .collect()
 }
 
 struct Rig {
-    host: Arc<Person>,
+    recorded: Record,
     asks: mpsc::UnboundedReceiver<Ask>,
     starts: mpsc::UnboundedReceiver<usize>,
     events: mpsc::UnboundedReceiver<Event>,
@@ -129,11 +153,12 @@ impl Rig {
     ) -> Self {
         let (asks_tx, asks) = mpsc::unbounded_channel();
         let (events_tx, events) = mpsc::unbounded_channel();
-        let host = Arc::new(Person {
-            recorded: RecordingHost::new(),
+        let recorded = Record::default();
+        let host = Person {
+            recorded: recorded.clone(),
             asks: asks_tx,
             events: events_tx,
-        });
+        };
         let (starts_tx, starts) = mpsc::unbounded_channel();
         let mut releases = HashMap::new();
         let receivers = Arc::new(Mutex::new(HashMap::new()));
@@ -142,7 +167,7 @@ impl Rig {
             releases.insert(index, send);
             receivers.lock().unwrap().insert(index, receive);
         }
-        let tools = controlled_tools(definitions, starts_tx, receivers, &host);
+        let tools = controlled_tools(definitions, starts_tx, receivers, &recorded);
         let provider = ScriptedProvider::new(vec![
             Script::Events(calls(names)),
             Script::Events(text("done")),
@@ -154,7 +179,6 @@ impl Rig {
         cfg.hooks = hooks;
         let cancel = CancellationToken::new();
         let task = tokio::spawn({
-            let host = host.clone();
             let cancel = cancel.clone();
             async move {
                 run_turn(
@@ -165,13 +189,13 @@ impl Rig {
                         cancel,
                         TurnKind::Respond,
                     ),
-                    host.as_ref(),
+                    &host,
                 )
                 .await
             }
         });
         Self {
-            host,
+            recorded,
             asks,
             starts,
             events,
@@ -185,15 +209,15 @@ impl Rig {
         self.releases.remove(&index).unwrap().send(()).unwrap();
     }
     fn status(&self, index: usize) -> ItemStatus {
-        let transcript = self
-            .host
-            .recorded
-            .events()
-            .iter()
-            .fold(Transcript::new(), |mut t, e| {
-                t.apply(e);
-                t
-            });
+        let transcript =
+            self.recorded
+                .lock()
+                .unwrap()
+                .iter()
+                .fold(Transcript::new(), |mut t, e| {
+                    t.apply(e);
+                    t
+                });
         transcript
             .items()
             .iter()
@@ -218,7 +242,15 @@ impl Rig {
         }
     }
     async fn answer(&mut self, tool: &str, answer: Answer) {
-        let (kind, reply) = self.asks.recv().await.unwrap();
+        let Ask {
+            kind,
+            in_flight,
+            reply,
+        } = self.asks.recv().await.expect("turn ended before asking");
+        assert!(
+            in_flight.is_empty(),
+            "an ask opened with calls in flight: {in_flight:?}"
+        );
         assert!(matches!(kind, InteractionKind::Permission { tool: name, .. } if name == tool));
         reply.send(answer).unwrap();
     }
@@ -240,7 +272,6 @@ async fn read_lands_before_edit_asks_and_edit_lands_before_bash_is_reached() {
     assert_eq!(rig.starts.recv().await, Some(0));
     assert_eq!(rig.status(1), ItemStatus::Pending);
     assert_eq!(rig.status(2), ItemStatus::Pending);
-    assert!(rig.asks.try_recv().is_err());
     rig.release(0);
     rig.answer("Edit", Answer::AllowOnce).await;
     assert_eq!(rig.status(0), ItemStatus::Completed);
@@ -431,7 +462,7 @@ async fn a_denial_lands_without_waiting_and_does_not_stop_the_walk() {
     rig.release(0);
     rig.release(2);
     assert_eq!(rig.task.await.unwrap().status, TurnStatus::Completed);
-    assert!(!rig.host.recorded.events().iter().any(|event| matches!(event,
+    assert!(!rig.recorded.lock().unwrap().iter().any(|event| matches!(event,
         Event::ItemUpdated { item } if matches!(&item.body, ItemBody::ToolCall { call_id, .. } if call_id == "c1")
             && item.status == ItemStatus::Running)));
 }
@@ -513,4 +544,48 @@ async fn a_landing_is_reported_while_a_check_waits_and_esc_drops_that_check() {
     let out = rig.task.await.unwrap();
     assert!(matches!(out.status, TurnStatus::Interrupted { .. }));
     assert!(rig.starts.try_recv().is_err());
+}
+
+struct PanicAtCheck;
+#[async_trait]
+impl Hook for PanicAtCheck {
+    fn id(&self) -> &str {
+        "panic-at-check"
+    }
+    fn matcher(&self) -> HookMatcher {
+        HookMatcher {
+            points: vec![HookPoint::BeforeTool],
+            tool: None,
+        }
+    }
+    async fn before_tool(&self, _: &mut ToolCall, _: &HookContext) -> HookOutcome {
+        panic!("test turn panicked");
+    }
+}
+
+fn assert_receivers_closed(rig: &Rig) {
+    assert!(rig.asks.is_closed(), "dead turn retained an ask sender");
+    assert!(rig.events.is_closed(), "dead turn retained an event sender");
+    assert!(rig.starts.is_closed(), "dead turn retained a start sender");
+}
+
+#[tokio::test]
+async fn a_panicked_turn_closes_every_rig_receiver() {
+    let mut rig = Rig::new(
+        &["Read"],
+        &[("Read", true, true)],
+        None,
+        HookSet::fixed(vec![Arc::new(PanicAtCheck)]),
+    );
+    assert!((&mut rig.task).await.unwrap_err().is_panic());
+    assert_receivers_closed(&rig);
+}
+
+#[tokio::test]
+async fn a_finished_turn_closes_every_rig_receiver() {
+    let mut rig = Rig::new(&["Read"], &[("Read", true, true)], None, HookSet::default());
+    assert_eq!(rig.starts.recv().await, Some(0));
+    rig.release(0);
+    assert_eq!((&mut rig.task).await.unwrap().status, TurnStatus::Completed);
+    assert_receivers_closed(&rig);
 }
