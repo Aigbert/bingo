@@ -81,7 +81,7 @@ async fn mismatched_session_scope_records_only_the_final_denial() {
             tool: "Echo".into(),
             decision: DecisionKind::Deny,
             feedback: None,
-            asked_at: Some(ask.opened_at)
+            asked_at: None
         }]
     );
     no_corrections(&mailbox).await;
@@ -91,6 +91,11 @@ async fn mismatched_session_scope_records_only_the_final_denial() {
 async fn edited_then_session_allowed_records_one_final_interaction() {
     let (mailbox, mut state, mut events) = prompted().await;
     let first = state.interactions[0].clone();
+    let first_wait = bingo_sdk::transcript::call_wait(
+        state.transcript.get(first.item.as_ref().unwrap()).unwrap(),
+    )
+    .unwrap()
+    .0;
     answer(
         &mailbox,
         &state,
@@ -110,6 +115,14 @@ async fn edited_then_session_allowed_records_one_final_interaction() {
     drive(&mut events, &mut state, turn_completed).await;
     assert_ne!(first.id, last.id);
     assert_eq!(
+        bingo_sdk::transcript::call_wait(
+            state.transcript.get(last.item.as_ref().unwrap()).unwrap()
+        )
+        .unwrap()
+        .0,
+        first_wait
+    );
+    assert_eq!(
         receipts(&state),
         vec![&ItemBody::PermissionReceipt {
             item: last.item,
@@ -117,7 +130,7 @@ async fn edited_then_session_allowed_records_one_final_interaction() {
             tool: "Echo".into(),
             decision: DecisionKind::AllowChangedSession,
             feedback: None,
-            asked_at: Some(first.opened_at)
+            asked_at: None
         }]
     );
     no_corrections(&mailbox).await;
@@ -144,7 +157,7 @@ async fn denial_feedback_survives_an_immediate_escape_once() {
             tool: "Echo".into(),
             decision: DecisionKind::Deny,
             feedback: Some("use a smaller change".into()),
-            asked_at: Some(ask.opened_at)
+            asked_at: None
         }]
     );
 }
@@ -207,7 +220,26 @@ async fn stopped(question: bool) {
             .unwrap()
             .0
     };
-    assert_eq!(clock.elapsed, wait_start.duration_since(start));
+    let ended = state
+        .transcript
+        .items()
+        .iter()
+        .filter_map(|i| i.completed_at)
+        .max()
+        .unwrap();
+    let tail = if question {
+        jiff::SignedDuration::ZERO
+    } else {
+        ended.duration_since(
+            state
+                .transcript
+                .get(ask.item.as_ref().unwrap())
+                .unwrap()
+                .completed_at
+                .unwrap(),
+        )
+    };
+    assert_eq!(clock.elapsed, wait_start.duration_since(start) + tail);
     let interruption = state
         .transcript
         .items()
@@ -216,7 +248,11 @@ async fn stopped(question: bool) {
         .unwrap();
     assert_eq!(
         serde_json::to_value(&interruption.body).unwrap()["askedAt"],
-        json!(ask.opened_at)
+        if question {
+            json!(ask.opened_at)
+        } else {
+            serde_json::Value::Null
+        }
     );
 }
 #[tokio::test]
@@ -263,6 +299,46 @@ async fn two_answered_asks_keep_their_own_opening_instants() {
                 _ => None,
             })
             .collect();
-        assert_eq!(matching, vec![Some(ask.opened_at)]);
+        assert_eq!(matching, vec![None]);
+        let call = state.transcript.get(ask.item.as_ref().unwrap()).unwrap();
+        assert!(bingo_sdk::transcript::call_wait(call).unwrap().0 <= ask.opened_at);
     }
+}
+
+#[tokio::test]
+async fn stopping_a_reasked_call_counts_from_its_first_stamp() {
+    let (mailbox, mut state, mut events) = prompted().await;
+    let first = state.interactions[0].clone();
+    let id = first.item.as_ref().unwrap();
+    let first_wait = bingo_sdk::transcript::call_wait(state.transcript.get(id).unwrap())
+        .unwrap()
+        .0;
+    answer(
+        &mailbox,
+        &state,
+        Answer::AllowChanged {
+            input: json!({"v":2}),
+        },
+    );
+    drive(&mut events, &mut state, opened).await;
+    assert_ne!(state.interactions[0].id, first.id);
+    assert_eq!(
+        bingo_sdk::transcript::call_wait(state.transcript.get(id).unwrap()),
+        Some((first_wait, None))
+    );
+    mailbox.interrupt(IntentId::mint(), InterruptScope::Head);
+    drive(&mut events, &mut state, turn_completed).await;
+    let call = state.transcript.get(id).unwrap();
+    assert_eq!(call.status, ItemStatus::Interrupted);
+    assert_eq!(
+        bingo_sdk::transcript::call_wait(call),
+        Some((first_wait, call.completed_at))
+    );
+    assert!(
+        state
+            .transcript
+            .items()
+            .iter()
+            .any(|i| matches!(i.body, ItemBody::Interruption { asked_at: None, .. }))
+    );
 }

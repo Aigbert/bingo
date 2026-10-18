@@ -6,6 +6,7 @@ use jiff::Timestamp;
 pub struct Asked {
     pub id: InteractionId,
     pub opened_at: Timestamp,
+    pub held: bool,
 }
 
 #[derive(Debug)]

@@ -85,6 +85,7 @@ impl GatePrompter for Person {
             ask: Asked {
                 id: InteractionId::mint(),
                 opened_at: jiff::Timestamp::now(),
+                held: false,
             },
             answer: self
                 .replies

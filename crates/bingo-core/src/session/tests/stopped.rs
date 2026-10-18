@@ -86,7 +86,18 @@ async fn agrees(kind: Option<InteractionKind>, close: bool) {
     let (mut actor, mut hooks) = observed_actor(permission).await;
     let turn = actor.running.as_ref().unwrap().turn.clone();
     let opened_at = if permission {
-        Some(actor.state.interactions[0].opened_at)
+        let open = &actor.state.interactions[0];
+        assert!(
+            bingo_sdk::transcript::call_wait(
+                actor
+                    .state
+                    .transcript
+                    .get(open.item.as_ref().unwrap())
+                    .unwrap()
+            )
+            .is_some()
+        );
+        None
     } else if let Some(kind) = kind {
         let (reply, _answer) = oneshot::channel();
         actor
@@ -106,6 +117,16 @@ async fn agrees(kind: Option<InteractionKind>, close: bool) {
             .unwrap();
     }
     let outcome = returned(&mut actor).await;
+    if permission {
+        assert!(
+            outcome
+                .items
+                .iter()
+                .any(|item| item.status == ItemStatus::Interrupted
+                    && item.completed_at.is_some()
+                    && bingo_sdk::transcript::call_wait(item).is_some())
+        );
+    }
     assert_eq!(asked_at(&outcome.items), opened_at, "turn outcome");
     actor
         .turn_finished(turn, Ended::Returned(outcome))
@@ -253,7 +274,12 @@ fn lost_ask_journal() -> Vec<Frame> {
         kind: permission(),
         answers: vec![AnswerSpec::AllowOnce, AnswerSpec::Deny, AnswerSpec::Cancel],
     };
-    frames.push(journal_frame(6, Event::InteractionOpened { interaction }));
+    let mut asking = state.transcript.items()[1].as_ref().clone();
+    if let ItemBody::ToolCall { asked_at, .. } = &mut asking.body {
+        *asked_at = Some(interaction.opened_at);
+    }
+    frames.push(journal_frame(6, Event::ItemUpdated { item: asking }));
+    frames.push(journal_frame(7, Event::InteractionOpened { interaction }));
     frames
 }
 
@@ -266,6 +292,16 @@ fn recovery_journals() -> [(&'static str, Vec<Frame>); 3] {
 }
 
 fn assert_recovered(name: &str, before: &SessionState, after: &SessionState, added: &[Frame]) {
+    if name == "mid-ask" {
+        let turn = before.turn.as_ref().unwrap().id.clone();
+        let expected = bingo_sdk::transcript::clock(before, &turn, Timestamp::now()).unwrap();
+        let recovered = bingo_sdk::transcript::clock(after, &turn, Timestamp::now()).unwrap();
+        assert_eq!(
+            recovered.elapsed, expected.elapsed,
+            "recovery keeps the held wait"
+        );
+        assert_eq!(recovered.next_second, None);
+    }
     assert!(after.turn.is_none(), "{name}: lost turn remains open");
     for prior in before.transcript.items() {
         let item = after.transcript.get(&prior.id).unwrap();

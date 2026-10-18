@@ -1,13 +1,13 @@
 use bingo_sdk::*;
 
-pub(super) fn answered(open: &Interaction, answer: &Answer) -> Option<ItemBody> {
+pub(super) fn answered(open: &Interaction, answer: &Answer, held: bool) -> Option<ItemBody> {
     if let InteractionKind::Permission { tool, .. } = &open.kind {
         let (decision, feedback) = match answer {
             Answer::Deny { feedback } => (DecisionKind::Deny, feedback.clone()),
             _ => return None,
         };
         return Some(ItemBody::PermissionReceipt {
-            asked_at: Some(open.opened_at),
+            asked_at: (!held).then_some(open.opened_at),
             item: open.item.clone(),
             interaction: open.id.clone(),
             tool: tool.clone(),
@@ -86,7 +86,8 @@ mod tests {
                 "kind":kind,"answers":["cancel"]
             }))
             .unwrap();
-            let Some(ItemBody::QuestionAnswer { answer, .. }) = answered(&open, &Answer::Cancel)
+            let Some(ItemBody::QuestionAnswer { answer, .. }) =
+                answered(&open, &Answer::Cancel, false)
             else {
                 panic!("missing answer receipt")
             };

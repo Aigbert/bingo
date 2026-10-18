@@ -77,15 +77,26 @@ impl TurnHost for RecordingHost {
     }
     async fn ask(
         &self,
-        _item: Option<ItemId>,
+        item: Option<ItemId>,
         kind: InteractionKind,
         _answers: Vec<AnswerSpec>,
     ) -> Result<crate::gate::Answered, KernelError> {
+        let mut transcript = Transcript::new();
+        for event in self.events() {
+            transcript.apply(&event);
+        }
+        let held = matches!(kind, InteractionKind::Permission { .. })
+            && item
+                .as_ref()
+                .and_then(|id| transcript.get(id))
+                .and_then(bingo_sdk::transcript::call_wait)
+                .is_some_and(|(_, end)| end.is_none());
         self.asked.lock().unwrap().push(kind);
         Ok(crate::gate::Answered {
             ask: crate::gate::Asked {
                 id: InteractionId::mint(),
                 opened_at: Timestamp::now(),
+                held,
             },
             answer: self
                 .answers

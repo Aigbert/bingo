@@ -147,6 +147,7 @@ impl Actor {
             ask: crate::gate::Asked {
                 id: pending.interaction.id.clone(),
                 opened_at: pending.interaction.opened_at,
+                held: self.held(&pending.interaction),
             },
             answer,
         }));
@@ -178,8 +179,18 @@ impl Actor {
     }
 
     fn answer_receipt(&self, open: &Interaction, answer: &Answer) -> Option<Item> {
-        let body = receipt::answered(open, answer)?;
+        let body = receipt::answered(open, answer, self.held(open))?;
         Some(self.fresh(open.turn.clone(), None, body))
+    }
+
+    fn held(&self, open: &Interaction) -> bool {
+        matches!(open.kind, InteractionKind::Permission { .. })
+            && open
+                .item
+                .as_ref()
+                .and_then(|id| self.state.transcript.get(id))
+                .and_then(bingo_sdk::transcript::call_wait)
+                .is_some_and(|(_, end)| end.is_none())
     }
 
     pub(super) fn remember_stopped_ask(&self) {
@@ -187,7 +198,9 @@ impl Actor {
             let earliest = self
                 .pending
                 .values()
-                .filter(|p| p.interaction.turn.as_ref() == Some(&running.turn))
+                .filter(|p| {
+                    p.interaction.turn.as_ref() == Some(&running.turn) && !self.held(&p.interaction)
+                })
                 .map(|p| p.interaction.opened_at)
                 .min();
             running.stopped_ask.set(earliest);

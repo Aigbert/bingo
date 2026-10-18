@@ -116,7 +116,7 @@ fn receipt_for(
     asked: &Asked,
 ) -> ItemBody {
     ItemBody::PermissionReceipt {
-        asked_at: Some(asked.opened_at),
+        asked_at: (!asked.held).then_some(asked.opened_at),
         item: Some(item.clone()),
         interaction: asked.id.clone(),
         tool: call.name.clone(),

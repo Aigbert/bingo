@@ -57,7 +57,7 @@ async fn an_answer_republishes_not_asking() {
         .collect();
     assert_eq!(receipts.len(), 1);
     assert_eq!(receipts[0].1, &opened.id);
-    assert_eq!(*receipts[0].2, Some(opened.opened_at));
+    assert_eq!(*receipts[0].2, None);
     assert!(receipts[0].0.started_at >= opened.opened_at);
 }
 

@@ -80,6 +80,12 @@ impl TurnHost for Person {
             ask: crate::gate::Asked {
                 id: opened.id,
                 opened_at: opened.opened_at,
+                held: opened
+                    .item
+                    .as_ref()
+                    .and_then(|id| transcript.get(id))
+                    .and_then(bingo_sdk::transcript::call_wait)
+                    .is_some_and(|(_, end)| end.is_none()),
             },
             answer: answer
                 .await
