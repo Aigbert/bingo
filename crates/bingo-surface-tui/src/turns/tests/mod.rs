@@ -2,7 +2,7 @@ use super::*;
 use crate::test_support::{finished_turn, folded, running_turn, stopped_turn, tool, worked};
 
 fn roles(state: &SessionState, folds: &Folds) -> Roles {
-    Roles::of(state, &Agents::new(), folds, &Answers::of(state))
+    Roles::of(state, &Agents::new(), folds, &Answers::of(state), &[])
 }
 
 fn id(raw: &str) -> ItemId {
@@ -186,9 +186,18 @@ fn a_long_run_of_one_verb_folds_to_a_count() {
 
 #[test]
 fn a_call_is_named_by_its_tool_in_plain_words() {
-    assert_eq!(verb("Read"), "read");
-    assert_eq!(verb("WebSearch"), "web search");
-    assert_eq!(verb("mcp__x"), "mcp__x");
+    assert_eq!(
+        bingo_sdk::look::row("Read", &serde_json::Value::Null, None, false).verb,
+        "read"
+    );
+    assert_eq!(
+        bingo_sdk::look::row("WebSearch", &serde_json::Value::Null, None, false).verb,
+        "websearch"
+    );
+    assert_eq!(
+        bingo_sdk::look::row("mcp__x", &serde_json::Value::Null, None, false).verb,
+        "mcp__x"
+    );
 }
 
 /// The finished turn with the edit answered `decision`, as its fold says it.
@@ -245,4 +254,46 @@ fn a_plain_yes_leaves_the_fold_and_a_changed_one_stays() {
             .any(|answer| matches!(answer, Upshot::Words { text, .. } if text.contains("changed"))),
         "{changed:?}"
     );
+}
+
+#[test]
+fn a_step_reads_the_catalogue_and_uses_only_trusted_baseline_traits() {
+    use bingo_sdk::component::Tier;
+    use serde_json::json;
+    let state = folded(running_turn());
+    let item = state
+        .transcript
+        .items()
+        .iter()
+        .find(|item| item.id == id("trn_1_2"))
+        .unwrap();
+    let answers = Answers::of(&state);
+    let mut entry = bingo_sdk::CatalogEntry {
+        id: "Read".into(),
+        label: "Read".into(),
+        meta: json!({"look":{"mark":"¶","ascii":"<","verb":"inspect",
+            "target":{"field":"file_path","reads":"path"}},
+            "traits":{"trusted":true,"readOnly":true}}),
+    };
+    let resolved = step(item, &state, &answers, &[entry.clone()]);
+    assert_eq!(resolved.verb, "inspect");
+    assert_eq!(resolved.reads, Some(bingo_sdk::Reads::Path));
+    assert_eq!(resolved.tier, Tier::Lookup);
+    assert_eq!(resolved.target, "src/main.rs");
+    for traits in [
+        json!({"trusted":false,"readOnly":true}),
+        json!({"trusted":true,"readOnly":false}),
+        json!({}),
+        json!(null),
+    ] {
+        entry.meta["traits"] = traits;
+        assert_eq!(
+            step(item, &state, &answers, &[entry.clone()]).tier,
+            Tier::Change
+        );
+    }
+    let unknown = step(item, &state, &answers, &[]);
+    assert_eq!(unknown.tier, Tier::Change);
+    assert_eq!(unknown.verb, "read");
+    assert_eq!(unknown.reads, Some(bingo_sdk::Reads::Text));
 }

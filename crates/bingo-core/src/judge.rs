@@ -30,6 +30,7 @@ struct StandIn {
 impl Tool for StandIn {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(self.call.kind.look()),
             name: self.name.clone(),
             description: self.call.title.clone(),
             input_schema: serde_json::json!({"type":"object"}),

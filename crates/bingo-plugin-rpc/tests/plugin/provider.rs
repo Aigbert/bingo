@@ -37,6 +37,7 @@ fn ask(said: &str, tools: Vec<ToolSpec>) -> ModelRequest {
 
 fn tool(name: &str) -> ToolSpec {
     ToolSpec {
+        look: None,
         name: name.into(),
         description: "a tool the stub may ask for".into(),
         input_schema: json!({ "type": "object" }),

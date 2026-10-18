@@ -134,3 +134,17 @@ async fn protocol_one_is_refused_with_both_numbers() {
     assert!(started.manager.tools().await.is_empty());
     started.manager.shutdown().await;
 }
+
+#[tokio::test]
+async fn malformed_tool_looks_refuse_loading_in_words() {
+    for (look, message) in [
+        (r#"{"mark":"xx","verb":"read"}"#, "character"),
+        (r#"{"mark":"¶","verb":""}"#, "verb"),
+    ] {
+        let started = started_with(&[("stub", &["--look", look])]).await;
+        let (_, text) = started.heard("PLUGIN_UNAVAILABLE").await;
+        assert!(text.contains(message), "{text}");
+        assert!(started.manager.tools().await.is_empty());
+        started.manager.shutdown().await;
+    }
+}

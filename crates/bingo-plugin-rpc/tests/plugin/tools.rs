@@ -17,6 +17,10 @@ async fn a_plugin_s_tools_are_named_for_it_and_are_untrusted() {
     let spec = tool.spec();
     assert_eq!(spec.name, "plugin__stub__echo");
     assert_eq!(spec.meta["plugin"], json!("stub"));
+    assert_eq!(
+        serde_json::to_value(spec.look).unwrap(),
+        json!({"mark":"/", "verb":"echo"})
+    );
     let traits = tool.traits(&json!({}));
     assert!(
         !traits.trusted,

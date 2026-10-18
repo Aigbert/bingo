@@ -266,6 +266,7 @@ mod tests {
     impl Tool for Echo {
         fn spec(&self) -> ToolSpec {
             ToolSpec {
+                look: None,
                 name: "Echo".into(),
                 description: String::new(),
                 input_schema: json!({}),
@@ -304,6 +305,7 @@ mod tests {
     impl Tool for Rendezvous {
         fn spec(&self) -> ToolSpec {
             ToolSpec {
+                look: None,
                 name: "Rendezvous".into(),
                 description: String::new(),
                 input_schema: json!({}),
@@ -657,6 +659,7 @@ mod tests {
     impl Tool for Deaf {
         fn spec(&self) -> ToolSpec {
             ToolSpec {
+                look: None,
                 name: "Deaf".into(),
                 description: String::new(),
                 input_schema: json!({}),

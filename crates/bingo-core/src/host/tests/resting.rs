@@ -93,6 +93,7 @@ struct Held(Arc<tokio::sync::Notify>);
 impl Tool for Held {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Echo".into(),
             description: "held".into(),
             input_schema: json!({"type": "object"}),

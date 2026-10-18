@@ -87,6 +87,7 @@ const EXPAND: &str = "ctrl+o to expand";
 /// What every row of one transcript needs to know about where it is.
 #[derive(Clone)]
 pub struct Rows<'a> {
+    pub tools: &'a [bingo_sdk::CatalogEntry],
     pub pulled: Option<&'a crate::pulled::Memo>,
     pub state: &'a SessionState,
     pub names: Vec<markdown::mentions::Name>,
@@ -138,6 +139,7 @@ impl<'a> Rows<'a> {
         now: Now,
     ) -> Self {
         Self {
+            tools: &[],
             pulled: None,
             state,
             names: Vec::new(),
@@ -779,20 +781,10 @@ fn child_row(child: &SessionState, input: &Value, rows: &Rows<'_>) -> Vec<Line<'
 
 /// What the call is about, from the field a person would recognise.
 pub fn summarize(input: &Value) -> String {
-    for key in ["file_path", "command", "pattern", "url", "query", "prompt"] {
-        if let Some(Value::String(value)) = input.get(key) {
-            return value.clone();
-        }
-    }
-    match input {
-        Value::Object(map) => map
-            .iter()
-            .find_map(|(_, v)| v.as_str())
-            .unwrap_or_default()
-            .to_string(),
-        Value::Null => String::new(),
-        other => other.to_string(),
-    }
+    bingo_sdk::look::row("", input, None, false)
+        .target
+        .map(|(value, _)| value)
+        .unwrap_or_default()
 }
 
 /// A long-running operation of the surface's own: login, reconnect, a team
@@ -1208,7 +1200,7 @@ mod tests {
         assert!(
             board
                 .iter()
-                .any(|l| l.contains("✓ task create write the plan")),
+                .any(|l| l.contains("✓ taskcreate write the plan")),
             "{board:?}"
         );
 

@@ -182,6 +182,7 @@ fn meta(plugin: &str) -> serde_json::Map<String, Value> {
 impl Tool for PluginTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: self.spec.look.clone(),
             name: tool_name(&self.plugin, &self.spec.name),
             description: self.spec.description.clone(),
             input_schema: self.spec.input_schema.clone(),

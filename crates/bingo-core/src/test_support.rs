@@ -234,6 +234,7 @@ pub struct EchoTool {
 impl Tool for EchoTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Echo".into(),
             description: "echo".into(),
             input_schema: json!({"type": "object"}),
@@ -330,6 +331,7 @@ pub struct PanicTool;
 impl Tool for PanicTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Panic".into(),
             description: "panics".into(),
             input_schema: json!({"type": "object"}),

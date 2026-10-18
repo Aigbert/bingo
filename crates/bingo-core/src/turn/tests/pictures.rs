@@ -14,6 +14,7 @@ struct PictureTool {
 impl Tool for PictureTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Picture".into(),
             description: "returns a picture".into(),
             input_schema: json!({"type": "object"}),

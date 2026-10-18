@@ -9,7 +9,7 @@ test('registered callbacks receive a fresh dollar and frozen plugin identity', a
   plugin = new Peer(message => { void host.receive(message); });
   const running = runtime(plugin, on => {
     on('session.start', async $ => {
-      await $.tool.register({name:'hello',description:'fixture',inputSchema:{type:'object'}},
+      await $.tool.register({name:'hello',description:'fixture',inputSchema:{type:'object'},look:{mark:'¶',ascii:'<',verb:'read',target:{field:'path',reads:'path'}}},
         async (api, input) => ({plugin:api.plugin, input, frozen:Object.isFrozen(api.plugin)}));
     });
   });
@@ -17,6 +17,7 @@ test('registered callbacks receive a fresh dollar and frozen plugin identity', a
   host.handlers.set('service/call', params => {
     assert.equal(params.key, 'bingo.plugin.tool');
     assert.equal(params.method, 'register');
+    assert.deepEqual(params.params.spec.look, {mark:'¶',ascii:'<',verb:'read',target:{field:'path',reads:'path'}});
     callback = params.params.callback;
     return {result:'plugin__fixture__hello'};
   });

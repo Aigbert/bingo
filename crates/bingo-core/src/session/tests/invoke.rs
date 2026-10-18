@@ -166,6 +166,7 @@ struct Hanging;
 impl Tool for Hanging {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Hanging".into(),
             description: "never answers".into(),
             input_schema: json!({"type": "object"}),

@@ -733,6 +733,8 @@ export type Read = {
   "session": SessionId;
   [key: string]: unknown;
 };
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
 export type RegisterCommand = { "callback": string; "session": SessionId; "spec": CommandSpec; [key: string]: unknown; };
 export type RegisterTool = { "callback": string; "session": SessionId; "spec": ToolSpec; [key: string]: unknown; };
 export type Role = ("user" | "assistant");
@@ -830,6 +832,8 @@ export type Submit = {
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 export type Timer = {
@@ -843,6 +847,8 @@ export type Timer = {
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** A call the model asked for, before or after the gate. */
 export type ToolCall = { "callId": string; "input": unknown; "name": string; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /**
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
@@ -862,6 +868,7 @@ export type ToolOutput = {
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.

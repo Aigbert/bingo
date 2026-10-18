@@ -92,6 +92,9 @@ mod tests {
 
     fn step(verb: &str, state: StepState, upshot: Option<Upshot>) -> Step {
         Step {
+            mark: '•',
+            reads: None,
+            tier: bingo_sdk::component::Tier::Change,
             verb: verb.into(),
             target: "src/main.rs".into(),
             state,

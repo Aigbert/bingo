@@ -75,6 +75,7 @@ impl Doors for Fake {
 /// tool would not show that.
 fn spec(name: &str) -> ToolSpec {
     ToolSpec {
+        look: None,
         name: name.to_string(),
         description: format!("What {name} does."),
         input_schema: json!({

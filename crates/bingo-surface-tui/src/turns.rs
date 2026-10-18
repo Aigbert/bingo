@@ -51,6 +51,7 @@ impl Roles {
         agents: &Agents<'_>,
         folds: &Folds,
         answers: &Answers<'_>,
+        tools: &[bingo_sdk::CatalogEntry],
     ) -> Self {
         let items: Vec<&Item> = state.transcript.items().iter().map(AsRef::as_ref).collect();
         let replaced = rowed(state);
@@ -65,6 +66,7 @@ impl Roles {
                 agents,
                 replaced: &replaced,
                 answers,
+                tools,
             };
             match state.turn.as_ref().is_some_and(|live| &live.id == id) {
                 true => turn.live(&mut roles),
@@ -214,6 +216,7 @@ struct Turn<'a> {
     agents: &'a Agents<'a>,
     replaced: &'a [ItemId],
     answers: &'a Answers<'a>,
+    tools: &'a [bingo_sdk::CatalogEntry],
 }
 
 impl Turn<'_> {
@@ -223,7 +226,7 @@ impl Turn<'_> {
         for item in self.items {
             let role = match () {
                 _ if self.is_step(item) => {
-                    let step = step(item, self.state, self.answers);
+                    let step = step(item, self.state, self.answers, self.tools);
                     steps.push(step.clone());
                     Role::Step {
                         step,
@@ -305,7 +308,7 @@ impl Turn<'_> {
     fn opened(&self, item: &Item) -> Role {
         match self.is_step(item) {
             true => Role::Step {
-                step: step(item, self.state, self.answers),
+                step: step(item, self.state, self.answers, self.tools),
                 opened: true,
             },
             false => Role::Thought,
@@ -314,7 +317,7 @@ impl Turn<'_> {
 
     fn steps(&self, at: &[usize]) -> Vec<Step> {
         at.iter()
-            .map(|&at| step(self.items[at], self.state, self.answers))
+            .map(|&at| step(self.items[at], self.state, self.answers, self.tools))
             .collect()
     }
 
@@ -399,9 +402,13 @@ fn refused(answers: &[&Item]) -> bool {
 }
 
 /// One call, in the words its row shows.
-pub fn step(item: &Item, state: &SessionState, answers: &Answers<'_>) -> Step {
+pub fn step(
+    item: &Item,
+    state: &SessionState,
+    answers: &Answers<'_>,
+    tools: &[bingo_sdk::CatalogEntry],
+) -> Step {
     let ItemBody::ToolCall {
-        call_id,
         name,
         input,
         output,
@@ -409,6 +416,9 @@ pub fn step(item: &Item, state: &SessionState, answers: &Answers<'_>) -> Step {
     } = &item.body
     else {
         return Step {
+            mark: '•',
+            reads: None,
+            tier: bingo_sdk::component::Tier::Change,
             verb: String::new(),
             target: String::new(),
             state: StepState::Done,
@@ -416,23 +426,26 @@ pub fn step(item: &Item, state: &SessionState, answers: &Answers<'_>) -> Step {
             answer: None,
         };
     };
-    let external = item
-        .external()
-        .then(|| {
-            bingo_sdk::ExternalCall::from_input(&bingo_sdk::ToolCall {
-                call_id: call_id.clone(),
-                name: name.clone(),
-                input: input.clone(),
-            })
-        })
-        .flatten();
-    let (verb, target) = match &external {
-        Some(call) => (call.kind.as_str().to_owned(), call.title.clone()),
-        None => (verb(name), crate::transcript::summarize(input)),
+    let entry = tools.iter().find(|entry| entry.id == *name);
+    let declared = entry
+        .and_then(|entry| entry.meta.get("look"))
+        .and_then(|look| serde_json::from_value::<bingo_sdk::ToolLook>(look.clone()).ok());
+    let row = bingo_sdk::look::row(
+        name,
+        input,
+        declared.as_ref(),
+        crate::theme::bullet().is_ascii(),
+    );
+    let (target, reads) = match row.target {
+        Some((target, reads)) => (target, Some(reads)),
+        None => (String::new(), None),
     };
     let target = target.lines().next().unwrap_or_default();
     Step {
-        verb,
+        mark: row.mark,
+        verb: row.verb,
+        reads,
+        tier: tier(entry),
         target: paths::shorten_in(target, &state.summary.cwd, paths::home()),
         state: step_state(item, state),
         upshot: output.as_ref().and_then(bingo_sdk::ToolOutput::outcome),
@@ -440,19 +453,14 @@ pub fn step(item: &Item, state: &SessionState, answers: &Answers<'_>) -> Step {
     }
 }
 
-/// A tool's name as a row says it: `Read` is `read`, `WebSearch` is
-/// `web search`.
-pub fn verb(name: &str) -> String {
-    let mut out = String::with_capacity(name.len() + 2);
-    let mut lower = false;
-    for c in name.chars() {
-        if c.is_uppercase() && lower {
-            out.push(' ');
-        }
-        lower = c.is_lowercase();
-        out.extend(c.to_lowercase());
+fn tier(entry: Option<&bingo_sdk::CatalogEntry>) -> bingo_sdk::component::Tier {
+    let traits = entry.and_then(|entry| entry.meta.get("traits"));
+    match traits.is_some_and(|traits| {
+        traits["trusted"].as_bool() == Some(true) && traits["readOnly"].as_bool() == Some(true)
+    }) {
+        true => bingo_sdk::component::Tier::Lookup,
+        false => bingo_sdk::component::Tier::Change,
     }
-    out
 }
 
 fn step_state(item: &Item, state: &SessionState) -> StepState {

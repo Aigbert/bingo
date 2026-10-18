@@ -393,7 +393,10 @@ fn asking(tool: &str, input: &serde_json::Value, agent: Option<&str>, cwd: &str)
     let target = crate::transcript::summarize(input);
     let target = shorten(target.lines().next().unwrap_or_default(), cwd);
     Step {
-        verb: crate::turns::verb(tool),
+        mark: crate::theme::bullet().chars().next().unwrap_or('•'),
+        reads: Some(bingo_sdk::Reads::Text),
+        tier: bingo_sdk::component::Tier::Change,
+        verb: bingo_sdk::look::row(tool, input, None, crate::theme::bullet().is_ascii()).verb,
         target: match agent {
             Some(name) if target.is_empty() => format!("\u{b7} {name}"),
             Some(name) => format!("{target} \u{b7} {name}"),

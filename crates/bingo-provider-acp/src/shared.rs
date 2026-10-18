@@ -152,6 +152,7 @@ mod tests {
 
     fn spec(name: &str) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: name.into(),
             description: format!("what {name} does"),
             input_schema: json!({ "type": "object" }),

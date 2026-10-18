@@ -291,7 +291,7 @@ impl Blocks {
     /// the whole transcript, in wrapped lines.
     pub fn sync(&mut self, state: &SessionState, agents: &Agents<'_>, rows: &Rows<'_>) -> usize {
         self.relaid(rows);
-        self.roles = Roles::of(state, agents, rows.folds, &rows.answers);
+        self.roles = Roles::of(state, agents, rows.folds, &rows.answers, rows.tools);
         let mut kept = 0;
         for (at, item) in state.transcript.items().iter().enumerate() {
             let role = self.roles.of_item(&item.id).clone();

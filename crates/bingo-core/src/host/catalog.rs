@@ -199,6 +199,14 @@ async fn tools(registry: &Registry) -> Vec<CatalogEntry> {
 fn tool_entry(tool: &dyn Tool) -> CatalogEntry {
     let spec = tool.spec();
     let mut meta = spec.meta;
+    if let Some(look) = spec.look {
+        meta.insert(
+            "look".into(),
+            serde_json::to_value(look).unwrap_or(Value::Null),
+        );
+    } else {
+        meta.remove("look");
+    }
     meta.insert("description".into(), Value::String(spec.description));
     meta.insert("inputSchema".into(), spec.input_schema);
     meta.insert(
@@ -471,6 +479,12 @@ mod tests {
     impl Tool for Declared {
         fn spec(&self) -> ToolSpec {
             ToolSpec {
+                look: Some(bingo_sdk::ToolLook {
+                    mark: '/',
+                    ascii: None,
+                    verb: "search".into(),
+                    target: None,
+                }),
                 name: self.name.into(),
                 description: "what it does".into(),
                 input_schema: json!({"type": "object", "properties": {"v": {"type": "string"}}}),
@@ -506,7 +520,11 @@ mod tests {
         let entries = tools(&registry).await;
 
         let reads = entry(&entries, "Reads");
-        assert_eq!(keys(&reads), ["description", "inputSchema", "traits"]);
+        assert_eq!(
+            keys(&reads),
+            ["description", "inputSchema", "look", "traits"]
+        );
+        assert_eq!(reads.meta["look"], json!({"mark":"/", "verb":"search"}));
         assert_eq!(reads.meta["description"], json!("what it does"));
         assert_eq!(reads.meta["inputSchema"]["type"], json!("object"));
         assert_eq!(

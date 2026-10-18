@@ -7,6 +7,7 @@ struct Shell;
 impl Tool for Shell {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Bash".into(),
             description: "fixture".into(),
             input_schema: json!({}),

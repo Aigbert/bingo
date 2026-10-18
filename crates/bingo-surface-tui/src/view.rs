@@ -493,7 +493,7 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     let state = tree.viewed();
     let browse_folds = crate::browse::folds(ui, tree);
     let commands = ui.catalogs.specs();
-    let rows_config = transcript::Rows::of(
+    let mut rows_config = transcript::Rows::of(
         state,
         area.width as usize,
         &browse_folds,
@@ -507,6 +507,12 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     .saying(ui.welcome.update.as_deref())
     .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
     .measuring(ui.measure);
+    rows_config.tools = ui
+        .catalogs
+        .values
+        .get("tools")
+        .map(Vec::as_slice)
+        .unwrap_or_default();
     frame.height = frame.blocks.sync(state, &tree.agents(), &rows_config);
     let inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
     if let Some((_, removed, drawing)) = &inline {

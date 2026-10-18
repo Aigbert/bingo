@@ -107,12 +107,16 @@ fn spec(entry: CatalogEntry) -> ToolSpec {
         Value::Object(map) => map,
         _ => serde_json::Map::new(),
     };
+    let look = meta
+        .remove("look")
+        .and_then(|look| serde_json::from_value(look).ok());
     let description = meta.remove("description");
     let input_schema = meta.remove("inputSchema");
     for catalogued in CATALOGUED {
         meta.remove(catalogued);
     }
     ToolSpec {
+        look,
         name: entry.id,
         description: description
             .as_ref()
@@ -131,6 +135,7 @@ mod tests {
 
     fn spec(name: &str) -> ToolSpec {
         ToolSpec {
+            look: None,
             name: name.into(),
             description: format!("what {name} does"),
             input_schema: json!({ "type": "object" }),
@@ -237,6 +242,7 @@ mod tests {
             label: "mcp__files__read".into(),
             meta: json!({
                 "server": "files",
+                "look": {"mark":"◊", "ascii":"%", "verb":"files"},
                 "description": "Read a file.",
                 "inputSchema": { "type": "object", "properties": { "path": { "type": "string" } } },
                 "traits": { "readOnly": true, "trusted": false }
@@ -247,6 +253,11 @@ mod tests {
         assert_eq!(read[0].description, "Read a file.");
         assert_eq!(read[0].input_schema["properties"]["path"]["type"], "string");
         assert_eq!(read[0].meta[SERVER], json!("files"));
+        assert_eq!(
+            serde_json::to_value(&read[0].look).unwrap(),
+            json!({"mark":"◊", "ascii":"%", "verb":"files"})
+        );
+        assert!(!read[0].meta.contains_key("look"));
         assert!(
             !read[0].meta.contains_key("traits"),
             "what the catalogue added is not the tool's own meta"

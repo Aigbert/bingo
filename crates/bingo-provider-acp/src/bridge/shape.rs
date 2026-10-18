@@ -92,6 +92,7 @@ mod tests {
     /// fixture built from a real bingo tool would not show that.
     fn spec() -> ToolSpec {
         ToolSpec {
+            look: None,
             name: "Shout".into(),
             description: "Say something out loud.".into(),
             input_schema: json!({

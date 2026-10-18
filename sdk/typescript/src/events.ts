@@ -964,15 +964,22 @@ export type ModelRequest = {
   "tools": Array<ToolSpec>;
   [key: string]: unknown;
 };
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
 export type Role = ("user" | "assistant");
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.
@@ -1033,15 +1040,22 @@ export type Image = {
   [key: string]: unknown;
 };
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
 export type Role = ("user" | "assistant");
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.
@@ -1115,15 +1129,22 @@ export type Image = {
   [key: string]: unknown;
 };
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
 export type Role = ("user" | "assistant");
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.
@@ -1180,15 +1201,22 @@ export type Image = {
   [key: string]: unknown;
 };
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
 export type Role = ("user" | "assistant");
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.
@@ -1345,6 +1373,8 @@ export type Origin = {
 };
 /** A question owner's editing projection; sealed labels remain the host's. */
 export type QuestionFocus = { "checked": number; "field": number; "writing": boolean; [key: string]: unknown; };
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
 export type Role = ("user" | "assistant");
 export type SelectOption = {
   /** The text shown. */
@@ -1359,10 +1389,14 @@ export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<K
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /**
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
@@ -1382,6 +1416,7 @@ export type ToolOutput = {
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.
@@ -1699,10 +1734,17 @@ export type Payload = ("complete" | { "continue": { "origin": string; "reason": 
 export type TurnStop = TurnStopInput.Payload;
 export namespace ToolDescribeInput {
 // Generated from JSON Schema. Do not edit.
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /** A tool as the model sees it. */
 export type Payload = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.
@@ -1714,10 +1756,17 @@ export type Payload = {
 }
 export namespace ToolDescribeResult {
 // Generated from JSON Schema. Do not edit.
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.

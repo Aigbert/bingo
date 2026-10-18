@@ -78,6 +78,7 @@ struct Options {
     /// The placement the contributor is declared with, as it is written on
     /// the wire; a kind that is not one is refused by the host in words.
     placement: Value,
+    look: Value,
     /// Whether it declares the `kv` service. A caller declares none: one key
     /// has one owner, and the second to claim it is refused.
     serves: bool,
@@ -108,6 +109,7 @@ fn options() -> Options {
     let mut options = Options {
         protocol: PROTOCOL,
         placement: json!({ "kind": "roundStart" }),
+        look: json!({"mark":"/", "verb":"echo"}),
         serves: true,
         announce: None,
     };
@@ -118,6 +120,9 @@ fn options() -> Options {
     while let Some(arg) = args.next() {
         match (arg.as_str(), args.next()) {
             ("--protocol", Some(n)) => options.protocol = n.parse().unwrap_or(PROTOCOL),
+            ("--look", Some(look)) => {
+                options.look = serde_json::from_str(&look).unwrap_or(Value::Null)
+            }
             ("--placement", Some(kind)) => options.placement = json!({ "kind": kind }),
             ("--announce", Some(line)) => options.announce = Some(line),
             _ => {}
@@ -183,6 +188,7 @@ fn handshake(options: &Options) -> Value {
         name: "stub".into(),
         version: "0.1.0".into(),
         tools: vec![ToolSpec {
+            look: None,
             name: "echo".into(),
             description: "Says back what it was given.".into(),
             input_schema: json!({
@@ -232,6 +238,7 @@ fn handshake(options: &Options) -> Value {
     // Written last, over the typed one: the point of `--placement` is to say
     // what this crate's own types cannot.
     declared["contributors"][0]["placement"] = options.placement.clone();
+    declared["tools"][0]["look"] = options.look.clone();
     declared
 }
 

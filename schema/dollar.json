@@ -3772,6 +3772,16 @@
     "ToolSpec": {
       "type": "object",
       "properties": {
+        "look": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolLook"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "name": {
           "type": "string"
         },
@@ -3791,6 +3801,68 @@
         "inputSchema"
       ],
       "description": "A tool as the model sees it."
+    },
+    "ToolLook": {
+      "type": "object",
+      "properties": {
+        "mark": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "ascii": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "verb": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Target"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "mark",
+        "verb"
+      ],
+      "description": "How a tool reads on a surface; never sent to a model."
+    },
+    "Target": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "reads": {
+          "$ref": "#/$defs/Reads"
+        }
+      },
+      "required": [
+        "field",
+        "reads"
+      ],
+      "description": "The top-level input field a tool's row names."
+    },
+    "Reads": {
+      "type": "string",
+      "enum": [
+        "path",
+        "command",
+        "text"
+      ],
+      "description": "How a surface reads a row's target."
     },
     "Run": {
       "type": "object",

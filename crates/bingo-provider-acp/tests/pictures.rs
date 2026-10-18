@@ -107,6 +107,7 @@ async fn the_bridge_offers_exactly_the_turns_resolved_tools() {
     let agent = AcpAgent::new("scripted".into(), adapter, sessions.clone());
     let mut turn = harness::turn(request(vec![ContentPart::text("list")]));
     turn.tools = vec![bingo_sdk::ToolSpec {
+        look: None,
         name: "Resolved".into(),
         description: "the turn resolved this".into(),
         input_schema: json!({"type":"object"}),

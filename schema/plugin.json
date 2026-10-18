@@ -8734,6 +8734,15 @@
         "key"
       ]
     },
+    "Reads": {
+      "type": "string",
+      "enum": [
+        "path",
+        "command",
+        "text"
+      ],
+      "description": "How a surface reads a row's target."
+    },
     "Reason": {
       "oneOf": [
         {
@@ -10307,6 +10316,24 @@
     "Step": {
       "type": "object",
       "properties": {
+        "mark": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "reads": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reads"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier2"
+        },
         "verb": {
           "type": "string",
           "description": "What the step does, one lowercase word: `read`, `bash`."
@@ -10342,6 +10369,8 @@
         }
       },
       "required": [
+        "mark",
+        "tier",
         "verb",
         "target",
         "state"
@@ -10501,6 +10530,22 @@
       ],
       "description": "One cacheable segment of the system prompt."
     },
+    "Target": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "reads": {
+          "$ref": "#/$defs/Reads"
+        }
+      },
+      "required": [
+        "field",
+        "reads"
+      ],
+      "description": "The top-level input field a tool's row names."
+    },
     "TextChild": {
       "anyOf": [
         {
@@ -10519,6 +10564,14 @@
         "rewrite",
         "full"
       ]
+    },
+    "Tier2": {
+      "type": "string",
+      "enum": [
+        "lookup",
+        "change"
+      ],
+      "description": "The catalogue's baseline: only a trusted read-only tool is a lookup."
     },
     "Timer": {
       "type": "object",
@@ -10712,6 +10765,43 @@
         "isExpanded"
       ]
     },
+    "ToolLook": {
+      "type": "object",
+      "properties": {
+        "mark": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "ascii": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "verb": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Target"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "mark",
+        "verb"
+      ],
+      "description": "How a tool reads on a surface; never sent to a model."
+    },
     "ToolOutput": {
       "type": "object",
       "properties": {
@@ -10810,6 +10900,16 @@
     "ToolSpec": {
       "type": "object",
       "properties": {
+        "look": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ToolLook"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "name": {
           "type": "string"
         },

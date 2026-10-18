@@ -1,22 +1,21 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 53
 expression: "draw_tree(80, 24, tree, ui, now)"
 ---
 " bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
-"   ▾ 3 steps · open room · send message · list agents                       1s  "
-"   ✓ open room design                                                           "
+"   ▾ 3 steps · openroom · sendmessage · listagents                          1s  "
+"   ✓ openroom design                                                            "
 "     └─ #design                                                                 "
 "        ├─ helper                                                               "
 "        ├─ scout                                                                "
 "        ├─ watcher [ 120s ]                                                     "
 "        └─ parent [ live ]                                                      "
-"   ✓ send message #design                                                       "
+"   ✓ sendmessage #design                                                        "
 "     to    #design                                                              "
 "     from  parent                                                               "
 "     read  at each seat's next turn; an @ wakes now                             "
-"   ✓ list agents                                                                "
+"   ✓ listagents                                                                 "
 "     ├─ helper [ working ]                                                      "
 "     └─ scout [ idle ]                                                          "
 "                                                                                "

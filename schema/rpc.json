@@ -5281,6 +5281,15 @@
         "origin"
       ]
     },
+    "Reads": {
+      "type": "string",
+      "enum": [
+        "path",
+        "command",
+        "text"
+      ],
+      "description": "How a surface reads a row's target."
+    },
     "ReasoningProps": {
       "type": "object",
       "properties": {
@@ -6335,6 +6344,24 @@
     "Step": {
       "type": "object",
       "properties": {
+        "mark": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1
+        },
+        "reads": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reads"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tier": {
+          "$ref": "#/$defs/Tier"
+        },
         "verb": {
           "type": "string",
           "description": "What the step does, one lowercase word: `read`, `bash`."
@@ -6370,6 +6397,8 @@
         }
       },
       "required": [
+        "mark",
+        "tier",
         "verb",
         "target",
         "state"
@@ -6518,6 +6547,14 @@
         }
       ],
       "description": "A text child preserves the style of its nested Text node."
+    },
+    "Tier": {
+      "type": "string",
+      "enum": [
+        "lookup",
+        "change"
+      ],
+      "description": "The catalogue's baseline: only a trusted read-only tool is a lookup."
     },
     "ToastProps": {
       "type": "object",

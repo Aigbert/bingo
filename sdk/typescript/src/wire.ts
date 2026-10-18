@@ -1126,6 +1126,8 @@ export type Read = {
   "session": SessionId;
   [key: string]: unknown;
 };
+/** How a surface reads a row's target. */
+export type Reads = ("path" | "command" | "text");
 export type Reason = ({ "kind": "rule"; "rule": string; [key: string]: unknown; } | { "kind": "mode"; "mode": string; [key: string]: unknown; } | { "hook": string; "kind": "hook"; [key: string]: unknown; } | { "detail": string; "kind": "safety"; [key: string]: unknown; } | { "kind": "readOnly"; [key: string]: unknown; } | { "detail": string; "kind": "confirm"; [key: string]: unknown; } | { "kind": "default"; [key: string]: unknown; });
 export type ReasoningProps = { "status": ItemStatus; "text": string; [key: string]: unknown; };
 /**
@@ -1332,9 +1334,12 @@ export type StatusProps = { "config"?: ConfigView; "context"?: (ContextUsage | n
 export type Step = {
   /** What the person answered when the step asked: `you: yes`. */
   "answer"?: (Upshot | null);
+  "mark": string;
+  "reads"?: (Reads | null);
   "state": StepState;
   /** What it does it to, shortened for one row. */
   "target": string;
+  "tier": Tier2;
   /** What the tool said the call came to. */
   "upshot"?: (Upshot | null);
   /** What the step does, one lowercase word: `read`, `bash`. */
@@ -1354,9 +1359,13 @@ export type SubmitResult = ({ "accepted": Input; } | { "rejected": KernelError; 
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 /** One cacheable segment of the system prompt. */
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
+/** The top-level input field a tool's row names. */
+export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 export type Tier = ("tighten" | "rewrite" | "full");
+/** The catalogue's baseline: only a trusted read-only tool is a lookup. */
+export type Tier2 = ("lookup" | "change");
 export type Timer = {
   "callback": string;
   /** Milliseconds. */
@@ -1396,6 +1405,8 @@ export type ToolEvent = {
   [key: string]: unknown;
 };
 export type ToolGroupProps = { "calls": Array<ToolUseProps>; "isActive": boolean; "isExpanded": boolean; [key: string]: unknown; };
+/** How a tool reads on a surface; never sent to a model. */
+export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
 /**
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
@@ -1419,6 +1430,7 @@ export type ToolResultProps = { "isErrored": boolean; "output": unknown; "tool":
 export type ToolSpec = {
   "description": string;
   "inputSchema": unknown;
+  "look"?: (ToolLook | null);
   /**
    * What a catalogue may show beside the tool (an MCP tool's `server`);
    * never sent to a model.

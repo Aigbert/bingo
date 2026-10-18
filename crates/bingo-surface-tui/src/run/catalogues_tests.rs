@@ -333,3 +333,30 @@ async fn a_disabled_panel_restores_its_folded_names_on_the_next_palette_open() {
     assert!(shown.contains("/agents"), "{shown}");
     assert!(!shown.contains("/crew"), "{shown}");
 }
+
+#[tokio::test]
+async fn tool_looks_refresh_when_the_tools_catalogue_changes() {
+    let mut run = super::super::tests::idle(scene().1.instant);
+    let host = TestHost::default();
+    host.on_catalog(|kind| async move {
+        assert_eq!(kind, CatalogKind::Tools);
+        Ok(Catalog {
+            kind,
+            entries: vec![bingo_sdk::CatalogEntry {
+                id: "fixture".into(),
+                label: "fixture".into(),
+                meta: serde_json::json!({"look":{"mark":"/","verb":"find"}}),
+            }],
+        })
+    });
+    run.host = host.handle();
+    let (tx, mut replies) = mpsc::channel(16);
+    run.replies = tx;
+    assert!(CATALOGUES.contains(&("tools", CatalogKind::Tools)));
+    changed(&mut run, CatalogKind::Tools);
+    run.reply(replies.recv().await.unwrap(), &mut None);
+    assert_eq!(
+        run.ui.catalogs.values["tools"][0].meta["look"]["verb"],
+        "find"
+    );
+}
