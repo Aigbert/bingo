@@ -99,17 +99,17 @@ No layout changes: today's screens only take Ember's inks until their milestone 
 
 ## Exit criteria
 
-- [ ] Ink test: every base and derived token, light and dark, equals the value `p3-core.js`
+- [x] Ink test: every base and derived token, light and dark, equals the value `p3-core.js`
       computes. Compute the expected hex once with node from the prototype and write it into
       the test.
-- [ ] Every one-cell glyph in both tables (all but `sep`, `ell`, `ret`) and every spinner frame
+- [x] Every one-cell glyph in both tables (all but `sep`, `ell`, `ret`) and every spinner frame
       is one cell (unicode-width), and every ASCII twin is ASCII.
-- [ ] A view naming each ink and ground draws it; a breathing text differs between two frames
+- [x] A view naming each ink and ground draws it; a breathing text differs between two frames
       and is still under `BINGO_MOTION=off`; an unknown name draws plain.
-- [ ] Each case `docs/design/ember/prototype/wraptest.js` prints passes in Rust, word for word.
-- [ ] Harness self-test: a buffer hand-built from three rows of `done` passes. Changing one
+- [x] Each case `docs/design/ember/prototype/wraptest.js` prints passes in Rust, word for word.
+- [x] Harness self-test: a buffer hand-built from three rows of `done` passes. Changing one
       character fails with the side-by-side report, and so does changing one ink.
-- [ ] A `NO_COLOR` render of an existing screen carries no colour; a 256-colour render uses
+- [x] A `NO_COLOR` render of an existing screen carries no colour; a 256-colour render uses
       indices only.
 - [ ] Every existing snapshot keeps its characters, and painted.rs asserts Ember's inks. Gates
       and checks as below.
@@ -148,3 +148,142 @@ Any screen's layout or keys; the characters of today's snapshots; node or playwr
 - A rounding drift shows as an ink mismatch on every scene, so the ink test pins every token.
 - M194 part A regenerates the same schema files. Whichever lands second regenerates them after
   its rebase, never merges them by hand.
+
+
+## Verified
+
+Implementation covers bricks 1–10. Native gates pass; the final combined exit criterion
+remains open only for the two Windows checks blocked by this host's missing C SDK headers.
+No M193–M200 layout work, new dependencies, prototype edits or capture edits were made.
+
+All Cargo jobs ran sequentially. The following exit evidence comes from
+`cargo test -p bingo-surface-tui --lib --locked` (1,389 passed) and the final workspace run:
+
+- [x] Both palettes: expected values were computed once with node from `p3-core.js` and
+  embedded in `theme/ink/tests.rs`; Rust tests never invoke node.
+  ```text
+  test theme::ink::tests::every_light_prototype_ink_matches ... ok
+  test theme::ink::tests::every_dark_prototype_ink_matches ... ok
+  ```
+- [x] Glyph widths and ASCII twins, following the prototype's two-cell ASCII arrow exception:
+  ```text
+  test theme::glyphs::tests::prototype_glyphs_have_their_documented_cell_widths ... ok
+  ```
+- [x] Ink/ground vocabulary, motion, reduced motion, unknown names and cached mod deadlines:
+  ```text
+  test views::ember_tests::every_ember_ink_is_available_to_views ... ok
+  test views::ember_tests::every_ember_ground_fills_text_and_boxes ... ok
+  test views::ember_tests::text_motion_uses_the_frame_clock_and_has_a_still_form ... ok
+  test views::ember_tests::unknown_names_are_plain_and_depth_conversion_keeps_modifiers ... ok
+  test views::ember_tests::a_cached_mod_row_animates_without_a_new_view_or_event ... ok
+  ```
+- [x] Every prototype wrap case, plus styled words, brackets, long units and explicit newlines:
+  ```text
+  test wrap::prototype_tests::every_wraptest_case_matches_word_for_word ... ok
+  test wrap::prototype_tests::brackets_styled_words_long_units_and_newlines_match_the_prototype ... ok
+  ```
+- [x] Three hand-built `done` dock rows pass; character and ink mutations fail with both
+  bands side by side, carets at the first differing cell, and expected/rendered ink runs.
+  All 105 capture entries load; wide cells, Reset normalization and spinner sets are tested.
+  ```text
+  test test_support::ember::tests::three_hand_built_done_rows_pass_and_each_failure_explains_its_cell ... ok
+  test test_support::ember::tests::every_capture_loads_its_geometry_metadata_and_ink_runs ... ok
+  test test_support::ember::tests::wide_cells_reset_inks_and_spinner_sets_compare_as_terminal_cells ... ok
+  ```
+- [x] Existing screen: truecolor uses Ember, NO_COLOR has no colour, 256-colour has indices.
+  ```text
+  test painted::existing_screen_uses_ember_inks_and_respects_terminal_depth ... ok
+  ```
+- [x] Existing snapshot characters: `python3 docs/verification/m192/check-snapshots.py`:
+  ```text
+  PASS: four syntax snapshots retain every character after removing ink annotations
+  PASS: the only other snapshot change is palette values
+  PASS: Cargo.lock, prototype and all scene captures are unchanged
+  ```
+
+Native gates (all exit 0):
+
+```text
+$ cargo fmt --all -- --check
+(no output)
+$ cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.54s
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 18.17s
+$ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
+test result: ok. 1389 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.78s
+[sum of 120 test-result lines: 6377 passed; 0 failed; 0 ignored]
+$ scripts/check_discipline.sh
+discipline ok
+$ scripts/budget.sh
+dependencies (unique, normal): 423 (max  423)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 10 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+budget ok
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+```
+
+The first workspace test run failed in the untouched OpenAI provider test
+`tests::a_claimed_api_key_reaches_the_provider`: ambient `OPENAI_API_KEY` selected
+`Ready { from: Some(Env) }`, while the test expected `Some(Setting)`.
+`cargo test -p bingo-provider-openai tests::a_claimed_api_key_reaches_the_provider --locked -- --exact`
+failed identically when run alone once. Removing provider variables only from the subsequent
+test subprocess environment made the full workspace pass; no provider code was changed.
+Discipline and deny emitted advisory warnings; budget's shared-target size warning is soft.
+
+Windows: `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc` ran for
+both edited Rust crates and the two generated-schema owners:
+
+```text
+bingo-sdk: Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.03s (exit 0)
+bingo-surface-rpc: Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.13s (exit 0)
+bingo-surface-tui, bingo-plugin-rpc: exit 101
+error: failed to run custom build command for `aws-lc-sys v0.44.0`
+fatal error: 'stdlib.h' file not found
+fatal error: 'windows.h' file not found
+```
+
+The Rust target is installed, but those two checks cannot reach the edited crates without
+Windows C headers. Their verification remains pending; no build-script bypass or dependency
+change was used. This is the same host limitation recorded in M180.
+
+Plan discrepancies and implementation details:
+
+- `GA.arrow` is `->` (two cells). The exit criterion excludes only `sep`, `ell`, `ret` from
+  the one-cell assertion; the test also exempts `arrow` to preserve the prototype exactly.
+- Old crew hue/contrast assertions assumed the previous palette. They now assert membership
+  in Ember's approved palette; the exact prototype values take precedence.
+- Motion is boxed in the SDK to avoid enlarging enclosing enums. `blocks.rs` and
+  `views/motion.rs` retain and schedule deadlines for cached drawings so mods animate without
+  events. These supporting files extend the plan's abbreviated file list, not its scope.
+- `BINGO_UPDATE_SCHEMA=1` repository generators updated plugin, event, RPC and dollar schemas
+  and their TypeScript consumers. No generated file was edited by hand; workspace tests
+  validate their committed contents and the additive motion contract.
+
+
+Terminal verification (exit 0; captures in `docs/verification/m192/`):
+
+```text
+$ cargo build -p bingo --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s)
+$ TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh
+tui-smoke ok
+$ python3 docs/verification/m192/drive.py
+PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+CLEAN 100x32: owned tmux server stopped; temporary files removed
+PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+CLEAN 80x24: owned tmux server stopped; temporary files removed
+```
+
+The drive uses a private `tmux -L m192-drive-…` server per size, temporary HOME/data/config/cwd,
+the fake provider, light truecolor, motion off and graphics off. The drive removes ambient `NO_COLOR`/`BINGO_ASCII` and asserts truecolor output.
+Both text and ANSI captures were inspected: the prompt and reply appear, the existing layout remains, and Ember ink is
+present. No terminal application was launched; only harness-owned servers were stopped.
+The full smoke covers ordinary replies, interruption, permissions, mod UI and ASCII/NO_COLOR.
+Only the two Windows C-toolchain checks remain unverified; no implementation brick is omitted.
+
+The first drive inherited `NO_COLOR=1`; its colourless captures were replaced after isolating
+that variable. Both final ANSI captures contain Ember glow `38;2;239;122;44` (`#ef7a2c`).
