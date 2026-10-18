@@ -50,6 +50,9 @@ fn syntax(lang: &str) -> &'static SyntaxReference {
 
 /// The rows of a code block, highlighted, one line in one line out.
 pub fn lines(lang: &str, text: &str) -> Vec<Line<'static>> {
+    if matches!(lang, "sh" | "bash") {
+        return text.lines().map(shell).collect();
+    }
     let (whole, tail) = split(text);
     BLOCKS.with_borrow_mut(|blocks| {
         let mut block = blocks
@@ -66,6 +69,25 @@ pub fn lines(lang: &str, text: &str) -> Vec<Line<'static>> {
         }
         rows
     })
+}
+
+/// The prototype's shell presentation rule, not a shell lexer.
+fn shell(text: &str) -> Line<'static> {
+    if text.trim_start().starts_with('#') {
+        return Line::from(Span::styled(text.to_owned(), theme::ink(Ink::Comment)));
+    }
+    let lead = text.len()
+        - text
+            .trim_start_matches(|c: char| c.is_whitespace() || c == '$')
+            .len();
+    let end = text[lead..]
+        .find(char::is_whitespace)
+        .map_or(text.len(), |at| lead + at);
+    Line::from(vec![
+        Span::styled(text[..lead].to_owned(), theme::dim()),
+        Span::styled(text[lead..end].to_owned(), theme::ink(Ink::Function)),
+        Span::styled(text[end..].to_owned(), theme::text()),
+    ])
 }
 
 /// A block's whole lines and the half-written one after them. Only whole
@@ -367,5 +389,26 @@ mod tests {
             lines("rust", &format!("let x{i} = {i};\n"));
         }
         assert_eq!(BLOCKS.with_borrow(Vec::len), WARM);
+    }
+
+    #[test]
+    fn code_categories_come_from_syntect_scopes() {
+        let rows = lines("rust", "let n = 42; println!(\"hi\"); // note");
+        let styled = |word: &str, ink| {
+            rows[0]
+                .spans
+                .iter()
+                .any(|span| span.content.contains(word) && span.style == theme::ink(ink))
+        };
+        assert!(styled("let", Ink::Keyword));
+        assert!(styled("42", Ink::Number));
+        assert!(styled("println!", Ink::Function));
+        assert!(styled("hi", Ink::String));
+        assert!(styled("note", Ink::Comment));
+        let shell = lines("sh", "$ cargo test\n # comment");
+        assert_eq!(shell[0].spans[0].style, theme::dim());
+        assert_eq!(shell[0].spans[1].style, theme::ink(Ink::Function));
+        assert_eq!(shell[0].spans[2].style, theme::text());
+        assert_eq!(shell[1].spans[0].style, theme::ink(Ink::Comment));
     }
 }

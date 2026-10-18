@@ -448,6 +448,7 @@ pub const INKS: &[(Ink, &str)] = &[
     (Ink::Number, "constant.numeric"),
     (Ink::Function, "entity.name.function"),
     (Ink::Function, "support.function"),
+    (Ink::Function, "support.macro"),
     (Ink::Type, "entity.name.type"),
     (Ink::Type, "support.type"),
     (Ink::Type, "support.class"),
@@ -522,6 +523,11 @@ pub fn spendable() -> std::collections::HashSet<Color> {
             landing(t),
             cooling(t),
             warming(t),
+            blended("glow", "coal", f64::from(t)).unwrap_or_default(),
+            blended("glow", "good", f64::from(t)).unwrap_or_default(),
+            blended("glow", "fg", f64::from(t)).unwrap_or_default(),
+            blended("glow", "muted", f64::from(t)).unwrap_or_default(),
+            blended("amberGlow", "you", f64::from(t)).unwrap_or_default(),
         ] {
             keep(style);
         }

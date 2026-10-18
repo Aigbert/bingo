@@ -1,98 +1,87 @@
-//! `View::Table`: hairline rules, right-aligned numbers, `–` for a missing
-//! cell (design §5). A table never wraps — it folds to the width and opens in
-//! a sheet — so a row wider than the frame is cut, not folded onto the next.
-
+//! Tables keep numeric columns aligned, quiet headers and three-cell gutters.
 use ratatui::text::{Line, Span};
-use unicode_width::UnicodeWidthStr;
 
-use crate::theme;
-use crate::views::{MISSING, clip, numeric};
+use super::{MISSING, numeric};
 
-/// What separates two columns.
-const GUTTER: &str = "  ";
-
-/// One column, as the whole table measures it.
 struct Column {
     width: usize,
-    /// Every value in it is a number, so the column reads down its right edge.
     numeric: bool,
 }
 
+/// Tables keep three cells between columns and a single rule below the header.
 pub fn lines(headers: &[String], rows: &[Vec<String>], width: usize) -> Vec<Line<'static>> {
-    let columns = columns(headers, rows);
-    let mut out = vec![Line::from(Span::styled(
-        clip(&laid(headers, &columns), width),
-        theme::text().patch(theme::bold()),
-    ))];
-    out.push(rule(across(&columns).min(width)));
-    out.extend(rows.iter().map(|row| {
-        Line::from(Span::styled(
-            clip(&laid(row, &columns), width),
-            theme::text(),
-        ))
-    }));
-    out
-}
-
-/// The hairline under the headers: the one rule that says these rows are one
-/// table and not a list of sentences. It runs the width of the widest row a
-/// column could hold, not of the headers — a header narrower than its column
-/// would cut the rule short of the table it heads.
-fn rule(width: usize) -> Line<'static> {
-    Line::from(Span::styled(theme::rule().repeat(width), theme::dim()))
-}
-
-/// How wide the table is, gutters included.
-fn across(columns: &[Column]) -> usize {
-    let cells: usize = columns.iter().map(|column| column.width).sum();
-    cells + GUTTER.width() * columns.len().saturating_sub(1)
-}
-
-fn columns(headers: &[String], rows: &[Vec<String>]) -> Vec<Column> {
-    headers
+    let heading: Vec<_> = (0..headers.len())
+        .map(|at| content(cell(headers, at), true, width))
+        .collect();
+    let drawn: Vec<Vec<_>> = rows
+        .iter()
+        .map(|row| {
+            (0..headers.len())
+                .map(|at| content(cell(row, at), false, width))
+                .collect()
+        })
+        .collect();
+    let columns: Vec<_> = headers
         .iter()
         .enumerate()
-        .map(|(at, header)| Column {
-            width: rows
-                .iter()
-                .map(|row| cell(row, at).width())
-                .chain(std::iter::once(header.width()))
+        .map(|(at, _)| Column {
+            width: std::iter::once(&heading[at])
+                .chain(drawn.iter().map(|row| &row[at]))
+                .map(Line::width)
                 .max()
                 .unwrap_or(0),
-            // A cell a row has not does not stop a column being numbers.
             numeric: rows
                 .iter()
                 .map(|row| cell(row, at))
-                .all(|cell| cell == MISSING || numeric(&cell)),
+                .all(|value| value == MISSING || numeric(value)),
         })
-        .collect()
+        .collect();
+    let rule = columns.iter().map(|column| column.width).sum::<usize>()
+        + 3 * columns.len().saturating_sub(1);
+    let mut out = vec![
+        laid(heading, &columns, width),
+        Line::from(Span::styled(
+            crate::theme::glyphs::get("thin").repeat(rule.min(width)),
+            crate::theme::foreground("faint").unwrap_or_default(),
+        )),
+    ];
+    out.extend(drawn.into_iter().map(|row| laid(row, &columns, width)));
+    out
 }
 
-/// What a row carries in a column: its cell, or the mark for one it has not.
-fn cell(row: &[String], at: usize) -> String {
-    match row.get(at) {
-        Some(cell) if !cell.is_empty() => cell.clone(),
-        _ => MISSING.to_string(),
+fn cell(row: &[String], at: usize) -> &str {
+    row.get(at)
+        .map(String::as_str)
+        .filter(|s| !s.is_empty())
+        .unwrap_or(MISSING)
+}
+
+fn content(value: &str, heading: bool, width: usize) -> Line<'static> {
+    if heading {
+        return Line::from(Span::styled(value.to_owned(), crate::theme::ash()));
     }
+    Line::from(
+        crate::markdown::mentioned(value, width, &[])
+            .lines
+            .into_iter()
+            .flat_map(|line| line.spans)
+            .collect::<Vec<_>>(),
+    )
 }
 
-/// One row laid out in the table's columns; numbers hug their right edge.
-fn laid(cells: &[String], columns: &[Column]) -> String {
-    columns
-        .iter()
-        .enumerate()
-        .map(|(at, column)| pad(&cell(cells, at), column))
-        .collect::<Vec<_>>()
-        .join(GUTTER)
-        .trim_end()
-        .to_string()
-}
-
-fn pad(cell: &str, column: &Column) -> String {
-    let room = column.width.saturating_sub(cell.width());
-    let space = " ".repeat(room);
-    match column.numeric {
-        true => format!("{space}{cell}"),
-        false => format!("{cell}{space}"),
+fn laid(cells: Vec<Line<'static>>, columns: &[Column], width: usize) -> Line<'static> {
+    let mut line = Line::default();
+    for (at, (drawn, column)) in cells.into_iter().zip(columns).enumerate() {
+        let start = line.width();
+        if column.numeric {
+            line.spans.push(Span::raw(
+                " ".repeat(column.width.saturating_sub(drawn.width())),
+            ));
+        }
+        line.spans.extend(drawn.spans);
+        if at + 1 < columns.len() {
+            line = crate::layout::grid::pad_to(line, start + column.width + 3);
+        }
     }
+    crate::layout::grid::fit(line, width)
 }

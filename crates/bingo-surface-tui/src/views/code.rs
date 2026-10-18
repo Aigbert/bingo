@@ -108,3 +108,32 @@ fn cut(row: Line<'static>, width: usize) -> Vec<Span<'static>> {
     }
     out
 }
+
+/// Answer code fills the measure with a separate language row and no gutter.
+pub fn answer_fence(lang: Option<&str>, text: &str, width: usize) -> Vec<Line<'static>> {
+    if is_diff(lang.unwrap_or_default()) {
+        return preview::diff(text);
+    }
+    use crate::layout::grid;
+    let ground = theme::ground("well").unwrap_or_default();
+    let language = lang.unwrap_or_default();
+    let mut head = Line::from(Span::raw(
+        " ".repeat(width.saturating_sub(language.width() + 2)),
+    ));
+    head.spans
+        .push(Span::styled(language.to_string(), theme::dim()));
+    let mut rows = vec![grid::pad_to(head, width)];
+    for line in highlight::lines(language, text) {
+        let code = grid::fit(line, width.saturating_sub(4));
+        let mut row = Line::from("  ");
+        row.spans.extend(code.spans);
+        rows.push(grid::pad_to(row, width));
+    }
+    rows.push(Line::from(" ".repeat(width)));
+    for row in &mut rows {
+        for span in &mut row.spans {
+            span.style = ground.patch(span.style);
+        }
+    }
+    rows
+}

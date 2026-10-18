@@ -2,7 +2,7 @@
 //! half-written document renders as whatever it currently is; there is no
 //! incremental state to keep in step with the stream.
 //!
-//! Logical lines come out unwrapped; [`crate::wrap`] fits them to the width.
+//! The writer fits prose, tables and code to the same requested measure.
 
 use pulldown_cmark::{CodeBlockKind, CowStr, Event as Md, Options, Parser, Tag, TagEnd};
 use ratatui::style::Style;
@@ -11,6 +11,9 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::{theme, views};
 
+mod inlines;
+mod wrapping;
+pub use inlines::line as inline;
 pub(crate) mod mentions;
 mod spaced;
 
@@ -121,12 +124,6 @@ struct Fence {
     text: String,
 }
 
-impl Fence {
-    fn lines(&self, width: usize) -> Vec<Line<'static>> {
-        views::code::lines(Some(&self.lang), &self.text, width)
-    }
-}
-
 /// An image being read: where it is, and the alt text collecting between its
 /// tags.
 #[derive(Debug)]
@@ -198,7 +195,7 @@ impl<'a> Writer<'a> {
 
     fn finish(mut self) -> Rendered {
         self.flush();
-        while self.lines.last().is_some_and(is_blank) {
+        while self.lines.last().is_some_and(empty_row) {
             self.lines.pop();
         }
         // A trailing blank line cannot be a chip's, so nothing dropped above
@@ -229,7 +226,7 @@ impl<'a> Writer<'a> {
             Md::End(tag) => self.close(tag),
             Md::Text(text) if self.code.is_some() => self.code_text(&text),
             Md::Text(text) => self.prose(&text),
-            Md::Code(code) => self.push(&format!("`{code}`"), self.style()),
+            Md::Code(code) => self.inline_code(&code),
             Md::Html(html) | Md::InlineHtml(html) => self.push(html.trim_end(), theme::dim()),
             Md::SoftBreak => self.push(" ", self.style()),
             Md::HardBreak => self.flush(),
@@ -237,6 +234,11 @@ impl<'a> Writer<'a> {
             Md::TaskListMarker(done) => self.push(&format!("{} ", theme::todo(done)), theme::dim()),
             _ => {}
         }
+    }
+
+    fn inline_code(&mut self, code: &str) {
+        let span = inlines::code(code, self.style());
+        self.push(&span.content, span.style);
     }
 
     fn open(&mut self, tag: Tag<'_>) {
@@ -377,13 +379,18 @@ impl<'a> Writer<'a> {
         }
     }
 
-    /// The block is whole: through the one code renderer, so a fence in an
-    /// answer is drawn exactly like a plugin's `View::Code` (design §5).
+    /// An answer fence uses the prototype block geometry and shared highlighter.
+    /// A plugin Code view keeps its own view geometry.
     fn end_code(&mut self) {
         let Some(fence) = self.code.take() else {
             return;
         };
-        for line in fence.lines(self.width) {
+        let lines = views::code::answer_fence(
+            Some(&fence.lang),
+            fence.text.trim_end_matches('\n'),
+            self.width,
+        );
+        for line in lines {
             self.line(line.spans);
         }
     }
@@ -397,7 +404,7 @@ impl<'a> Writer<'a> {
                 *n += 1;
                 marker
             }
-            _ => format!("{} ", theme::point()),
+            _ => format!("{} ", theme::glyphs::get("bullet")),
         };
         let indent = " ".repeat(marker.chars().count());
         self.spans = self.margin.spans();
@@ -478,14 +485,18 @@ impl<'a> Writer<'a> {
     fn flush(&mut self) {
         if !self.spans.is_empty() && (self.words || self.pending.is_empty()) {
             let spans = std::mem::take(&mut self.spans);
-            self.lines.push(Line::from(spans));
+            self.lines.extend(wrapping::wrap(
+                Line::from(spans),
+                self.width,
+                &self.margin.0,
+            ));
         }
         self.words = false;
         self.chips();
     }
 
     fn blank(&mut self) {
-        if !self.lines.is_empty() && !self.lines.last().is_some_and(is_blank) {
+        if !self.lines.is_empty() && !self.lines.last().is_some_and(empty_row) {
             self.lines.push(Line::default());
         }
     }
@@ -498,8 +509,8 @@ fn decoration(spans: &[Span<'static>]) -> usize {
     spans.iter().map(|span| span.content.width()).sum()
 }
 
-fn is_blank(line: &Line<'static>) -> bool {
-    line.spans.iter().all(|s| s.content.trim().is_empty())
+fn empty_row(line: &Line<'static>) -> bool {
+    line.spans.is_empty()
 }
 
 /// What an event contributes to a run of prose read as plain text: a table's
@@ -554,23 +565,31 @@ mod tests {
     fn a_fence_is_indented_and_highlighted_line_by_line() {
         let lines = render("```rust\nfn main() {}\n// go\n```", 40);
         assert_eq!(
-            text(&lines),
-            vec!["    fn main() {}  rust", "    // go             "]
+            text(&lines)
+                .iter()
+                .map(|line| line.trim_end())
+                .collect::<Vec<_>>(),
+            vec![
+                "                                  rust",
+                "  fn main() {}",
+                "  // go",
+                ""
+            ]
         );
-        assert_eq!(
-            lines[0].spans.last().unwrap().style,
-            theme::raised().patch(theme::dim()),
-            "the fence's word"
-        );
-        assert_eq!(
-            lines[0].spans[1].style,
-            theme::raised().patch(theme::ink(theme::Ink::Keyword)),
-            "`fn` is a keyword"
+        let ground = theme::ground("well").unwrap();
+        assert!(
+            lines[0]
+                .spans
+                .iter()
+                .any(|span| span.content == "rust" && span.style == ground.patch(theme::dim()))
         );
         assert_eq!(
             lines[1].spans[1].style,
-            theme::raised().patch(theme::ink(theme::Ink::Comment)),
-            "the comment"
+            ground.patch(theme::ink(theme::Ink::Keyword))
+        );
+        assert_eq!(
+            lines[2].spans[1].style,
+            ground.patch(theme::ink(theme::Ink::Comment))
         );
     }
 
@@ -584,9 +603,31 @@ mod tests {
 
     #[test]
     fn an_inline_code_span_keeps_its_backticks_and_spends_no_colour() {
+        theme::with(crate::painted::no_colour(), || {
+            let lines = render("call `run()` now", 40);
+            assert_eq!(text(&lines), vec!["call `run()` now"]);
+            assert!(
+                lines[0]
+                    .spans
+                    .iter()
+                    .all(|span| span.style == theme::text())
+            );
+        });
+    }
+
+    #[test]
+    fn inline_code_uses_code_ink_without_delimiters() {
         let lines = render("call `run()` now", 40);
-        assert_eq!(text(&lines), vec!["call `run()` now"]);
-        assert_eq!(lines[0].spans[1].style, theme::text());
+        assert_eq!(text(&lines), vec!["call run() now"]);
+        assert_eq!(
+            lines[0]
+                .spans
+                .iter()
+                .find(|span| span.content == "run()")
+                .unwrap()
+                .style,
+            theme::foreground("code").unwrap()
+        );
     }
 
     #[test]
@@ -628,33 +669,36 @@ mod tests {
     const TABLE: &str = "| crate | tests |\n|---|---|\n| sdk | 41 |\n| core | 7 |";
 
     #[test]
-    fn a_table_is_ruled_and_its_numbers_hug_the_right_edge() {
+    fn a_table_is_ruled_and_its_numbers_align_right() {
         assert_eq!(
             text(&render(TABLE, 40)),
             vec![
-                "crate  tests".to_string(),
-                "────────────".to_string(),
-                "sdk       41".to_string(),
-                "core       7".to_string(),
+                "crate   tests".to_string(),
+                "─────────────".to_string(),
+                "sdk        41".to_string(),
+                "core        7".to_string(),
             ],
         );
     }
 
     #[test]
-    fn a_tables_header_is_bold_and_its_rule_is_dim() {
+    fn a_tables_header_is_muted_and_its_rule_is_faint() {
         let lines = render(TABLE, 40);
-        assert_eq!(lines[0].spans[0].style, theme::text().patch(theme::bold()));
-        assert_eq!(lines[1].spans[0].style, theme::dim());
+        assert_eq!(lines[0].spans[0].style, theme::ash());
+        assert_eq!(
+            lines[1].spans[0].style,
+            theme::foreground("faint").unwrap_or_default()
+        );
     }
 
     #[test]
-    fn a_cell_a_row_has_not_is_marked_and_emphasis_in_one_is_plain_text() {
+    fn a_cell_a_row_has_not_is_a_dash() {
         assert_eq!(
             text(&render("| a | b |\n|---|---|\n| *one* |\n", 40)),
             vec![
-                "a    b".to_string(),
-                "──────".to_string(),
-                "one  –".to_string()
+                "a     b".to_string(),
+                "───────".to_string(),
+                "one   –".to_string()
             ],
         );
     }
@@ -740,7 +784,7 @@ mod tests {
         );
         assert_eq!(
             text(&rendered("- see ![one](a.png)", 40).lines),
-            vec!["• see ", "  [image: one]"],
+            vec!["• see", "  [image: one]"],
             "and an item with words of its own puts them first, the chip \
              standing in the item's own column (M56)"
         );
@@ -782,7 +826,7 @@ mod tests {
         let out = rendered("![one](a.png) and ![two](b.png)", 40);
         assert_eq!(
             text(&out.lines),
-            vec![" and ", "[image: one]", "[image: two]"]
+            vec![" and", "[image: one]", "[image: two]"]
         );
         assert_eq!(
             out.images,
@@ -823,10 +867,10 @@ soft\nbreak.\n\n- one\n- two\n  - nested\n\n1. first\n2. second\n\n> quoted\n> o
             vec![
                 "before".to_string(),
                 String::new(),
-                "crate  tests".to_string(),
-                "────────────".to_string(),
-                "sdk       41".to_string(),
-                "core       7".to_string(),
+                "crate   tests".to_string(),
+                "─────────────".to_string(),
+                "sdk        41".to_string(),
+                "core        7".to_string(),
                 String::new(),
                 "after".to_string(),
             ],

@@ -50,6 +50,16 @@ fn tokens(text: &str) -> Vec<&str> {
     let mut out = Vec::new();
     let mut chars = text.char_indices().peekable();
     while let Some((start, c)) = chars.next() {
+        if text[start..].starts_with("[image ")
+            && let Some(close) = text[start..].find(']')
+        {
+            let end = start + close + 1;
+            while chars.peek().is_some_and(|(at, _)| *at < end) {
+                chars.next();
+            }
+            out.push(&text[start..end]);
+            continue;
+        }
         let space = matches!(c, ' ' | '\t');
         let mut end = start + c.len_utf8();
         if c != '\n' && !cjk(c) {

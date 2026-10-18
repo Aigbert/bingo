@@ -258,12 +258,23 @@ fn a_missing_cell_is_a_dash_and_numbers_hug_their_right_edge() {
         .iter()
         .map(|line| line.to_string().trim_end().to_string())
         .collect();
-    assert_eq!(drawn[0], "id  task            tokens");
-    assert_eq!(drawn[2], " 1  write the plan    1200");
+    assert_eq!(drawn[0], "id   task             tokens");
+    assert_eq!(drawn[2], " 1   write the plan     1200");
     assert_eq!(
-        drawn[3], " 2  ship it              –",
+        drawn[3], " 2   ship it               –",
         "a row that is short"
     );
+}
+
+#[test]
+fn an_empty_cell_keeps_its_dash_beside_a_numeric_column() {
+    let table = table::lines(
+        &["n".into(), "value".into()],
+        &[vec!["1".into(), "".into()], vec!["22".into(), "yes".into()]],
+        30,
+    );
+    assert_eq!(table[0].to_string(), " n   value");
+    assert_eq!(table[2].to_string().trim_end(), " 1   –");
 }
 
 #[test]

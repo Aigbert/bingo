@@ -129,3 +129,12 @@ const SCREENSHOT: &[(usize, &[&str])] = &[
         ],
     ),
 ];
+
+#[test]
+fn image_chips_are_indivisible_words() {
+    let rows = super::wrap(&ratatui::text::Line::from("one [image 1] [image 2]"), 15);
+    assert_eq!(
+        rows.iter().map(ToString::to_string).collect::<Vec<_>>(),
+        ["one [image 1]", "[image 2]"]
+    );
+}
