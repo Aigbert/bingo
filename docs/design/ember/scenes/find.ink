@@ -33,6 +33,6 @@
 26 fg 3-32 code · 33-49 fg
 28 bg 0-99 you
 29 bg 0-99 you
-29 fg 3-6 dim · 9-13 fg · 14 #efbc9a · 90-97 dim
+29 fg 3-6 dim · 9-13 fg · 14 #efbc9a · 92-97 muted
 30 bg 0-99 you
 31 fg 3-10 muted · 12-15 dim · 67-68 muted · 70-76 dim · 80 muted · 82-85 dim · 89-91 muted · 93-97 dim

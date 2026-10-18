@@ -261,8 +261,8 @@ function findLines(d, now, W) {
   const caret = s(g('caret'), caretInk(now));
   return [L(TX, [s('find', 'dim'), s('  '), ...(d.q ? [s(d.q, 'fg'), caret] : [caret, s('in this conversation', 'dim')])], { r: right })];
 }
-/* every match in the whole stream, newest last; a jump centres the current one */
-function findHits(d, stream, W, h) {
+/* every match in the whole stream, newest last, counted before the dock that names them is drawn */
+function findHits(d, stream, W) {
   const q = [...d.q.toLowerCase()];
   d.hits = [];
   if (q.length) stream.forEach((l, i) => {
@@ -275,6 +275,9 @@ function findHits(d, stream, W, h) {
     }
   });
   if (d.cur == null || d.cur >= d.hits.length) d.cur = d.hits.length - 1;
+}
+/* a jump centres the current match in the rows the stream has */
+function centreFind(d, stream, h) {
   if (d.want && d.hits.length) S.scroll = clamp(stream.length - d.hits[d.cur].i - Math.ceil(h / 2), 0, S.maxScroll);
   d.want = false;
 }
@@ -383,19 +386,20 @@ function viewHints(t) {
 function frame(now) {
   if (S.exited) return exitFrame(now);
   const W = S.W, H = S.H;
+  const stream = S.log.length ? [...streamLines(now), BLANK()] : [];
+  if (S.dock && S.dock.kind === 'find') findHits(S.dock, stream, W);
   const dock = dockLines(now, W, H), foot = footerLine(now, W);
-  const h = Math.max(1, H - dock.length - 1), view = viewport(now, W, h);
+  const h = Math.max(1, H - dock.length - 1), view = viewport(now, stream, W, h);
   const lines = [...view, ...dock, foot], rows = lines.map(l => rowOf(l, W));
   if (S.dock && S.dock.kind === 'find') markFinds(rows, h);
   lines.forEach((l, y) => { if (l.fx) effects(rows, l.fx, y, now); });
   scrollbar(rows, h, now, W);
   return { lines, rows };
 }
-function viewport(now, W, h) {
-  const stream = S.log.length ? [...streamLines(now), BLANK()] : [];
+function viewport(now, stream, W, h) {
   S.streamN = stream.length; S.viewH = h;
   S.maxScroll = Math.max(0, stream.length - h);
-  if (S.dock && S.dock.kind === 'find') findHits(S.dock, stream, W, h);
+  if (S.dock && S.dock.kind === 'find') centreFind(S.dock, stream, h);
   if (S.focus === 'ledger') keepSelVisible(stream, h);
   S.scroll = clamp(S.scroll, 0, S.maxScroll);
   const end = stream.length - S.scroll, top = Math.max(0, end - h), v = stream.slice(top, end);

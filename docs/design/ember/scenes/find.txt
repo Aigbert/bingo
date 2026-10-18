@@ -28,6 +28,6 @@
    cargo test -p bingo-core queue：12 个全部通过。                                                  
                                                                                                     
                                                                                                     
-   find  reset▍                                                                           no match  
+   find  reset▍                                                                             8 of 8  
                                                                                                     
    opus-5.5 high                                                   ↑↓ matches   ⏎ jump   esc close  
