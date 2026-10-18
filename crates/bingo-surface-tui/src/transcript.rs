@@ -108,7 +108,7 @@ pub struct Rows<'a> {
     pub slots: Vec<bingo_sdk::slot::Placed>,
     /// Each mode's label, derived once per frame from slots' Mode placement
     /// so a step's why never searches the placements.
-    pub(super) mode_labels: std::collections::BTreeMap<String, String>,
+    pub(crate) mode_labels: std::collections::BTreeMap<String, String>,
     /// A newer release than this build, when the start-up check found one
     /// (M63). Terminal-side, like the fold and the scroll: it is a fact about
     /// this machine, not about the conversation.
