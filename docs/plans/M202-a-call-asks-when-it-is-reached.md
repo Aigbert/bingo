@@ -13,18 +13,9 @@ A round runs its calls in order, the way the prototype draws them:
   waits there;
 - each call lands when it finishes.
 
-Today the kernel does otherwise:
-- **Every ask comes first.** `turn.rs` `gate` (~850-907) gates every call of the round before
-  `execute` runs any. A round of `read, edit, bash` asks about the edit and the bash before the
-  read has run.
-- **Running is claimed early.** `gate` marks each allowed call `Running` while it still waits
-  behind the asks.
-- **A batch lands at once.** `executor.rs` `execute_chain` (~69-118) runs consecutive
-  concurrency-safe calls with `join_all`. It reports their outcomes only when the whole batch has
-  landed, though its doc (~48-49) says `on_done` sees each outcome as it lands.
-
-So a step row can spin before its call runs, a fast read lands with the slowest one, and the
-person is asked about a call whose turn has not come.
+Before this milestone, every call was gated before execution and marked Running too early.
+Concurrency-safe batches landed together. The kernel rounds fixed reach and landing order;
+round 3 makes each call own its wait and makes the surface draw only reached work.
 
 ## Bricks
 
@@ -113,11 +104,11 @@ person is asked about a call whose turn has not come.
   - a stop during a question: outcome, turn-end hooks and journal Interruption hold its
     `opened_at`. During a call permission ask, the call holds `askedAt`, Interruption none.
     With no ask open, none does.
-- [ ] TUI: three calls where the second asks. The first row has landed, the second reads
+- [x] TUI: three calls where the second asks. The first row has landed, the second reads
       `needs you`, and the third is not drawn until it starts. Stop during that ask: the
       second reads `stopped`, the third is never drawn. Evidence: TUI tests and drive.sh.
-- [ ] ToolCall contract: round trip, old fixture, regenerated schemas and TypeScript.
-- [ ] Turn clock never jumps across an ask: frame-by-frame literal tests.
+- [x] ToolCall contract: round trip, old fixture, regenerated schemas and TypeScript.
+- [x] Turn clock never jumps across an ask: frame-by-frame literal tests.
 - [x] RPC, print and ACP black-box tests pass. Each test re-pinned for frame order is named in
       Verified.
 - [x] Gates, one at a time, and the Windows check for `bingo-core`.
@@ -143,4 +134,12 @@ person is asked about a call whose turn has not come.
 ## Verified
 
 Rounds 1–2b: [round 1](../verification/m202/round-1.md), [round 2 and 2b](../verification/m202/round-2.md).
-Round 3 verification is being recorded in [round 3](../verification/m202/round-3.md).
+Round 3 details, audits, re-pins and departures: [round 3](../verification/m202/round-3.md).
+- [x] Contract/clock: SDK why_and_time `2 passed`, call_wait `3 passed`, turn_clock `12 passed`.
+- [x] Kernel stamps, held receipts/stops and recovery: core `713 passed; 0 failed`.
+- [x] Reached rows/crew: TUI `1431 passed`, crew `28 passed`; no snapshot changed.
+- [x] `bash docs/verification/m202/drive.sh`: 100×32/80×24 passed; `scripts/tui-smoke.sh`: `tui-smoke ok`.
+- [x] fmt/check/clippy/test/discipline/budget/deny: all passed; workspace `6567 passed`.
+- [x] Windows sdk/core/crew passed; TUI and other native stops are named in round 3.
+- Departures: box optional output for enum size; missing-tool policy/message; RPC schema generator.
+- Tool-host/judge waits and mid-call recovery timing remain follow-ups; old unstamped stops hide.
