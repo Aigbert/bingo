@@ -2,7 +2,7 @@
 
 ADR-0097 §4, §6, §10; ADR-0095 as amended; ADR-0084 §1. Spec: `docs/design/ember/`
 (`p4-model.js` `TOOLS`/`markOf`/`verbOf`; `p5-stream.js` `turnLines` … `answerLines`).
-After: part A nothing; part B M192 and part A. Part B runs beside M193.
+After: part A nothing; part B M192, M201 and part A, rebased onto M193.
 
 ## Goal
 
@@ -78,9 +78,10 @@ says how its row reads, and no surface names a tool.
 2. **The band** (`bandRows`, `promptSegs`, `clockSegs`, `sideInk`).
    - **Side light:** breathes glow↔coal over 1.8 s while live, amberGlow while asking. Only the
      newest finished turn stays lit: good, bad, or dim when stopped.
-   - **Clock:** the `TurnDuration` site on the band's first row from 1 s; muted while live, dim
-     once done; a stopped turn reads `stopped · 4s`. While live it keeps 10 cells free so your
-     words never rewrap.
+   - **Clock:** the `TurnDuration` site on the band's first row from 1 s, read from M201's
+     `clock` for every band alike, so time spent waiting for you is left out; muted while live,
+     dim once done; a stopped turn reads `stopped · 4s`. While live it keeps 10 cells free so
+     your words never rewrap.
 3. **Step rows** (`stepRow` … `whySegs`, `tailLine`). Mod-ledger draws them from `Step`, each row
    asked of `Ledger` on its own, with M192's view vocabulary; what moves is declared as motion.
    - **Layout:** mark at 3, verb at 5, target at `max(13, 5 + verb + 2)`, outcome right, RM 2.
@@ -91,12 +92,22 @@ says how its row reads, and no surface names a tool.
    - **Asked:** `◆` breathes amber, reading `needs you`. **Failed:** mark and verb bad, the
      reason on the right. **Skipped or cut:** faint mark, dim verb and target, `said no` or
      `stopped` on the right.
-   - **Why:** the reason a step ran without asking (`accept edits`, `session rule`) comes from
-     the policy; a step you changed reads `changed by you`.
-4. **Narration and live rows** (`narrLines`, `liveLines`, `stalled`). Narration is italic muted
-   between the steps where it was said; the newest types out at 70 cps until something follows.
-   While nothing runs, `thinking` shimmers, and after a 500 ms pause it reads `working`. The
-   working line (` ▍ burrowing · 7s`, `activity.rs`) goes; queued rows stay until M196.
+   - **Why:** from M201's facts: `accept edits` or `bypass` for a mode, `session rule` for a rule
+     added this session (a settings rule or a hook says nothing), and `changed by you` for a
+     call allowed after you changed it.
+4. **Narration and the live row** (`narrLines`, `liveLines`, `stalled`). Narration is italic
+   muted between the steps where it was said, and grows as it streams (the prototype's 70 cps
+   stands in for the stream). The live row ends a live turn and is the `Spinner` site, so a mod
+   still draws it:
+   - `thinking` shimmers while a thought is open and nothing runs (a `Running` call or an open
+     ask), with its clock on the right from 1 s;
+   - `working`, or the placed task's verb as written, once no item has started or ended for
+     500 ms while the turn is live, no answer has begun (narration with a step after it is not
+     an answer) and no retry shows; the frame wakes when the 500 ms is due;
+   - `stopping` from the esc frame until `TurnCompleted`, also while a step runs or the answer
+     streams (ADR-0097 §4; the prototype stops at once).
+   The dock's working row (` ▍ burrowing · 7s`, `activity.rs`), its verbs and the
+   `TurnProgress` site retire, and a mod naming it gets a load error; queued rows stay until M196.
 5. **Ends** (`failsTurn`, `failTail`, `errorLines`, `sparks`). A turn ending on a failed step
    keeps its last 4 output lines in a well; a recovered failure is one red row. Done: glow→good
    over 320 ms and three sparks (700 ms, empty cells only). The edge flash is M193's.
@@ -128,8 +139,11 @@ says how its row reads, and no surface names a tool.
       `ascii-done`, `reduced-live`, `small-done` and `narrow` passes the harness.
 - [ ] **B:** motion budget on `live`: between frames 500 ms apart, `moved` reports only the side
       light, the spinner cell and the comet.
-- [ ] **B:** whichever of M193 and M194 lands second also passes the full frame of `live`,
-      `done`, `ascii-live`, `ascii-done`, `reduced-live` and `small-done`.
+- [ ] **B:** M194 lands after M193, so it also passes the full frame of `live`, `done`,
+      `ascii-live`, `ascii-done`, `reduced-live`, `small-done`, `mode` and `mode-later`.
+- [ ] **B:** the live row: `working` at 500 ms and not before, its deadline exact; the placed
+      verb; `thinking` and its clock; `stopping` on the esc frame while a step runs, gone at
+      `TurnCompleted`; a mod's `Spinner` answer redraws the row; `TurnProgress` refused at load.
 - [x] `--print` and RPC are unchanged except the additive `look`; their black-box tests pass
       untouched. Today's turn snapshots are deleted or re-pinned, each deletion named in Verified.
 - [ ] Gates and checks as in M192; tmux drive of a live, a done and a stopped turn.

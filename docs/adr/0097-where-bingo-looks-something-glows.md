@@ -1,7 +1,8 @@
 # ADR-0097 — Where bingo looks, something glows
 
-Status: accepted · 2026-10-18 · Plans: M192–M200 · Amends: ADR-0095 (§1, §2, §6, §7 and
-`TurnFold` superseded; §3 refined), ADR-0084 §1 (`Ledger`, `TurnFold`) · Spec: `docs/design/ember/`
+Status: accepted · 2026-10-18, amended 2026-10-19 (§4 live row) · Plans: M192–M200 · Amends:
+ADR-0095 (§1, §2, §6, §7 and `TurnFold` superseded; §3 refined), ADR-0084 §1 (`Ledger`,
+`TurnFold`), ADR-0082 §3 (`TurnProgress` retired) · Spec: `docs/design/ember/`
 
 ## Context
 
@@ -43,6 +44,10 @@ unknown. The traits that pick a row's tier (`read_only`, `edit`) already belong 
      the right. A running step spins in its mark cell, then lands on its mark (glow→ink, 420 ms).
      Lookups read one shade quieter than changes.
    - Narration stays between the steps where it was said.
+   - A live turn ends in at most one live row, the `Spinner` site: `thinking` while a thought is
+     open and nothing runs; `working`, or the task's verb, after 500 ms with nothing new and no
+     answer begun; `stopping` from the esc frame until the turn ends. The prototype stops at
+     once; the kernel takes a moment, and a key that draws nothing reads as dropped (M34).
    - A turn never folds, and nothing draws a stop line.
 5. **Detail opens in place.** `ctrl+o` brings a turn's thoughts and your additions back to where
    they happened. ↑↓ picks a row, and ⏎ opens its *well*, one shade deeper from column 5. A
@@ -101,8 +106,9 @@ unknown. The traits that pick a row's tier (`read_only`, `edit`) already belong 
   (ADR-0095 as amended). The capture exporter, node with playwright-core, is a docs tool and
   not a build dependency.
 - `Step` carries its tool's look. `Marks` keeps only the states that belong to no tool
-  (spinner, asked, cut). `TurnFold` retires, and a mod that hooks it is told so by `validate`.
-  `TurnDuration` draws on the band.
+  (spinner, asked, cut). `TurnFold` and `TurnProgress` retire, and a mod that hooks either is
+  told so by `validate` and at the handshake. `TurnDuration` draws the band's clock, the keybar
+  says `esc stop`, and a turn's tokens are not drawn.
 - `KeyBar` keeps its props and is drawn in the footer.
 - Plans M186, M188 and M189 were never started. M197 and M198 replace them.
 - Check 4c extends to `bingo-surface-tui` and `bingo-mod-ledger`.

@@ -1,6 +1,6 @@
 # ADR-0082 — Every place on screen is a site
 
-Status: accepted · 2026-10-14 · Plans: M159 (§§1–5), M160 (§6) · Amends: ADR-0079 §2 §4 and its non-goal · Amended by ADR-0086 (2026-10-14): §1's innermost answer is the built-in mod; the surface's `Engine` is the fallback
+Status: accepted · 2026-10-14 · Plans: M159 (§§1–5), M160 (§6) · Amends: ADR-0079 §2 §4 and its non-goal · Amended by ADR-0086 (2026-10-14): §1's innermost answer is the built-in mod; the surface's `Engine` is the fallback · Amended by ADR-0097 (2026-10-19): §3's `TurnProgress` retires; a band's clock is `TurnDuration` and the live row is `Spinner`
 
 ## Context
 
