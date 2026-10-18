@@ -38,3 +38,12 @@ fn unknown_motion_is_not_an_authoring_variant() {
         .collect();
     assert_eq!(kinds, ["breathe", "spin", "fade"]);
 }
+
+#[test]
+fn unknown_motion_round_trips_its_original_fields() {
+    let value = json!({
+        "kind":"Text", "motion":{"kind":"shimmer", "speed":2}, "children":["hello"]
+    });
+    let view: View = serde_json::from_value(value.clone()).unwrap();
+    assert_eq!(serde_json::to_value(view).unwrap(), value);
+}

@@ -228,7 +228,7 @@ pub struct Spacing {
 
 /// Declarative motion on the surface clock, with a reduced-motion still form.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(tag = "kind", rename_all = "camelCase")]
+#[serde(remote = "Self", tag = "kind", rename_all = "camelCase")]
 pub enum TextMotion {
     Breathe {
         with: String,
@@ -243,7 +243,34 @@ pub enum TextMotion {
         at_ms: i64,
         ms: u64,
     },
-    #[serde(other)]
+    #[serde(skip)]
     #[schemars(skip)]
-    Unknown,
+    Other(serde_json::Value),
+}
+
+impl<'de> Deserialize<'de> for TextMotion {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        if let Some(kind) = value.get("kind").and_then(serde_json::Value::as_str)
+            && !matches!(kind, "breathe" | "spin" | "fade")
+        {
+            return Ok(Self::Other(value));
+        }
+        #[derive(Deserialize)]
+        struct Known(#[serde(with = "TextMotion")] TextMotion);
+        serde_json::from_value::<Known>(value)
+            .map(|known| known.0)
+            .map_err(serde::de::Error::custom)
+    }
+}
+
+impl Serialize for TextMotion {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if let Self::Other(value) = self {
+            return value.serialize(serializer);
+        }
+        #[derive(Serialize)]
+        struct Known<'a>(#[serde(with = "TextMotion")] &'a TextMotion);
+        Known(self).serialize(serializer)
+    }
 }
