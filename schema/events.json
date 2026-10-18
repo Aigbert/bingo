@@ -374,6 +374,24 @@
                   "$ref": "#/$defs/TextChild"
                 }
               },
+              "ground": {
+                "description": "An Ember ground, filled to the available width.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "motion": {
+                "description": "A surface-clock animation; the author never needs to redraw it.",
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/TextMotion"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "color": {
                 "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                 "type": [
@@ -679,6 +697,13 @@
                 "items": {
                   "$ref": "#"
                 }
+              },
+              "ground": {
+                "description": "An Ember ground, filled across the box including padding.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
               "question": {
                 "description": "A question owner's editing state, on the root of a drawn question;\nthe choices' labels and the answer stay the host's.",
@@ -1332,6 +1357,77 @@
               },
               {
                 "$ref": "#"
+              }
+            ]
+          },
+          "TextMotion": {
+            "description": "Declarative motion on the surface clock, with a reduced-motion still form.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "with": {
+                    "type": "string"
+                  },
+                  "periodMs": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "depth": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "breathe"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "with",
+                  "periodMs",
+                  "depth"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "spin"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "ms": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "fade"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "from",
+                  "atMs",
+                  "ms"
+                ]
               }
             ]
           },
@@ -2777,6 +2873,24 @@
                       "$ref": "#/$defs/TextChild"
                     }
                   },
+                  "ground": {
+                    "description": "An Ember ground, filled to the available width.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "motion": {
+                    "description": "A surface-clock animation; the author never needs to redraw it.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/TextMotion"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "color": {
                     "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                     "type": [
@@ -3082,6 +3196,13 @@
                     "items": {
                       "$ref": "#/$defs/View"
                     }
+                  },
+                  "ground": {
+                    "description": "An Ember ground, filled across the box including padding.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "question": {
                     "description": "A question owner's editing state, on the root of a drawn question;\nthe choices' labels and the answer stay the host's.",
@@ -3735,6 +3856,77 @@
               },
               {
                 "$ref": "#/$defs/View"
+              }
+            ]
+          },
+          "TextMotion": {
+            "description": "Declarative motion on the surface clock, with a reduced-motion still form.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "with": {
+                    "type": "string"
+                  },
+                  "periodMs": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "depth": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "breathe"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "with",
+                  "periodMs",
+                  "depth"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "spin"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "ms": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "fade"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "from",
+                  "atMs",
+                  "ms"
+                ]
               }
             ]
           },
@@ -7347,6 +7539,24 @@
                       "$ref": "#/$defs/TextChild"
                     }
                   },
+                  "ground": {
+                    "description": "An Ember ground, filled to the available width.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "motion": {
+                    "description": "A surface-clock animation; the author never needs to redraw it.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/TextMotion"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "color": {
                     "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                     "type": [
@@ -7652,6 +7862,13 @@
                     "items": {
                       "$ref": "#/$defs/View"
                     }
+                  },
+                  "ground": {
+                    "description": "An Ember ground, filled across the box including padding.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "question": {
                     "description": "A question owner's editing state, on the root of a drawn question;\nthe choices' labels and the answer stay the host's.",
@@ -8305,6 +8522,77 @@
               },
               {
                 "$ref": "#/$defs/View"
+              }
+            ]
+          },
+          "TextMotion": {
+            "description": "Declarative motion on the surface clock, with a reduced-motion still form.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "with": {
+                    "type": "string"
+                  },
+                  "periodMs": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "depth": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "breathe"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "with",
+                  "periodMs",
+                  "depth"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "spin"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "ms": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "fade"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "from",
+                  "atMs",
+                  "ms"
+                ]
               }
             ]
           },
@@ -10932,6 +11220,24 @@
                       "$ref": "#/$defs/TextChild"
                     }
                   },
+                  "ground": {
+                    "description": "An Ember ground, filled to the available width.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "motion": {
+                    "description": "A surface-clock animation; the author never needs to redraw it.",
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/TextMotion"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "color": {
                     "description": "An Ember ink: fg, muted, dim, faint, ember, glow, coal, amber, amberGlow,\ngood, bad, plan, auto, code, crew0–crew5, kw, str, num, fn, ty; or `#rrggbb`.\nGround inks: bg, you, well, wellDeep, pick, pickBg, addTint, delTint,\naddWord, delWord, badTint, amberTint, glowTint.\nLegacy ash, presence and attention are accepted; unknown names draw plain.",
                     "type": [
@@ -11237,6 +11543,13 @@
                     "items": {
                       "$ref": "#/$defs/View"
                     }
+                  },
+                  "ground": {
+                    "description": "An Ember ground, filled across the box including padding.",
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "question": {
                     "description": "A question owner's editing state, on the root of a drawn question;\nthe choices' labels and the answer stay the host's.",
@@ -11890,6 +12203,77 @@
               },
               {
                 "$ref": "#/$defs/View"
+              }
+            ]
+          },
+          "TextMotion": {
+            "description": "Declarative motion on the surface clock, with a reduced-motion still form.",
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "with": {
+                    "type": "string"
+                  },
+                  "periodMs": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "depth": {
+                    "type": "number",
+                    "format": "double"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "breathe"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "with",
+                  "periodMs",
+                  "depth"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "spin"
+                  }
+                },
+                "required": [
+                  "kind"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string"
+                  },
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "ms": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "fade"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "from",
+                  "atMs",
+                  "ms"
+                ]
               }
             ]
           },
