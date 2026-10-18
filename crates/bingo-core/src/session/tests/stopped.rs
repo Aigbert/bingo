@@ -21,12 +21,17 @@ impl Hook for EndItems {
     }
 }
 
-async fn observed_actor() -> (Actor, mpsc::UnboundedReceiver<Vec<Item>>) {
+async fn observed_actor(permission: bool) -> (Actor, mpsc::UnboundedReceiver<Vec<Item>>) {
     let (mut actor, _) = storage::failing_actor().await;
     let (send, receive) = mpsc::unbounded_channel();
+    let script = if permission {
+        Script::Events(tool_call("Echo", json!({"v": 1})))
+    } else {
+        Script::Hang(vec![ModelEvent::TextStart { id: "live".into() }])
+    };
     let mut cfg = config(
-        ScriptedProvider::new(vec![Script::Hang(vec![])]),
-        vec![],
+        ScriptedProvider::new(vec![script]),
+        vec![Arc::new(EchoTool { read_only: false })],
         Arc::new(NoHost),
     );
     cfg.hooks = HookSet::fixed(vec![Arc::new(EndItems(send))]);
@@ -39,6 +44,14 @@ async fn observed_actor() -> (Actor, mpsc::UnboundedReceiver<Vec<Item>>) {
         )
         .await
         .unwrap();
+    loop {
+        let message = actor.rx.recv().await.unwrap();
+        let started = matches!(&message, Msg::Emit { event, .. } if matches!(event.as_ref(), Event::ItemStarted { .. }));
+        actor.handle(message).await;
+        if (permission && !actor.state.interactions.is_empty()) || (!permission && started) {
+            break;
+        }
+    }
     (actor, receive)
 }
 
@@ -69,9 +82,12 @@ fn asked_at(items: &[Item]) -> Option<Timestamp> {
 }
 
 async fn agrees(kind: Option<InteractionKind>, close: bool) {
-    let (mut actor, mut hooks) = observed_actor().await;
+    let permission = matches!(&kind, Some(InteractionKind::Permission { .. }));
+    let (mut actor, mut hooks) = observed_actor(permission).await;
     let turn = actor.running.as_ref().unwrap().turn.clone();
-    let opened_at = if let Some(kind) = kind {
+    let opened_at = if permission {
+        Some(actor.state.interactions[0].opened_at)
+    } else if let Some(kind) = kind {
         let (reply, _answer) = oneshot::channel();
         actor
             .open_interaction(None, kind, vec![AnswerSpec::Cancel], reply)
@@ -146,4 +162,82 @@ async fn stop_without_an_ask_agrees_in_outcome_hooks_and_journal() {
 #[tokio::test]
 async fn closing_with_an_ask_agrees_in_outcome_hooks_and_journal() {
     agrees(Some(permission()), true).await;
+}
+
+#[tokio::test]
+async fn resumed_pending_calls_close_before_the_lost_turn() {
+    let turn = TurnId::from_raw("lost");
+    let mut frames = vec![
+        journal_frame(
+            1,
+            Event::SessionUpdated {
+                summary: summary("ses_1"),
+            },
+        ),
+        journal_frame(
+            2,
+            Event::TurnStarted {
+                turn: turn.clone(),
+                inputs: vec![],
+                origin: TurnOrigin::Submit,
+            },
+        ),
+    ];
+    for (index, status) in [ItemStatus::Running, ItemStatus::Pending]
+        .into_iter()
+        .enumerate()
+    {
+        let item = crate::turn::mint(
+            &turn,
+            0,
+            ItemBody::ToolCall {
+                call_id: format!("c{index}"),
+                name: "Echo".into(),
+                input: json!({}),
+                output: None,
+                duration_ms: None,
+                progress: None,
+                allowed_by: None,
+                quiet: false,
+            },
+            status,
+        );
+        frames.push(journal_frame(index as u64 + 3, Event::ItemStarted { item }));
+    }
+    let mailbox = resume(frames, None, Services::none(), |_| {
+        Arc::new(config(
+            ScriptedProvider::new(vec![]),
+            vec![],
+            Arc::new(NoHost),
+        ))
+    })
+    .unwrap();
+    let (state, _) = mailbox.attach().await.unwrap();
+    let calls: Vec<_> = state
+        .transcript
+        .items()
+        .iter()
+        .filter(|item| matches!(item.body, ItemBody::ToolCall { .. }))
+        .collect();
+    assert_eq!(calls.len(), 2);
+    assert!(
+        calls
+            .iter()
+            .all(|item| item.status == ItemStatus::Interrupted && item.completed_at.is_some())
+    );
+    let journal = events_of(&mailbox).await;
+    let done = journal
+        .iter()
+        .position(|frame| matches!(frame.event, Event::TurnCompleted { .. }))
+        .unwrap();
+    assert_eq!(
+        journal[..done]
+            .iter()
+            .filter(|frame| matches!(&frame.event,
+        Event::ItemCompleted { item } if matches!(item.body, ItemBody::ToolCall { .. })))
+            .count(),
+        2
+    );
+    mailbox.close(CloseReason::Client);
+    mailbox.wait_closed().await;
 }

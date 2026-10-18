@@ -8,6 +8,7 @@ use super::Actor;
 pub(super) fn storage_failed(actor: &mut Actor, error: &KernelError) {
     tracing::error!(session = %actor.id, %error, "journal append failed");
     actor.rx.close();
+    actor.remember_stopped_ask();
     if let Some(running) = actor.running.take() {
         running.abandon();
     }

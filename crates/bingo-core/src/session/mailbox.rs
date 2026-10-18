@@ -539,6 +539,7 @@ impl SessionPort for Port {
 
 /// The turn loop's view of the actor: publish, ask, absorb — all by mail.
 pub(super) struct TurnMail {
+    pub(super) stopped_ask: super::running::StoppedAsk,
     pub(super) stopped: std::sync::Arc<std::sync::atomic::AtomicBool>,
     /// The running turn's own door ([`super::running::Running`]): set here,
     /// not mailed, so a call the actor reads after the stream ended finds it
@@ -550,6 +551,10 @@ pub(super) struct TurnMail {
 
 #[async_trait]
 impl TurnHost for TurnMail {
+    fn stopped_ask(&self) -> Option<jiff::Timestamp> {
+        self.stopped_ask.get()
+    }
+
     async fn receipt(&self, item: Item) -> Result<Item, KernelError> {
         self.mailbox
             .call(|reply| Msg::Receipt { item, reply })

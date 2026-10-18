@@ -294,6 +294,7 @@ impl Actor {
                 .reject(intent, ErrorCode::NotReady, "that turn is not running")
                 .await;
         }
+        self.remember_stopped_ask();
         running.cancel.cancel();
         let turn = running.turn.clone();
         self.cancel_interactions(CancelReason::Interrupted).await?;

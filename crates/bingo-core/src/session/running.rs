@@ -75,8 +75,24 @@ impl Door {
     }
 }
 
+/// Written before cancellation and read by every builder of the interruption.
+#[derive(Clone, Default)]
+pub(super) struct StoppedAsk(Arc<std::sync::OnceLock<jiff::Timestamp>>);
+
+impl StoppedAsk {
+    pub(super) fn set(&self, at: Option<jiff::Timestamp>) {
+        if let Some(at) = at {
+            let _ = self.0.set(at);
+        }
+    }
+
+    pub(super) fn get(&self) -> Option<jiff::Timestamp> {
+        self.0.get().copied()
+    }
+}
+
 pub(super) struct Running {
-    pub(super) stopped_ask: Option<jiff::Timestamp>,
+    pub(super) stopped_ask: StoppedAsk,
     pub(super) hooks: Arc<tokio::sync::OnceCell<crate::turn::HookSet>>,
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
@@ -107,7 +123,9 @@ impl Running {
         let mailbox = actor.mailbox.clone();
         let stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let door = Door::default();
+        let stopped_ask = StoppedAsk::default();
         let host = TurnMail {
+            stopped_ask: stopped_ask.clone(),
             stopped: stopped.clone(),
             door: door.clone(),
             mailbox: mailbox.clone(),
@@ -128,7 +146,7 @@ impl Running {
             });
         });
         Self {
-            stopped_ask: None,
+            stopped_ask,
             hooks,
             stopped,
             door,
@@ -168,7 +186,11 @@ pub(super) async fn close_dropped_turn(
         item.completed_at = Some(jiff::Timestamp::now());
         actor.publish(Event::ItemCompleted { item }, None).await?;
     }
-    let asked_at = take_stopped_ask(actor, Some(turn));
+    let asked_at = actor
+        .running
+        .as_ref()
+        .filter(|running| &running.turn == turn)
+        .and_then(|running| running.stopped_ask.get());
     let marker = actor.fresh(
         Some(turn.clone()),
         None,
@@ -193,15 +215,4 @@ pub(super) async fn close_dropped_turn(
             .map(|item| item.as_ref().clone())
             .collect(),
     })
-}
-
-pub(super) fn take_stopped_ask(
-    actor: &mut Actor,
-    turn: Option<&TurnId>,
-) -> Option<jiff::Timestamp> {
-    actor
-        .running
-        .as_mut()
-        .filter(|running| turn == Some(&running.turn))
-        .and_then(|running| running.stopped_ask.take())
 }

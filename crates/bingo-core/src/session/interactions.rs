@@ -30,7 +30,14 @@ impl Actor {
         item: Item,
         reply: oneshot::Sender<Result<Item, KernelError>>,
     ) -> Result<(), KernelError> {
-        let result = self.record_item(item).await;
+        let result = if item.turn.as_ref().is_none_or(|turn| !self.is_running(turn)) {
+            Err(KernelError::new(
+                ErrorCode::Interrupted,
+                "the receipt's turn has ended",
+            ))
+        } else {
+            self.record_item(item).await
+        };
         if let Err(error) = &result
             && error.code != ErrorCode::Interrupted
         {
@@ -38,43 +45,6 @@ impl Actor {
         }
         let _ = reply.send(result);
         Ok(())
-    }
-
-    pub(super) async fn record_item(&mut self, item: Item) -> Result<Item, KernelError> {
-        let permission = matches!(item.body, ItemBody::PermissionReceipt { .. });
-        let canonical = if let Some(recorded) = self.recorded_receipt(&item.body) {
-            recorded
-        } else {
-            if permission
-                && item
-                    .turn
-                    .as_ref()
-                    .is_some_and(|turn| !self.is_running(turn))
-            {
-                return Err(KernelError::new(
-                    ErrorCode::Interrupted,
-                    "the receipt's turn has ended",
-                ));
-            }
-            self.publish(Event::ItemCompleted { item: item.clone() }, None)
-                .await?;
-            item
-        };
-        if permission {
-            self.refresh_config().await?;
-        }
-        Ok(canonical)
-    }
-
-    fn recorded_receipt(&self, body: &ItemBody) -> Option<Item> {
-        let ItemBody::PermissionReceipt { interaction, .. } = body else {
-            return None;
-        };
-        self.state.transcript.items().iter().find_map(|previous| {
-            matches!(&previous.body, ItemBody::PermissionReceipt { interaction: id, .. }
-                if id == interaction)
-            .then(|| previous.as_ref().clone())
-        })
     }
 
     pub(super) async fn open_interaction(
@@ -212,19 +182,22 @@ impl Actor {
         Some(self.fresh(open.turn.clone(), None, body))
     }
 
-    pub(super) async fn cancel_interactions(
-        &mut self,
-        reason: CancelReason,
-    ) -> Result<(), KernelError> {
-        if let Some(running) = &mut self.running {
+    pub(super) fn remember_stopped_ask(&self) {
+        if let Some(running) = &self.running {
             let earliest = self
                 .pending
                 .values()
                 .filter(|p| p.interaction.turn.as_ref() == Some(&running.turn))
                 .map(|p| p.interaction.opened_at)
                 .min();
-            running.stopped_ask = running.stopped_ask.into_iter().chain(earliest).min();
+            running.stopped_ask.set(earliest);
         }
+    }
+
+    pub(super) async fn cancel_interactions(
+        &mut self,
+        reason: CancelReason,
+    ) -> Result<(), KernelError> {
         let pending: Vec<_> = self.pending.drain().collect();
         self.cancel_each(pending, reason).await?;
         Ok(())

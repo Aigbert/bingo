@@ -16,6 +16,7 @@ mod invoke;
 mod mailbox;
 mod past;
 mod queue;
+mod recovery;
 mod running;
 mod signals;
 mod spawn;
@@ -120,6 +121,7 @@ impl Actor {
             };
             flow = self.handle(msg).await;
         }
+        self.remember_stopped_ask();
         if let Some(running) = self.running.take() {
             running.abandon();
         }
@@ -607,45 +609,6 @@ impl Actor {
         self.config.model.is_some()
     }
 
-    /// A resumed journal may end inside a turn the old process never
-    /// finished. Its questions can no longer be answered and its turn is
-    /// lost; both are said before anything new happens.
-    async fn recover(&mut self) -> Result<(), KernelError> {
-        let open: Vec<InteractionId> = self
-            .state
-            .interactions
-            .iter()
-            .map(|i| i.id.clone())
-            .collect();
-        for id in open {
-            self.publish(
-                Event::InteractionCancelled {
-                    id,
-                    reason: CancelReason::SessionClosed,
-                },
-                None,
-            )
-            .await?;
-        }
-        if let Some(turn) = self.state.turn.clone() {
-            self.publish(
-                Event::TurnCompleted {
-                    turn: turn.id,
-                    status: TurnStatus::Failed {
-                        error: KernelError::new(
-                            ErrorCode::TurnLost,
-                            "the process ended during this turn",
-                        ),
-                    },
-                    usage: turn.usage,
-                },
-                None,
-            )
-            .await?;
-        }
-        Ok(())
-    }
-
     fn is_running(&self, turn: &TurnId) -> bool {
         self.running.as_ref().is_some_and(|r| &r.turn == turn)
     }
@@ -658,15 +621,38 @@ impl Actor {
             tracing::warn!(session = %self.id, %turn, "event from a turn that is not running");
             return Ok(());
         }
-        if let Event::ItemCompleted { mut item } = event {
-            if let ItemBody::Interruption { asked_at, .. } = &mut item.body {
-                *asked_at = running::take_stopped_ask(self, item.turn.as_ref());
-            }
+        if let Event::ItemCompleted { item } = event {
             self.record_item(item).await?;
         } else {
             self.publish(event, None).await?;
         }
         Ok(())
+    }
+
+    pub(super) async fn record_item(&mut self, item: Item) -> Result<Item, KernelError> {
+        let permission = matches!(item.body, ItemBody::PermissionReceipt { .. });
+        let canonical = if let Some(recorded) = self.recorded_receipt(&item.body) {
+            recorded
+        } else {
+            self.publish(Event::ItemCompleted { item: item.clone() }, None)
+                .await?;
+            item
+        };
+        if permission {
+            self.refresh_config().await?;
+        }
+        Ok(canonical)
+    }
+
+    fn recorded_receipt(&self, body: &ItemBody) -> Option<Item> {
+        let ItemBody::PermissionReceipt { interaction, .. } = body else {
+            return None;
+        };
+        self.state.transcript.items().iter().find_map(|previous| {
+            matches!(&previous.body, ItemBody::PermissionReceipt { interaction: id, .. }
+                if id == interaction)
+            .then(|| previous.as_ref().clone())
+        })
     }
 
     /// A running tool's own tail, numbered per session so clients can order it.
@@ -873,6 +859,7 @@ impl Actor {
             tracing::warn!(session = %self.id, %turn, "completion from a turn that is not running");
             return Ok(Flow::Continue);
         }
+        self.remember_stopped_ask();
         self.cancel_interactions(CancelReason::TurnEnded).await?;
         let (status, items) = match outcome {
             Ended::Returned(outcome) => (outcome.status, outcome.items),
@@ -919,15 +906,15 @@ impl Actor {
         if self.state.closed {
             return Ok(Flow::Stop);
         }
-        self.cancel.cancel();
-        gate::close_gate(self).await?;
-        // Before the turn is told to stop, and whether or not there is one: a
-        // question opened between turns (ADR-0039 §1) is closed by the same
-        // close as any other.
-        self.cancel_interactions(CancelReason::SessionClosed)
-            .await?;
+        self.remember_stopped_ask();
         if let Some(running) = &self.running {
             running.cancel.cancel();
+        }
+        self.cancel.cancel();
+        gate::close_gate(self).await?;
+        self.cancel_interactions(CancelReason::SessionClosed)
+            .await?;
+        if self.running.is_some() {
             self.closing = Some(reason);
             return Ok(Flow::Continue);
         }

@@ -249,7 +249,7 @@ pub(super) fn stopped_early(
         turn,
         0,
         ItemBody::Interruption {
-            asked_at: None,
+            asked_at: host.stopped_ask(),
             marker: INTERRUPTED_MARKER.into(),
         },
         ItemStatus::Completed,

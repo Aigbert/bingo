@@ -9,6 +9,11 @@ use bingo_sdk::*;
 /// The session actor as the turn sees it: a place to publish, a way to ask, a queue to absorb.
 #[async_trait]
 pub trait TurnHost: Send + Sync {
+    /// The earliest ask open when the actor stopped this turn.
+    fn stopped_ask(&self) -> Option<jiff::Timestamp> {
+        None
+    }
+
     /// A bridged after-tool observer requested completion at this round's boundary.
     fn stopped(&self) -> bool {
         false

@@ -164,6 +164,7 @@ async fn an_answered_denial_refreshes_once() {
 async fn publishing_does_not_rewrite_an_interruption() {
     let (mut actor, _) = actor().await;
     let opened = ask(&mut actor).await;
+    actor.remember_stopped_ask();
     actor
         .cancel_interactions(CancelReason::Interrupted)
         .await
@@ -182,7 +183,7 @@ async fn publishing_does_not_rewrite_an_interruption() {
         .unwrap();
     assert_eq!(actor.state.transcript.get(&item.id).unwrap(), &item);
     assert_eq!(
-        actor.running.as_ref().unwrap().stopped_ask,
+        actor.running.as_ref().unwrap().stopped_ask.get(),
         Some(opened.opened_at)
     );
     actor.running.take().unwrap().abandon();
@@ -207,7 +208,10 @@ async fn a_dropped_turn_closes_its_open_ask() {
     assert!(
         matches!(marker.body, ItemBody::Interruption { asked_at: Some(at), .. } if at == opened.opened_at)
     );
-    assert_eq!(actor.running.as_ref().unwrap().stopped_ask, None);
+    assert_eq!(
+        actor.running.as_ref().unwrap().stopped_ask.get(),
+        Some(opened.opened_at)
+    );
     // Completion is queued through the catalogue even without any interceptors.
     while actor.state.turn.is_some() {
         let message = actor.rx.recv().await.unwrap();
