@@ -229,6 +229,24 @@
               },
               "description": "Strings and nested `Text` nodes, drawn in order."
             },
+            "ground": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "An Ember ground, filled to the available width."
+            },
+            "motion": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TextMotion"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A surface-clock animation; the author never needs to redraw it."
+            },
             "color": {
               "type": [
                 "string",
@@ -534,6 +552,13 @@
                 "$ref": "#/$defs/View"
               },
               "description": "The views inside, in order."
+            },
+            "ground": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "An Ember ground, filled across the box including padding."
             },
             "question": {
               "anyOf": [
@@ -1190,6 +1215,77 @@
         }
       ],
       "description": "A text child preserves the style of its nested Text node."
+    },
+    "TextMotion": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "with": {
+              "type": "string"
+            },
+            "periodMs": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "depth": {
+              "type": "number",
+              "format": "double"
+            },
+            "kind": {
+              "type": "string",
+              "const": "breathe"
+            }
+          },
+          "required": [
+            "kind",
+            "with",
+            "periodMs",
+            "depth"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string",
+              "const": "spin"
+            }
+          },
+          "required": [
+            "kind"
+          ]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "from": {
+              "type": "string"
+            },
+            "atMs": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "ms": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            },
+            "kind": {
+              "type": "string",
+              "const": "fade"
+            }
+          },
+          "required": [
+            "kind",
+            "from",
+            "atMs",
+            "ms"
+          ]
+        }
+      ],
+      "description": "Declarative motion on the surface clock, with a reduced-motion still form."
     },
     "Tone": {
       "oneOf": [

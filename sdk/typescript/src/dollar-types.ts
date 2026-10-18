@@ -836,6 +836,8 @@ export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: un
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
+/** Declarative motion on the surface clock, with a reduced-motion still form. */
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "atMs": number; "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
 export type Timer = {
   "callback": string;
   /** Milliseconds. */
@@ -908,11 +910,15 @@ export type View = ({
   "color"?: (string | null);
   /** Draw the text dimmed. */
   "dimColor"?: (boolean | null);
+  /** An Ember ground, filled to the available width. */
+  "ground"?: (string | null);
   /** Swap the foreground and background colours. */
   "inverse"?: (boolean | null);
   /** Draw the text in italics. */
   "italic"?: (boolean | null);
   "kind": "Text";
+  /** A surface-clock animation; the author never needs to redraw it. */
+  "motion"?: (TextMotion | null);
   /** Strike the text through. */
   "strikethrough"?: (boolean | null);
   /** Underline the text. */
@@ -996,6 +1002,8 @@ export type View = ({
   "flexWrap"?: (Wrap | null);
   /** Cells between children. */
   "gap"?: (number | null);
+  /** An Ember ground, filled across the box including padding. */
+  "ground"?: (string | null);
   /** The height in rows. */
   "height"?: (number | null);
   /** The focused site declares chrome separately from its body. */

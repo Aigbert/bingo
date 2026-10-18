@@ -8,7 +8,7 @@ pub struct TextStyle {
     pub ground: Option<String>,
     /// A surface-clock animation; the author never needs to redraw it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub motion: Option<TextMotion>,
+    pub motion: Option<Box<TextMotion>>,
     /// A colour name or `#rrggbb`; the surface may adjust it to its theme.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub color: Option<String>,
