@@ -105,7 +105,8 @@ meanings, and generated schemas/TypeScript.
 ## Non-goals
 
 The stream's rows (M194); the palette, mentions and queued rows in the dock, and the key
-behaviour (M196); asks (M197); sheets (M198); view segments and ctrl+g (M200); the welcome wordmark and the exit receipt (M199).
+behaviour (M196); asks (M197); sheets (M198); view segments and ctrl+g (M200); the welcome
+wordmark and the exit receipt (M199).
 
 ## Risks
 
@@ -124,11 +125,11 @@ behaviour (M196); asks (M197); sheets (M198); view segments and ctrl+g (M200); t
 - [x] Smoke — `TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`; readiness now waits for footer `fake-1`.
 - [x] Drive — `python3 docs/verification/m193/drive.py`: `PASS 100x32` / `PASS 80x24`, each followed by `CLEAN`; idle/live/done, four modes, toast expiry and moving edge; private fake-provider HOME/data/cwd. Text and ANSI captures in `docs/verification/m193/`.
 - [x] `cargo fmt --all -- --check`: exit 0, no output.
-- [x] `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 6.63s`.
-- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 23.84s`.
-- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6445 passed; 0 failed; 0 ignored**; TUI 1389, PTY 19. `cargo build -p bingo --locked`: exit 0.
+- [x] `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 36.00s`.
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 50.88s`.
+- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6452 passed; 0 failed; 0 ignored**; TUI 1396, PTY 19. `cargo build -p bingo --locked`: exit 0.
 - [x] `scripts/check_discipline.sh`: `discipline ok` (advisory warnings only).
-- [x] `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `0s`, TUI relink `0 crates`; `target/debug: 13 GB (soft max 5)` warning; `budget ok`.
+- [x] `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `1s`, TUI relink `0 crates`; `target/debug: 14 GB (soft max 5)` warning; `budget ok`.
 - [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
 - [x] Windows — `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: SDK, core, mod-hello, mod-keybar and tool-bash each `Finished dev profile`, exit 0.
 - [ ] Same Windows check for permissions/TUI/bingo: exit 101. Permissions' tree-sitter lacks `stdio.h`/`stdlib.h`; TUI's aws-lc-sys lacks `stdlib.h`/`windows.h`; bingo's rquickjs-sys rejects `/std:c11`. Native-toolchain checks remain owed; no bypass.
@@ -151,3 +152,5 @@ behaviour (M196); asks (M197); sheets (M198); view segments and ctrl+g (M200); t
 - `· this session` after the model and `context N%` below 70%: the prototype dropped them.
 - The title's attention mark: the prototype says “waiting on you” once, with the edge (`p8-page.js`).
 - `ctrl+c again to exit` as a right pair: it becomes a toast in M196.
+- M198 handoff: with the stream bottom-anchored, ui.block/view-table, rewind, plugins and pager overlays cover its newest rows; M198 makes them dock sheets that push the stream up. Unchanged this round.
+- Round 3 — send/end scrollbar regressions and zero-height footer/edge/ask wakes fail before and pass after; local notice lifetime/payload, shared submissions, all needs-you paths and review cleanups verified. [Evidence and gates](../verification/m193/review-round3.txt). No Ember capture or .snap changes; no wall-clock retries.

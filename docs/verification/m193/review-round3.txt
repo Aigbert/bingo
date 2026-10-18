@@ -1,0 +1,129 @@
+M193 round 3
+
+Regression evidence (tests were added before their fixes):
+1. cargo test -p bingo-surface-tui --lib --locked sending_while_following
+   Without the send reset (restored only ui.scroll.end(now.instant)):
+   test view::placement_tests::sending_while_following_does_not_flash_the_scrollbar ... FAILED
+   assertion failed: !draw_tree(80, 24, &tree, &mut ui, still(now)).contains('▕')
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1395 filtered out; finished in 0.12s
+   The fixture folds 60 user items, asserts stream overflow, sends via on_key,
+   then pages up and presses End: visible at 0/899 ms, absent at 900 ms.
+2. cargo test -p bingo-surface-tui --lib --locked placement_tests
+   Before structural collection (the three zero-height regressions):
+   test view::placement_tests::a_zero_height_ask_keeps_its_deadline ... FAILED
+   test view::placement_tests::a_zero_height_edge_keeps_its_flash_deadline ... FAILED
+   test view::placement_tests::a_zero_height_footer_keeps_its_countdown_deadline ... FAILED
+   Each returned no deadline: expected ask +100 ms, edge +1100 ms, footer +5 s +1 ns.
+   After fixes:
+   test view::placement_tests::a_zero_height_ask_keeps_its_deadline ... ok
+   test view::placement_tests::the_scrollbar_stays_for_nine_hundred_ms_at_the_end ... ok
+   test view::placement_tests::a_zero_height_edge_keeps_its_flash_deadline ... ok
+   test view::placement_tests::a_zero_height_footer_keeps_its_countdown_deadline ... ok
+   test view::placement_tests::sending_while_following_does_not_flash_the_scrollbar ... ok
+   test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1391 filtered out; finished in 0.02s
+
+Main-session needs-you name/ink:
+Before:
+   test footer::tests::needs_you_names_one_two_or_many_with_their_inks ... ok
+   test footer::tests::round2_needs_you_replaces_crew_lamps_before_the_model ... ok
+   test footer::tests::needs_you_calls_the_main_session_bingo_in_glow ... FAILED
+     left: "◆ project needs you"
+    right: "◆ bingo needs you"
+   test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 1393 filtered out; finished in 0.07s
+After:
+   test footer::tests::needs_you_calls_the_main_session_bingo_in_glow ... ok
+   test footer::tests::needs_you_names_one_two_or_many_with_their_inks ... ok
+   test footer::tests::needs_you_replaces_crew_lamps_before_the_model ... ok
+   test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1393 filtered out; finished in 0.00s
+
+Refused mode submission retains its command:
+Before:
+   test run::action_tests::a_refused_mode_key_names_the_command_it_submitted ... FAILED
+     left: None
+    right: Some("/permission plan")
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1395 filtered out; finished in 0.08s
+After:
+   test run::action_tests::a_refused_mode_key_names_the_command_it_submitted ... ok
+   test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1395 filtered out; finished in 0.00s
+
+Source checks:
+- Layout::place collects before placing; Layout::collect accepts both line and
+  sealed drawings, consumes their deadline and routes it through Layout::wake.
+- NOTICE derives from TOAST_HOLD + TOAST_FADE; ordinary NoticeKind::hold shares
+  TOAST_HOLD. Existing toast wall-clock expiry/fade tests exercise both paths.
+- Composer rest calculation is in rested; draw is 57 lines. transcript.rs called
+  and clock.rs shimmer are unchanged in this round (M194 owns them).
+- Only run::terminal_event writes keyed_at, including paste and excluding release.
+- Needs-you count and names use Scope::Others; tests cover one/two/three, amber
+  count, crew inks and root bingo/glow. No ctrl+g pair was added.
+- KeyToast was deleted from SDK; ui::Message is a local payload. No wire contract
+  references the removed type; generated schema/TypeScript changes are not needed.
+- mint accepts Submission; submit, cycle_mode and send_line share sending and
+  surface::capture. Rejected mode-key commands retain about.
+- Test-only Tree::attention, keys::PLACEHOLDER and footer::line were removed;
+  retained tests call production paths. TX/RM dead-code allowances were removed.
+- Composer width names CARET_COLUMNS. round2_* and review_tests names are gone.
+- Duplicate toast assertion and dead _label removed; glyph comment says footer;
+  session_facts precedes mod tests; the plan's Non-goals sentence is wrapped.
+
+All gates, run one at a time:
+cargo fmt --all -- --check
+  exit 0, no output
+cargo check --workspace --all-targets --locked
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 36.00s
+cargo clippy --workspace --all-targets --locked -- -D warnings
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 50.88s
+cargo test --workspace --locked (provider credentials unset)
+  123 result lines: 6452 passed; 0 failed; 0 ignored
+  TUI: 1396 passed; PTY: 19 passed; no wall-clock retries needed
+  footer::tests::m193_capture_dock_and_footer_bands ... ok (11 captures)
+  Generated schema and TypeScript contract tests passed unchanged.
+scripts/check_discipline.sh
+  discipline ok (advisory warnings only)
+  No composer draw length warning (61 before, 57 now).
+  transcript.rs called remains 67 lines as requested; M194 owns its split.
+scripts/budget.sh
+  dependencies (unique, normal): 423 (max  423)
+  warm cargo check -p bingo-core: 1s (max  20s)
+  relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+  target/debug: 14 GB (soft max  5); warning retained; budget ok
+cargo deny check
+  advisories ok, bans ok, licenses ok, sources ok
+
+Windows (each crate touched by M193, run serially):
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.54s; exit 0
+cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 22.57s; exit 0
+cargo check -p bingo-mod-hello --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.87s; exit 0
+cargo check -p bingo-mod-keybar --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.39s; exit 0
+cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 8.42s; exit 0
+cargo check -p bingo-permissions --all-targets --target x86_64-pc-windows-msvc
+  exit 101: tree-sitter 'stdio.h' not found; tree-sitter-bash 'stdlib.h' not found
+cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+  exit 101: aws-lc-sys 'stdlib.h' / 'windows.h' not found
+cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc
+  exit 101: rquickjs-sys clang: no such file or directory: '/std:c11'
+Native cross-toolchain stops are unchanged; the three full checks remain owed.
+
+Terminal verification:
+cargo build -p bingo --locked
+  Finished `dev` profile [unoptimized + debuginfo] target(s) in 29.63s; exit 0
+TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh
+  tui-smoke ok; exit 0
+python3 docs/verification/m193/drive.py
+  PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+  CLEAN 100x32: owned tmux server stopped; temporary files removed
+  PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+  CLEAN 80x24: owned tmux server stopped; temporary files removed
+  exit 0; idle/live/done, four mode cycles, toast expiry and moving edge checked.
+  Refreshed text/ANSI drive captures show this run's time and sampled ink.
+
+No Ember scene captures or .snap files changed; no snapshots deleted.
+No dependency additions; no rebase/merge/push or other worktree changes.
+M198 takes the existing overlays into dock sheets so the bottom-anchored stream
+moves up instead of having its newest rows covered. Full-frame validation still
+waits for whichever of M193 and M194 lands second; neither changed this round.
