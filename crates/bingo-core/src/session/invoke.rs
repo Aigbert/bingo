@@ -207,6 +207,7 @@ impl crate::gate::GatePrompter for AskVia {
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
     ) -> Result<crate::gate::Answered, KernelError> {
+        self.mailbox.call_asked(self.item.clone());
         self.mailbox
             .ask(Some(self.item.clone()), kind, answers)
             .await

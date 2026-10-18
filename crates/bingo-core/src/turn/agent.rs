@@ -211,7 +211,7 @@ impl Turn<'_> {
         let mut item =
             existing.unwrap_or_else(|| mint(&self.id, 0, body.clone(), ItemStatus::Running));
         item.mark_external();
-        item.body = body;
+        replace_external_body(&mut item, body);
         if started {
             emit_and_fold(
                 &mut self.transcript,
@@ -260,6 +260,24 @@ impl Turn<'_> {
             );
         }
     }
+}
+
+fn replace_external_body(item: &mut Item, mut body: ItemBody) {
+    if let (
+        ItemBody::ToolCall {
+            asked_at, began_at, ..
+        },
+        ItemBody::ToolCall {
+            asked_at: asked,
+            began_at: began,
+            ..
+        },
+    ) = (&mut body, &item.body)
+    {
+        *asked_at = *asked;
+        *began_at = began.or(Some(item.started_at));
+    }
+    item.body = body;
 }
 
 fn failed(message: impl Into<String>) -> TurnStatus {

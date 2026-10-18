@@ -164,6 +164,10 @@ pub(crate) enum Msg {
         call: ToolCall,
         reply: super::invoke::Reply,
     },
+    /// The first ask owns the wait; a re-ask keeps that stamp.
+    CallAsked {
+        item: ItemId,
+    },
     /// A bridged call the gate let through, on its way to running.
     CallAllowed {
         item: ItemId,
@@ -450,6 +454,10 @@ impl Mailbox {
 
     pub async fn invoke(&self, call: ToolCall) -> Result<ToolOutcome, KernelError> {
         self.call(|reply| Msg::Invoke { call, reply }).await?
+    }
+
+    pub(super) fn call_asked(&self, item: ItemId) {
+        self.send(Msg::CallAsked { item });
     }
 
     pub(super) fn call_allowed(&self, item: ItemId, input: Value) {

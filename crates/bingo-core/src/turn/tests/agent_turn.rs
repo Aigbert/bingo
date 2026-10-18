@@ -33,6 +33,7 @@ impl Agent for ScriptedAgent {
         };
         Ok(Box::pin(futures::stream::iter(vec![
             Ok(AgentEvent::Call(call.clone())),
+            Ok(AgentEvent::Call(call.clone())),
             Ok(AgentEvent::Done {
                 call,
                 output: ToolOutput::text("written"),
@@ -62,6 +63,22 @@ async fn an_agent_journals_one_external_call() {
             _ => None,
         })
         .collect();
+    let mut stamps = Vec::new();
+    for event in host.events() {
+        if let Event::ItemStarted { item }
+        | Event::ItemUpdated { item }
+        | Event::ItemCompleted { item } = event
+            && let ItemBody::ToolCall {
+                asked_at, began_at, ..
+            } = item.body
+        {
+            assert_eq!(asked_at, None);
+            assert_eq!(began_at, Some(item.started_at));
+            stamps.push(began_at);
+        }
+    }
+    assert!(stamps.len() >= 3);
+    assert!(stamps.iter().all(|stamp| stamp == &stamps[0]));
     assert_eq!(completed.len(), 1);
     assert!(completed[0].external());
     assert!(

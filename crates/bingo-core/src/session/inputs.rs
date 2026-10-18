@@ -420,6 +420,18 @@ impl Actor {
         Ok(id)
     }
 
+    /// The first ask owns the wait; a re-ask keeps that stamp.
+    pub(super) async fn call_asked(&mut self, id: &ItemId) -> Result<(), KernelError> {
+        if let Some(mut item) = self.item(id)
+            && let ItemBody::ToolCall { asked_at, .. } = &mut item.body
+            && asked_at.is_none()
+        {
+            *asked_at = Some(Timestamp::now());
+            self.publish(Event::ItemUpdated { item }, None).await?;
+        }
+        Ok(())
+    }
+
     /// The gate let it through: the item goes `Running` and carries whatever a
     /// hook rewrote, exactly as a call of the model's own does.
     pub(super) async fn call_allowed(
@@ -431,7 +443,13 @@ impl Actor {
             return Ok(());
         };
         item.status = ItemStatus::Running;
-        if let ItemBody::ToolCall { input: held, .. } = &mut item.body {
+        if let ItemBody::ToolCall {
+            input: held,
+            began_at,
+            ..
+        } = &mut item.body
+        {
+            *began_at = Some(Timestamp::now());
             *held = input;
         }
         self.publish(Event::ItemUpdated { item }, None).await?;

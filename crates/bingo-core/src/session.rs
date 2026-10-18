@@ -256,6 +256,7 @@ impl Actor {
                 let _ = reply.send(result);
             }
             Msg::Invoke { call, reply } => self.invoke(call, reply).await?,
+            Msg::CallAsked { item } => self.call_asked(&item).await?,
             Msg::CallAllowed { item, input } => self.call_allowed(&item, input).await?,
             Msg::CallFinished { outcome } => self.call_finished(outcome).await?,
             Msg::Rewind { to_turn, reply } => past::rewind_read(self, to_turn, reply).await,

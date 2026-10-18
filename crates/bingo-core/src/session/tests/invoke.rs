@@ -553,3 +553,83 @@ async fn a_call_still_running_when_its_turn_completes_is_not_called_an_interrupt
         "the journal says the same as the caller was told: {item:?}"
     );
 }
+
+struct AskAgain;
+#[async_trait::async_trait]
+impl PermissionPolicy for AskAgain {
+    fn id(&self) -> &str {
+        "ask-again"
+    }
+    fn allows_replacement(&self, _: PolicyInput<'_>) -> bool {
+        true
+    }
+    async fn decide(&self, _: PolicyInput<'_>) -> Decision {
+        Decision::Ask {
+            reason: Reason::Default,
+            scope: None,
+        }
+    }
+}
+
+#[tokio::test]
+async fn a_bridged_reask_keeps_its_first_stamp_and_starts_with_began_at() {
+    let mailbox = start_with(
+        streaming(),
+        vec![Arc::new(EchoTool { read_only: false })],
+        |cfg| cfg.policy = Arc::new(AskAgain),
+    );
+    let (mut state, mut events) = mid_turn(&mailbox).await;
+    let task = tokio::spawn({
+        let mailbox = mailbox.clone();
+        async move { mailbox.invoke(call("Echo", 1)).await }
+    });
+    let first = frames_until(&mut events, &mut state, |f| {
+        matches!(f.event, Event::InteractionOpened { .. })
+    })
+    .await;
+    let ask = state.interactions[0].clone();
+    let id = ask.item.as_ref().unwrap();
+    let item = item_of(&state, id);
+    let wait = bingo_sdk::transcript::call_wait(&item).unwrap();
+    assert!(wait.0 <= ask.opened_at);
+    assert_eq!(wait.1, None);
+    assert!(first.iter().any(|f| matches!(&f.event, Event::ItemUpdated { item } if &item.id == id
+        && item.status == ItemStatus::Pending && bingo_sdk::transcript::call_wait(item) == Some(wait))));
+    mailbox.answer(
+        IntentId::mint(),
+        ask.id,
+        Answer::AllowChanged {
+            input: json!({"v":2}),
+        },
+        Activation::Programmatic,
+        who(),
+    );
+    drive(&mut events, &mut state, |f| {
+        matches!(f.event, Event::InteractionOpened { .. })
+    })
+    .await;
+    assert_eq!(
+        bingo_sdk::transcript::call_wait(&item_of(&state, id)),
+        Some(wait)
+    );
+    mailbox.answer(
+        IntentId::mint(),
+        state.interactions[0].id.clone(),
+        Answer::AllowOnce,
+        Activation::Programmatic,
+        who(),
+    );
+    let outcome = task.await.unwrap().unwrap();
+    let frames = frames_until(
+        &mut events,
+        &mut state,
+        |f| matches!(&f.event, Event::ItemCompleted { item } if item.id == outcome.item),
+    )
+    .await;
+    assert!(frames.iter().any(|f| matches!(&f.event, Event::ItemUpdated { item }
+        if item.status == ItemStatus::Running && matches!(item.body, ItemBody::ToolCall { began_at: Some(_), .. }))));
+    let final_wait = bingo_sdk::transcript::call_wait(&item_of(&state, id)).unwrap();
+    assert_eq!(final_wait.0, wait.0);
+    assert!(final_wait.1.is_some());
+    mailbox.interrupt(IntentId::mint(), InterruptScope::Head);
+}
