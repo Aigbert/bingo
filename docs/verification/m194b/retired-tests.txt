@@ -1,0 +1,88 @@
+Deleted/renamed tests against original base 03bcad2f and Round 1 HEAD fce33f99.
+One entry per test; same-name moves/restorations follow.
+
+crates/bingo-mod-ledger/src/draw.rs::a_done_step_draws_and_a_running_one_is_the_surfaces -> the_builtin_draws_each_step_with_declared_motion; running motion is now declared by Ledger
+crates/bingo-mod-ledger/src/draw.rs::a_stopped_turn_folds_to_one_row -> running_finished_and_stopped_turns_keep_each_step_row; folds retired
+crates/bingo-mod-ledger/src/lib.rs::the_builtin_owns_both_sites -> the_builtin_draws_each_step_with_declared_motion; TurnFold retired and loader rejection covered
+crates/bingo-sdk/src/component/ledger.rs::a_finished_turn_folds_to_the_prototype_line -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-sdk/src/component/ledger.rs::a_stopped_turn_says_so -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-sdk/src/component/ledger.rs::an_answered_step_says_the_answer_at_the_right_and_the_fold_repeats_it_once -> an_answered_step_keeps_its_outcome_and_answer_at_the_right; no fold
+crates/bingo-sdk/src/component/ledger.rs::long_runs_count_and_sum -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/activity.rs::the_working_word_is_beamed_while_the_turn_runs_and_plain_when_still -> component::live::tests and shimmer_samples_each_cell_and_schedules_only_with_motion; stream owns declared shimmer
+crates/bingo-surface-tui/src/blocks.rs::a_flash_owes_frames_until_its_resting_form_is_drawn -> an_answer_has_no_surface_pacing_or_landing_deadline; step_motion_lands_and_reduced_motion_owes_nothing covers real landing
+crates/bingo-surface-tui/src/component/sites_tests.rs::spinner_and_progress_keep_meaning_and_tick_once_per_second -> an_open_thought_has_its_own_clock_and_exact_second_deadline; TurnProgress retired and Spinner moved to stream
+crates/bingo-surface-tui/src/component/sites_tests.rs::working_frame_requests_spinner -> a_mods_spinner_answer_redraws_the_stream_row; asserts exact pull props and response invalidation
+crates/bingo-surface-tui/src/identity.rs::caret_phase_styles -> views::ember_tests declared Breathe/Spin tests; dock caret removed, M193 composer retained
+crates/bingo-surface-tui/src/identity.rs::embers_hold_the_band_and_yield_to_motion_off_and_the_foot -> activity::ember_tests::embers_keep_their_row_and_deadline_without_a_dock_spinner plus embers unit tests
+crates/bingo-surface-tui/src/markdown.rs::a_cell_a_row_has_not_is_marked_and_emphasis_in_one_is_plain_text -> a_cell_a_row_has_not_is_a_dash; cells retain inline markdown
+crates/bingo-surface-tui/src/markdown.rs::a_table_is_ruled_and_its_numbers_hug_the_right_edge -> a_table_is_ruled_and_its_numbers_align_right
+crates/bingo-surface-tui/src/markdown.rs::a_tables_header_is_bold_and_its_rule_is_dim -> a_tables_header_is_muted_and_its_rule_is_faint
+crates/bingo-surface-tui/src/markdown.rs::an_inline_code_span_keeps_its_backticks_and_spends_no_colour -> retained under no_colour(); inline_code_uses_code_ink_without_delimiters additionally pins the colour look
+crates/bingo-surface-tui/src/motion.rs::a_comet_tail_cools_from_the_glow_to_the_text_behind_it -> answers_show_their_streaming_and_stopped_ends; arrival-only tail blend, no surface pacing
+crates/bingo-surface-tui/src/motion.rs::a_turn_asked_to_stop_says_so_and_keeps_its_sparkle_and_its_clock -> escape_draws_stopping_on_its_own_frame_until_the_turn_completes; immediate stream acknowledgement
+crates/bingo-surface-tui/src/motion.rs::arriving_words_hold_the_caret_steady_while_tools_breathe -> retained under the same name; now asserts the answer caret and step spinner
+crates/bingo-surface-tui/src/motion.rs::every_verb_is_one_of_bingos_own -> retired random verb table; a_pending_call_does_not_hold_back_the_placed_verb pins the actual placed verb
+crates/bingo-surface-tui/src/motion.rs::stopping_outruns_the_activity_row_s_own_delay -> escape_draws_stopping_on_its_own_frame_until_the_turn_completes; tested at 100 ms for call and answer
+crates/bingo-surface-tui/src/motion.rs::the_activity_row_says_a_verb_a_clock_and_what_the_turn_has_said -> component::live::tests; working has no clock, thinking uses thought age, call tail remains under its step
+crates/bingo-surface-tui/src/motion.rs::the_blocked_caret_breathes_on_the_tool_period -> retired dock caret; views::ember_tests declared Spin/Breathe tests cover the stream state marks
+crates/bingo-surface-tui/src/motion.rs::waiting_caret_blinks_without_changing_its_glyph -> retired dock caret; component::live::tests and declared Spin cover the stream live row
+crates/bingo-surface-tui/src/motion/landing.rs::a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh -> a_completion_lands_only_its_mark_for_420_ms
+crates/bingo-surface-tui/src/motion/landing.rs::a_failure_flares_and_cools_into_the_words_behind_it -> a_failure_keeps_its_bad_verb_after_the_mark_lands
+crates/bingo-surface-tui/src/screens/folds.rs::a_click_or_enter_on_the_folded_line_opens_it -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/screens/folds.rs::a_click_under_an_opened_turn_leaves_it_open -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/screens/folds.rs::an_action_on_a_running_step_hangs_under_it -> running_steps_do_not_repeat_the_footer_action; placed mod body/action test retained
+crates/bingo-surface-tui/src/screens/folds.rs::ctrl_o_opens_the_latest_folded_turn -> ctrl_o_opens_only_the_latest_steps_output
+crates/bingo-surface-tui/src/screens/folds.rs::every_row_of_a_turn_keeps_the_same_left_edge -> ember_stream_bands_match_the_prototype; distinct band/step/narration columns
+crates/bingo-surface-tui/src/screens/thinking.rs::a_finished_thought_opens_whole_where_it_sits -> duplicate reasoning_open retired; reasoning_shut retained; thoughts belong to M195
+crates/bingo-surface-tui/src/transcript.rs::a_failed_turn_is_a_bullet_of_its_own -> a_failed_turn_names_its_error_above_the_hint
+crates/bingo-surface-tui/src/transcript.rs::the_models_own_call_draws_the_same_row -> the_models_skill_call_draws_a_step_row
+crates/bingo-surface-tui/src/transcript/steps.rs::the_stop_line_counts_what_ran_and_says_nothing_of_steps_never_begun -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/transcript/turn_tests.rs::newest_narration_reveals_until_a_step_follows -> an_answer_is_whole_until_a_step_follows; narration never types out
+crates/bingo-surface-tui/src/turns/tests/mod.rs::a_call_is_named_by_its_tool_in_plain_words -> transcript_steps_keep_declared_targets; catalogue verb replaces lowercased title
+crates/bingo-surface-tui/src/turns/tests/mod.rs::a_finished_turn_folds_onto_its_first_step_and_keeps_its_answer -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/turns/tests/mod.rs::a_long_run_of_one_verb_folds_to_a_count -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/turns/tests/mod.rs::a_plain_yes_leaves_the_fold_and_a_changed_one_stays -> a_refused_step_is_skipped_and_a_changed_permission_stays; permission semantics restored on steps
+crates/bingo-surface-tui/src/turns/tests/mod.rs::a_running_turn_gives_each_step_a_row_and_no_thought_a_row -> running_finished_and_stopped_turns_keep_each_step_row
+crates/bingo-surface-tui/src/turns/tests/mod.rs::a_step_the_person_refused_is_not_counted_as_run -> a_refused_step_is_skipped_and_a_changed_permission_stays; skipped state retained, aggregate count retired
+crates/bingo-surface-tui/src/turns/tests/mod.rs::a_stopped_turn_says_how_many_of_its_steps_had_run -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/turns/tests/mod.rs::an_opened_turn_shows_its_steps_thoughts_and_words_under_its_line -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/turns/tests/mod.rs::every_part_of_a_turn_opens_from_the_line_that_holds_it -> fold/count/stop-line behavior retired by ADR-0097; running_finished_and_stopped_turns_keep_each_step_row and ember_stream_bands_match_the_prototype replace it
+crates/bingo-surface-tui/src/views/tests.rs::a_missing_cell_is_a_dash_and_numbers_hug_their_right_edge -> retained with the three-cell gutter
+crates/bingo-surface-tui/src/worked.rs::a_duration_is_two_units_at_most -> elapsed_reads_like_the_prototype in SDK component/row.rs; one formatter
+crates/bingo-surface-tui/src/worked.rs::a_finished_turn_says_what_it_cost_under_its_answer -> closing row retired; band clocks covered by ember_stream_bands_match_the_prototype and turn_finished/turn_stopped snapshots; calendar label/verdict has no surviving caller
+crates/bingo-surface-tui/src/worked.rs::a_new_turn_takes_the_closing_away_and_a_wait_stands_beside_it -> closing row retired; band clocks covered by ember_stream_bands_match_the_prototype and turn_finished/turn_stopped snapshots; calendar label/verdict has no surviving caller
+crates/bingo-surface-tui/src/worked.rs::a_turn_that_answered_at_once_and_a_session_with_no_turn_say_nothing -> closing row retired; band clocks covered by ember_stream_bands_match_the_prototype and turn_finished/turn_stopped snapshots; calendar label/verdict has no surviving caller
+crates/bingo-surface-tui/src/worked.rs::the_clock_is_the_hour_today_and_the_day_before_it_otherwise -> closing row retired; band clocks covered by ember_stream_bands_match_the_prototype and turn_finished/turn_stopped snapshots; calendar label/verdict has no surviving caller
+crates/bingo-surface-tui/src/worked.rs::the_closing_stands_under_the_answer_and_not_over_the_composer -> closing row retired; band clocks covered by ember_stream_bands_match_the_prototype and turn_finished/turn_stopped snapshots; calendar label/verdict has no surviving caller
+crates/bingo-surface-tui/src/worked.rs::the_verdict_picks_the_verb -> closing row retired; band clocks covered by ember_stream_bands_match_the_prototype and turn_finished/turn_stopped snapshots; calendar label/verdict has no surviving caller
+
+Restored or moved with retained behavior:
+crates/bingo-mod-ledger/src/draw.rs::rows_are_drawn_in_the_marks_they_are_handed -> restored, now asserts declared spin and caller marks.
+crates/bingo-sdk/src/component/ledger.rs::step_rows_say_their_state_at_the_right -> component/ledger/draw/tests.rs, all six states.
+crates/bingo-sdk/src/component/ledger.rs::elapsed_reads_like_the_prototype -> component/row.rs, single formatter.
+crates/bingo-sdk/src/component/ledger.rs::a_failed_turn_says_failed_once_on_the_step_that_failed -> component/ledger/draw/tests.rs, restored.
+crates/bingo-surface-tui/src/layout/grid.rs duration tests -> SDK elapsed_reads_like_the_prototype; wrapper deleted.
+crates/bingo-skills/src/hook.rs::both_doors_place_the_same_row_and_ignore_old_prompts -> only_the_command_places_a_row_and_ignores_old_prompts; tool calls now use Ledger, command placement and old-prompt filtering retained.
+
+Detail-row renames preserve the tests unless explicitly noted:
+crates/bingo-surface-tui/src/transcript.rs::a_long_result_says_how_much_it_folded_away_and_what_opens_it -> a_long_tool_result_keeps_only_its_step_row (M195 owns tool detail)
+crates/bingo-surface-tui/src/view.rs::a_completed_tool_shows_the_first_lines_of_its_output -> a_completed_tool_keeps_its_detail_out_of_the_stream (snapshot renamed; real invocation fixture now has TurnStarted)
+crates/bingo-surface-tui/src/view.rs::ctrl_o_lifts_the_fold_then_opens_the_pager_and_esc_folds_it_back -> retired; tool preview removed, M195 owns ctrl+o detail. input::tests::a_click_opens_a_fold_and_a_second_click_folds_it now uses the surviving shell fold.
+
+crates/bingo-surface-tui/src/theme/tests.rs::a_breath_is_five_steps_of_presence_on_twenty_four_bits -> views::ember_tests declared Breathe sampling; the dock's manual five-step breath is removed from the dock
+
+Additional retirement/rename inventory:
+crates/bingo-surface-tui/src/blocks.rs::a_flash_owes_frames_until_its_resting_form_is_drawn -> motion::landing::a_completion_lands_only_its_mark_for_420_ms and SDK declared Fade tests; the old whole-row flash is retired
+crates/bingo-surface-tui/src/motion.rs::a_comet_tail_cools_from_the_glow_to_the_text_behind_it -> transcript::turn_tests motion-enabled answer-tail blend and footer::tests live comet budget; old paced-answer comet removed
+crates/bingo-surface-tui/src/motion/landing.rs::a_completion_sweeps_its_name_for_six_frames_and_rests_on_the_seventh -> a_completion_lands_only_its_mark_for_420_ms
+crates/bingo-surface-tui/src/motion/landing.rs::a_failure_flares_and_cools_into_the_words_behind_it -> a_failure_keeps_its_bad_verb_after_the_mark_lands
+crates/bingo-surface-tui/src/identity.rs::opening_wordmark_and_frames -> opening_props_carry_the_session_identity; M193 Welcome has no surface fallback
+crates/bingo-surface-tui/src/view.rs::a_display_view_is_drawn_under_the_tool_row_that_made_it -> a_finished_display_stays_closed_until_opened; display opens only on demand, M195 owns its well.
+crates/bingo-surface-tui/src/views/tests.rs::a_missing_cell_is_empty_and_numbers_align_left -> restored a_missing_cell_is_a_dash_and_numbers_hug_their_right_edge; M11e rules retained.
+crates/bingo-surface-tui/src/markdown.rs::a_cell_a_row_has_not_stays_empty -> a_cell_a_row_has_not_is_a_dash.
+crates/bingo-surface-tui/src/markdown.rs::a_table_is_ruled_and_its_numbers_align_left -> a_table_is_ruled_and_its_numbers_align_right.
+crates/bingo-surface-tui/src/transcript/turn_tests.rs::quiet_and_visible_calls_place_the_same_display_body -> quiet_and_opened_calls_place_the_same_display_body.
+crates/bingo-surface-tui/src/view.rs::a_wide_terminal_is_filled_unless_a_person_set_a_measure -> prose_keeps_its_measure_inside_a_persons_narrower_region; exact 102/57 cell extents.
+crates/bingo-surface-tui/src/transcript.rs::prose_fills_the_width_until_a_person_asks_for_less -> prose_keeps_its_measure_inside_a_persons_narrower_region; exact 102/57 cell extents.
+crates/bingo-mods/tests/engine.rs::a_retired_turn_fold_refuses_loading_in_words -> retired_turn_sites_refuse_loading_in_words; both retired sites.
+crates/bingo-surface-tui/src/markdown.rs::writer_tests::all_markdown_uses_the_same_writer -> alias equality retired with markdown::answer; table header and missing-cell assertions moved to views::tests::an_empty_cell_keeps_its_dash_beside_a_numeric_column.

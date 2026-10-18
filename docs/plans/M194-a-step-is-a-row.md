@@ -130,23 +130,25 @@ says how its row reads, and no surface names a tool.
   activity.rs,fold.rs,input/turn.rs,pointer.rs,markdown.rs,views/code.rs,component/closing.rs}`;
   `crates/bingo-mod-ledger`; `crates/bingo-sdk/src/{render.rs,component/ledger.rs,
   component/row.rs}`; `scripts/check_discipline.sh`.
+- TUI dev-dependencies reuse workspace tool-fs, tool-bash, tool-web and skills to load the real test catalogue; no new package.
+- A tool look belongs beside its spec; a Look fixture in test_support would duplicate it.
 
 ## Exit criteria
 
 - [x] **A:** contract, resolution and catalogue tests; provider encodings unchanged; schemas
       regenerated; each built-in tool's look pinned by one test per crate.
-- [ ] **B:** the stream band of `live`, `done`, `stop`, `steer`, `steer-landed`, `ascii-live`,
+- [x] **B:** the stream band of `live`, `done`, `stop`, `steer`, `steer-landed`, `ascii-live`,
       `ascii-done`, `reduced-live`, `small-done` and `narrow` passes the harness.
-- [ ] **B:** motion budget on `live`: between frames 500 ms apart, `moved` reports only the side
+- [x] **B:** motion budget on `live`: between frames 500 ms apart, `moved` reports only the side
       light, the spinner cell and the comet.
-- [ ] **B:** M194 lands after M193, so it also passes the full frame of `live`, `done`,
+- [x] **B:** M194 lands after M193, so it also passes the full frame of `live`, `done`,
       `ascii-live`, `ascii-done`, `reduced-live`, `small-done`, `mode` and `mode-later`.
-- [ ] **B:** the live row: `working` at 500 ms and not before, its deadline exact; the placed
+- [x] **B:** the live row: `working` at 500 ms and not before, its deadline exact; the placed
       verb; `thinking` and its clock; `stopping` on the esc frame while a step runs, gone at
       `TurnCompleted`; a mod's `Spinner` answer redraws the row; `TurnProgress` refused at load.
 - [x] `--print` and RPC are unchanged except the additive `look`; their black-box tests pass
       untouched. Today's turn snapshots are deleted or re-pinned, each deletion named in Verified.
-- [ ] Gates and checks as in M192; tmux drive of a live, a done and a stopped turn.
+- [x] Gates and checks as in M192; tmux drive of a live, a done and a stopped turn (Windows toolchain limits below).
 
 ## Non-goals
 
@@ -201,3 +203,41 @@ Departures and outstanding scope:
 - Part B, theme/row_mark, six Looks::in_ui sites and transcript::called splitting remain Part B's work; no Ember captures edited. Combined gates criterion stays open for the Windows native-toolchain blocker.
 - Inherited provider credentials break an unrelated auth test (reproduced alone); verification removes the four provider key/base-URL variables.
 - Existing CLI recovery test hung once after rebase; terminated only its owned child. `cargo test -p bingo --test cli agents::a_resumed_root_is_told_which_child_was_mid_turn_when_the_process_ended -- --exact`: `1 passed; 0 failed` unchanged.
+
+## Verified — Part B
+
+- [x] B1–B8, live-row decisions and regressions: `cargo test --workspace --locked`: **6535 passed; 0 failed; 0 ignored**; TUI **1427 passed**. No wall-clock retry was needed.
+- [x] Capture harness in that run: `ember_stream_bands_match_the_prototype` (all ten), `ember_full_frames_match_the_prototype` (all eight), and `ember_live_motion_is_only_side_light_spinner_and_comet ... ok`; M193's criterion links here.
+- [x] Motion samples 1400→1900 ms: only side light (0,19), declared spinner (3,25), and edge comet (row 28) may move; caret rests at 10 s. Off-screen rows and inline-card-hidden Spinner requests/deadlines are pinned.
+- [x] Before→after: plain inline code, numeric/missing table cells, finished displays and independent answer/why fail before their fixes, then pass. Seven reverted mutations each give `0 passed; 1 failed`: breath period, fade default, why omission, Spinner bounds, raw tail deadline, skill guard, reduced-motion blend.
+- [x] Exact breath ink/deadline, EaseOut weight, linear fades, reduced/finished answer ink, 102/57-cell prose extents, running child, visible/off-screen Spinner keys and both retired-site engine refusals pass in the workspace run.
+- [x] `--print`/RPC black-box tests: CLI **309 passed**, RPC **104 passed**, PTY **19 passed**; `protocol_two_keeps_every_frozen_shape ... ok`. Schemas/TS regenerated with `BINGO_UPDATE_SCHEMA=1` at both contract addition and retirement; no hand merges.
+- [x] `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked` and `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile`; `cargo test --workspace --locked`: above.
+- [x] `scripts/check_discipline.sh`: `discipline ok`; `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; `warm cargo check -p bingo-core: 0s (max 20s)`; `relink isolation: touching the TUI recompiled 0 crates for core`; `target/debug: 23 GB (soft max 5)` (warning); `test binaries: 204`; `budget ok`.
+- [x] Windows: `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`; this round sdk passes, TUI stops at aws-lc missing stdlib.h/windows.h. Unchanged preceding checks: mod-ledger/skills pass, mods stops at rquickjs-sys MSVC flags, plugin-rpc at aws-lc Windows headers. Accepted native-toolchain stops, built by CI’s windows job; [output](../verification/m194b/windows.txt).
+- [x] `TUI_SMOKE_SOCKET_PREFIX=m194b-drive scripts/tui-smoke.sh`: `tui-smoke ok`; `bash docs/verification/m194b/drive.sh /tmp/m194b-r6/drive`: **100x32** and **80x24: read upshot, clock, working, live, done, stopping, stopped passed**. Finished output and all forbidden rows absent; server killed; captures stay outside the repository.
+- [x] No snapshots changed in this round. Every earlier re-pin/deletion is in [snapshots](../verification/m194b/snapshots.md); every test retirement/rename in [retired tests](../verification/m194b/retired-tests.txt). Immutable scenes unchanged; only dev's eight `assertion_line` entries remain. Plain backticks restored; ANSI code ink exists, so this correction leaves `ascii_idle` unchanged.
+- [x] Deleted `theme::row_mark`, old tool output/row/fold drawing, duplicate markdown/highlighter paths and the cache reset. Looks decode once per frame; `look::mark` owns the mark rule. Remaining connector owners and syntect cells: [audit](../verification/m194b/audit.md).
+- Drawing scans: History/Answers, Roles and Blocks each visit the transcript once per frame; band/narration/failure/additions read indexed turn items. Sparks scan once per paint; child summaries once per child; detail/browse/rewind scans are on demand; emptiness checks and indexed Blocks reads are O(1).
+- Fade declarations easing out are exactly SDK `component/ledger/draw.rs` (landing, 420 ms) and TUI `transcript/band.rs` (done light, 320 ms); steered/said-no notes and absent curves stay linear. Arrival, not time, advances the answer tail.
+- Departures: tables retain M11e numeric alignment and missing `–` over `tableLines` because no scene captures a table; why separators occur only between present parts, unlike `whySegs`' unconditional prefix.
+- Departures: D2 passes `stop_asked` through Rows, recomputed every sync; four TUI dev-dependencies load each tool's authoritative look beside its spec, avoiding a duplicate fixture; no new package. Dev's inherited plan already exceeds 150 lines; Part A is preserved and this section stays under 40.
+- M201 clock/reasons are integrated. Steers still derive from turn items (no receipt); said-no uses receipt facts. Progress remains the call's tail. M202 owns the actual Running-frame start/order; the receipt/start approximation is commented.
+- M195 opens a step's display in its well and moves pictures there; closed finished steps hang nothing. M196 owns shell/image/chip/queued rows; M197 typed question answers; M198 overlaid layers/login; M199 retry facts; M200 child rows and view ink for landing, answer caret/blend and live glyph.
+- Shims checked at `e6daad25` (now `9429a320`): Step `why`/`elapsed_ms`/`landed_at` are None in TUI `tool_rows.rs:61–63`, `turns.rs:334–336`, and mod-ledger `draw.rs:103–105`; TUI `views/ember_tests.rs` Fade declarations at 149/341/471 set `curve: None` at 150/342/472. Old helpers/sites and six Marks fields survive through commit 6; commit 7 removes them.
+- [x] Shared inline code: plain_prompt_and_steered_code_keep_backticks_and_their_own_ink: before 0 passed; 1 failed, after 1 passed; helper tests pin plain/default ink. Production foreground("code") appears only in markdown/inlines.rs::code; prompt note predicate is evaluated once.
+- [x] Removed markdown::answer/alias test, retained literal table lines in an_empty_cell_keeps_its_dash_beside_a_numeric_column; existing table tests pass unchanged. Cells render once; running duration and quiet-call predicates each have one helper. Measure docs and frame-local mode_labels visibility/docs corrected.
+- [x] Clock assertions pin 7150 ms/next 9850 ms, 650 ms/no next, 500 ms/no next through both entries; a shared +1 s mutation fails (8150 != 7150) and is restored. Running-call test pins zero clamp, 999 ms and exact next second; elapsed-ms docs regenerated into schemas/TS.
+- Range-diff against 295bd047: commits 1/2/3/6/10 change intentionally; 7 differs only in the surrounding function name (running_for); 4/5/8/9 are unchanged. No new design departure. A preliminary fmt completion was collected after starting the targeted test; all final gates/proof jobs are serial.
+- Per-commit proof uses detached `cargo check --workspace --all-targets --locked`, then returns to `m194b-step-rows`; each result below is exit 0 (`Finished dev profile`).
+- `327835de` markdown/code: exit 0 (`Finished dev profile`).
+- `32d5b057` clock core: exit 0 (`Finished dev profile`).
+- `9429a320` additive SDK contract: exit 0 (`Finished dev profile`).
+- `99eadc07` skill looks: exit 0 (`Finished dev profile`).
+- `bf933324` mod-ledger adapter: exit 0 (`Finished dev profile`).
+- `4f2e85c6` TUI switch: exit 0 (`Finished dev profile`).
+- `05cfdfc5` retirement: exit 0 (`Finished dev profile`).
+- `c0f3b37c` production scanner: exit 0 (`Finished dev profile`).
+- `301005be` drive: exit 0 (`Finished dev profile`).
+- This docs commit: exit 0 (`Finished dev profile`).

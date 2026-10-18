@@ -95,8 +95,9 @@ meanings, and generated schemas/TypeScript.
       0/550/1100 ms, the mode flash, reduced. Each is a band test or a `moved` assertion.
 - [x] Growth: a dock going from 3 to 14 rows shows the intermediate heights at 14 ms steps;
       shrinking is immediate.
-- [ ] Whichever of M193 and M194 lands second also passes the full frame of `live`, `done`,
-      `ascii-live`, `ascii-done`, `reduced-live`, `small-done`, `mode` and `mode-later`.
+- [x] Whichever of M193 and M194 lands second also passes the full frame of `live`, `done`,
+      `ascii-live`, `ascii-done`, `reduced-live`, `small-done`, `mode` and `mode-later`
+      ([M194 evidence](M194-a-step-is-a-row.md#verified--part-b)).
 - [x] `scripts/tui-smoke.sh` waits for a footer string, not `/ commands` in the old `KeyBar`
       row, and passes.
 - [x] Gates and Windows check commands as in M192 (native-toolchain blockers recorded below).

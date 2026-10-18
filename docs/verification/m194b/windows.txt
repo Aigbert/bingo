@@ -1,0 +1,27 @@
+$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+exit 0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.88s
+
+$ cargo check -p bingo-mod-ledger --all-targets --target x86_64-pc-windows-msvc
+exit 0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.37s
+
+$ cargo check -p bingo-skills --all-targets --target x86_64-pc-windows-msvc
+exit 0
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.54s
+
+$ cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc
+exit 101
+warning: rquickjs-sys@0.14.0: clang: error: no such file or directory: '/DWIN32_LEAN_AND_MEAN'
+
+$ cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc
+exit 101
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/stdalign_check.c:10:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
+
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+exit 101
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/stdalign_check.c:10:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
