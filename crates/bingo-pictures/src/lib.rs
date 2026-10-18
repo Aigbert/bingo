@@ -133,7 +133,7 @@ fn decoded(data: &str) -> Option<Vec<u8>> {
 /// A picture's size out of its header: a PNG's own read here, and every other
 /// format's asked of its own decoder's header reader. Not one pixel is
 /// decoded, which is what lets a frame ask this.
-pub(crate) fn measured(bytes: &[u8]) -> Option<(u32, u32)> {
+pub fn measured(bytes: &[u8]) -> Option<(u32, u32)> {
     if let Some(size) = png_size(bytes) {
         return Some(size);
     }

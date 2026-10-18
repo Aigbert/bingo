@@ -89,6 +89,7 @@ async fn bounded(
 ) -> Result<ToolOutput, ToolError> {
     let shown = path.display().to_string();
     let len = bytes.len();
+    let upshot = crate::upshot::picture(bingo_pictures::measured(&bytes));
     let seen = tokio::task::spawn_blocking(move || bingo_pictures::bounded(media_type, &bytes))
         .await
         .map_err(|e| ToolError::Failed(format!("the picture did not finish: {e}")))?
@@ -100,7 +101,7 @@ async fn bounded(
         parts,
         is_error: false,
         display: None,
-        upshot: None,
+        upshot,
     })
 }
 
@@ -134,11 +135,12 @@ fn original(media_type: &'static str, bytes: &[u8], path: &Path) -> Result<ToolO
         seen.width = Some(width);
         seen.height = Some(height);
     }
+    let upshot = crate::upshot::picture(seen.width.zip(seen.height));
     Ok(ToolOutput {
         parts: vec![ContentPart::Image(seen.at(path))],
         is_error: false,
         display: None,
-        upshot: None,
+        upshot,
     })
 }
 
@@ -215,7 +217,9 @@ impl Tool for ReadTool {
 
         let text = String::from_utf8(bytes)
             .map_err(|_| ToolError::Failed(format!("not valid UTF-8: {shown}")))?;
-        Ok(ToolOutput::text(render(&text, args.offset, args.limit)))
+        let mut output = ToolOutput::text(render(&text, args.offset, args.limit));
+        output.upshot = Some(crate::upshot::read(&text));
+        Ok(output)
     }
 }
 
@@ -314,6 +318,22 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn whole_and_partial_reads_report_the_same_file_line_count() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        write(dir.path(), "a.txt", "one\ntwo\nthree\n");
+        for args in [
+            serde_json::json!({"file_path":"a.txt"}),
+            serde_json::json!({"file_path":"a.txt","offset":2,"limit":1}),
+        ] {
+            let out = ReadTool
+                .call(args, &context(dir.path()))
+                .await
+                .expect("read");
+            assert_eq!(out.upshot, Some(bingo_sdk::Upshot::plain("3 lines")));
+        }
+    }
+
+    #[tokio::test]
     async fn a_long_file_is_truncated_and_says_how_many_lines_are_missing() {
         let dir = tempfile::tempdir().expect("temp dir");
         let body = (0..5_000)
@@ -379,6 +399,67 @@ mod tests {
             [ContentPart::Image(image)] => image.clone(),
             other => panic!("a picture, not {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn a_picture_reports_its_decoded_dimensions() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(
+            dir.path().join("pixel.png"),
+            bingo_pictures::testing::png_bytes(40, 30),
+        )
+        .unwrap();
+        for original in [false, true] {
+            let out = ReadTool
+                .call(
+                    serde_json::json!({"file_path":"pixel.png","original":original}),
+                    &context(dir.path()),
+                )
+                .await
+                .unwrap();
+            assert_eq!(out.upshot, Some(bingo_sdk::Upshot::plain("40×30")));
+        }
+    }
+
+    #[tokio::test]
+    async fn one_line_has_a_singular_upshot() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "one.txt", "hello\n");
+        let out = ReadTool
+            .call(
+                serde_json::json!({"file_path":"one.txt"}),
+                &context(dir.path()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out.upshot, Some(bingo_sdk::Upshot::plain("1 line")));
+    }
+
+    #[tokio::test]
+    async fn a_bounded_picture_reports_the_original_dimensions() {
+        let dir = tempfile::tempdir().unwrap();
+        let (width, height) = bingo_pictures::MODEL_BOX;
+        let (width, height) = (width + 100, height + 100);
+        std::fs::write(
+            dir.path().join("big.png"),
+            bingo_pictures::testing::png_bytes(width, height),
+        )
+        .unwrap();
+        let out = ReadTool
+            .call(
+                serde_json::json!({"file_path":"big.png"}),
+                &context(dir.path()),
+            )
+            .await
+            .unwrap();
+        let ContentPart::Image(shown) = &out.parts[0] else {
+            panic!("picture")
+        };
+        assert_ne!((shown.width, shown.height), (Some(width), Some(height)));
+        assert_eq!(
+            out.upshot,
+            Some(bingo_sdk::Upshot::plain(format!("{width}×{height}")))
+        );
     }
 
     /// A picture a model can read as it is reaches it as the file's own

@@ -4,6 +4,17 @@
 
 use bingo_sdk::Upshot;
 
+pub(crate) fn read(text: &str) -> Upshot {
+    let count = text.lines().count();
+    let noun = if count == 1 { "line" } else { "lines" };
+    Upshot::plain(format!("{count} {noun}"))
+}
+
+pub(crate) fn picture(size: Option<(u32, u32)>) -> Option<Upshot> {
+    let (width, height) = size?;
+    Some(Upshot::plain(format!("{width}×{height}")))
+}
+
 /// How many entries a search found, in the caller's plural noun.
 pub(crate) fn found(count: usize, plural: &str) -> Upshot {
     match count {
