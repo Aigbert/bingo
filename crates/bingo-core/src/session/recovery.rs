@@ -1,4 +1,4 @@
-//! Close the unfinished segment of a recovered journal.
+//! Close what a lost or dropped turn left open.
 
 use bingo_sdk::*;
 use jiff::Timestamp;
