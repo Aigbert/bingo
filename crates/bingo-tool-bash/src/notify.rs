@@ -242,7 +242,13 @@ pub fn clock() -> String {
 /// that only matched in its last breath is carried here rather than sent on
 /// its own, and so is a tally a quiet window was still holding: one ending,
 /// one message.
-pub fn finished(job: &Job, state: State, pending: Option<&Notice>, at: &str) -> String {
+pub fn finished(
+    job: &Job,
+    state: State,
+    pending: Option<&Notice>,
+    at: &str,
+    outcome: &str,
+) -> String {
     let matched = pending
         .map(|notice| {
             format!(
@@ -252,14 +258,43 @@ pub fn finished(job: &Job, state: State, pending: Option<&Notice>, at: &str) -> 
             )
         })
         .unwrap_or_default();
+    let mark = if state == (State::Exited { code: 0 }) {
+        "✓"
+    } else {
+        "×"
+    };
+    let command = head_for_notice(&job.command);
     format!(
-        "Background job {} {} at {at}, after {}.{matched}\n`BashOutput` with id \"{}\" reads what it wrote; its log is {}.",
+        "{mark} `{command}` finished in the background · {}\nBackground job {} {} at {at}, after {}.{matched}\n`BashOutput` with id \"{}\" reads what it wrote; its log is {}.",
+        outcome,
         job.named(),
         state.said(),
         job.age(),
         job.id,
         job.log.display(),
     )
+}
+
+pub async fn outcome(job: &Job, state: State) -> String {
+    use crate::output::Ended;
+    let end = match state {
+        State::Exited { code } => Ended::Exited(code),
+        State::Killed => Ended::Interrupted,
+        State::Running => return "running".into(),
+    };
+    let window = crate::log::window(&job.log, 0, crate::output::MAX_OUTPUT_CHARS)
+        .await
+        .ok();
+    let body = window.as_ref().map_or("", |w| w.text.as_str());
+    let whole = window.as_ref().is_some_and(|w| !w.more);
+    match crate::upshot::upshot(body, whole, end) {
+        bingo_sdk::Upshot::Words { text, .. } => text,
+        _ => state.said(),
+    }
+}
+
+fn head_for_notice(command: &str) -> String {
+    crate::jobs::head(command).replace('`', "")
 }
 
 /// What a job says when its output answers a condition. It says the job is
@@ -498,7 +533,10 @@ mod tests {
     #[test]
     fn a_completion_names_the_job_its_state_and_where_to_read_it() {
         let job = job();
-        let text = finished(&job, State::Exited { code: 1 }, None, "16:33:51");
+        let text = finished(&job, State::Exited { code: 1 }, None, "16:33:51", "exit 1");
+        assert!(
+            text.starts_with("× `cargo test --workspace` finished in the background · exit 1\n")
+        );
         assert!(text.contains(&job.id), "{text}");
         assert!(text.contains("at 16:33:51"), "{text}");
         assert!(text.contains("cargo test --workspace"), "{text}");
@@ -516,6 +554,7 @@ mod tests {
             State::Killed,
             Some(&Notice::of("error[E0308]\n")),
             "now",
+            "stopped",
         );
         assert!(text.contains("It matched: error[E0308]\n"), "{text}");
         assert!(text.contains("killed"), "{text}");
@@ -530,7 +569,13 @@ mod tests {
             line: "error[E0433]: no `Foo`\n".into(),
             more: 12,
         };
-        let text = finished(&job(), State::Exited { code: 101 }, Some(&pending), "now");
+        let text = finished(
+            &job(),
+            State::Exited { code: 101 },
+            Some(&pending),
+            "now",
+            "stopped",
+        );
         assert!(
             text.contains("It matched: error[E0433]: no `Foo`"),
             "{text}"

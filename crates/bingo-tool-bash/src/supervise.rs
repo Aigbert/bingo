@@ -72,7 +72,13 @@ async fn supervise(watch: Watch) {
         &host,
         &job,
         &running.sink,
-        notify::finished(&job, state, pending.as_ref(), &notify::clock()),
+        notify::finished(
+            &job,
+            state,
+            pending.as_ref(),
+            &notify::clock(),
+            &notify::outcome(&job, state).await,
+        ),
     )
     .await;
 }

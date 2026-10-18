@@ -341,15 +341,6 @@ impl Jobs {
         };
         let slots = std::iter::once(status)
             .filter(|_| !running.is_empty())
-            .chain(running.iter().map(|job| bingo_sdk::slot::Slot::Row {
-                caption: None,
-                item: job.item.clone(),
-                mark: None,
-                title: None,
-                badge: None,
-                body: Some(View::text("Running in the background")),
-                actions: vec![],
-            }))
             .chain(foreground);
         bingo_sdk::slot::with(serde_json::to_value(view).unwrap_or(Value::Null), slots)
     }
@@ -397,7 +388,7 @@ mod tests {
     }
 
     #[test]
-    fn slots_place_the_running_count_and_the_call_row() {
+    fn slots_place_the_running_count_without_a_second_call_row() {
         let jobs = Jobs::new();
         let job = job("sleep 1");
         jobs.file(job.clone());
@@ -407,10 +398,7 @@ mod tests {
         assert!(
             matches!(&slots[0], bingo_sdk::slot::Slot::Status { text, .. } if text == "1 shell")
         );
-        assert!(
-            matches!(&slots[1], bingo_sdk::slot::Slot::Row { body: Some(body), .. }
-            if body == &View::text("Running in the background"))
-        );
+        assert_eq!(slots.len(), 1);
         job.finished(State::Killed);
         assert_eq!(jobs.view(&session()), Value::Null);
     }
