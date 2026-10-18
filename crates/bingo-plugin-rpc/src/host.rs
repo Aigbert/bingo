@@ -37,6 +37,10 @@ impl Server {
         }
     }
 
+    pub(crate) fn catalog_changed(&self, kind: bingo_sdk::CatalogKind) {
+        self.host.catalog_changed(kind);
+    }
+
     pub fn initialize(&self, plugin: &BTreeSet<Cap>) {
         self.capabilities.send_replace(Some(crate::wire::negotiated(
             &crate::wire::capabilities(),

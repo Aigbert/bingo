@@ -300,7 +300,11 @@ impl super::Host {
         crate::plugins::effective_switches(&self.plugins, off)
     }
     pub(crate) fn plugins_changed(&self) {
-        for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
+        for kind in [
+            CatalogKind::Plugins,
+            CatalogKind::Commands,
+            CatalogKind::Tools,
+        ] {
             self.catalog_changed(kind);
         }
     }

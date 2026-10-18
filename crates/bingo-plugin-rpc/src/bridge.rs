@@ -494,6 +494,7 @@ impl Bridge {
         state.next_attempt = None;
         if let Some(live) = state.live.take() {
             live.connection.stop().await;
+            self.catalogues_changed();
         }
     }
 
@@ -517,6 +518,7 @@ impl Bridge {
         };
         if let Some(live) = &old {
             live.connection.stop().await;
+            self.catalogues_changed();
         }
         if let Some(registration) = &self.registration {
             registration.update(&manifest);
@@ -572,6 +574,7 @@ impl Bridge {
         }
         drop(state);
         if let Some(live) = departed {
+            self.catalogues_changed();
             self.died(&live);
         }
         self.respawn();
@@ -637,6 +640,18 @@ impl Bridge {
                     format!("the {} plugin is not running: {why}", self.name),
                 ));
             }
+        }
+        drop(state);
+        self.catalogues_changed();
+    }
+
+    fn catalogues_changed(&self) {
+        for kind in [
+            bingo_sdk::CatalogKind::Plugins,
+            bingo_sdk::CatalogKind::Commands,
+            bingo_sdk::CatalogKind::Tools,
+        ] {
+            self.host.catalog_changed(kind);
         }
     }
 

@@ -324,11 +324,13 @@ async fn an_append_keeps_its_calling_hook_across_the_mailbox() {
 
 #[tokio::test]
 async fn a_registered_tool_is_prefixed_and_offered_by_the_catalogue() {
+    use futures::StreamExt;
     let fixture = support::Fixture::new(
         r#"
       export function register(on) {
         on('fixture.echo', async ($, e) => ({name:await $.tool.register({
-          name:'hello',description:'Say hello',inputSchema:{type:'object'}
+          name:'hello',description:'Say hello',inputSchema:{type:'object',properties:{message:{type:'string'}}},
+          look:{mark:'!',verb:'greet',target:{field:'message',reads:'text'}}
         }, async ($, input) => ({parts:[{type:'text',text:'hello'}],isError:false}))}));
       }
     "#,
@@ -336,6 +338,7 @@ async fn a_registered_tool_is_prefixed_and_offered_by_the_catalogue() {
         json!({}),
     )
     .await;
+    let mut events = fixture.host.gateway_events();
     let answer = fixture
         .call(
             "fixture",
@@ -349,12 +352,30 @@ async fn a_registered_tool_is_prefixed_and_offered_by_the_catalogue() {
         .catalog(bingo_sdk::CatalogKind::Tools)
         .await
         .unwrap();
-    assert!(
-        tools
-            .entries
-            .iter()
-            .any(|tool| tool.id == "plugin__fixture__hello")
+    let entry = tools
+        .entries
+        .iter()
+        .find(|tool| tool.id == "plugin__fixture__hello")
+        .unwrap();
+    assert_eq!(
+        entry.look(),
+        Some(bingo_sdk::ToolLook::new('!', "greet").target("message", bingo_sdk::Reads::Text))
     );
+    tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while let Some(event) = events.next().await {
+            if matches!(
+                event,
+                bingo_sdk::GatewayEvent::CatalogChanged {
+                    kind: CatalogKind::Tools
+                }
+            ) {
+                return;
+            }
+        }
+        panic!("gateway closed before late tool announcement");
+    })
+    .await
+    .expect("late registration announces Tools");
     fixture.host.shutdown().await;
 }
 

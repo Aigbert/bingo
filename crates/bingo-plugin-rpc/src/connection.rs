@@ -182,12 +182,15 @@ impl Router {
         if lists.ready && !self.permits(&notification.method) {
             return;
         }
-        match notification.method.as_str() {
+        let kind = match notification.method.as_str() {
             name::TOOLS_CHANGED => {
                 if let Ok(params) =
                     serde_json::from_value::<crate::wire::ToolsChanged>(notification.params)
                 {
                     lists.tools = Some(params.tools);
+                    Some(bingo_sdk::CatalogKind::Tools)
+                } else {
+                    None
                 }
             }
             name::COMMANDS_CHANGED => {
@@ -195,9 +198,16 @@ impl Router {
                     serde_json::from_value::<crate::wire::CommandsChanged>(notification.params)
                 {
                     lists.commands = Some(params.commands);
+                    Some(bingo_sdk::CatalogKind::Commands)
+                } else {
+                    None
                 }
             }
-            _ => {}
+            _ => None,
+        };
+        drop(lists);
+        if let (Some(kind), Some(serving)) = (kind, &self.serving) {
+            serving.calls.catalog_changed(kind);
         }
     }
 
@@ -554,6 +564,51 @@ mod tests {
 
     use super::*;
     use serde_json::json;
+
+    struct NoServices;
+    #[async_trait::async_trait]
+    impl crate::service::ServiceCalls for NoServices {
+        async fn call(&self, _: Value) -> Result<Value, crate::codec::RpcError> {
+            panic!("no service call expected")
+        }
+    }
+
+    #[test]
+    fn changed_tools_notify_the_catalogue_after_updating_the_list() {
+        use bingo_sdk::{
+            CatalogKind,
+            testing::{HostCall, TestHost},
+        };
+        let host = TestHost::default();
+        let home = tempfile::tempdir().unwrap();
+        let calls = Arc::new(Server::new(
+            "stub",
+            host.handle(),
+            Arc::new(NoServices),
+            crate::state::Store::new(home.path(), "stub"),
+        ));
+        calls.initialize(&crate::wire::capabilities());
+        let router = Router {
+            serving: Some(Serving { calls }),
+            ..Default::default()
+        };
+        router.lists.lock().unwrap().ready = true;
+        let tool = json!({"name":"late","description":"Late tool","inputSchema":{},"look":{"mark":"!","verb":"late"}});
+        router.changed(Notification::new(
+            name::TOOLS_CHANGED,
+            json!({"tools":[tool]}),
+        ));
+        assert_eq!(
+            router.lists.lock().unwrap().tools.as_ref().unwrap()[0].name,
+            "late"
+        );
+        assert!(host.calls().iter().any(|call| matches!(
+            call,
+            HostCall::CatalogChanged {
+                kind: CatalogKind::Tools
+            }
+        )));
+    }
 
     #[tokio::test(start_paused = true)]
     async fn an_unserved_request_gets_method_not_found() {

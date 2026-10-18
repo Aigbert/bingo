@@ -197,6 +197,7 @@ impl Manager {
     pub(crate) fn changed(&self) {
         if let Some(host) = self.host.get().and_then(std::sync::Weak::upgrade) {
             host.catalog_changed(bingo_sdk::CatalogKind::Plugins);
+            host.catalog_changed(bingo_sdk::CatalogKind::Tools);
         }
     }
 

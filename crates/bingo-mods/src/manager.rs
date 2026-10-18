@@ -36,6 +36,18 @@ pub(crate) struct Manager {
     tasks: Mutex<Vec<tokio::task::JoinHandle<()>>>,
 }
 impl Manager {
+    fn catalogues_changed(&self) {
+        if let Some(host) = self.host.get() {
+            for kind in [
+                CatalogKind::Plugins,
+                CatalogKind::Commands,
+                CatalogKind::Tools,
+            ] {
+                host.catalog_changed(kind);
+            }
+        }
+    }
+
     pub fn new(
         env: Env,
         directories: Vec<PathBuf>,
@@ -222,11 +234,7 @@ impl PluginSource for Manager {
             )
             .await;
             switching::finish(&manager, &name, &request);
-            if let Some(host) = manager.host.get() {
-                for kind in [CatalogKind::Plugins, CatalogKind::Commands] {
-                    host.catalog_changed(kind);
-                }
-            }
+            manager.catalogues_changed();
             if let Err(error) = &result {
                 manager
                     .notices

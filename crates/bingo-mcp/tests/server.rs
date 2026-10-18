@@ -87,6 +87,27 @@ async fn connected() -> (Arc<Manager>, tempfile::TempDir) {
     (manager, data)
 }
 
+#[tokio::test]
+async fn a_late_mcp_connection_announces_the_tools_catalogue() {
+    let (manager, _data) = manager(
+        &[("test", stdio(echo_server().display().to_string(), &[]))],
+        &[],
+    );
+    let host = bingo_sdk::testing::TestHost::default();
+    let handle = host.handle();
+    manager.bind(&handle);
+    assert!(manager.tools().await.is_empty());
+    manager.dial_enabled().await;
+    assert!(!manager.tools().await.is_empty());
+    assert!(host.calls().iter().any(|call| matches!(
+        call,
+        bingo_sdk::testing::HostCall::CatalogChanged {
+            kind: bingo_sdk::CatalogKind::Tools
+        }
+    )));
+    manager.shutdown().await;
+}
+
 /// What every configured server is doing, without the sign-in column the
 /// tests here have nothing to say about.
 async fn states(manager: &Arc<Manager>) -> Vec<(String, Status)> {

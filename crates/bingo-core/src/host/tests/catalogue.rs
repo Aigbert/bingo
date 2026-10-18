@@ -236,3 +236,24 @@ async fn plugin_catalogue_callback_emits_gateway_change() {
     ));
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn plugin_changes_invalidate_the_tools_catalogue() {
+    let home = tempfile::tempdir().unwrap();
+    let host = Host::build(vec![], HostConfig::new(env_in(home.path())))
+        .await
+        .unwrap();
+    let mut events = host.gateway_events();
+    host.plugins_changed();
+    for kind in [
+        CatalogKind::Plugins,
+        CatalogKind::Commands,
+        CatalogKind::Tools,
+    ] {
+        assert_eq!(
+            events.next().await,
+            Some(GatewayEvent::CatalogChanged { kind })
+        );
+    }
+    host.shutdown().await;
+}

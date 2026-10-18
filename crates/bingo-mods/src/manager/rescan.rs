@@ -47,6 +47,7 @@ impl Manager {
         }
         self.baseline(project);
         self.report_changes(&report);
+        self.catalogues_changed();
         Ok(report)
     }
     fn discovered(&self, project: bool, old: &[Arc<Module>]) -> (Vec<Found>, PluginReload) {

@@ -365,9 +365,15 @@ async fn deferred_switch_notifies_after_its_worker_finishes() {
         .count();
     assert_eq!(
         after,
-        before + 2,
+        before + 3,
         "background completion did not notify catalogues"
     );
+    assert!(host.calls().iter().any(|call| matches!(
+        call,
+        bingo_sdk::testing::HostCall::CatalogChanged {
+            kind: CatalogKind::Tools
+        }
+    )));
     manager.stop().await;
 }
 

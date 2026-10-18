@@ -33,6 +33,7 @@ impl Registrations {
         let mut spec = input.spec;
         spec.name = name.clone();
         self.insert(caller, input.callback, Spec::Tool(spec))?;
+        caller.host.catalog_changed(CatalogKind::Tools);
         Ok(name)
     }
     pub fn command(&self, caller: &Caller, input: RegisterCommand) -> Result<String, String> {

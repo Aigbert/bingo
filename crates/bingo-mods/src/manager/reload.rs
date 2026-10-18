@@ -156,7 +156,9 @@ impl Manager {
             let authority = self.host.get().and_then(|host| host.service(&APPROVALS));
             found.state = discovery::project_state(&found, authority.as_deref());
         }
-        self.install_generation(found, Some(&old)).await?;
+        let result = self.install_generation(found, Some(&old)).await;
+        self.catalogues_changed();
+        result?;
         self.baseline(false);
         self.notices.push(Notice::warn(
             "PLUGIN_RELOADED",
