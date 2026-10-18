@@ -27,6 +27,17 @@ impl TurnHost for Person {
         kind: InteractionKind,
         _: Vec<AnswerSpec>,
     ) -> Result<crate::gate::Answered, KernelError> {
+        let mut transcript = Transcript::new();
+        for event in self.recorded.events() {
+            transcript.apply(&event);
+        }
+        assert!(
+            transcript.items().iter().all(|item| {
+                !matches!(item.body, ItemBody::ToolCall { .. })
+                    || item.status != ItemStatus::Running
+            }),
+            "an ask opened with a call in flight"
+        );
         let (reply, answer) = oneshot::channel();
         self.asks.send((kind, reply)).unwrap();
         Ok(crate::gate::Answered {

@@ -1,240 +1,276 @@
 //! A round walks once; each decision belongs to the call it has reached.
 
-use super::*;
-use crate::executor::{Dispatch, InFlight};
-use crate::gate::{self, Decided, Gated};
+use super::{HookSet, TurnConfig, TurnHost, emit_and_fold, mint, racing};
+use std::future::Future;
+use std::sync::Arc;
+
+use bingo_sdk::*;
+use jiff::Timestamp;
+
+use crate::accumulator::Finished;
+use crate::chain::tool::AskVia;
+use crate::executor::{self, Dispatch, Gate, InFlight, PendingCall};
+use crate::gate::{self, Decided, GateInput, Gated};
 use crate::round::{Action, next};
 
-pub(super) async fn run(turn: &mut Turn<'_>, finished: &Finished) -> Vec<ToolOutcome> {
-    let mut outcomes = Vec::with_capacity(finished.tool_calls.len());
-    let report = crate::chain::Report::default();
-    let links = turn.hooks.links.clone();
-    let cx = turn.hook_cx.clone();
-    let dispatch = Dispatch {
-        links: &links,
-        cx: &cx,
-        report: report.clone(),
-    };
-    let mut flight = InFlight::default();
-    if let Some(hooks) = turn.racing(turn.hooks.gather()).await {
-        walk_calls(
-            turn,
-            finished,
-            &hooks,
-            &dispatch,
-            &mut flight,
-            &mut outcomes,
-        )
-        .await;
-    }
-    if turn.cancel.is_cancelled() {
-        for outcome in flight.cancelled() {
-            land(turn, outcome, &mut outcomes);
-        }
-    }
-    interrupt_remaining(turn, finished, &mut outcomes);
-    for notice in report.take() {
-        turn.record(notice);
-    }
-    outcomes.sort_by_key(|outcome| {
-        finished
-            .tool_calls
-            .iter()
-            .position(|(item, _)| item == &outcome.item)
-    });
-    outcomes
+pub(super) struct Round<'t> {
+    pub(super) cfg: &'t TurnConfig,
+    pub(super) hooks: &'t HookSet,
+    pub(super) tools: &'t [Arc<dyn Tool>],
+    pub(super) hook_cx: &'t HookContext,
+    pub(super) id: &'t TurnId,
+    pub(super) number: u32,
+    pub(super) cancel: &'t CancellationToken,
+    pub(super) host: &'t dyn TurnHost,
+    pub(super) transcript: &'t mut Transcript,
 }
 
-async fn walk_calls<'a>(
-    turn: &mut Turn<'_>,
-    finished: &Finished,
-    hooks: &[Arc<dyn Hook>],
-    dispatch: &Dispatch<'a>,
-    flight: &mut InFlight<'a>,
-    outcomes: &mut Vec<ToolOutcome>,
-) -> Option<()> {
-    for (item, call) in &finished.tool_calls {
-        while !flight.state().all_safe {
-            land_next(turn, flight, outcomes).await?;
-        }
-        let cfg = turn.cfg;
-        let tool = turn
-            .late
-            .tools
-            .iter()
-            .find(|tool| tool.spec().name == call.name)
-            .cloned();
-        let input = GateInput {
-            session: &cfg.session.id,
-            cwd: &cfg.cwd,
-            item,
-            call: call.clone(),
-            tool: tool.clone(),
-            policy: cfg.policy.as_ref(),
-            hooks,
-            links: dispatch.links,
-            hook_cx: dispatch.cx,
+impl Round<'_> {
+    pub(super) async fn run(mut self, finished: &Finished) -> Vec<ToolOutcome> {
+        let mut outcomes = Vec::with_capacity(finished.tool_calls.len());
+        let report = crate::chain::Report::default();
+        let links = self.hooks.links.clone();
+        let cx = self.hook_cx;
+        let dispatch = Dispatch {
+            links: &links,
+            cx,
+            report: report.clone(),
         };
-        let decided = progressing(turn, flight, outcomes, gate::decide(&input)).await?;
-        let gated = settle_reached(turn, input, decided, flight, outcomes).await?;
-        let call = admit(turn, item, gated, tool).await?;
-        let cx = tool_context(turn, &call);
-        if let Some(outcome) = flight.start(call, cx, turn.cancel.clone(), Some(dispatch.clone())) {
-            land(turn, outcome, outcomes);
+        let mut flight = InFlight::default();
+        if let Some(hooks) = racing(self.cancel, self.hooks.gather()).await {
+            self.walk_calls(finished, &hooks, &dispatch, &mut flight, &mut outcomes)
+                .await;
         }
-    }
-    while next(flight.state(), None) == Action::Wait {
-        land_next(turn, flight, outcomes).await?;
-    }
-    Some(())
-}
-
-async fn admit(
-    turn: &mut Turn<'_>,
-    item: &ItemId,
-    mut gated: Gated,
-    tool: Option<Arc<dyn Tool>>,
-) -> Option<PendingCall> {
-    for notice in gated.notices.drain(..) {
-        turn.record(notice);
-    }
-    if !turn.record_receipt(gated.receipt.take()).await || turn.cancel.is_cancelled() {
-        return None;
-    }
-    mark_gated(turn, item, &mut gated);
-    Some(PendingCall {
-        item: item.clone(),
-        call: gated.call,
-        tool,
-        traits: gated.traits,
-        gate: gated.gate,
-    })
-}
-
-async fn settle_reached(
-    turn: &mut Turn<'_>,
-    input: GateInput<'_>,
-    decided: Decided,
-    flight: &mut InFlight<'_>,
-    outcomes: &mut Vec<ToolOutcome>,
-) -> Option<Gated> {
-    while next(flight.state(), Some(decided.action())) == Action::Wait {
-        land_next(turn, flight, outcomes).await?;
-    }
-    match decided {
-        Decided::Settled(gated) => Some(*gated),
-        decided @ Decided::Ask(_) => {
-            let prompter = AskVia {
-                host: turn.host,
-                item: input.item.clone(),
-            };
-            turn.racing(gate::ask(input, decided, &prompter)).await
-        }
-    }
-}
-
-/// Earlier safe calls keep progressing while a reached call is deciding.
-async fn progressing<T>(
-    turn: &mut Turn<'_>,
-    flight: &mut InFlight<'_>,
-    outcomes: &mut Vec<ToolOutcome>,
-    work: impl Future<Output = T>,
-) -> Option<T> {
-    tokio::pin!(work);
-    let cancel = turn.cancel.clone();
-    racing(&cancel, async {
-        loop {
-            tokio::select! {
-                biased;
-                Some(outcome) = flight.next(), if flight.state().count > 0 => {
-                    land(turn, outcome, outcomes);
-                }
-                result = &mut work => return result,
+        if self.cancel.is_cancelled() {
+            for outcome in flight.cancelled() {
+                self.land(outcome, &mut outcomes);
             }
         }
-    })
-    .await
-}
-
-async fn land_next(
-    turn: &mut Turn<'_>,
-    flight: &mut InFlight<'_>,
-    outcomes: &mut Vec<ToolOutcome>,
-) -> Option<()> {
-    let outcome = turn.racing(flight.next()).await??;
-    land(turn, outcome, outcomes);
-    Some(())
-}
-
-fn tool_context(turn: &Turn<'_>, call: &PendingCall) -> ToolContext {
-    ToolContext {
-        call_id: call.call.call_id.clone(),
-        session: turn.cfg.session.id.clone(),
-        turn: turn.id.clone(),
-        item: call.item.clone(),
-        cwd: turn.cfg.cwd.clone(),
-        cancel: turn.cancel.child_token(),
-        env: turn.cfg.env.clone(),
-        host: turn.cfg.host.clone(),
-        call: turn.cfg.call_host.tool.clone(),
-    }
-}
-
-fn interrupt_remaining(turn: &mut Turn<'_>, finished: &Finished, outcomes: &mut Vec<ToolOutcome>) {
-    for (item, call) in &finished.tool_calls {
-        if outcomes.iter().any(|outcome| &outcome.item == item) {
-            continue;
+        self.interrupt_remaining(finished, &mut outcomes);
+        for notice in report.take() {
+            self.record(notice);
         }
-        let pending = PendingCall {
+        outcomes.sort_by_key(|outcome| {
+            finished
+                .tool_calls
+                .iter()
+                .position(|(item, _)| item == &outcome.item)
+        });
+        outcomes
+    }
+
+    async fn walk_calls<'a>(
+        &mut self,
+        finished: &Finished,
+        hooks: &[Arc<dyn Hook>],
+        dispatch: &Dispatch<'a>,
+        flight: &mut InFlight<'a>,
+        outcomes: &mut Vec<ToolOutcome>,
+    ) -> Option<()> {
+        for (item, call) in &finished.tool_calls {
+            while !flight.state().all_safe {
+                self.land_next(flight, outcomes).await?;
+            }
+            let cfg = self.cfg;
+            let tool = self
+                .tools
+                .iter()
+                .find(|tool| tool.spec().name == call.name)
+                .cloned();
+            let input = GateInput {
+                session: &cfg.session.id,
+                cwd: &cfg.cwd,
+                item,
+                call: call.clone(),
+                tool: tool.clone(),
+                policy: cfg.policy.as_ref(),
+                hooks,
+                links: dispatch.links,
+                hook_cx: dispatch.cx,
+            };
+            let decided = self
+                .progressing(flight, outcomes, gate::decide(&input))
+                .await?;
+            let gated = self
+                .settle_reached(input, decided, flight, outcomes)
+                .await?;
+            let call = self.admit(item, gated, tool).await?;
+            let cx = self.tool_context(&call);
+            if let Some(outcome) =
+                flight.start(call, cx, self.cancel.clone(), Some(dispatch.clone()))
+            {
+                self.land(outcome, outcomes);
+            }
+        }
+        while next(flight.state(), None) == Action::Wait {
+            self.land_next(flight, outcomes).await?;
+        }
+        Some(())
+    }
+
+    async fn admit(
+        &mut self,
+        item: &ItemId,
+        mut gated: Gated,
+        tool: Option<Arc<dyn Tool>>,
+    ) -> Option<PendingCall> {
+        for notice in gated.notices.drain(..) {
+            self.record(notice);
+        }
+        if !self.record_receipt(gated.receipt.take()).await || self.cancel.is_cancelled() {
+            return None;
+        }
+        self.mark_gated(item, &mut gated);
+        Some(PendingCall {
             item: item.clone(),
-            call: call.clone(),
-            tool: None,
-            traits: ToolTraits::default(),
-            gate: Gate::Allowed,
+            call: gated.call,
+            tool,
+            traits: gated.traits,
+            gate: gated.gate,
+        })
+    }
+
+    async fn settle_reached(
+        &mut self,
+        input: GateInput<'_>,
+        decided: Decided,
+        flight: &mut InFlight<'_>,
+        outcomes: &mut Vec<ToolOutcome>,
+    ) -> Option<Gated> {
+        while next(flight.state(), Some(decided.action())) == Action::Wait {
+            self.land_next(flight, outcomes).await?;
+        }
+        match decided {
+            Decided::Settled(gated) => Some(*gated),
+            decided @ Decided::Ask(_) => {
+                let prompter = AskVia {
+                    host: self.host,
+                    item: input.item.clone(),
+                };
+                racing(self.cancel, gate::ask(input, decided, &prompter)).await
+            }
+        }
+    }
+
+    /// Earlier safe calls keep progressing while a reached call is deciding.
+    async fn progressing<T>(
+        &mut self,
+        flight: &mut InFlight<'_>,
+        outcomes: &mut Vec<ToolOutcome>,
+        work: impl Future<Output = T>,
+    ) -> Option<T> {
+        tokio::pin!(work);
+        let cancel = self.cancel;
+        racing(cancel, async {
+            loop {
+                tokio::select! {
+                    biased;
+                    Some(outcome) = flight.next(), if flight.state().count > 0 => {
+                        self.land(outcome, outcomes);
+                    }
+                    result = &mut work => return result,
+                }
+            }
+        })
+        .await
+    }
+
+    async fn land_next(
+        &mut self,
+        flight: &mut InFlight<'_>,
+        outcomes: &mut Vec<ToolOutcome>,
+    ) -> Option<()> {
+        let outcome = racing(self.cancel, flight.next()).await??;
+        self.land(outcome, outcomes);
+        Some(())
+    }
+
+    fn tool_context(&self, call: &PendingCall) -> ToolContext {
+        ToolContext {
+            call_id: call.call.call_id.clone(),
+            session: self.cfg.session.id.clone(),
+            turn: self.id.clone(),
+            item: call.item.clone(),
+            cwd: self.cfg.cwd.clone(),
+            cancel: self.cancel.child_token(),
+            env: self.cfg.env.clone(),
+            host: self.cfg.host.clone(),
+            call: self.cfg.call_host.tool.clone(),
+        }
+    }
+
+    fn interrupt_remaining(&mut self, finished: &Finished, outcomes: &mut Vec<ToolOutcome>) {
+        for (item, call) in &finished.tool_calls {
+            if outcomes.iter().any(|outcome| &outcome.item == item) {
+                continue;
+            }
+            let pending = PendingCall {
+                item: item.clone(),
+                call: call.clone(),
+                tool: None,
+                traits: ToolTraits::default(),
+                gate: Gate::Allowed,
+            };
+            self.land(executor::interrupted(&pending), outcomes);
+        }
+    }
+
+    fn land(&mut self, outcome: ToolOutcome, outcomes: &mut Vec<ToolOutcome>) {
+        if let Some(mut item) = self.transcript.get(&outcome.item).cloned() {
+            item.status = outcome.status;
+            item.completed_at = Some(Timestamp::now());
+            if let ItemBody::ToolCall {
+                output,
+                duration_ms,
+                progress,
+                ..
+            } = &mut item.body
+            {
+                *output = Some(outcome.output.clone());
+                *duration_ms = Some(outcome.duration_ms);
+                *progress = None;
+            }
+            emit_and_fold(self.transcript, self.host, Event::ItemCompleted { item });
+        }
+        outcomes.push(outcome);
+    }
+
+    fn mark_gated(&mut self, item_id: &ItemId, gated: &mut crate::gate::Gated) {
+        if let Some(mut item) = self.transcript.get(item_id).cloned()
+            && (gated.gate == Gate::Allowed
+                || matches!(&item.body, ItemBody::ToolCall { input, .. } if *input != gated.call.input))
+        {
+            if gated.gate == Gate::Allowed {
+                item.status = ItemStatus::Running;
+            }
+            if let ItemBody::ToolCall {
+                input, allowed_by, ..
+            } = &mut item.body
+            {
+                *input = gated.call.input.clone();
+                *allowed_by = gated.allowed_by.take().map(Box::new);
+            }
+            emit_and_fold(self.transcript, self.host, Event::ItemUpdated { item });
+        }
+    }
+
+    fn record(&mut self, body: ItemBody) {
+        let item = mint(self.id, self.number, body, ItemStatus::Completed);
+        emit_and_fold(self.transcript, self.host, Event::ItemCompleted { item });
+    }
+
+    async fn record_receipt(&mut self, body: Option<ItemBody>) -> bool {
+        let Some(body) = body else {
+            return true;
         };
-        land(turn, executor::interrupted(&pending), outcomes);
-    }
-}
-
-fn land(turn: &mut Turn<'_>, outcome: ToolOutcome, outcomes: &mut Vec<ToolOutcome>) {
-    if let Some(mut item) = turn.transcript.get(&outcome.item).cloned() {
-        item.status = outcome.status;
-        item.completed_at = Some(Timestamp::now());
-        if let ItemBody::ToolCall {
-            output,
-            duration_ms,
-            progress,
-            ..
-        } = &mut item.body
-        {
-            *output = Some(outcome.output.clone());
-            *duration_ms = Some(outcome.duration_ms);
-            *progress = None;
-        }
-        emit_and_fold(
-            &mut turn.transcript,
-            turn.host,
-            Event::ItemCompleted { item },
-        );
-    }
-    outcomes.push(outcome);
-}
-
-fn mark_gated(turn: &mut Turn<'_>, item_id: &ItemId, gated: &mut crate::gate::Gated) {
-    if let Some(mut item) = turn.transcript.get(item_id).cloned()
-        && (gated.gate == Gate::Allowed
-            || matches!(&item.body, ItemBody::ToolCall { input, .. } if *input != gated.call.input))
-    {
-        if gated.gate == Gate::Allowed {
-            item.status = ItemStatus::Running;
-        }
-        if let ItemBody::ToolCall {
-            input, allowed_by, ..
-        } = &mut item.body
-        {
-            *input = gated.call.input.clone();
-            *allowed_by = gated.allowed_by.take().map(Box::new);
-        }
-        emit_and_fold(&mut turn.transcript, turn.host, Event::ItemUpdated { item });
+        // Receipt awaits need not poll flight: only asks yield receipts, and the
+        // Ask row in crate::round::next requires nothing in flight.
+        let item = mint(self.id, self.number, body, ItemStatus::Completed);
+        let Some(Ok(item)) = racing(self.cancel, self.host.receipt(item)).await else {
+            self.cancel.cancel();
+            return false;
+        };
+        self.transcript.apply(&Event::ItemCompleted { item });
+        true
     }
 }

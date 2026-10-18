@@ -37,10 +37,7 @@ pub use stream::{MAX_RETRY_DELAY, MAX_SERVER_RETRY_DELAY, backoff};
 use stream::{Streamed, stopped_early};
 
 use crate::accumulator::Finished;
-use crate::chain::tool::AskVia;
 use crate::context::{ContextView, KERNEL_SURFACE, budget, elide, estimate_tokens};
-use crate::executor::{self, Gate, PendingCall};
-use crate::gate::GateInput;
 use crate::models::vision;
 
 pub const INTERRUPTED_MARKER: &str = "[Request interrupted by user]";
@@ -681,7 +678,19 @@ impl Turn<'_> {
 
     /// Walk the calls, then hold the barrier before the next round.
     async fn act(&mut self, finished: &Finished) -> Step {
-        let outcomes = round::run(self, finished).await;
+        let outcomes = round::Round {
+            cfg: self.cfg,
+            hooks: &self.hooks,
+            tools: &self.late.tools,
+            hook_cx: &self.hook_cx,
+            id: &self.id,
+            number: self.round,
+            cancel: &self.cancel,
+            host: self.host,
+            transcript: &mut self.transcript,
+        }
+        .run(finished)
+        .await;
         let stop_after = self.after_tool_hooks(&outcomes).await;
         if self.cancel.is_cancelled() {
             return self.interrupted();
@@ -834,19 +843,6 @@ impl Turn<'_> {
                 kept: c.kept.clone(),
             },
         );
-    }
-
-    async fn record_receipt(&mut self, body: Option<ItemBody>) -> bool {
-        let Some(body) = body else {
-            return true;
-        };
-        let item = self.fresh(body, ItemStatus::Completed);
-        let Some(Ok(item)) = self.racing(self.host.receipt(item)).await else {
-            self.cancel.cancel();
-            return false;
-        };
-        self.transcript.apply(&Event::ItemCompleted { item });
-        true
     }
 
     /// Let the adapters observe the whole round before honoring a block.
