@@ -3086,9 +3086,13 @@
               "description": "The rule `AllowSession` would install, when one would silence the prompt."
             },
             "caution": {
-              "type": [
-                "string",
-                "null"
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Caution"
+                },
+                {
+                  "type": "null"
+                }
               ]
             },
             "kind": {
@@ -3218,6 +3222,16 @@
                 "null"
               ]
             },
+            "stakes": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Stakes"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "command"
@@ -3246,6 +3260,43 @@
           ]
         }
       ]
+    },
+    "Stakes": {
+      "type": "object",
+      "properties": {
+        "line": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "line",
+        "items"
+      ],
+      "description": "The local consequences a command preview can establish before it runs."
+    },
+    "Caution": {
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string"
+        },
+        "act": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "description": "Why a call needs care, and the act its one-time approval names."
     },
     "QuestionOption": {
       "type": "object",

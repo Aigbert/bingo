@@ -132,6 +132,8 @@ export type CancelReason = (("turnEnded" | "interrupted" | "sessionClosed" | "ex
 export type Catalog = { "entries": Array<CatalogEntry>; "kind": CatalogKind; [key: string]: unknown; };
 export type CatalogEntry = { "id": string; "label": string; "meta"?: unknown; [key: string]: unknown; };
 export type CatalogKind = ("events" | "models" | "providers" | "tools" | "commands" | "plugins");
+/** Why a call needs care, and the act its one-time approval names. */
+export type Caution = { "act"?: (string | null); "reason": string; [key: string]: unknown; };
 export type CheckResult = {
   /** The call as judged, possibly with tightened arguments. */
   "call": ToolCall;
@@ -681,7 +683,7 @@ export type Interaction = {
 /** A pending question or permission, answered once by id. */
 export type InteractionId = string;
 export type InteractionKind = ({
-  "caution"?: (string | null);
+  "caution"?: (Caution | null);
   /** The call after hooks and interceptors, before this decision. */
   "input"?: unknown;
   "kind": "permission";
@@ -975,7 +977,7 @@ export type PluginData = { "name": string; "root": string; "version"?: (string |
 export type PluginState = ({ "kind": "on"; } | { "kind": "off"; "why": string; } | { "kind": "failed"; "why": string; } | { "changed": boolean; "kind": "waiting"; } | { "kind": "pending"; } | { "at": NextStart; "kind": "pending"; "now": boolean; });
 export type PluginsOpen = ("plugins" | "mcp");
 export type PluginsProps = { "action": Action; "open": PluginsOpen; "plugins": Array<CatalogEntry>; "session": SessionId; [key: string]: unknown; };
-export type Preview = ({ "kind": "diff"; "unified": string; [key: string]: unknown; } | { "command": string; "cwd": string; "description"?: (string | null); "kind": "command"; [key: string]: unknown; } | { "kind": "url"; "url": string; [key: string]: unknown; });
+export type Preview = ({ "kind": "diff"; "unified": string; [key: string]: unknown; } | { "command": string; "cwd": string; "description"?: (string | null); "kind": "command"; "stakes"?: (Stakes | null); [key: string]: unknown; } | { "kind": "url"; "url": string; [key: string]: unknown; });
 export type Proceed = ({ "next": Input; } | { "answer": SubmitResult; });
 export type Proceed10 = ({ "next": Catalog; } | { "answer": Catalog; });
 export type Proceed11 = ({ "next": Send; } | { "answer": null; });
@@ -1319,6 +1321,8 @@ export type Span = {
   [key: string]: unknown;
 };
 export type SpinnerProps = { "message"?: (string | null); "mode": string; "suffix": string; "word": string; [key: string]: unknown; };
+/** The local consequences a command preview can establish before it runs. */
+export type Stakes = { "items": Array<string>; "line": string; [key: string]: unknown; };
 export type StateGet = { "key": string; "scope": string; [key: string]: unknown; };
 export type StateSet = { "ifVersion"?: (number | null); "key": string; "scope": string; "value": unknown; [key: string]: unknown; };
 export type StateValue = { "value": unknown; "version": number; [key: string]: unknown; };

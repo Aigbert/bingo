@@ -59,6 +59,8 @@ export type Authorize = {
 export type Catalog = { "entries": Array<CatalogEntry>; "kind": CatalogKind; [key: string]: unknown; };
 export type CatalogEntry = { "id": string; "label": string; "meta"?: unknown; [key: string]: unknown; };
 export type CatalogKind = ("events" | "models" | "providers" | "tools" | "commands" | "plugins");
+/** Why a call needs care, and the act its one-time approval names. */
+export type Caution = { "act"?: (string | null); "reason": string; [key: string]: unknown; };
 /** Whether the chosen model applies only here or is the default for new sessions. */
 export type ChoiceScope = ("session" | "default");
 export type Classify = {
@@ -537,7 +539,7 @@ export type IntentId = string;
 /** A pending question or permission, answered once by id. */
 export type InteractionId = string;
 export type InteractionKind = ({
-  "caution"?: (string | null);
+  "caution"?: (Caution | null);
   /** The call after hooks and interceptors, before this decision. */
   "input"?: unknown;
   "kind": "permission";
@@ -651,7 +653,7 @@ export type OversizedItem = {
  */
 export type ParentLink = { "item"?: (ItemId | null); "session": SessionId; [key: string]: unknown; };
 export type PluginData = { "name": string; "root": string; "version"?: (string | null); [key: string]: unknown; };
-export type Preview = ({ "kind": "diff"; "unified": string; [key: string]: unknown; } | { "command": string; "cwd": string; "description"?: (string | null); "kind": "command"; [key: string]: unknown; } | { "kind": "url"; "url": string; [key: string]: unknown; });
+export type Preview = ({ "kind": "diff"; "unified": string; [key: string]: unknown; } | { "command": string; "cwd": string; "description"?: (string | null); "kind": "command"; "stakes"?: (Stakes | null); [key: string]: unknown; } | { "kind": "url"; "url": string; [key: string]: unknown; });
 export type ProcessId = {
   /** The id `spawn` answered. */
   "id": string;
@@ -814,6 +816,8 @@ export type Setting = {
   [key: string]: unknown;
 };
 export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
+/** The local consequences a command preview can establish before it runs. */
+export type Stakes = { "items": Array<string>; "line": string; [key: string]: unknown; };
 export type StateGet = { "key": string; "scope": string; [key: string]: unknown; };
 export type StateSet = { "ifVersion"?: (number | null); "key": string; "scope": string; "value": unknown; [key: string]: unknown; };
 export type StateValue = { "value": unknown; "version": number; [key: string]: unknown; };
