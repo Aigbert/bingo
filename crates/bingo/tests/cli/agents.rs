@@ -550,7 +550,14 @@ fn a_resumed_root_is_told_which_child_was_mid_turn_when_the_process_ended() {
     );
 
     let back = script(r#"{"responses":[{"steps":[{"text":"noted"}]}]}"#);
-    let out = scripted_run(home.path(), &back, &["--continue"], "what happened?");
+    let out = scripted_run_within(
+        home.path(),
+        &back,
+        &["--continue"],
+        "what happened?",
+        Duration::from_secs(60),
+        "the resumed root did not finish recovering the interrupted child",
+    );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     assert_eq!(frames_of(&out)[0].session, root, "the same root came back");
 
