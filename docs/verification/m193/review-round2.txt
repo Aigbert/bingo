@@ -1,0 +1,105 @@
+M193 review, round 2
+
+Contracts first
+$ cargo test -p bingo-sdk --lib --locked round2_
+Before implementation: 0 passed; 2 failed.
+After implementation: 2 passed; 0 failed.
+ActionItem.meaning is optional and omitted when absent; KeyBarProps contains only pairs.
+$ cargo test -p bingo-permissions --locked slots_place_the_mode_and_each_action
+With the producer's meaning removed: 0 passed; 1 failed.
+Mode::label already returned "bypass" on dev; the TUI override and reverse bridge are gone.
+$ BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked
+bingo-sdk, bingo-mods, bingo-plugin-rpc, bingo-surface-rpc, in that order: exit 0 each.
+An initial combined invocation reached the TS generator before events.json was regenerated;
+regeneration in dependency order passed. The old KeyBar golden fixture was updated too.
+
+Red / green
+$ cargo test -p bingo-surface-tui --lib --locked round2_
+Initial four regressions before implementation: 0 passed; 4 failed.
+Controlled reversions of the final fixes: 0 passed; 10 failed.
+Restored fixes: 10 passed; 0 failed.
+Each reversion was restored before the gates; no capture or snapshot was changed in those runs.
+1. round2_a_mode_shaped_sentence_is_only_a_plain_notice
+   round2_the_mode_toast_reads_the_placed_meaning
+   round2_only_the_key_acknowledgement_creates_a_mode_notice
+   Reverted typed notice recognition, slot-derived words and intent-tag acknowledgement.
+   Manual /permission, unrelated and duplicate acknowledgements cannot make a mode notice.
+2. round2_the_idle_caret_rests_and_carries_no_deadline
+   Reverted the 10 s motion cutoff and deadline cap.
+   $ cargo test -p bingo-surface-tui --lib --locked an_idle_surface_draws_nothing_at_all
+   $ cargo test -p bingo-surface-tui --lib --locked the_seconds_after_a_flash_cost_no_frames_at_all
+   Without rest: each 0 passed; 1 failed. With rest: both pass in the workspace gate.
+   Both run with motion enabled; virtual time checks the idle gaps and the next key's wake.
+3. round2_reduced_activity_wakes_for_its_first_row
+   round2_reduced_motion_wakes_the_working_row_without_an_event
+   Reverted collection of a zero-height part's deadline. Both failed, then passed.
+   The run test sleeps on next_draw(), wakes at 300 ms and paints without another event.
+4. Layout::wake is the only writer of private next_frame; collect delegates to it.
+   Growth, scrollbar, ask drawing and both layer paths use wake. Existing deadline tests pass.
+5. footer/toast.rs separates draw, words, fade and next; no word-prefix dispatch remains.
+6–7. Removed dead adapters, timers and their tests, crew target/branch, status.rs and clipping
+   copy; pill.rs replaces foot.rs. Composer owns the input column. Guide/comments updated.
+   Attention/Others remain because item 8 makes them live; no dead-code allowances remain there.
+8. round2_the_latest_edge_flash_wins
+   round2_the_scrollbar_stays_for_nine_hundred_ms_at_the_end
+   round2_a_countdown_wakes_only_when_its_words_change
+   round2_needs_you_replaces_crew_lamps_before_the_model
+   Reverted latest-flash ordering, tail scrollbar timestamp, countdown boundary and lead:
+   each failed, then passed. Isolating only the edge-ordering reversion also gives
+   0 passed; 1 failed, then 1 passed; 0 failed when restored. No ctrl+g answer pair was added.
+
+Snapshots and scope
+Sampled both failing snapshots before updating. Four changed, none deleted this round:
+- ask/tests/snapshots/bingo_surface_tui__ask__tests__m169_crew_108x30.snap
+- ask/tests/snapshots/bingo_surface_tui__ask__tests__m169_crew_80x24.snap
+- snapshots/bingo_surface_tui__screens__child_needs_you_120x40.snap
+- snapshots/bingo_surface_tui__screens__child_needs_you_80x24.snap
+Only the footer's named/count needs-you lead changed. Scene captures and prototype unchanged.
+Small shared-file cleanup: pointer.rs removes the unset crew target's branch; transcript.rs
+removes the obsolete opening adapter/height; transcript/said.rs uses grid::fit; transcript/slots.rs
+only supplies the additive ActionItem field. No stream-row redesign, fold retirement or merge.
+The 10 s caret rest is the requested ADR-0097 §10 departure; no capture reaches that age.
+M198's mode sheet will read ActionItem.meaning; the sheet remains outside M193.
+
+Gates (one job at a time; provider credentials unset for tests)
+$ cargo fmt --all -- --check
+exit 0 (no output)
+$ cargo check --workspace --all-targets --locked
+exit 0
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+exit 0 (the cleanup's redundant Default implementation was replaced with a derive)
+$ cargo test --workspace --locked
+123 result lines: 6445 passed; 0 failed; 0 ignored. TUI 1389; PTY 19.
+All eleven dock/footer captures pass; idle/flash and permissions slot regressions pass.
+No unrelated or wall-clock test failure; no retry was needed.
+$ scripts/check_discipline.sh
+discipline ok (advisory warnings)
+$ scripts/budget.sh
+dependencies (unique, normal): 423 (max 423)
+warm core check: 0s; TUI relink: 0 crates; target/debug: 13 GB (soft max 5)
+budget ok
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok
+
+Windows
+$ cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc
+bingo-sdk, bingo-core, bingo-mod-hello, bingo-mod-keybar, bingo-tool-bash: exit 0 each.
+bingo-permissions: exit 101; tree-sitter lacks stdio.h; tree-sitter-bash lacks stdlib.h.
+bingo-surface-tui: exit 101; aws-lc-sys lacks stdlib.h/windows.h.
+bingo: exit 101; rquickjs-sys rejects /std:c11 (aws-lc-sys also lacks Windows headers).
+All eight changed crates checked, sequentially. These native-toolchain checks remain owed;
+no dependency, target exclusion or bypass was added. Permissions exposes another instance
+of the unavailable Windows C headers, in tree-sitter, beyond the two known blockers.
+
+Terminal verification
+$ cargo build -p bingo --locked
+Finished dev profile; exit 0.
+$ TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh
+tui-smoke ok
+$ python3 docs/verification/m193/drive.py
+PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+CLEAN 100x32: owned tmux server stopped; temporary files removed
+PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+CLEAN 80x24: owned tmux server stopped; temporary files removed
+Refreshed text/ANSI captures in this directory. No scene captures were edited.
+Full-frame criterion remains deferred to whichever of M193/M194 lands second.

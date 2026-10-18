@@ -80,10 +80,11 @@ title.
 
 ## Files
 
-`crates/bingo-surface-tui/src/{frame.rs,view.rs,view/,status.rs,keybar.rs,keybar/,toast.rs,
-foot.rs,composer.rs,crew.rs,welcome.rs,opening.rs,run/look.rs,terminal.rs}`; new
+`crates/bingo-surface-tui/src/{frame.rs,view.rs,view/,keybar.rs,keybar/,toast.rs,
+pill.rs,composer.rs,crew.rs,welcome.rs,opening.rs,run/look.rs,terminal.rs}`; new
 `src/dock.rs` (regions, growth, edge) and `src/footer.rs`, one noun each; `bingo-mod-keybar`
-(it draws pairs into the footer row).
+(it draws pairs into the footer row). Round 2: SDK action/keybar contracts, permissions mode
+meanings, and generated schemas/TypeScript.
 
 ## Exit criteria
 
@@ -98,13 +99,13 @@ foot.rs,composer.rs,crew.rs,welcome.rs,opening.rs,run/look.rs,terminal.rs}`; new
       `ascii-live`, `ascii-done`, `reduced-live`, `small-done`, `mode` and `mode-later`.
 - [x] `scripts/tui-smoke.sh` waits for a footer string, not `/ commands` in the old `KeyBar`
       row, and passes.
-- [ ] Gates and checks as in M192. tmux drive: idle, live, mode cycle, 80×24, a toast.
+- [x] Gates and Windows check commands as in M192 (native-toolchain blockers recorded below).
+- [x] tmux drive: idle, live, mode cycle, 80×24, a toast.
 
 ## Non-goals
 
 The stream's rows (M194); the palette, mentions and queued rows in the dock, and the key
-behaviour (M196); asks (M197); sheets (M198); the needs-you lead, view segments and ctrl+g
-(M200); the welcome wordmark and the exit receipt (M199).
+behaviour (M196); asks (M197); sheets (M198); view segments and ctrl+g (M200); the welcome wordmark and the exit receipt (M199).
 
 ## Risks
 
@@ -123,17 +124,17 @@ behaviour (M196); asks (M197); sheets (M198); the needs-you lead, view segments 
 - [x] Smoke — `TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`; readiness now waits for footer `fake-1`.
 - [x] Drive — `python3 docs/verification/m193/drive.py`: `PASS 100x32` / `PASS 80x24`, each followed by `CLEAN`; idle/live/done, four modes, toast expiry and moving edge; private fake-provider HOME/data/cwd. Text and ANSI captures in `docs/verification/m193/`.
 - [x] `cargo fmt --all -- --check`: exit 0, no output.
-- [x] `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 2.31s`.
-- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 4.35s`.
-- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6442 passed; 0 failed; 0 ignored**; TUI 1388, PTY 19. `cargo build -p bingo --locked`: exit 0.
+- [x] `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 6.63s`.
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 23.84s`.
+- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6445 passed; 0 failed; 0 ignored**; TUI 1389, PTY 19. `cargo build -p bingo --locked`: exit 0.
 - [x] `scripts/check_discipline.sh`: `discipline ok` (advisory warnings only).
-- [x] `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `0s`, TUI relink `0 crates`; `target/debug: 8 GB (soft max 5)` warning; `budget ok`.
+- [x] `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `0s`, TUI relink `0 crates`; `target/debug: 13 GB (soft max 5)` warning; `budget ok`.
 - [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
-- [x] Windows command: `cargo check -p bingo-mod-keybar --all-targets --target x86_64-pc-windows-msvc`: exit 0, `Finished dev profile ... in 3.03s`.
-- [ ] Same Windows command for `bingo-surface-tui` and `bingo`: exit 101; `aws-lc-sys` lacks `stdlib.h`/`windows.h`; `bingo` also hits `rquickjs-sys` rejecting MSVC `/std:c11`. Same native-toolchain blocker as M192; these checks remain owed, with no bypass.
+- [x] Windows — `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: SDK, core, mod-hello, mod-keybar and tool-bash each `Finished dev profile`, exit 0.
+- [ ] Same Windows check for permissions/TUI/bingo: exit 101. Permissions' tree-sitter lacks `stdio.h`/`stdlib.h`; TUI's aws-lc-sys lacks `stdlib.h`/`windows.h`; bingo's rquickjs-sys rejects `/std:c11`. Native-toolchain checks remain owed; no bypass.
 - [ ] Full frames: explicitly deferred by the task until the reviewer assigns the second-to-land criterion; M194's stream rows/fold retirement remain untouched.
 - Departures: prototype mode toast holds 2800 ms plus 300 ms fade (ordinary toast 2400+300); brick 5 only names 2400. `p8-page.js::paintBar` retains ` — <dir>` in child titles, unlike brick 6/ADR's shorter spelling; prototype followed.
-- Prototype wins: idle edge is blank; a focused caret fades and schedules frames. “Idle costs nothing” means no invisible/expired animation wakes; unfocused and reduced idle frames stay still.
+- Round 2 departure: the caret rests after 10 s without a key (ADR-0097 §10), then schedules nothing; no capture reaches that age. The next key wakes it. The needs-you lead moved forward from M200; view segments/ctrl+g remain there.
 - Harness fix: M192 omitted snapshot/capture's `T0 = 10_000_000`; `Capture::now` now includes that origin, needed for the exact `mode-later` caret ink. Scene captures and prototype are unchanged.
 - Smoke found the retired opening's invisible focus swallowing the first character after a pane closed; removed it and pinned `the_first_key_is_typed ... ok`. Two PTY expectations changed for the embedded caret and footer clipping; no unrelated test failures remained.
 - Snapshots: sampled before bulk re-pin; 408 updated for removed header/notice/key/status/crew rows, bottom anchoring, embedded caret and footer ink. Twelve deleted because the old opening animation is gone; M199 owns the replacement wordmark.
@@ -142,5 +143,11 @@ behaviour (M196); asks (M197); sheets (M198); the needs-you lead, view segments 
 - Deleted under `crates/bingo-surface-tui/src/screens/snapshots/`, each with prefix `bingo_surface_tui__screens__opening__`:
   `opening_line_120x40.snap`, `opening_line_80x24.snap`, `opening_rest_120x40.snap`, `opening_rest_80x24.snap`,
   `opening_words_120x40.snap`, `opening_words_80x24.snap`, `opening_words_daylight.snap`.
-- Shared-file changes: `pointer.rs` only removes six lines intercepting the retired Intro focus; `blocks.rs`/`worked.rs` only adjust geometry/copy tests. Shared snapshots only reflect these bands; no M194 merge attempted.
+- Shared files: `pointer.rs` removes retired Intro/crew targets; `transcript.rs` drops the opening adapter/height; `transcript/said.rs` uses `grid::fit`; `transcript/slots.rs` supplies optional meanings. `blocks.rs`/`worked.rs` only adjust tests. No M194 merge attempted.
 - No dependency additions. Site/footer/activity clocks return `Drawing` deadlines; Layout collects them. Mode flash reuses the existing acknowledgement timestamp; end flash reads `last_turn`.
+- Round 2 — typed mode notices, 10 s caret rest, delayed wakes, deadline fold, cleanup and four prototype fixes; contracts and ten regressions fail without fixes and pass with them. [Evidence and final gates](../verification/m193/review-round2.txt). Four needs-you snapshots updated; none deleted this round.
+- `/plugins N from this repo waiting`: M199's welcome takes it.
+- The 1.4 s model-change glow: the prototype uses a toast, arriving with M198's model sheet.
+- `· this session` after the model and `context N%` below 70%: the prototype dropped them.
+- The title's attention mark: the prototype says “waiting on you” once, with the edge (`p8-page.js`).
+- `ctrl+c again to exit` as a right pair: it becomes a toast in M196.
