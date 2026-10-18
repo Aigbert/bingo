@@ -39,17 +39,6 @@ pub fn splice(
         room: area.height as usize,
     }
     .rows(&mut frame.pulls, false);
-    let span = (owner.summary.id == *tree.view())
-        .then(|| {
-            interaction
-                .item
-                .as_ref()
-                .and_then(|item| frame.blocks.span(item))
-        })
-        .flatten();
-    let (at, removed) = span
-        .map(|(from, to)| (from, to - from))
-        .unwrap_or((frame.blocks.height(), 0));
     if !matches!(interaction.kind, InteractionKind::Permission { .. }) {
         drawing.rows.insert(0, (asking(), None));
     }
@@ -65,8 +54,25 @@ pub fn splice(
     {
         dim(&mut drawing);
     }
-    frame.inline = Some((at, removed, drawing.rows.len()));
+    let (at, removed) = position(tree, frame, drawing.rows.len())?;
     Some((at, removed, drawing))
+}
+
+pub fn position(tree: &Tree, frame: &mut Layout, count: usize) -> Option<(usize, usize)> {
+    let (owner, interaction) = tree.open_interaction()?;
+    let span = (owner.summary.id == *tree.view())
+        .then(|| {
+            interaction
+                .item
+                .as_ref()
+                .and_then(|item| frame.blocks.span(item))
+        })
+        .flatten();
+    let (at, removed) = span
+        .map(|(from, to)| (from, to - from))
+        .unwrap_or((frame.blocks.height(), 0));
+    frame.inline = Some((at, removed, count));
+    Some((at, removed))
 }
 
 /// The row a card that no step asked for is headed with.

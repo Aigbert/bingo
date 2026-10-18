@@ -23,14 +23,7 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Line<'static>
     attention(tree, ui, now, &mut pairs);
     let props = Props::KeyBar(KeyBarProps {
         pairs,
-        toast: crate::toast::components(
-            ui,
-            tree.viewed(),
-            now,
-            width,
-            &mut frame.pulls,
-            &mut frame.next_frame,
-        ),
+        toast: crate::toast::components(ui, tree.viewed(), now, width, &mut frame.pulls),
     });
     if tree.open_interaction().is_some() {
         return own(&props, width).remove(0);

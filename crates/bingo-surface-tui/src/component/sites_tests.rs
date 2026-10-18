@@ -699,15 +699,7 @@ fn round3_flattened_toast_has_no_motion_deadline() {
     let (mut ui, now) = scene();
     ui.sync_toasts(&state, now);
     let mut frame = crate::layout::Layout::default();
-    crate::toast::components(
-        &ui,
-        &state,
-        now,
-        80,
-        &mut frame.pulls,
-        &mut frame.next_frame,
-    )
-    .unwrap();
+    crate::toast::components(&ui, &state, now, 80, &mut frame.pulls).unwrap();
     let key = frame
         .pulls
         .iter()
@@ -724,15 +716,7 @@ fn round3_flattened_toast_has_no_motion_deadline() {
         .unwrap(),
     );
     crate::theme::with(crate::painted::daylight(), || {
-        let toast = crate::toast::components(
-            &ui,
-            &state,
-            now,
-            80,
-            &mut frame.pulls,
-            &mut frame.next_frame,
-        )
-        .unwrap();
+        let toast = crate::toast::components(&ui, &state, now, 80, &mut frame.pulls).unwrap();
         assert_eq!(toast.text, "still words");
         assert_eq!(frame.next_frame, None);
     });

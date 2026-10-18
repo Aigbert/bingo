@@ -134,7 +134,6 @@ pub fn components(
     now: Now,
     width: usize,
     pulls: &mut Vec<crate::pulled::Key>,
-    _next: &mut Option<std::time::Instant>,
 ) -> Option<bingo_sdk::component::KeyToast> {
     let mut toast = current(ui, state, now)?;
     let Some((placed, _)) = ui

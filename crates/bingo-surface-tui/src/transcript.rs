@@ -288,6 +288,9 @@ impl From<crate::views::Drawing> for Block {
     }
 }
 impl Block {
+    /// Discard picture placements and pending image destinations: component
+    /// substitutions replace text only, while their callers retain those fields
+    /// on the original block for the graphics pass.
     pub fn into_text_drawing(self) -> crate::views::Drawing {
         crate::views::Drawing {
             lines: self.lines,
@@ -670,13 +673,9 @@ struct Call<'a> {
 
 fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> crate::views::Drawing {
     let failed = call.status.failed(call.output);
-    let style = live_bullet(call.status, failed, rows);
+    let bullet = live_bullet(call.status, failed, rows);
     let landing = Landing::of(cue, failed, rows);
-    let mut out = crate::views::Drawing::still(speaks(
-        style,
-        vec![signature(call.name, &call.about, rows, landing)],
-        rows,
-    ));
+    let mut out = bullet.heading(vec![signature(call.name, &call.about, rows, landing)], rows);
     out.append(result(&call, rows));
     out
 }
@@ -686,11 +685,31 @@ fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> crate::views::Drawing
 /// What the answer landing looks like is the row's own words ([`Landing`]),
 /// not a frame of weight on the bullet: a thirty-three millisecond flash is
 /// below the threshold at which a person reads it as something happening.
-fn live_bullet(status: ItemStatus, failed: bool, rows: &Rows<'_>) -> Style {
-    let settled = bullet_style(status, failed);
-    match rows.now.motion && status == ItemStatus::Running {
-        true => theme::pulse(clock::breath(rows.now, PULSE)),
-        false => settled,
+fn live_bullet(status: ItemStatus, failed: bool, rows: &Rows<'_>) -> Bullet {
+    let moving = rows.now.motion && status == ItemStatus::Running;
+    let style = if moving {
+        theme::pulse(clock::breath(rows.now, PULSE))
+    } else {
+        bullet_style(status, failed)
+    };
+    Bullet {
+        span: Span::styled(format!(" {} ", theme::bullet()), style),
+        next: moving.then_some(rows.now.instant + clock::FRAME),
+    }
+}
+
+#[must_use]
+struct Bullet {
+    span: Span<'static>,
+    next: Option<Instant>,
+}
+
+impl Bullet {
+    fn heading(self, body: Vec<Line<'static>>, rows: &Rows<'_>) -> crate::views::Drawing {
+        crate::views::Drawing {
+            lines: under(self.span, body, speaks_indent(), rows.measured()),
+            next: self.next,
+        }
     }
 }
 

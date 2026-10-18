@@ -513,7 +513,7 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     with_transcript_rows(tree, ui, frame, area, now, |blocks, agents, rows| {
         blocks.sync(state, agents, rows);
     });
-    let inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
+    let mut inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
     transcript_window(tree, ui, frame, rows, now);
     let height = frame.blocks.height();
     let visible = frame.visible_lines(rows);
@@ -523,6 +523,11 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
         }
     });
     if frame.blocks.height() != height {
+        if let Some((at, removed, drawing)) = &mut inline
+            && let Some(position) = crate::ask::drawing::position(tree, frame, drawing.rows.len())
+        {
+            (*at, *removed) = position;
+        }
         transcript_window(tree, ui, frame, rows, now);
     }
     let next = frame

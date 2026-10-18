@@ -1,7 +1,7 @@
 use bingo_sdk::{Item, ItemBody};
 use ratatui::text::{Line, Span};
 
-use super::{Block, Cue, Landing, Rows, live_bullet, returns, signature, speaks};
+use super::{Block, Cue, Landing, Rows, live_bullet, returns, signature};
 use crate::theme;
 
 /// Apply only the fields a producer replaces; absent fields keep the item's drawing.
@@ -31,13 +31,16 @@ pub(super) fn placed_row(
         block.pictures.clear();
         block.wanted.clear();
         let drawn = placed_body(body, rows);
-        block.next = drawn.next;
+        block.next = block.next.into_iter().chain(drawn.next).min();
         block.lines.extend(drawn.lines);
     }
     if !quiet {
         if let Some(title) = title {
             let heading = replacement_heading(item, title, badge.as_deref(), rows, cue);
-            block.lines.splice(..block.lines.len().min(1), heading);
+            block.next = block.next.into_iter().chain(heading.next).min();
+            block
+                .lines
+                .splice(..block.lines.len().min(1), heading.lines);
         }
         if let Some(heading) = block.lines.first_mut() {
             placed_heading(heading, *mark, badge.as_deref().filter(|_| title.is_none()));
@@ -67,7 +70,7 @@ fn replacement_heading(
     badge: Option<&str>,
     rows: &Rows<'_>,
     cue: Cue,
-) -> Vec<Line<'static>> {
+) -> crate::views::Drawing {
     let failed = match &item.body {
         ItemBody::ToolCall { output, .. } => item.status.failed(output.as_ref()),
         _ => false,
@@ -76,8 +79,7 @@ fn replacement_heading(
         ItemBody::User { .. } => Landing::Settled,
         _ => Landing::of(cue, failed, rows),
     };
-    speaks(
-        live_bullet(item.status, failed, rows),
+    live_bullet(item.status, failed, rows).heading(
         vec![signature(title, badge.unwrap_or_default(), rows, landing)],
         rows,
     )
