@@ -164,9 +164,8 @@ async fn closing_with_an_ask_agrees_in_outcome_hooks_and_journal() {
     agrees(Some(permission()), true).await;
 }
 
-fn lost_call_journal() -> Vec<Frame> {
-    let turn = TurnId::from_raw("lost");
-    let mut frames = vec![
+fn lost_turn_journal() -> Vec<Frame> {
+    vec![
         journal_frame(
             1,
             Event::SessionUpdated {
@@ -176,12 +175,17 @@ fn lost_call_journal() -> Vec<Frame> {
         journal_frame(
             2,
             Event::TurnStarted {
-                turn: turn.clone(),
+                turn: TurnId::from_raw("lost"),
                 inputs: vec![],
                 origin: TurnOrigin::Submit,
             },
         ),
-    ];
+    ]
+}
+
+fn lost_call_journal() -> Vec<Frame> {
+    let turn = TurnId::from_raw("lost");
+    let mut frames = lost_turn_journal();
     for (index, status) in [ItemStatus::Running, ItemStatus::Pending]
         .into_iter()
         .enumerate()
@@ -204,6 +208,98 @@ fn lost_call_journal() -> Vec<Frame> {
         frames.push(journal_frame(index as u64 + 3, Event::ItemStarted { item }));
     }
     frames
+}
+
+fn lost_text_journal() -> Vec<Frame> {
+    let mut frames = lost_turn_journal();
+    let item = crate::turn::mint(
+        &TurnId::from_raw("lost"),
+        0,
+        ItemBody::Assistant {
+            text: "unfinished".into(),
+        },
+        ItemStatus::Running,
+    );
+    frames.push(journal_frame(3, Event::ItemStarted { item }));
+    frames
+}
+
+fn lost_ask_journal() -> Vec<Frame> {
+    let mut frames = lost_call_journal();
+    let state = replayed(&frames).unwrap();
+    let mut first = state.transcript.items()[0].as_ref().clone();
+    first.status = ItemStatus::Completed;
+    first.completed_at = Some(Timestamp::now());
+    if let ItemBody::ToolCall {
+        output,
+        duration_ms,
+        ..
+    } = &mut first.body
+    {
+        *output = Some(ToolOutput::text("done"));
+        *duration_ms = Some(1);
+    }
+    frames.push(journal_frame(5, Event::ItemCompleted { item: first }));
+    let interaction = Interaction {
+        id: InteractionId::from_raw("lost-ask"),
+        session: state.summary.id,
+        turn: Some(TurnId::from_raw("lost")),
+        item: Some(state.transcript.items()[1].id.clone()),
+        opened_at: Timestamp::now(),
+        guard_until: None,
+        expires_at: None,
+        kind: permission(),
+        answers: vec![AnswerSpec::AllowOnce, AnswerSpec::Deny, AnswerSpec::Cancel],
+    };
+    frames.push(journal_frame(6, Event::InteractionOpened { interaction }));
+    frames
+}
+
+fn recovery_journals() -> [(&'static str, Vec<Frame>); 3] {
+    [
+        ("mid-ask", lost_ask_journal()),
+        ("mid-call", lost_call_journal()),
+        ("mid-text", lost_text_journal()),
+    ]
+}
+
+fn assert_recovered(name: &str, before: &SessionState, after: &SessionState, added: &[Frame]) {
+    assert!(after.turn.is_none(), "{name}: lost turn remains open");
+    for prior in before.transcript.items() {
+        let item = after.transcript.get(&prior.id).unwrap();
+        if prior.status.is_terminal() {
+            assert_eq!(item, prior.as_ref(), "{name}: terminal item changed");
+        } else {
+            assert_eq!(
+                item.status,
+                ItemStatus::Interrupted,
+                "{name}: unfinished item stayed open"
+            );
+            assert!(
+                item.completed_at.is_some(),
+                "{name}: interrupted item has no completion time"
+            );
+        }
+        assert_eq!(
+            added
+                .iter()
+                .filter(|frame| matches!(&frame.event,
+                    Event::ItemCompleted { item } if item.id == prior.id
+                ))
+                .count(),
+            usize::from(!prior.status.is_terminal()),
+            "{name}: unexpected item closure"
+        );
+    }
+    for ask in &before.interactions {
+        assert_eq!(added.iter().filter(|frame| matches!(&frame.event,
+            Event::InteractionCancelled { id, reason: CancelReason::SessionClosed } if id == &ask.id
+        )).count(), 1, "{name}: missing interaction cancellation");
+    }
+    assert!(
+        after.interactions.is_empty(),
+        "{name}: interaction stayed open"
+    );
 }
 
 async fn resume_stopped(frames: Vec<Frame>) -> (SessionState, Vec<Frame>) {
@@ -253,51 +349,70 @@ async fn resumed_pending_calls_close_before_the_lost_turn() {
 
 #[tokio::test]
 async fn resuming_the_same_journal_twice_adds_no_recovery_frames() {
-    let (first, journal) = resume_stopped(lost_call_journal()).await;
-    let before = journal.len();
-    let (second, journal) = resume_stopped(journal).await;
-    assert!(
-        journal[before..].iter().all(|frame| !matches!(
-            frame.event,
-            Event::ItemCompleted { .. }
-                | Event::InteractionCancelled { .. }
-                | Event::TurnCompleted { .. }
-        )),
-        "the second resume wrote recovery frames"
-    );
-    assert_eq!(first.transcript, second.transcript);
-    assert_eq!(first.turn, second.turn);
-    assert_eq!(first.last_turn, second.last_turn);
-    assert_eq!(first.interactions, second.interactions);
-    assert!(
-        recovery::frames(
-            &second.interactions,
-            second.turn.as_ref(),
-            &second.transcript,
-            Timestamp::now(),
-        )
-        .is_empty(),
-        "recovery has nothing left to publish"
-    );
+    for (name, source) in recovery_journals() {
+        let before = replayed(&source).unwrap();
+        let cut = source.len();
+        let (first, journal) = resume_stopped(source).await;
+        assert_recovered(name, &before, &first, &journal[cut..]);
+        let cut = journal.len();
+        let (second, journal) = resume_stopped(journal).await;
+        assert!(
+            journal[cut..].iter().all(|frame| !matches!(
+                frame.event,
+                Event::ItemCompleted { .. }
+                    | Event::InteractionCancelled { .. }
+                    | Event::TurnCompleted { .. }
+            )),
+            "{name}: the second resume wrote recovery frames"
+        );
+        assert_eq!(first.transcript, second.transcript, "{name}");
+        assert_eq!(first.turn, second.turn, "{name}");
+        assert_eq!(first.last_turn, second.last_turn, "{name}");
+        assert_eq!(first.interactions, second.interactions, "{name}");
+        assert!(
+            recovery::frames(
+                &second.interactions,
+                second.turn.as_ref(),
+                &second.transcript,
+                Timestamp::now(),
+            )
+            .is_empty(),
+            "{name}: recovery has nothing left to publish"
+        );
+    }
 }
 
 #[tokio::test]
 async fn resuming_partway_through_recovery_never_closes_an_item_twice() {
-    let (first, mut journal) = resume_stopped(lost_call_journal()).await;
-    let done = journal
-        .iter()
-        .position(|frame| matches!(frame.event, Event::TurnCompleted { .. }))
-        .unwrap();
-    journal.truncate(done);
-    let before = journal.len();
-    let (second, journal) = resume_stopped(journal).await;
-    assert!(
-        journal[before..]
+    for (name, source) in recovery_journals() {
+        let before = replayed(&source).unwrap();
+        let cut = source.len();
+        let (first, mut journal) = resume_stopped(source).await;
+        assert_recovered(name, &before, &first, &journal[cut..]);
+        let done = journal
             .iter()
-            .all(|frame| !matches!(frame.event, Event::ItemCompleted { .. })),
-        "recovery closed a terminal item twice"
-    );
-    assert_eq!(first.transcript, second.transcript);
-    assert_eq!(first.turn, second.turn);
-    assert_eq!(first.interactions, second.interactions);
+            .position(|frame| matches!(frame.event, Event::TurnCompleted { .. }))
+            .unwrap();
+        journal.truncate(done);
+        let cut = journal.len();
+        let (second, journal) = resume_stopped(journal).await;
+        assert!(
+            journal[cut..].iter().all(|frame| !matches!(
+                frame.event,
+                Event::ItemCompleted { .. } | Event::InteractionCancelled { .. }
+            )),
+            "{name}: recovery closed an item or interaction twice"
+        );
+        assert_eq!(
+            journal[cut..]
+                .iter()
+                .filter(|frame| matches!(frame.event, Event::TurnCompleted { .. }))
+                .count(),
+            1,
+            "{name}: only the lost turn still needed closing"
+        );
+        assert_eq!(first.transcript, second.transcript, "{name}");
+        assert_eq!(first.turn, second.turn, "{name}");
+        assert_eq!(first.interactions, second.interactions, "{name}");
+    }
 }
