@@ -113,3 +113,24 @@ async fn an_unawaited_dollar_call_finishes_before_the_hook_returns() {
     );
     engine.close().await;
 }
+
+#[tokio::test]
+async fn retired_turn_sites_refuse_loading_in_words() {
+    let root = tempfile::tempdir().unwrap();
+    for (site, matcher) in [
+        ("TurnFold", "'TurnFold'"),
+        ("TurnFold", "['Ledger', 'TurnFold']"),
+        ("TurnProgress", "'TurnProgress'"),
+        ("TurnProgress", "['Spinner', 'TurnProgress']"),
+    ] {
+        std::fs::write(root.path().join("main.js"), format!(
+            "export function register(on) {{ on('ui.render', {{component:{matcher}}}, ($, e, next) => next(e)); }}"
+        )).unwrap();
+        let result = Engine::start(root.path(), "main.js", json!({}), Limits::default()).await;
+        let error = result
+            .err()
+            .expect("a retired site cannot load")
+            .to_string();
+        assert!(error.contains(site) && error.contains("retired"), "{error}");
+    }
+}

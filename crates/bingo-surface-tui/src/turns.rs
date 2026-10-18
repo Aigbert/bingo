@@ -127,21 +127,8 @@ pub fn running_for(
 }
 
 pub fn marks() -> Marks {
-    let chrome = crate::theme::glyphs().chrome;
-    let [done, asked, running, failed] = chrome.steps.map(str::to_owned);
-    let [folded, open] = if crate::theme::bullet().is_ascii() {
-        [">", "v"]
-    } else {
-        ["▸", "▾"]
-    }
-    .map(str::to_owned);
     Marks {
-        done,
-        asked,
-        running,
-        failed,
-        folded,
-        open,
+        asked: crate::theme::glyphs().chrome.steps[1].into(),
     }
 }
 

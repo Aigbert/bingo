@@ -109,8 +109,7 @@ fn site(component: Component) -> bingo_sdk::SessionState {
         | Component::ToolGroup
         | Component::ToolResult
         | Component::ToolProgress
-        | Component::Ledger
-        | Component::TurnFold => call_site(component),
+        | Component::Ledger => call_site(component),
         Component::CommandOutput => completed_item(item(
             "itm_one",
             ItemStatus::Completed,
@@ -129,7 +128,7 @@ fn site(component: Component) -> bingo_sdk::SessionState {
                 code: String::new(),
             },
         )),
-        Component::Spinner | Component::TurnProgress => folded(vec![frame(1, started("trn_one"))]),
+        Component::Spinner => folded(vec![frame(1, started("trn_one"))]),
         Component::TurnDuration => {
             let mut closed = frame(2, completed("trn_one", bingo_sdk::TurnStatus::Completed));
             closed.seq = bingo_sdk::Seq(3);

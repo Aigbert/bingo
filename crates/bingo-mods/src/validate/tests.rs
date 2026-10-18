@@ -364,3 +364,33 @@ fn component_surface_warning_names_the_unasked_site() {
             .any(|finding| finding.rule == Rule::ComponentSurface)
     );
 }
+
+#[test]
+fn a_retired_turn_fold_is_a_validation_error() {
+    let result = checked(
+        "export const register = on => on('ui.render', {component:'TurnFold'}, ($, e, next) => next(e));",
+        "",
+    );
+    assert!(!result.valid());
+    assert!(
+        result
+            .findings
+            .iter()
+            .any(|f| f.text.contains("TurnFold") && f.text.contains("retired"))
+    );
+}
+
+#[test]
+fn a_retired_turn_progress_is_a_validation_error() {
+    let result = checked(
+        "export const register = on => on('ui.render', {component:'TurnProgress'}, ($, e, next) => next(e));",
+        "",
+    );
+    assert!(!result.valid());
+    assert!(
+        result
+            .findings
+            .iter()
+            .any(|f| f.text.contains("TurnProgress") && f.text.contains("retired"))
+    );
+}

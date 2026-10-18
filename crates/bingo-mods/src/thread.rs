@@ -83,12 +83,7 @@ async fn initialize(
     stop: &CancellationToken,
     active: &Active,
 ) -> Result<(AsyncRuntime, AsyncContext, Vec<RegisteredHook>), Fault> {
-    let root = Root::new(&root, limits.memory_bytes as u64).map_err(Fault::load)?;
-    let root = if module.testing {
-        root.for_testing()
-    } else {
-        root
-    };
+    let root = loader(&root, limits.memory_bytes as u64, module.testing)?;
     let runtime = AsyncRuntime::new().map_err(Fault::load)?;
     runtime.set_memory_limit(limits.memory_bytes).await;
     runtime.set_max_stack_size(limits.stack_bytes).await;
@@ -126,7 +121,9 @@ async fn initialize(
         ctx.globals()
             .set("__bingo_dispatch", run)
             .map_err(Fault::load)?;
-        serde_json::from_str::<Vec<RegisteredHook>>(&patterns).map_err(Fault::load)
+        let hooks = serde_json::from_str::<Vec<RegisteredHook>>(&patterns).map_err(Fault::load)?;
+        refuse_retired(&hooks)?;
+        Ok(hooks)
     });
     let patterns = tokio::select! {
         result = loaded => result?,
@@ -134,6 +131,20 @@ async fn initialize(
     };
     meter.suspend();
     Ok((runtime, context, patterns))
+}
+
+fn loader(path: &std::path::Path, limit: u64, testing: bool) -> Result<Root, Fault> {
+    let root = Root::new(path, limit).map_err(Fault::load)?;
+    Ok(if testing { root.for_testing() } else { root })
+}
+
+fn refuse_retired(hooks: &[RegisteredHook]) -> Result<(), Fault> {
+    for hook in hooks {
+        if let Some(reason) = bingo_sdk::render::retired(&hook.matcher) {
+            return Err(Fault::load(reason));
+        }
+    }
+    Ok(())
 }
 
 async fn execute(context: AsyncContext, active: Active, request: Request) {

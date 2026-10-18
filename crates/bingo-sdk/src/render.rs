@@ -44,12 +44,10 @@ pub enum Component {
     Asset,
     ShellRun,
     Action,
-    TurnProgress,
     SessionStatus,
     Toast,
     Welcome,
     Ledger,
-    TurnFold,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -83,6 +81,20 @@ pub struct RenderRequest {
     /// The cells the surface offers the drawing.
     pub viewport: Viewport,
 }
+/// A named retired site is a load error, even in a list of matched sites.
+pub fn retired(matcher: &Value) -> Option<&'static str> {
+    let component = matcher.get("component")?;
+    let names = component
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_else(|| std::slice::from_ref(component));
+    names.iter().find_map(|name| match name.as_str()? {
+        "TurnFold" => Some("TurnFold site retired; use Ledger for each step row (ADR-0097)"),
+        "TurnProgress" => Some("TurnProgress site retired; a band's clock is TurnDuration and the live row is Spinner (ADR-0097)"),
+        _ => None,
+    })
+}
+
 impl Component {
     /// What this site draws, for authors choosing a `ui.render` match.
     pub const fn summary(self) -> &'static str {
@@ -133,15 +145,11 @@ impl Component {
             Self::Asset => "A file or picture the session produced, in the transcript.",
             Self::ShellRun => "A shell command the person ran from the prompt, with its output.",
             Self::Action => "An action a client ran, with its result.",
-            Self::TurnProgress => "A running turn's elapsed time and tokens.",
             Self::SessionStatus => "The status line: model, effort, directory and context use.",
             Self::Toast => "A short-lived notification.",
             Self::Welcome => "The welcome card a new session opens with.",
             Self::Ledger => {
                 "A running turn's step: its glyph, verb, target and right-aligned outcome."
-            }
-            Self::TurnFold => {
-                "A finished turn folded to one line of its steps and its elapsed time."
             }
         }
     }
@@ -188,12 +196,10 @@ impl Component {
             | Self::PermissionReceipt
             | Self::Asset
             | Self::Action
-            | Self::TurnProgress
             | Self::SessionStatus
             | Self::Toast
             | Self::Welcome
-            | Self::Ledger
-            | Self::TurnFold => &[
+            | Self::Ledger => &[
                 SurfaceName::Terminal,
                 SurfaceName::Desktop,
                 SurfaceName::Text,
@@ -201,7 +207,7 @@ impl Component {
         }
     }
 
-    pub const ALL: [Self; 40] = [
+    pub const ALL: [Self; 38] = [
         Self::KeyBar,
         Self::Composer,
         Self::ModelPicker,
@@ -236,12 +242,10 @@ impl Component {
         Self::Asset,
         Self::ShellRun,
         Self::Action,
-        Self::TurnProgress,
         Self::SessionStatus,
         Self::Toast,
         Self::Welcome,
         Self::Ledger,
-        Self::TurnFold,
     ];
 }
 impl RenderRequest {

@@ -17,12 +17,7 @@ fn step(state: StepState) -> Step {
 }
 fn marks() -> Marks {
     Marks {
-        asked: "◆".into(),
-        done: "✓".into(),
-        running: "◌".into(),
-        failed: "✗".into(),
-        folded: "▸".into(),
-        open: "▾".into(),
+        asked: "◆".into()
     }
 }
 

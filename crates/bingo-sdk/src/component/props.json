@@ -231,15 +231,6 @@
     }
   },
   {
-    "component": "TurnProgress",
-    "props": {
-      "elapsedMs": 3000,
-      "tokensOut": 12,
-      "interruptible": true,
-      "stopping": false
-    }
-  },
-  {
     "component": "SessionStatus",
     "props": {
       "provider": "fake",
@@ -433,52 +424,7 @@
         }
       ],
       "marks": {
-        "done": "+",
-        "asked": "*",
-        "running": "o",
-        "failed": "!",
-        "folded": ">",
-        "open": "v"
-      }
-    }
-  },
-  {
-    "component": "TurnFold",
-    "props": {
-      "steps": [
-        {
-          "verb": "edit",
-          "target": "src/main.rs",
-          "state": "done",
-          "upshot": {
-            "kind": "diff",
-            "added": 1,
-            "removed": 1
-          },
-          "mark": "•",
-          "reads": "text",
-          "tier": "change"
-        },
-        {
-          "verb": "bash",
-          "target": "cargo test",
-          "state": "stopped",
-          "mark": "•",
-          "reads": "text",
-          "tier": "change"
-        }
-      ],
-      "outcome": "stopped",
-      "elapsed": 7000,
-      "thought": true,
-      "isExpanded": true,
-      "marks": {
-        "done": "✓",
-        "asked": "◆",
-        "running": "◌",
-        "failed": "✗",
-        "folded": "▸",
-        "open": "▾"
+        "asked": "*"
       }
     }
   }

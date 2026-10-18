@@ -232,12 +232,10 @@
               "Asset",
               "ShellRun",
               "Action",
-              "TurnProgress",
               "SessionStatus",
               "Toast",
               "Welcome",
-              "Ledger",
-              "TurnFold"
+              "Ledger"
             ]
           },
           "SurfaceName": {
@@ -1721,12 +1719,10 @@
               "Asset",
               "ShellRun",
               "Action",
-              "TurnProgress",
               "SessionStatus",
               "Toast",
               "Welcome",
-              "Ledger",
-              "TurnFold"
+              "Ledger"
             ]
           }
         }
@@ -4276,12 +4272,10 @@
               "Asset",
               "ShellRun",
               "Action",
-              "TurnProgress",
               "SessionStatus",
               "Toast",
               "Welcome",
-              "Ledger",
-              "TurnFold"
+              "Ledger"
             ]
           },
           "Upshot": {
@@ -9135,12 +9129,10 @@
               "Asset",
               "ShellRun",
               "Action",
-              "TurnProgress",
               "SessionStatus",
               "Toast",
               "Welcome",
-              "Ledger",
-              "TurnFold"
+              "Ledger"
             ]
           },
           "Upshot": {
@@ -12839,12 +12831,10 @@
               "Asset",
               "ShellRun",
               "Action",
-              "TurnProgress",
               "SessionStatus",
               "Toast",
               "Welcome",
-              "Ledger",
-              "TurnFold"
+              "Ledger"
             ]
           },
           "ItemBody": {

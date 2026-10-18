@@ -737,6 +737,7 @@ impl Bridge {
         let result: InitializeResult =
             serde_json::from_value(answer).map_err(|e| format!("initialize: {e}"))?;
         check_protocol(&result)?;
+        check_sites(&result)?;
         connection.negotiate(&result.capabilities);
         connection.initialize_lists(result.tools.clone(), result.commands.clone());
         Ok(result)
@@ -785,6 +786,17 @@ impl Bridge {
 /// A major this host does not speak is refused rather than guessed at
 /// (ADR-0015 §Consequences): a wire whose meaning is unknown is worse than no
 /// wire at all.
+fn check_sites(result: &InitializeResult) -> Result<(), String> {
+    for matcher in &result.subscriptions {
+        for value in std::iter::once(&matcher.prefilter).chain(matcher.render.iter().flatten()) {
+            if let Some(reason) = bingo_sdk::render::retired(value) {
+                return Err(reason.into());
+            }
+        }
+    }
+    Ok(())
+}
+
 fn check_protocol(result: &InitializeResult) -> Result<(), String> {
     if result.protocol == PROTOCOL {
         return Ok(());
@@ -815,6 +827,29 @@ mod tests {
             subscriptions: Vec::new(),
             services: Default::default(),
         }
+    }
+
+    #[test]
+    fn a_retired_turn_fold_refuses_the_handshake() {
+        let mut registration = result(PROTOCOL);
+        let mut matcher = bingo_sdk::LinkMatcher::at(bingo_sdk::catalogue::UI_RENDER);
+        matcher.prefilter = serde_json::json!({"component":"TurnFold"});
+        registration.subscriptions.push(matcher);
+        let why = check_sites(&registration).unwrap_err();
+        assert!(why.contains("TurnFold") && why.contains("retired"), "{why}");
+    }
+
+    #[test]
+    fn a_retired_turn_progress_refuses_the_handshake() {
+        let mut registration = result(PROTOCOL);
+        let mut matcher = bingo_sdk::LinkMatcher::at(bingo_sdk::catalogue::UI_RENDER);
+        matcher.prefilter = serde_json::json!({"component":"TurnProgress"});
+        registration.subscriptions.push(matcher);
+        let why = check_sites(&registration).unwrap_err();
+        assert!(
+            why.contains("TurnProgress") && why.contains("retired"),
+            "{why}"
+        );
     }
 
     #[test]

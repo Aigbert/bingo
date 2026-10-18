@@ -117,12 +117,6 @@ props!(PermissionReceiptProps { interaction: crate::InteractionId, tool: String,
 props!(AssetProps { asset: String, label: Option<String> });
 props!(ShellRunProps { command: String, output: String, exit: Option<i32>, cwd: std::path::PathBuf, status: crate::ItemStatus });
 props!(ActionProps { name: String, args: Value, result: Option<Value>, status: crate::ItemStatus });
-props!(TurnProgressProps {
-    elapsed_ms: u64,
-    tokens_out: u64,
-    interruptible: bool,
-    stopping: bool
-});
 props!(SessionStatusProps {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     model_scope: Option<crate::ChoiceScope>,

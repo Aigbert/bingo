@@ -277,7 +277,7 @@ export type CompactorContext = {
 export type CompactorSpec = { "id": string; [key: string]: unknown; };
 export type Complete = { "request": ModelRequest; "session": SessionId; "turn"?: (TurnId | null); [key: string]: unknown; };
 export type Completed = { "events": Array<ModelEvent>; [key: string]: unknown; };
-export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "TurnProgress" | "SessionStatus" | "Toast" | "Welcome" | "Ledger" | "TurnFold");
+export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "SessionStatus" | "Toast" | "Welcome" | "Ledger");
 export type ComposerProps = { "placeholder": string; "tag": string; [key: string]: unknown; };
 export type ConfigSet = {
   /** The setting's dotted key. */
@@ -757,13 +757,8 @@ export type KeyBarProps = { "pairs": Array<KeyPair>; [key: string]: unknown; };
  */
 export type KeyBinding = (string | { "args": string; "chord": string; [key: string]: unknown; });
 export type KeyPair = { "action": string; "emphasis"?: boolean; "keys": string; [key: string]: unknown; };
-/** The `Ledger` site: the rows of a running turn's steps. */
-export type LedgerProps = {
-  /** What each row starts with. */
-  "marks": Marks;
-  "steps": Array<Step>;
-  [key: string]: unknown;
-};
+/** The `Ledger` site, asked for one step at a time. */
+export type LedgerProps = { "marks": Marks; "steps": Array<Step>; [key: string]: unknown; };
 /**
  * A length: a number of terminal cells, or a share of the screen written as
  * a percentage string such as `'40%'`.
@@ -829,26 +824,8 @@ export type Manifest = ({
   "version": string;
   [key: string]: unknown;
 });
-/**
- * The marks a turn's rows start with, from the surface's glyph table. A
- * drawing uses the marks it is handed, so a terminal that shows only ASCII
- * gets ASCII whoever draws the rows.
- */
-export type Marks = {
-  /** A step waiting on a person: `◆`. */
-  "asked": string;
-  /** A step that came back: `✓`. */
-  "done": string;
-  /** A step that failed or was stopped: `✗`. */
-  "failed": string;
-  /** A turn folded to its line: `▸`. */
-  "folded": string;
-  /** A turn opened under its line: `▾`. */
-  "open": string;
-  /** A running step when nothing turns it: `◌`. */
-  "running": string;
-  [key: string]: unknown;
-};
+/** The only state mark supplied by a surface; tool marks belong to tools. */
+export type Marks = { "asked": string; [key: string]: unknown; };
 export type Match = { "item": ItemId; "line": number; "turn"?: (TurnId | null); [key: string]: unknown; };
 export type Message = { "parts": Array<ContentPart>; "providerOptions"?: { [key: string]: { [key: string]: unknown; }; }; "role": Role; [key: string]: unknown; };
 export type Messages = {
@@ -1052,7 +1029,7 @@ export type PromptView = {
   "queue": Array<QueueEntry>;
   [key: string]: unknown;
 };
-export type Props = ({ "component": "KeyBar"; "props": KeyBarProps; [key: string]: unknown; } | { "component": "Composer"; "props": ComposerProps; [key: string]: unknown; } | { "component": "ModelPicker"; "props": ModelPickerProps; [key: string]: unknown; } | { "component": "Browse"; "props": BrowseProps; [key: string]: unknown; } | { "component": "Plugins"; "props": PluginsProps; [key: string]: unknown; } | { "component": "Palette"; "props": PaletteProps; [key: string]: unknown; } | { "component": "Sessions"; "props": SessionsProps; [key: string]: unknown; } | { "component": "Status"; "props": StatusProps; [key: string]: unknown; } | { "component": "Question"; "props": QuestionProps; [key: string]: unknown; } | { "component": "UserMessage"; "props": UserMessageProps; [key: string]: unknown; } | { "component": "AssistantMessage"; "props": AssistantMessageProps; [key: string]: unknown; } | { "component": "ToolUse"; "props": ToolUseProps; [key: string]: unknown; } | { "component": "ToolResult"; "props": ToolResultProps; [key: string]: unknown; } | { "component": "ToolGroup"; "props": ToolGroupProps; [key: string]: unknown; } | { "component": "ToolProgress"; "props": ToolProgressProps; [key: string]: unknown; } | { "component": "CommandOutput"; "props": CommandOutputProps; [key: string]: unknown; } | { "component": "Spinner"; "props": SpinnerProps; [key: string]: unknown; } | { "component": "TurnDuration"; "props": TurnDurationProps; [key: string]: unknown; } | { "component": "InfoNotice"; "props": InfoNoticeProps; [key: string]: unknown; } | { "component": "SessionMode"; "props": SessionModeProps; [key: string]: unknown; } | { "component": "PromptHint"; "props": PromptHintProps; [key: string]: unknown; } | { "component": "AbovePrompt"; "props": AbovePromptProps; [key: string]: unknown; } | { "component": "Pane"; "props": PaneProps; [key: string]: unknown; } | { "component": "Permission"; "props": PermissionProps; [key: string]: unknown; } | { "component": "SignIn"; "props": SignInProps; [key: string]: unknown; } | { "component": "Reasoning"; "props": ReasoningProps; [key: string]: unknown; } | { "component": "Compaction"; "props": CompactionProps; [key: string]: unknown; } | { "component": "Rewind"; "props": RewindProps; [key: string]: unknown; } | { "component": "Interruption"; "props": InterruptionProps; [key: string]: unknown; } | { "component": "QuestionAnswer"; "props": QuestionAnswerProps; [key: string]: unknown; } | { "component": "PermissionReceipt"; "props": PermissionReceiptProps; [key: string]: unknown; } | { "component": "Asset"; "props": AssetProps; [key: string]: unknown; } | { "component": "ShellRun"; "props": ShellRunProps; [key: string]: unknown; } | { "component": "Action"; "props": ActionProps; [key: string]: unknown; } | { "component": "TurnProgress"; "props": TurnProgressProps; [key: string]: unknown; } | { "component": "SessionStatus"; "props": SessionStatusProps; [key: string]: unknown; } | { "component": "Toast"; "props": ToastProps; [key: string]: unknown; } | { "component": "Welcome"; "props": WelcomeProps; [key: string]: unknown; } | { "component": "Ledger"; "props": LedgerProps; [key: string]: unknown; } | { "component": "TurnFold"; "props": TurnFoldProps; [key: string]: unknown; });
+export type Props = ({ "component": "KeyBar"; "props": KeyBarProps; [key: string]: unknown; } | { "component": "Composer"; "props": ComposerProps; [key: string]: unknown; } | { "component": "ModelPicker"; "props": ModelPickerProps; [key: string]: unknown; } | { "component": "Browse"; "props": BrowseProps; [key: string]: unknown; } | { "component": "Plugins"; "props": PluginsProps; [key: string]: unknown; } | { "component": "Palette"; "props": PaletteProps; [key: string]: unknown; } | { "component": "Sessions"; "props": SessionsProps; [key: string]: unknown; } | { "component": "Status"; "props": StatusProps; [key: string]: unknown; } | { "component": "Question"; "props": QuestionProps; [key: string]: unknown; } | { "component": "UserMessage"; "props": UserMessageProps; [key: string]: unknown; } | { "component": "AssistantMessage"; "props": AssistantMessageProps; [key: string]: unknown; } | { "component": "ToolUse"; "props": ToolUseProps; [key: string]: unknown; } | { "component": "ToolResult"; "props": ToolResultProps; [key: string]: unknown; } | { "component": "ToolGroup"; "props": ToolGroupProps; [key: string]: unknown; } | { "component": "ToolProgress"; "props": ToolProgressProps; [key: string]: unknown; } | { "component": "CommandOutput"; "props": CommandOutputProps; [key: string]: unknown; } | { "component": "Spinner"; "props": SpinnerProps; [key: string]: unknown; } | { "component": "TurnDuration"; "props": TurnDurationProps; [key: string]: unknown; } | { "component": "InfoNotice"; "props": InfoNoticeProps; [key: string]: unknown; } | { "component": "SessionMode"; "props": SessionModeProps; [key: string]: unknown; } | { "component": "PromptHint"; "props": PromptHintProps; [key: string]: unknown; } | { "component": "AbovePrompt"; "props": AbovePromptProps; [key: string]: unknown; } | { "component": "Pane"; "props": PaneProps; [key: string]: unknown; } | { "component": "Permission"; "props": PermissionProps; [key: string]: unknown; } | { "component": "SignIn"; "props": SignInProps; [key: string]: unknown; } | { "component": "Reasoning"; "props": ReasoningProps; [key: string]: unknown; } | { "component": "Compaction"; "props": CompactionProps; [key: string]: unknown; } | { "component": "Rewind"; "props": RewindProps; [key: string]: unknown; } | { "component": "Interruption"; "props": InterruptionProps; [key: string]: unknown; } | { "component": "QuestionAnswer"; "props": QuestionAnswerProps; [key: string]: unknown; } | { "component": "PermissionReceipt"; "props": PermissionReceiptProps; [key: string]: unknown; } | { "component": "Asset"; "props": AssetProps; [key: string]: unknown; } | { "component": "ShellRun"; "props": ShellRunProps; [key: string]: unknown; } | { "component": "Action"; "props": ActionProps; [key: string]: unknown; } | { "component": "SessionStatus"; "props": SessionStatusProps; [key: string]: unknown; } | { "component": "Toast"; "props": ToastProps; [key: string]: unknown; } | { "component": "Welcome"; "props": WelcomeProps; [key: string]: unknown; } | { "component": "Ledger"; "props": LedgerProps; [key: string]: unknown; });
 /**
  * Kernel → plugin: nobody is reading this stream any more — the turn was
  * interrupted, or whoever asked let go. A process that ignores it is slow, not
@@ -1487,33 +1464,9 @@ export type Turn = {
  */
 export type Turn2 = { "first": number; "headline"?: (string | null); "id": TurnId; "last": number; [key: string]: unknown; };
 export type TurnDurationProps = { "durationMs": number; "word": string; [key: string]: unknown; };
-/**
- * How a turn ended, for its folded line. A failed turn ends `done` here:
- * the line under the turn says why it failed, and a failed step already says
- * `failed`.
- */
-export type TurnEnd = ("done" | "stopped");
-/**
- * The `TurnFold` site: a finished turn as one line. The stop line under a
- * stopped turn is the interruption's own row.
- */
-export type TurnFoldProps = {
-  /** From the turn's first item to its last, in milliseconds. */
-  "elapsed": number;
-  /** The person opened the fold to read the steps inline. */
-  "isExpanded"?: boolean;
-  /** What the line starts with, folded or opened. */
-  "marks": Marks;
-  "outcome": TurnEnd;
-  "steps": Array<Step>;
-  /** The turn thought before or between its steps. */
-  "thought"?: boolean;
-  [key: string]: unknown;
-};
 /** One run of the turn loop, closed exactly once. */
 export type TurnId = string;
 export type TurnOrigin = ("submit" | "queue" | "peer" | "auto");
-export type TurnProgressProps = { "elapsedMs": number; "interruptible": boolean; "stopping": boolean; "tokensOut": number; [key: string]: unknown; };
 export type TurnStatus = ({ "kind": "completed"; [key: string]: unknown; } | { "error": KernelError; "kind": "failed"; [key: string]: unknown; } | { "kind": "interrupted"; "reason": InterruptReason; [key: string]: unknown; });
 export type UnifiedFinish = ("stop" | "length" | "toolCalls" | "contentFilter" | "error" | "other");
 /** A call's result in one line: `+1 −1`, `3 passed`, `exit 1`. */

@@ -16,6 +16,15 @@ pub(super) fn check(call: &CallExpression<'_>, semantic: &Semantic<'_>, source: 
     let components = values(object, "component", semantic);
     let surfaces = values(object, "surface", semantic);
     for name in components {
+        if let Some(reason) = bingo_sdk::render::retired(&serde_json::json!({"component":name})) {
+            source.finding(
+                call.span.start,
+                Rule::ComponentSurface,
+                Severity::Error,
+                reason,
+            );
+            continue;
+        }
         let Ok(component) = serde_json::from_value::<Component>(serde_json::json!(name)) else {
             continue;
         };

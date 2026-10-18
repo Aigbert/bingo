@@ -830,12 +830,10 @@
         "Asset",
         "ShellRun",
         "Action",
-        "TurnProgress",
         "SessionStatus",
         "Toast",
         "Welcome",
-        "Ledger",
-        "TurnFold"
+        "Ledger"
       ]
     },
     "ComposerProps": {
@@ -3434,15 +3432,14 @@
           }
         },
         "marks": {
-          "$ref": "#/$defs/Marks",
-          "description": "What each row starts with."
+          "$ref": "#/$defs/Marks"
         }
       },
       "required": [
         "steps",
         "marks"
       ],
-      "description": "The `Ledger` site: the rows of a running turn's steps."
+      "description": "The `Ledger` site, asked for one step at a time."
     },
     "Length": {
       "anyOf": [
@@ -3640,40 +3637,14 @@
     "Marks": {
       "type": "object",
       "properties": {
-        "done": {
-          "type": "string",
-          "description": "A step that came back: `✓`."
-        },
         "asked": {
-          "type": "string",
-          "description": "A step waiting on a person: `◆`."
-        },
-        "running": {
-          "type": "string",
-          "description": "A running step when nothing turns it: `◌`."
-        },
-        "failed": {
-          "type": "string",
-          "description": "A step that failed or was stopped: `✗`."
-        },
-        "folded": {
-          "type": "string",
-          "description": "A turn folded to its line: `▸`."
-        },
-        "open": {
-          "type": "string",
-          "description": "A turn opened under its line: `▾`."
+          "type": "string"
         }
       },
       "required": [
-        "done",
-        "asked",
-        "running",
-        "failed",
-        "folded",
-        "open"
+        "asked"
       ],
-      "description": "The marks a turn's rows start with, from the surface's glyph table. A\ndrawing uses the marks it is handed, so a terminal that shows only ASCII\ngets ASCII whoever draws the rows."
+      "description": "The only state mark supplied by a surface; tool marks belong to tools."
     },
     "Match": {
       "type": "object",
@@ -5018,22 +4989,6 @@
           "properties": {
             "component": {
               "type": "string",
-              "const": "TurnProgress"
-            },
-            "props": {
-              "$ref": "#/$defs/TurnProgressProps"
-            }
-          },
-          "required": [
-            "component",
-            "props"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "component": {
-              "type": "string",
               "const": "SessionStatus"
             },
             "props": {
@@ -5086,22 +5041,6 @@
             },
             "props": {
               "$ref": "#/$defs/LedgerProps"
-            }
-          },
-          "required": [
-            "component",
-            "props"
-          ]
-        },
-        {
-          "type": "object",
-          "properties": {
-            "component": {
-              "type": "string",
-              "const": "TurnFold"
-            },
-            "props": {
-              "$ref": "#/$defs/TurnFoldProps"
             }
           },
           "required": [
@@ -7089,53 +7028,6 @@
         "durationMs"
       ]
     },
-    "TurnEnd": {
-      "type": "string",
-      "enum": [
-        "done",
-        "stopped"
-      ],
-      "description": "How a turn ended, for its folded line. A failed turn ends `done` here:\nthe line under the turn says why it failed, and a failed step already says\n`failed`."
-    },
-    "TurnFoldProps": {
-      "type": "object",
-      "properties": {
-        "steps": {
-          "type": "array",
-          "items": {
-            "$ref": "#/$defs/Step"
-          }
-        },
-        "outcome": {
-          "$ref": "#/$defs/TurnEnd"
-        },
-        "elapsed": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0,
-          "description": "From the turn's first item to its last, in milliseconds."
-        },
-        "thought": {
-          "type": "boolean",
-          "description": "The turn thought before or between its steps."
-        },
-        "isExpanded": {
-          "type": "boolean",
-          "description": "The person opened the fold to read the steps inline."
-        },
-        "marks": {
-          "$ref": "#/$defs/Marks",
-          "description": "What the line starts with, folded or opened."
-        }
-      },
-      "required": [
-        "steps",
-        "outcome",
-        "elapsed",
-        "marks"
-      ],
-      "description": "The `TurnFold` site: a finished turn as one line. The stop line under a\nstopped turn is the interruption's own row."
-    },
     "TurnId": {
       "type": "string",
       "description": "One run of the turn loop, closed exactly once."
@@ -7162,33 +7054,6 @@
           "const": "auto",
           "description": "The kernel or a plugin opened the turn with no prose."
         }
-      ]
-    },
-    "TurnProgressProps": {
-      "type": "object",
-      "properties": {
-        "elapsedMs": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
-        },
-        "tokensOut": {
-          "type": "integer",
-          "format": "uint64",
-          "minimum": 0
-        },
-        "interruptible": {
-          "type": "boolean"
-        },
-        "stopping": {
-          "type": "boolean"
-        }
-      },
-      "required": [
-        "elapsedMs",
-        "tokensOut",
-        "interruptible",
-        "stopping"
       ]
     },
     "TurnStatus": {
