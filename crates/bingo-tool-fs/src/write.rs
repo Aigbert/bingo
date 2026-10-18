@@ -60,6 +60,15 @@ fn existing(path: &Path, read: io::Result<String>) -> Result<Option<String>, Too
 impl Tool for WriteTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '+',
+                ascii: None,
+                verb: "write".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "file_path".into(),
+                    reads: bingo_sdk::Reads::Path,
+                }),
+            }),
             name: "Write".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<WriteArgs>(),

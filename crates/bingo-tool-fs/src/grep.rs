@@ -300,6 +300,15 @@ fn noun(mode: OutputMode) -> &'static str {
 impl Tool for GrepTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '/',
+                ascii: None,
+                verb: "search".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "pattern".into(),
+                    reads: bingo_sdk::Reads::Text,
+                }),
+            }),
             name: "Grep".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<GrepArgs>(),

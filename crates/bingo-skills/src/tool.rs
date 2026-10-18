@@ -64,6 +64,12 @@ fn unknown(name: &str, available: &str) -> String {
 impl Tool for SkillTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '§',
+                ascii: Some('&'),
+                verb: "skill".into(),
+                target: None,
+            }),
             name: "Skill".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SkillArgs>(),

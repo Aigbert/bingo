@@ -44,6 +44,12 @@ impl ExperienceForgetTool {
 impl Tool for ExperienceForgetTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '√',
+                ascii: Some('!'),
+                verb: "recall".into(),
+                target: None,
+            }),
             name: "ExperienceForget".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Forget>(),

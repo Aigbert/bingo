@@ -1,0 +1,30 @@
+{
+  "SendMessage": {
+    "mark": "@",
+    "verb": "send"
+  },
+  "StopAgent": {
+    "mark": "@",
+    "verb": "stop"
+  },
+  "ListAgents": {
+    "mark": "@",
+    "verb": "list"
+  },
+  "ListModels": {
+    "mark": "@",
+    "verb": "models"
+  },
+  "SpawnAgent": {
+    "mark": "@",
+    "verb": "spawn"
+  },
+  "SetThinking": {
+    "mark": "@",
+    "verb": "think"
+  },
+  "DismissAgent": {
+    "mark": "@",
+    "verb": "dismiss"
+  }
+}

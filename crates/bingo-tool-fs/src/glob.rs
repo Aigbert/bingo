@@ -85,6 +85,15 @@ fn newest_first(found: &mut [(SystemTime, PathBuf)]) {
 impl Tool for GlobTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '*',
+                ascii: None,
+                verb: "find".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "pattern".into(),
+                    reads: bingo_sdk::Reads::Path,
+                }),
+            }),
             name: "Glob".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<GlobArgs>(),

@@ -1,0 +1,22 @@
+{
+  "ScheduleList": {
+    "mark": "∞",
+    "verb": "wake",
+    "ascii": "^"
+  },
+  "ScheduleCreate": {
+    "mark": "∞",
+    "verb": "wake",
+    "ascii": "^"
+  },
+  "ScheduleForget": {
+    "mark": "∞",
+    "verb": "wake",
+    "ascii": "^"
+  },
+  "Wake": {
+    "mark": "∞",
+    "verb": "wake",
+    "ascii": "^"
+  }
+}

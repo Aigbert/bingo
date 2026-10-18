@@ -50,6 +50,12 @@ impl ExperienceOutcomeTool {
 impl Tool for ExperienceOutcomeTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '√',
+                ascii: Some('!'),
+                verb: "recall".into(),
+                target: None,
+            }),
             name: "ExperienceOutcome".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Outcomes>(),

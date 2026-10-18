@@ -181,6 +181,12 @@ fn written(span: SignedDuration) -> String {
 impl Tool for WakeTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '∞',
+                ascii: Some('^'),
+                verb: "wake".into(),
+                target: None,
+            }),
             name: "Wake".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Ask>(),

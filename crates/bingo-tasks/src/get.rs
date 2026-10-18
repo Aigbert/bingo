@@ -34,6 +34,12 @@ pub struct TaskGetTool;
 impl Tool for TaskGetTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '#',
+                ascii: None,
+                verb: "plan".into(),
+                target: None,
+            }),
             name: "TaskGet".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<GetArgs>(),

@@ -1,0 +1,19 @@
+{
+  "Bash": {
+    "mark": "$",
+    "verb": "run",
+    "target": {
+      "field": "command",
+      "reads": "command"
+    }
+  },
+  "BashOutput": {
+    "mark": "$",
+    "verb": "output"
+  },
+  "KillShell": {
+    "mark": "×",
+    "verb": "stop",
+    "ascii": "x"
+  }
+}

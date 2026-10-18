@@ -44,6 +44,12 @@ impl ScheduleForgetTool {
 impl Tool for ScheduleForgetTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '∞',
+                ascii: Some('^'),
+                verb: "wake".into(),
+                target: None,
+            }),
             name: "ScheduleForget".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Forget>(),

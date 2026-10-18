@@ -1,0 +1,25 @@
+{
+  "ShowPage": {
+    "mark": "↓",
+    "verb": "show",
+    "ascii": "v"
+  },
+  "WebFetch": {
+    "mark": "↓",
+    "verb": "fetch",
+    "ascii": "v",
+    "target": {
+      "field": "url",
+      "reads": "path"
+    }
+  },
+  "WebSearch": {
+    "mark": "»",
+    "verb": "web",
+    "ascii": ">",
+    "target": {
+      "field": "query",
+      "reads": "text"
+    }
+  }
+}

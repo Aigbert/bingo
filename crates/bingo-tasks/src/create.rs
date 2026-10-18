@@ -40,6 +40,12 @@ pub struct TaskCreateTool;
 impl Tool for TaskCreateTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '#',
+                ascii: None,
+                verb: "plan".into(),
+                target: None,
+            }),
             name: "TaskCreate".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<CreateArgs>(),

@@ -68,6 +68,15 @@ impl WebSearchTool {
 impl Tool for WebSearchTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '»',
+                ascii: Some('>'),
+                verb: "web".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "query".into(),
+                    reads: bingo_sdk::Reads::Text,
+                }),
+            }),
             name: "WebSearch".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SearchArgs>(),

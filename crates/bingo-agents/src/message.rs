@@ -135,6 +135,12 @@ pub struct MessageTool;
 impl Tool for MessageTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "send".into(),
+                target: None,
+            }),
             name: SEND_MESSAGE.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<MessageArgs>(),

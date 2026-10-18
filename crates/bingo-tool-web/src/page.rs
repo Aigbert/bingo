@@ -96,6 +96,12 @@ impl ShowPageTool {
 impl Tool for ShowPageTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '↓',
+                ascii: Some('v'),
+                verb: "show".into(),
+                target: None,
+            }),
             name: "ShowPage".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<PageArgs>(),

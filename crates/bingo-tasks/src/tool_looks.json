@@ -1,0 +1,18 @@
+{
+  "TaskList": {
+    "mark": "#",
+    "verb": "plan"
+  },
+  "TaskCreate": {
+    "mark": "#",
+    "verb": "plan"
+  },
+  "TaskUpdate": {
+    "mark": "#",
+    "verb": "plan"
+  },
+  "TaskGet": {
+    "mark": "#",
+    "verb": "plan"
+  }
+}

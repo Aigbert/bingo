@@ -39,6 +39,12 @@ impl ScheduleListTool {
 impl Tool for ScheduleListTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '∞',
+                ascii: Some('^'),
+                verb: "wake".into(),
+                target: None,
+            }),
             name: "ScheduleList".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<List>(),

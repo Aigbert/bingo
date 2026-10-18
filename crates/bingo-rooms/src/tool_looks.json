@@ -1,0 +1,22 @@
+{
+  "Listen": {
+    "mark": "@",
+    "verb": "listen"
+  },
+  "Seat": {
+    "mark": "@",
+    "verb": "seat"
+  },
+  "CloseRoom": {
+    "mark": "@",
+    "verb": "close"
+  },
+  "Unseat": {
+    "mark": "@",
+    "verb": "unseat"
+  },
+  "OpenRoom": {
+    "mark": "@",
+    "verb": "open"
+  }
+}

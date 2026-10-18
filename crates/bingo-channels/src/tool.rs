@@ -103,6 +103,15 @@ async fn read(path: &Path) -> Result<Vec<u8>, ToolError> {
 impl Tool for SendFile {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "send".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "path".into(),
+                    reads: bingo_sdk::Reads::Path,
+                }),
+            }),
             name: SEND_FILE.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SendFileArgs>(),
@@ -411,5 +420,25 @@ mod tests {
         );
         drop(serving);
         assert!(source.tools().await.is_empty());
+    }
+}
+
+#[cfg(test)]
+mod look_tests {
+    use super::*;
+    #[test]
+    fn every_tool_declares_its_look() {
+        assert_eq!(
+            SendFile::new(Directory::default()).spec().look,
+            Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "send".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "path".into(),
+                    reads: bingo_sdk::Reads::Path
+                }),
+            })
+        );
     }
 }

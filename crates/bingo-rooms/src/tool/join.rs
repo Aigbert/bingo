@@ -76,6 +76,12 @@ pub struct SeatTool;
 impl Tool for SeatTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "seat".into(),
+                target: None,
+            }),
             name: SEAT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SeatArgs>(),

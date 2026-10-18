@@ -1,0 +1,48 @@
+{
+  "Grep": {
+    "mark": "/",
+    "verb": "search",
+    "target": {
+      "field": "pattern",
+      "reads": "text"
+    }
+  },
+  "Edit": {
+    "mark": "±",
+    "verb": "edit",
+    "ascii": "~",
+    "target": {
+      "field": "file_path",
+      "reads": "path"
+    }
+  },
+  "AskUserQuestion": {
+    "mark": "?",
+    "verb": "ask"
+  },
+  "Write": {
+    "mark": "+",
+    "verb": "write",
+    "target": {
+      "field": "file_path",
+      "reads": "path"
+    }
+  },
+  "Read": {
+    "mark": "¶",
+    "verb": "read",
+    "ascii": "<",
+    "target": {
+      "field": "file_path",
+      "reads": "path"
+    }
+  },
+  "Glob": {
+    "mark": "*",
+    "verb": "find",
+    "target": {
+      "field": "pattern",
+      "reads": "path"
+    }
+  }
+}

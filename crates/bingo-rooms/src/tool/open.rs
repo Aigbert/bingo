@@ -104,6 +104,12 @@ pub struct OpenRoomTool;
 impl Tool for OpenRoomTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "open".into(),
+                target: None,
+            }),
             name: OPEN_ROOM.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<OpenRoomArgs>(),

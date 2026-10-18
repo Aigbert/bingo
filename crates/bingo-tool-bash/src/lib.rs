@@ -353,6 +353,15 @@ fn description() -> String {
 impl Tool for BashTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '$',
+                ascii: None,
+                verb: "run".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "command".into(),
+                    reads: bingo_sdk::Reads::Command,
+                }),
+            }),
             name: "Bash".into(),
             description: description(),
             input_schema: input_schema::<BashArgs>(),
@@ -1459,3 +1468,6 @@ pub(crate) mod tests {
         assert!(promotions.open().is_empty(), "the call is over");
     }
 }
+
+#[cfg(test)]
+mod tool_looks;

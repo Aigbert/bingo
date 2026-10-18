@@ -418,6 +418,12 @@ fn seated(name: &str, session: &SessionId) -> String {
 impl Tool for SpawnAgentTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "spawn".into(),
+                target: None,
+            }),
             name: SPAWN_AGENT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SpawnArgs>(),

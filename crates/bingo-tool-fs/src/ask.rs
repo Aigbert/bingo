@@ -225,6 +225,12 @@ fn lines(args: &AskArgs, answers: Vec<Answer>) -> Result<Vec<String>, ToolError>
 impl Tool for AskUserQuestionTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '?',
+                ascii: None,
+                verb: "ask".into(),
+                target: None,
+            }),
             name: "AskUserQuestion".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<AskArgs>(),

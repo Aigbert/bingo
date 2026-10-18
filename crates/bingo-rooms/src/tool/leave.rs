@@ -63,6 +63,12 @@ pub struct UnseatTool;
 impl Tool for UnseatTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "unseat".into(),
+                target: None,
+            }),
             name: UNSEAT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<UnseatArgs>(),

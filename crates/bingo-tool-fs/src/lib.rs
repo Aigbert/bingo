@@ -195,3 +195,6 @@ pub(crate) mod tests {
         assert_eq!(names, promised);
     }
 }
+
+#[cfg(test)]
+mod tool_looks;

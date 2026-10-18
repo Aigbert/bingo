@@ -34,6 +34,12 @@ pub struct TaskListTool;
 impl Tool for TaskListTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '#',
+                ascii: None,
+                verb: "plan".into(),
+                target: None,
+            }),
             name: "TaskList".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<ListArgs>(),

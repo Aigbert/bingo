@@ -106,6 +106,12 @@ fn said(level: Option<Effort>, whose: Option<&str>) -> String {
 impl Tool for SetThinkingTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "think".into(),
+                target: None,
+            }),
             name: "SetThinking".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SetThinkingArgs>(),

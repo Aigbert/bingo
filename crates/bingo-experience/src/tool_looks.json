@@ -1,0 +1,22 @@
+{
+  "ExperienceCommit": {
+    "mark": "√",
+    "verb": "recall",
+    "ascii": "!"
+  },
+  "ExperienceOutcome": {
+    "mark": "√",
+    "verb": "recall",
+    "ascii": "!"
+  },
+  "ExperienceQuery": {
+    "mark": "√",
+    "verb": "recall",
+    "ascii": "!"
+  },
+  "ExperienceForget": {
+    "mark": "√",
+    "verb": "recall",
+    "ascii": "!"
+  }
+}

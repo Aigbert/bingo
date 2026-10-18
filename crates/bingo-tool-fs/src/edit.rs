@@ -102,6 +102,15 @@ fn summary(path: &Path, count: usize) -> String {
 impl Tool for EditTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '±',
+                ascii: Some('~'),
+                verb: "edit".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "file_path".into(),
+                    reads: bingo_sdk::Reads::Path,
+                }),
+            }),
             name: "Edit".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<EditArgs>(),

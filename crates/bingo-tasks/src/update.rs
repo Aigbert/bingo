@@ -51,6 +51,12 @@ pub struct TaskUpdateTool;
 impl Tool for TaskUpdateTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '#',
+                ascii: None,
+                verb: "plan".into(),
+                target: None,
+            }),
             name: "TaskUpdate".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<UpdateArgs>(),

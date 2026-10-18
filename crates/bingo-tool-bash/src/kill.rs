@@ -51,6 +51,12 @@ impl KillShellTool {
 impl Tool for KillShellTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '×',
+                ascii: Some('x'),
+                verb: "stop".into(),
+                target: None,
+            }),
             name: "KillShell".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<KillArgs>(),

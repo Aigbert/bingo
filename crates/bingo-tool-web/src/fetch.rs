@@ -147,6 +147,15 @@ async fn read_capped(response: Response) -> Result<Vec<u8>, ToolError> {
 impl Tool for WebFetchTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '↓',
+                ascii: Some('v'),
+                verb: "fetch".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "url".into(),
+                    reads: bingo_sdk::Reads::Path,
+                }),
+            }),
             name: "WebFetch".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<FetchArgs>(),

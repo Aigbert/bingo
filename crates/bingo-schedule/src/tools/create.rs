@@ -124,6 +124,12 @@ impl ScheduleCreateTool {
 impl Tool for ScheduleCreateTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '∞',
+                ascii: Some('^'),
+                verb: "wake".into(),
+                target: None,
+            }),
             name: "ScheduleCreate".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<Create>(),

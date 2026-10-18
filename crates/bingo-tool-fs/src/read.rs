@@ -164,6 +164,15 @@ fn render(text: &str, offset: Option<usize>, limit: Option<usize>) -> String {
 impl Tool for ReadTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '¶',
+                ascii: Some('<'),
+                verb: "read".into(),
+                target: Some(bingo_sdk::Target {
+                    field: "file_path".into(),
+                    reads: bingo_sdk::Reads::Path,
+                }),
+            }),
             name: "Read".into(),
             description: description(),
             input_schema: input_schema::<ReadArgs>(),

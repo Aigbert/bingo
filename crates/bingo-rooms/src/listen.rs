@@ -49,6 +49,12 @@ pub struct ListenTool;
 impl Tool for ListenTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "listen".into(),
+                target: None,
+            }),
             name: LISTEN.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<ListenArgs>(),

@@ -9,6 +9,12 @@ pub struct Progress;
 impl Tool for Progress {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '#',
+                ascii: None,
+                verb: "progress".into(),
+                target: None,
+            }),
             name: "HelloProgress".into(),
             description: "Publish one fixture progress frame".into(),
             input_schema: json!({"type":"object","properties":{"value":{"type":"integer","minimum":0,"maximum":100}},"required":["value"],"additionalProperties":false}),
@@ -51,5 +57,22 @@ impl Tool for Progress {
         let mut output = ToolOutput::text("Published one progress frame.");
         output.display = Some(view);
         Ok(output)
+    }
+}
+
+#[cfg(test)]
+mod look_tests {
+    use super::*;
+    #[test]
+    fn every_tool_declares_its_look() {
+        assert_eq!(
+            Progress.spec().look,
+            Some(bingo_sdk::ToolLook {
+                mark: '#',
+                ascii: None,
+                verb: "progress".into(),
+                target: None,
+            })
+        );
     }
 }

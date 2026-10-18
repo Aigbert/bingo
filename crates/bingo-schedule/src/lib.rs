@@ -332,3 +332,6 @@ mod plugin_tests {
         plugin.stop().await.expect("stop");
     }
 }
+
+#[cfg(test)]
+mod tool_looks;

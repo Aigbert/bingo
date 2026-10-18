@@ -145,6 +145,12 @@ pub struct ListAgentsTool;
 impl Tool for ListAgentsTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "list".into(),
+                target: None,
+            }),
             name: "ListAgents".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<ListArgs>(),

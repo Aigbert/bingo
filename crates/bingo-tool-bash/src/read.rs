@@ -51,6 +51,12 @@ impl BashOutputTool {
 impl Tool for BashOutputTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '$',
+                ascii: None,
+                verb: "output".into(),
+                target: None,
+            }),
             name: "BashOutput".into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<OutputArgs>(),

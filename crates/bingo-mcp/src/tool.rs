@@ -89,6 +89,15 @@ fn input_schema(schema: &JsonObject) -> Value {
     Value::Object(schema)
 }
 
+fn look(server: &str) -> bingo_sdk::ToolLook {
+    bingo_sdk::ToolLook {
+        mark: '◊',
+        ascii: Some('%'),
+        verb: server.into(),
+        target: None,
+    }
+}
+
 /// What a catalogue may show beside the tool: which server it came from.
 fn meta(server: &str) -> serde_json::Map<String, Value> {
     let mut meta = serde_json::Map::new();
@@ -174,6 +183,7 @@ async fn pictured(image: &rmcp::model::ImageContent) -> ContentPart {
 impl Tool for McpTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(look(&self.server)),
             name: tool_name(&self.server, &self.tool),
             description: self.description.clone(),
             input_schema: self.input_schema.clone(),
@@ -259,6 +269,16 @@ mod tests {
     #[test]
     fn the_catalogue_learns_which_server_a_tool_came_from() {
         assert_eq!(meta("files")["server"], json!("files"));
+    }
+
+    #[test]
+    fn every_server_tool_declares_the_server_look() {
+        assert_eq!(
+            serde_json::to_value(look("files")).unwrap(),
+            json!({
+                "mark":"◊", "ascii":"%", "verb":"files"
+            })
+        );
     }
 
     /// A picture a server would answer with, base64 as the protocol carries it.

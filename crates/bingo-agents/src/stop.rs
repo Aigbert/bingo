@@ -156,6 +156,12 @@ pub struct StopAgentTool;
 impl Tool for StopAgentTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
+            look: Some(bingo_sdk::ToolLook {
+                mark: '@',
+                ascii: None,
+                verb: "stop".into(),
+                target: None,
+            }),
             name: STOP_AGENT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<StopArgs>(),

@@ -331,3 +331,6 @@ mod report;
 
 #[cfg(test)]
 mod control_tests;
+
+#[cfg(test)]
+mod tool_looks;
