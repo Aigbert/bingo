@@ -27,7 +27,7 @@ use bingo_sdk::*;
 use jiff::Timestamp;
 
 pub use config::{Breaker, ModelChoice, TurnBudget, TurnConfig};
-pub use host::TurnHost;
+pub use host::{CallHost, TurnHost};
 use late::Late;
 pub use late::{CompactorSet, ContributorSet, HookSet, ProviderSet, ToolSet};
 pub(crate) use resting::{context_used, restated, switched};
@@ -864,7 +864,7 @@ impl Turn<'_> {
                 host: self.host,
                 item: item_id.clone(),
             };
-            let gated = gate_call(
+            let mut gated = gate_call(
                 GateInput {
                     links: &self.hooks.links.clone(),
                     session: &self.cfg.session.id,
@@ -879,24 +879,13 @@ impl Turn<'_> {
                 &prompter,
             )
             .await;
-            for notice in gated.notices {
+            for notice in gated.notices.drain(..) {
                 self.record(notice);
             }
-            if !self.record_receipt(gated.receipt).await {
+            if !self.record_receipt(gated.receipt.take()).await {
                 return Vec::new();
             }
-            if let Some(mut item) = self.transcript.get(item_id).cloned()
-                && (gated.gate == Gate::Allowed
-                    || matches!(&item.body, ItemBody::ToolCall { input, .. } if *input != gated.call.input))
-            {
-                if gated.gate == Gate::Allowed {
-                    item.status = ItemStatus::Running;
-                }
-                if let ItemBody::ToolCall { input, .. } = &mut item.body {
-                    *input = gated.call.input.clone();
-                }
-                emit_and_fold(&mut self.transcript, self.host, Event::ItemUpdated { item });
-            }
+            self.mark_gated(item_id, &mut gated);
             calls.push(PendingCall {
                 item: item_id.clone(),
                 call: gated.call,
@@ -906,6 +895,25 @@ impl Turn<'_> {
             });
         }
         calls
+    }
+
+    fn mark_gated(&mut self, item_id: &ItemId, gated: &mut crate::gate::Gated) {
+        if let Some(mut item) = self.transcript.get(item_id).cloned()
+            && (gated.gate == Gate::Allowed
+                || matches!(&item.body, ItemBody::ToolCall { input, .. } if *input != gated.call.input))
+        {
+            if gated.gate == Gate::Allowed {
+                item.status = ItemStatus::Running;
+            }
+            if let ItemBody::ToolCall {
+                input, allowed_by, ..
+            } = &mut item.body
+            {
+                *input = gated.call.input.clone();
+                *allowed_by = gated.allowed_by.take().map(Box::new);
+            }
+            emit_and_fold(&mut self.transcript, self.host, Event::ItemUpdated { item });
+        }
     }
 
     /// Returns whether an `after_tool` hook asked to end the turn after this round.
@@ -939,7 +947,7 @@ impl Turn<'_> {
                 cancel: cancel.child_token(),
                 env: cfg.env.clone(),
                 host: cfg.host.clone(),
-                call: cfg.tool_host.clone(),
+                call: cfg.call_host.tool.clone(),
             },
             |o| {
                 if let Some(mut item) = self.transcript.get(&o.item).cloned() {

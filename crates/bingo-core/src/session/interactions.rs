@@ -17,7 +17,7 @@ pub const INTERACTION_GUARD_MS: i64 = 400;
 
 pub(super) struct Pending {
     pub(super) interaction: Interaction,
-    pub(super) reply: oneshot::Sender<Result<Answer, KernelError>>,
+    pub(super) reply: oneshot::Sender<Result<crate::gate::Answered, KernelError>>,
     /// Opened by a holding command, and closed when that command is done
     /// (ADR-0012 §5). The turn it names cannot say so: a question that
     /// arrived between turns names none either (ADR-0039 §1).
@@ -30,40 +30,50 @@ impl Actor {
         item: Item,
         reply: oneshot::Sender<Result<Item, KernelError>>,
     ) -> Result<(), KernelError> {
-        let recorded = self
-            .recorded_denial(&item.body)
-            .and_then(|id| self.state.transcript.get(&id))
-            .cloned();
-        if recorded.is_none() && item.turn.as_ref().is_none_or(|turn| !self.is_running(turn)) {
-            let _ = reply.send(Err(KernelError::new(
-                ErrorCode::Interrupted,
-                "the receipt's turn has ended",
-            )));
-            return Ok(());
+        let result = self.record_item(item).await;
+        if let Err(error) = &result
+            && error.code != ErrorCode::Interrupted
+        {
+            return Err(error.clone());
         }
-        let canonical = if let Some(recorded) = recorded {
+        let _ = reply.send(result);
+        Ok(())
+    }
+
+    pub(super) async fn record_item(&mut self, item: Item) -> Result<Item, KernelError> {
+        let permission = matches!(item.body, ItemBody::PermissionReceipt { .. });
+        let canonical = if let Some(recorded) = self.recorded_receipt(&item.body) {
             recorded
         } else {
+            if permission
+                && item
+                    .turn
+                    .as_ref()
+                    .is_some_and(|turn| !self.is_running(turn))
+            {
+                return Err(KernelError::new(
+                    ErrorCode::Interrupted,
+                    "the receipt's turn has ended",
+                ));
+            }
             self.publish(Event::ItemCompleted { item: item.clone() }, None)
                 .await?;
             item
         };
-        self.refresh_config().await?;
-        let _ = reply.send(Ok(canonical));
-        Ok(())
+        if permission {
+            self.refresh_config().await?;
+        }
+        Ok(canonical)
     }
 
-    pub(super) fn recorded_denial(&self, body: &ItemBody) -> Option<ItemId> {
-        let ItemBody::PermissionReceipt {
-            item: Some(source),
-            decision: DecisionKind::Deny,
-            ..
-        } = body
-        else {
+    fn recorded_receipt(&self, body: &ItemBody) -> Option<Item> {
+        let ItemBody::PermissionReceipt { interaction, .. } = body else {
             return None;
         };
         self.state.transcript.items().iter().find_map(|previous| {
-            matches!(&previous.body, ItemBody::PermissionReceipt { item: Some(id), decision: DecisionKind::Deny, .. } if id == source).then(|| previous.id.clone())
+            matches!(&previous.body, ItemBody::PermissionReceipt { interaction: id, .. }
+                if id == interaction)
+            .then(|| previous.as_ref().clone())
         })
     }
 
@@ -72,7 +82,7 @@ impl Actor {
         item: Option<ItemId>,
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
-        reply: oneshot::Sender<Result<Answer, KernelError>>,
+        reply: oneshot::Sender<Result<crate::gate::Answered, KernelError>>,
     ) -> Result<(), KernelError> {
         // A turn's call asks under the turn; a holding command (ADR-0012 §5)
         // and a question handed in between turns (ADR-0039 §1) ask under
@@ -162,8 +172,14 @@ impl Actor {
             return Ok(());
         };
         let recorded = recorded_answer(&pending.interaction.kind, &answer);
-        let receipt = receipt::answered(&pending.interaction, &recorded);
-        let _ = pending.reply.send(Ok(answer));
+        let receipt = self.answer_receipt(&pending.interaction, &recorded);
+        let _ = pending.reply.send(Ok(crate::gate::Answered {
+            ask: crate::gate::Asked {
+                id: pending.interaction.id.clone(),
+                opened_at: pending.interaction.opened_at,
+            },
+            answer,
+        }));
         self.publish(
             Event::InteractionResolved {
                 id,
@@ -183,18 +199,32 @@ impl Actor {
             Some(intent.clone()),
         )
         .await?;
-        if let Some(body) = receipt {
-            self.record(body).await?;
+        if let Some(item) = receipt {
+            self.record_item(item).await?;
         }
         self.applied(intent, Value::Null).await?;
         self.publish_summary(self.state.summary.clone()).await?;
         Ok(())
     }
 
+    fn answer_receipt(&self, open: &Interaction, answer: &Answer) -> Option<Item> {
+        let body = receipt::answered(open, answer)?;
+        Some(self.fresh(open.turn.clone(), None, body))
+    }
+
     pub(super) async fn cancel_interactions(
         &mut self,
         reason: CancelReason,
     ) -> Result<(), KernelError> {
+        if let Some(running) = &mut self.running {
+            let earliest = self
+                .pending
+                .values()
+                .filter(|p| p.interaction.turn.as_ref() == Some(&running.turn))
+                .map(|p| p.interaction.opened_at)
+                .min();
+            running.stopped_ask = running.stopped_ask.into_iter().chain(earliest).min();
+        }
         let pending: Vec<_> = self.pending.drain().collect();
         self.cancel_each(pending, reason).await?;
         Ok(())

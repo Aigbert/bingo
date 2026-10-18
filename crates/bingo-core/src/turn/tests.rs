@@ -68,6 +68,11 @@ impl TurnHost for RecordingHost {
     fn offered(&self, _tools: Vec<Arc<dyn Tool>>) {}
 
     fn emit(&self, event: Event) {
+        if let Event::ItemCompleted { item } = &event
+            && let ItemBody::PermissionReceipt { interaction, .. } = &item.body
+        {
+            assert_ne!(interaction.as_str(), "pending");
+        }
         self.events.lock().unwrap().push(event);
     }
     async fn ask(
@@ -75,14 +80,20 @@ impl TurnHost for RecordingHost {
         _item: Option<ItemId>,
         kind: InteractionKind,
         _answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
+    ) -> Result<crate::gate::Answered, KernelError> {
         self.asked.lock().unwrap().push(kind);
-        Ok(self
-            .answers
-            .lock()
-            .unwrap()
-            .pop_front()
-            .unwrap_or(Answer::Cancel))
+        Ok(crate::gate::Answered {
+            ask: crate::gate::Asked {
+                id: InteractionId::mint(),
+                opened_at: Timestamp::now(),
+            },
+            answer: self
+                .answers
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or(Answer::Cancel),
+        })
     }
     async fn absorb(&self) -> Vec<(IntentId, Input)> {
         std::mem::take(&mut *self.queue.lock().unwrap())
@@ -147,7 +158,10 @@ fn config(provider: Arc<ScriptedProvider>, tools: Vec<Arc<dyn Tool>>) -> TurnCon
             data_dir: "/tmp".into(),
         }),
         host: bingo_sdk::testing::NoHost::handle(),
-        tool_host: Arc::new(NoHost),
+        call_host: super::host::CallHost {
+            tool: Arc::new(NoHost),
+            gate: Arc::new(NoHost),
+        },
     }
 }
 
@@ -960,35 +974,6 @@ fn transcript(frames: &[Frame]) -> Transcript {
     transcript
 }
 
-#[test]
-fn turn_start_shares_ten_thousand_bodies_without_a_journal() {
-    let mut folded = Transcript::new();
-    let template = history("body")
-        .into_iter()
-        .find_map(|frame| match frame.event {
-            Event::ItemCompleted { item } => Some(item),
-            _ => None,
-        })
-        .unwrap();
-    for n in 0..10_000 {
-        let mut item = template.clone();
-        item.id = ItemId::from_raw(format!("i{n}"));
-        folded.apply(&Event::ItemCompleted { item });
-    }
-    // The constructor accepts no frames and has no journal to clone or fold.
-    let run = TurnRun::new(
-        TurnId::from_raw("t"),
-        &folded,
-        CancellationToken::new(),
-        TurnKind::Respond,
-    );
-    assert_eq!(run.transcript.items().len(), 10_000);
-    for (original, shared) in folded.items().iter().zip(run.transcript.items()) {
-        assert!(Arc::ptr_eq(original, shared));
-        assert_eq!(Arc::strong_count(original), 2);
-    }
-}
-
 #[path = "../chain/hook_contract_turn.rs"]
 mod hook_contract;
 
@@ -996,3 +981,5 @@ mod hook_contract;
 mod chain;
 
 mod agent_turn;
+
+mod provenance;

@@ -7,3 +7,5 @@ mod person_only;
 mod room_posts;
 #[path = "../thinking.rs"]
 mod thinking;
+
+mod provenance;

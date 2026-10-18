@@ -658,13 +658,13 @@ impl Actor {
             tracing::warn!(session = %self.id, %turn, "event from a turn that is not running");
             return Ok(());
         }
-        let receipt = matches!(
-            &event,
-            Event::ItemCompleted { item } if matches!(item.body, ItemBody::PermissionReceipt { .. })
-        );
-        self.publish(event, None).await?;
-        if receipt {
-            self.refresh_config().await?;
+        if let Event::ItemCompleted { mut item } = event {
+            if let ItemBody::Interruption { asked_at, .. } = &mut item.body {
+                *asked_at = running::take_stopped_ask(self, item.turn.as_ref());
+            }
+            self.record_item(item).await?;
+        } else {
+            self.publish(event, None).await?;
         }
         Ok(())
     }
@@ -863,15 +863,9 @@ impl Actor {
         intent: Option<IntentId>,
         body: ItemBody,
     ) -> Result<ItemId, KernelError> {
-        if let Some(id) = self.recorded_denial(&body) {
-            self.refresh_config().await?;
-            return Ok(id);
-        }
         let turn = self.running.as_ref().map(|r| r.turn.clone());
         let item = self.fresh(turn, intent, body);
-        let id = item.id.clone();
-        self.publish(Event::ItemCompleted { item }, None).await?;
-        Ok(id)
+        Ok(self.record_item(item).await?.id)
     }
 
     async fn turn_finished(&mut self, turn: TurnId, outcome: Ended) -> Result<Flow, KernelError> {

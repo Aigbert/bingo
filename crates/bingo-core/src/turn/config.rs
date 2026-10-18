@@ -113,7 +113,7 @@ pub struct TurnConfig {
     /// The whole host, for a tool, a hook and a redirect (ADR-0011 §3).
     pub host: HostHandle,
     /// What a call may do to its own session.
-    pub tool_host: Arc<dyn ToolHost>,
+    pub call_host: super::host::CallHost,
 }
 
 impl std::fmt::Debug for TurnConfig {

@@ -511,9 +511,12 @@ impl Host {
             budget: self.config.budget,
             env: Arc::new(self.config.env.clone()),
             host: self.plugin_host.clone(),
-            tool_host: Arc::new(SessionToolHost {
-                mailbox: mailbox.clone(),
-            }),
+            call_host: crate::turn::CallHost {
+                gate: Arc::new(mailbox.clone()),
+                tool: Arc::new(SessionToolHost {
+                    mailbox: mailbox.clone(),
+                }),
+            },
         }
     }
 

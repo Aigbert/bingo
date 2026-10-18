@@ -17,7 +17,10 @@ impl Prompter for SessionToolHost {
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
     ) -> Result<Answer, KernelError> {
-        self.mailbox.ask(None, kind, answers).await
+        self.mailbox
+            .ask(None, kind, answers)
+            .await
+            .map(|reply| reply.answer)
     }
 }
 
@@ -29,7 +32,10 @@ impl ToolHost for SessionToolHost {
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
     ) -> Result<Answer, KernelError> {
-        self.mailbox.ask(Some(item.clone()), kind, answers).await
+        self.mailbox
+            .ask(Some(item.clone()), kind, answers)
+            .await
+            .map(|reply| reply.answer)
     }
 
     fn progress(&self, item: &ItemId, tail: String) {

@@ -10,34 +10,7 @@ impl Turn<'_> {
         let (events, mut judged) = mpsc::unbounded_channel();
         let cancel = self.cancel.child_token();
         let _stop = cancel.clone().drop_guard();
-        let judge = Arc::new(crate::judge::TurnJudge {
-            name: agent.id().into(),
-            cwd: self.cfg.cwd.clone(),
-            policy: self.cfg.policy.clone(),
-            hooks: self.hooks.clone(),
-            cx: self.hook_cx.clone(),
-            cancel,
-            events,
-        });
-        let input = self
-            .transcript
-            .items()
-            .iter()
-            .rev()
-            .find_map(|item| match &item.body {
-                ItemBody::User { parts, origin } if !origin.is_context() => Some(parts.clone()),
-                _ => None,
-            })
-            .unwrap_or_default();
-        let request = AgentTurn {
-            session: self.cfg.session.id.clone(),
-            cwd: self.cfg.cwd.clone(),
-            input,
-            tools: self.tool_specs(),
-            model: self.model.id.clone(),
-            reasoning: self.model.reasoning,
-            judge,
-        };
+        let request = self.agent_request(agent.id(), cancel, events);
         let mut stream = match self.racing(agent.run(request)).await {
             Some(Ok(stream)) => stream,
             Some(Err(error)) => return provider_failed(error),
@@ -81,6 +54,43 @@ impl Turn<'_> {
             }
         }
         status
+    }
+
+    fn agent_request(
+        &self,
+        name: &str,
+        cancel: CancellationToken,
+        events: mpsc::UnboundedSender<Event>,
+    ) -> AgentTurn {
+        let judge = Arc::new(crate::judge::TurnJudge {
+            name: name.into(),
+            cwd: self.cfg.cwd.clone(),
+            policy: self.cfg.policy.clone(),
+            person: self.cfg.call_host.gate.clone(),
+            hooks: self.hooks.clone(),
+            cx: self.hook_cx.clone(),
+            cancel,
+            events,
+        });
+        let input = self
+            .transcript
+            .items()
+            .iter()
+            .rev()
+            .find_map(|item| match &item.body {
+                ItemBody::User { parts, origin } if !origin.is_context() => Some(parts.clone()),
+                _ => None,
+            })
+            .unwrap_or_default();
+        AgentTurn {
+            session: self.cfg.session.id.clone(),
+            cwd: self.cfg.cwd.clone(),
+            input,
+            tools: self.tool_specs(),
+            model: self.model.id.clone(),
+            reasoning: self.model.reasoning,
+            judge,
+        }
     }
 
     async fn read_agent(

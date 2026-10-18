@@ -76,6 +76,7 @@ impl Door {
 }
 
 pub(super) struct Running {
+    pub(super) stopped_ask: Option<jiff::Timestamp>,
     pub(super) hooks: Arc<tokio::sync::OnceCell<crate::turn::HookSet>>,
     pub(super) turn: TurnId,
     pub(super) cancel: CancellationToken,
@@ -127,6 +128,7 @@ impl Running {
             });
         });
         Self {
+            stopped_ask: None,
             hooks,
             stopped,
             door,
@@ -166,11 +168,12 @@ pub(super) async fn close_dropped_turn(
         item.completed_at = Some(jiff::Timestamp::now());
         actor.publish(Event::ItemCompleted { item }, None).await?;
     }
+    let asked_at = take_stopped_ask(actor, Some(turn));
     let marker = actor.fresh(
         Some(turn.clone()),
         None,
         ItemBody::Interruption {
-            asked_at: None,
+            asked_at,
             marker: INTERRUPTED_MARKER.into(),
         },
     );
@@ -190,4 +193,15 @@ pub(super) async fn close_dropped_turn(
             .map(|item| item.as_ref().clone())
             .collect(),
     })
+}
+
+pub(super) fn take_stopped_ask(
+    actor: &mut Actor,
+    turn: Option<&TurnId>,
+) -> Option<jiff::Timestamp> {
+    actor
+        .running
+        .as_mut()
+        .filter(|running| turn == Some(&running.turn))
+        .and_then(|running| running.stopped_ask.take())
 }

@@ -74,19 +74,25 @@ struct Person {
     asks: Mutex<Vec<(InteractionKind, Vec<AnswerSpec>)>>,
 }
 #[async_trait]
-impl Prompter for Person {
+impl GatePrompter for Person {
     async fn ask(
         &self,
         kind: InteractionKind,
         specs: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
+    ) -> Result<Answered, KernelError> {
         self.asks.lock().unwrap().push((kind, specs));
-        Ok(self
-            .replies
-            .lock()
-            .unwrap()
-            .pop_front()
-            .unwrap_or(Answer::Deny { feedback: None }))
+        Ok(Answered {
+            ask: Asked {
+                id: InteractionId::mint(),
+                opened_at: jiff::Timestamp::now(),
+            },
+            answer: self
+                .replies
+                .lock()
+                .unwrap()
+                .pop_front()
+                .unwrap_or(Answer::Deny { feedback: None }),
+        })
     }
 }
 async fn run(command: &str, replies: Vec<Answer>) -> (Gated, Person) {

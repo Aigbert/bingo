@@ -33,7 +33,14 @@ pub trait TurnHost: Send + Sync {
         item: Option<ItemId>,
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError>;
+    ) -> Result<crate::gate::Answered, KernelError>;
     /// Queued inputs eligible for steering, removed from the queue.
     async fn absorb(&self) -> Vec<(IntentId, Input)>;
+}
+
+/// Both call interfaces belong to the same session mailbox.
+#[derive(Clone)]
+pub struct CallHost {
+    pub tool: Arc<dyn ToolHost>,
+    pub gate: Arc<dyn crate::gate::GatePrompter>,
 }

@@ -11,8 +11,8 @@ pub(super) async fn ask_person(
     scope: Option<String>,
     blocked: Option<String>,
     policy: &dyn PermissionPolicy,
-    prompter: &dyn Prompter,
-) -> Reply {
+    prompter: &dyn GatePrompter,
+) -> Result<(Reply, Asked), KernelError> {
     let caution = policy.caution(input).or_else(|| {
         input.traits.destructive.then(|| Caution {
             reason: "this call can irreversibly destroy data".into(),
@@ -38,14 +38,11 @@ pub(super) async fn ask_person(
             .map(|reason| Caution { reason, act: None })
             .or(caution),
     };
-    let answer = prompter
-        .ask(kind, answers.clone())
-        .await
-        .unwrap_or(Answer::Cancel);
+    let Answered { ask, answer } = prompter.ask(kind, answers.clone()).await?;
     if !answers.contains(&answer.spec()) {
-        return denied(None);
+        return Ok((denied(None), ask));
     }
-    match answer {
+    let reply = match answer {
         Answer::AllowChanged { input } => Reply::Changed(input),
         Answer::AllowOnce => Reply::Decided(Gate::Allowed, DecisionKind::Allow, None),
         Answer::AllowSession { scope: requested } if scope.as_ref() == Some(&requested) => {
@@ -64,7 +61,8 @@ pub(super) async fn ask_person(
             denied(feedback)
         }
         _ => denied(None),
-    }
+    };
+    Ok((reply, ask))
 }
 
 fn answers(editable: bool, scoped: bool, blocked: bool) -> Vec<AnswerSpec> {

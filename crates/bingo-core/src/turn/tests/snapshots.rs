@@ -162,3 +162,32 @@ async fn compaction_replay_reissues_a_removed_snapshot_then_keeps_the_request_pr
         "the provider receives the refreshed state"
     );
 }
+
+#[test]
+fn turn_start_shares_ten_thousand_bodies_without_a_journal() {
+    let mut folded = Transcript::new();
+    let template = history("body")
+        .into_iter()
+        .find_map(|frame| match frame.event {
+            Event::ItemCompleted { item } => Some(item),
+            _ => None,
+        })
+        .unwrap();
+    for n in 0..10_000 {
+        let mut item = template.clone();
+        item.id = ItemId::from_raw(format!("i{n}"));
+        folded.apply(&Event::ItemCompleted { item });
+    }
+    // The constructor accepts no frames and has no journal to clone or fold.
+    let run = TurnRun::new(
+        TurnId::from_raw("t"),
+        &folded,
+        CancellationToken::new(),
+        TurnKind::Respond,
+    );
+    assert_eq!(run.transcript.items().len(), 10_000);
+    for (original, shared) in folded.items().iter().zip(run.transcript.items()) {
+        assert!(Arc::ptr_eq(original, shared));
+        assert_eq!(Arc::strong_count(original), 2);
+    }
+}

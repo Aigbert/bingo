@@ -73,22 +73,11 @@ pub(crate) struct TurnJudge {
     pub name: String,
     pub cwd: PathBuf,
     pub policy: Arc<dyn PermissionPolicy>,
+    pub person: Arc<dyn crate::gate::GatePrompter>,
     pub hooks: HookSet,
     pub cx: HookContext,
     pub cancel: CancellationToken,
     pub events: mpsc::UnboundedSender<Event>,
-}
-
-struct Person<'a>(&'a HookContext);
-#[async_trait]
-impl Prompter for Person<'_> {
-    async fn ask(
-        &self,
-        kind: InteractionKind,
-        answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
-        self.0.host.ask(&self.0.session, kind, answers).await
-    }
 }
 
 impl TurnJudge {
@@ -117,7 +106,7 @@ impl TurnJudge {
                 hooks: &hooks,
                 hook_cx: &cx,
             },
-            &Person(&cx),
+            self.person.as_ref(),
         )
         .await;
         for body in gated.notices.into_iter().chain(gated.receipt) {

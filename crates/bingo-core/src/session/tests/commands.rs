@@ -53,7 +53,7 @@ async fn an_idle_session_opens_the_question_it_is_handed() {
         Activation::Programmatic,
         who(),
     );
-    assert_eq!(asking.await.unwrap().unwrap(), Answer::Confirm);
+    assert_eq!(asking.await.unwrap().unwrap().answer, Answer::Confirm);
 }
 
 #[tokio::test]

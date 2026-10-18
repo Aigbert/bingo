@@ -10,6 +10,9 @@ use bingo_sdk::*;
 
 use crate::executor::Gate;
 
+mod asking;
+pub use asking::{Answered, Asked, GatePrompter};
+
 mod prompt;
 use prompt::{Reply, ask_person};
 
@@ -65,6 +68,7 @@ pub struct GateInput<'a> {
 }
 
 pub struct Gated {
+    pub allowed_by: Option<Reason>,
     pub notices: Vec<ItemBody>,
     pub call: ToolCall,
     pub traits: ToolTraits,
@@ -75,8 +79,14 @@ pub struct Gated {
 
 impl Gated {
     /// Through the gate with nobody asked, so nothing to receipt.
-    fn allowed(call: ToolCall, traits: ToolTraits) -> Self {
+    fn allowed(call: ToolCall, traits: ToolTraits, reason: Reason) -> Self {
         Self {
+            allowed_by: match reason {
+                reason @ (Reason::Mode { .. } | Reason::Rule { .. } | Reason::Hook { .. }) => {
+                    Some(reason)
+                }
+                _ => None,
+            },
             notices: Vec::new(),
             call,
             traits,
@@ -88,6 +98,7 @@ impl Gated {
     /// Stopped by a hook or the policy, so nobody was asked either.
     fn denied(call: ToolCall, traits: ToolTraits, message: String) -> Self {
         Self {
+            allowed_by: None,
             notices: Vec::new(),
             call,
             traits,
@@ -102,11 +113,12 @@ fn receipt_for(
     call: &ToolCall,
     decision: DecisionKind,
     feedback: Option<String>,
+    asked: &Asked,
 ) -> ItemBody {
     ItemBody::PermissionReceipt {
-        asked_at: None,
+        asked_at: Some(asked.opened_at),
         item: Some(item.clone()),
-        interaction: InteractionId::from_raw("pending"),
+        interaction: asked.id.clone(),
         tool: call.name.clone(),
         decision,
         feedback,
@@ -114,7 +126,7 @@ fn receipt_for(
 }
 
 /// Decide one call: hooks, then the policy, then a person when the answer is `Ask`.
-pub async fn gate_call(input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
+pub async fn gate_call(input: GateInput<'_>, prompter: &dyn GatePrompter) -> Gated {
     let hook_cx = HookContext {
         item: Some(input.item.clone()),
         ..input.hook_cx.clone()
@@ -126,9 +138,10 @@ pub async fn gate_call(input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
     recheck(input, prompter).await
 }
 
-async fn recheck(mut input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
+async fn recheck(mut input: GateInput<'_>, prompter: &dyn GatePrompter) -> Gated {
     let report = crate::chain::Report::default();
     let mut changed = false;
+    let mut asked = None;
     loop {
         let checked = crate::chain::run::<crate::chain::tool::Check>(
             input.links,
@@ -139,7 +152,7 @@ async fn recheck(mut input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
         )
         .await;
         let result = match checked {
-            Ok(checked) => resolve_check(checked, &input, prompter, changed).await,
+            Ok(checked) => resolve_check(checked, &input, prompter, changed, &mut asked).await,
             Err(error) => Ok(Gated::denied(
                 input.call.clone(),
                 ToolTraits::default(),
@@ -148,12 +161,16 @@ async fn recheck(mut input: GateInput<'_>, prompter: &dyn Prompter) -> Gated {
         };
         match result {
             Ok(mut result) => {
-                if changed && result.gate == Gate::Allowed {
+                if changed
+                    && result.gate == Gate::Allowed
+                    && let Some(asked) = &asked
+                {
                     result.receipt = Some(receipt_for(
                         input.item,
                         &result.call,
                         changed_decision(result.receipt.as_ref()),
                         None,
+                        asked,
                     ));
                 }
                 result.notices = report.take();
@@ -184,8 +201,9 @@ fn changed_decision(receipt: Option<&ItemBody>) -> DecisionKind {
 async fn resolve_check(
     checked: CheckResult,
     input: &GateInput<'_>,
-    prompter: &dyn Prompter,
+    prompter: &dyn GatePrompter,
     changed: bool,
+    asked: &mut Option<Asked>,
 ) -> Result<Gated, ToolCall> {
     let CheckResult { call, decision } = checked;
     let traits = input
@@ -194,7 +212,13 @@ async fn resolve_check(
         .map(|tool| tool.traits(&call.input))
         .unwrap_or_default();
     let (scope, reason, blocked) = match decision {
-        Decision::Allow { .. } => return Ok(Gated::allowed(call, traits)),
+        Decision::Allow { reason } => {
+            let mut result = Gated::allowed(call, traits, reason);
+            if changed {
+                result.allowed_by = None;
+            }
+            return Ok(result);
+        }
         Decision::Deny { reason } => {
             let message = match &reason {
                 Reason::Hook { hook } => hook.clone(),
@@ -223,7 +247,7 @@ async fn resolve_check(
         session: input.session,
         cwd: input.cwd,
     };
-    let reply = ask_person(
+    let response = ask_person(
         policy_input,
         tool.as_ref(),
         scope,
@@ -232,23 +256,36 @@ async fn resolve_check(
         prompter,
     )
     .await;
-    resolve_reply(call, traits, input.item, reply)
+    resolve_reply(call, traits, input.item, response, asked)
 }
 
 fn resolve_reply(
     mut call: ToolCall,
     traits: ToolTraits,
     item: &ItemId,
-    reply: Reply,
+    response: Result<(Reply, Asked), KernelError>,
+    asked: &mut Option<Asked>,
 ) -> Result<Gated, ToolCall> {
+    let Ok((reply, mut current)) = response else {
+        return Ok(Gated::denied(
+            call,
+            traits,
+            "Permission interaction closed".into(),
+        ));
+    };
+    if let Some(first) = asked {
+        current.opened_at = first.opened_at;
+    }
+    *asked = Some(current.clone());
     match reply {
         Reply::Changed(value) => {
             call.input = value;
             Err(call)
         }
         Reply::Decided(gate, decision, feedback) => {
-            let receipt = Some(receipt_for(item, &call, decision, feedback));
+            let receipt = Some(receipt_for(item, &call, decision, feedback, &current));
             Ok(Gated {
+                allowed_by: None,
                 call,
                 traits,
                 gate,

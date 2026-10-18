@@ -172,7 +172,7 @@ impl Bridged {
             cancel: self.cancel.child_token(),
             env: self.config.env.clone(),
             host: self.config.host.clone(),
-            call: self.config.tool_host.clone(),
+            call: self.config.call_host.tool.clone(),
         }
     }
 
@@ -201,12 +201,12 @@ struct AskVia {
 }
 
 #[async_trait]
-impl Prompter for AskVia {
+impl crate::gate::GatePrompter for AskVia {
     async fn ask(
         &self,
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
+    ) -> Result<crate::gate::Answered, KernelError> {
         self.mailbox
             .ask(Some(self.item.clone()), kind, answers)
             .await

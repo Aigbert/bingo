@@ -435,7 +435,10 @@ pub fn config(
             data_dir: "/tmp".into(),
         }),
         host: bingo_sdk::testing::NoHost::handle(),
-        tool_host,
+        call_host: crate::turn::CallHost {
+            tool: tool_host,
+            gate: Arc::new(NoHost),
+        },
     }
 }
 
@@ -791,5 +794,16 @@ pub(crate) fn hook_context(cwd: &str) -> HookContext {
         provider: None,
         model: None,
         host: bingo_sdk::testing::NoHost::handle(),
+    }
+}
+
+#[async_trait]
+impl crate::gate::GatePrompter for NoHost {
+    async fn ask(
+        &self,
+        _: InteractionKind,
+        _: Vec<AnswerSpec>,
+    ) -> Result<crate::gate::Answered, KernelError> {
+        Err(KernelError::new(ErrorCode::InteractionClosed, "no person"))
     }
 }

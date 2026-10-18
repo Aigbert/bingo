@@ -199,12 +199,12 @@ pub(crate) struct AskVia<'a> {
     pub item: ItemId,
 }
 #[async_trait::async_trait]
-impl Prompter for AskVia<'_> {
+impl crate::gate::GatePrompter for AskVia<'_> {
     async fn ask(
         &self,
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
+    ) -> Result<crate::gate::Answered, KernelError> {
         self.host.ask(Some(self.item.clone()), kind, answers).await
     }
 }

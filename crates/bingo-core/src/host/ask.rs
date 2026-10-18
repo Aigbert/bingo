@@ -35,7 +35,7 @@ pub(super) async fn put(
     // Interrupted under, closed under: whatever became of the question, the
     // asker hears the one answer that is safe to hear.
     match mailbox.ask(None, kind, answers).await {
-        Ok(answer) => Ok(answer),
+        Ok(answer) => Ok(answer.answer),
         Err(unasked) => refusing.ok_or(unasked),
     }
 }

@@ -117,7 +117,7 @@ pub(crate) enum Msg {
         item: Option<ItemId>,
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
-        reply: oneshot::Sender<Result<Answer, KernelError>>,
+        reply: oneshot::Sender<Result<crate::gate::Answered, KernelError>>,
     },
     Absorb {
         turn: TurnId,
@@ -404,7 +404,7 @@ impl Mailbox {
         item: Option<ItemId>,
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
+    ) -> Result<crate::gate::Answered, KernelError> {
         self.call(|reply| Msg::Ask {
             item,
             kind,
@@ -583,7 +583,7 @@ impl TurnHost for TurnMail {
         item: Option<ItemId>,
         kind: InteractionKind,
         answers: Vec<AnswerSpec>,
-    ) -> Result<Answer, KernelError> {
+    ) -> Result<crate::gate::Answered, KernelError> {
         self.mailbox.ask(item, kind, answers).await
     }
 
@@ -593,5 +593,16 @@ impl TurnHost for TurnMail {
             .call(|reply| Msg::Absorb { turn, reply })
             .await
             .unwrap_or_default()
+    }
+}
+
+#[async_trait]
+impl crate::gate::GatePrompter for Mailbox {
+    async fn ask(
+        &self,
+        kind: InteractionKind,
+        answers: Vec<AnswerSpec>,
+    ) -> Result<crate::gate::Answered, KernelError> {
+        self.ask(None, kind, answers).await
     }
 }

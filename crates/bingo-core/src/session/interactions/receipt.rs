@@ -1,17 +1,18 @@
 use bingo_sdk::*;
 
 pub(super) fn answered(open: &Interaction, answer: &Answer) -> Option<ItemBody> {
-    // Escape can interrupt the waiting caller before it records its result.
-    if let (InteractionKind::Permission { tool, .. }, Answer::Deny { feedback }) =
-        (&open.kind, answer)
-    {
+    if let InteractionKind::Permission { tool, .. } = &open.kind {
+        let (decision, feedback) = match answer {
+            Answer::Deny { feedback } => (DecisionKind::Deny, feedback.clone()),
+            _ => return None,
+        };
         return Some(ItemBody::PermissionReceipt {
-            asked_at: None,
+            asked_at: Some(open.opened_at),
             item: open.item.clone(),
             interaction: open.id.clone(),
             tool: tool.clone(),
-            decision: DecisionKind::Deny,
-            feedback: feedback.clone(),
+            decision,
+            feedback,
         });
     }
     let (question, answer) = match (&open.kind, answer) {
@@ -44,7 +45,7 @@ pub(super) fn answered(open: &Interaction, answer: &Answer) -> Option<ItemBody> 
         _ => return None,
     };
     Some(ItemBody::QuestionAnswer {
-        asked_at: None,
+        asked_at: Some(open.opened_at),
         item: open.item.clone(),
         interaction: open.id.clone(),
         question,
