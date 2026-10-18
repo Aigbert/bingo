@@ -91,8 +91,8 @@ person is asked about a call whose turn has not come.
 
 ## Exit criteria
 
-- [ ] Brick 1's table tests land before the loop.
-- [ ] Core tests, with tool doubles released by channels, never by the wall clock:
+- [x] Brick 1's table tests land before the loop.
+- [x] Core tests, with tool doubles released by channels, never by the wall clock:
   - `read, edit (asks), bash (asks)`:
     - the read lands before the first ask opens;
     - the bash's ask opens only after the edit lands;
@@ -108,9 +108,9 @@ person is asked about a call whose turn has not come.
     turn-end hooks and the journal hold the ask's `opened_at`; with no ask open, none does.
 - [ ] TUI: three calls where the second asks. The first row has landed, the second reads
       `needs you`, and the third is not drawn until it starts.
-- [ ] RPC, print and ACP black-box tests pass. Each test re-pinned for frame order is named in
+- [x] RPC, print and ACP black-box tests pass. Each test re-pinned for frame order is named in
       Verified.
-- [ ] Gates, one at a time, and the Windows check for `bingo-core`.
+- [x] Gates, one at a time, and the Windows check for `bingo-core`.
 
 ## Non-goals
 
@@ -128,3 +128,23 @@ person is asked about a call whose turn has not come.
   brings back the 2026-09-09 bug.
 - **Old journals.** A session killed mid-round must not leave a `Pending` call that the TUI
   hides forever. Check how resume closes it.
+
+## Verified
+
+Round 1, 2026-10-19: bricks 1–5 and 7. Detail: [round-1.md](../verification/m202/round-1.md).
+- [x] Table before loop: `cargo test -p bingo-core --lib round --locked` → `17 passed; 0 failed`;
+  contract commit `e290a457` precedes the walk. The original esc bug was pinned there too.
+- [x] Kernel: `cargo test --workspace --locked` → `test result: ok. 703 passed; 0 failed`.
+  Channels pin reach, asks, sliding admission, landings, esc, hooks, shared ask time and recovery.
+- [x] Wire, same command: CLI `309 passed; 0 failed`, RPC `104 passed; 0 failed`, wire `43 passed`.
+  Final full run: 6,522 passed, zero failed. No black-box re-pins; ACP fixture was present.
+- [x] `cargo fmt --all -- --check`: exit 0. Workspace check and Clippy `-D warnings`: `Finished`.
+  `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `budget ok` (423 dependencies).
+  `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] `cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked`: `Finished`.
+  The same check for `bingo` stops in aws-lc-sys/rquickjs-sys native cross-toolchain setup.
+- One existing CLI recovery timeout passed alone unchanged, then passed in the full rerun.
+  Budget retains a 7 GB debug-directory soft warning. Detailed outputs and risk audit are linked above.
+- Departures: remove unused batch entry points; round/recovery own functions to meet cohesion limits.
+  Accepted cost: a stop during a second ask counts from that ask. No prototype conflict found.
+- [ ] Brick 6 and its TUI criterion remain for round 2 after M194 part B; both excluded crates are untouched.
