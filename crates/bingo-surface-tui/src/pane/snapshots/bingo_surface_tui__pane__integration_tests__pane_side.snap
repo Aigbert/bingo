@@ -2,8 +2,6 @@
 source: crates/bingo-surface-tui/src/pane/integration_tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                                                                                                                                         session 1  "
-"                                                                                                                                                                                                        "
 "                                                                                                                                        Counter                                                         "
 "                                                                                                                                        Pane content                                                    "
 "                                                                                                                                        Second row                                                      "
@@ -48,7 +46,9 @@ expression: screen
 "                                                                                                                                                                                                        "
 "                                                                                                                                                                                                        "
 "                                                                                                                                                                                                        "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ ask anything                                                                                                                                                                                         "
-"                                                                                                                                                / commands · ? keys · ctrl+r sessions · shift+tab mode  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                                                                                                                           fake-1  "
+"                                                                                                                                                                                                        "
+"                                                                                                                                                                                                        "
+"                                                                                                                                                                                                        "
+"   ▍Ask anything, or / for commands                                                                                                                                                                     "
+"                                                                                                                                                                                                        "
+"   fake-1                                                                                                                                                                / commands   @ files   ? keys  "

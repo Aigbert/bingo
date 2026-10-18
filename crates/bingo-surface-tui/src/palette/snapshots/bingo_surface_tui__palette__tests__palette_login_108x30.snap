@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -26,9 +25,10 @@ expression: screen
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ /login                                                                                                   "
+"   /login ▍                                                                                                 "
+"                                                                                                            "
 "   /login  choose login                                                                                     "
 " ❯ anthropic                                                                                   ● signed in  "
 "   openai                                                                                     ○ signed out  "
 "   fake                                                                                                     "
+"   fake-1                                                                    ↑↓ pick   ⏎ choose   esc back  "

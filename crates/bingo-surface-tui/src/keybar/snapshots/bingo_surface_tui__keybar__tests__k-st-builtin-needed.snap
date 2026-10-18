@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-" bingo-tool-fs stays on: the kernel reads and edits files with it                                           "
+"                                                                                                            "
 
 80 columns
-" bingo-tool-fs stays on: the kernel reads and edits files with it               "
+"                                                                                "
 
 32 columns
-" bingo-tool-fs stays on: the k… "
+"                                "

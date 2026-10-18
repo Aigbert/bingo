@@ -2,8 +2,6 @@
 source: crates/bingo-surface-tui/src/crew/tests/mod.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                 session 1  "
-"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -22,7 +20,9 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ /crew                                                                        "
-"   ↑↓ pick · ⏎ step in · s stop · x dismiss · m message · ←→ model · esc close  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"   /crew                                                                        "
+"                                                                                "
+"   fake-1    ⏎ step in   s stop   x dismiss   m message   ←→ model   esc close  "

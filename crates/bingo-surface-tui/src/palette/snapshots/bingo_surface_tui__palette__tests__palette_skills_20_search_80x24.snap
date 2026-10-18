@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -12,8 +11,8 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ /d                                                                           "
+"   /d▍                                                                          "
+"                                                                                "
 "   skills                                                                       "
 " ❯ /deploy    ship the current branch to staging                       project  "
 "   /docs-03   write the docs page number 3 from its outline            project  "
@@ -26,3 +25,4 @@ expression: screen
 "   ◆ project  idle                                                    this one  "
 "   keys                                                                         "
 "   shift+tab     cycle permission mode                                 default  "
+"   fake-1                            ↑↓ pick   ⏎ run   tab fill in   esc close  "

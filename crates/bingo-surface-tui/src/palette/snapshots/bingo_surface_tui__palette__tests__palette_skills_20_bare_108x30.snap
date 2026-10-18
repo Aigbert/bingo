@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -18,8 +17,8 @@ expression: screen
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ /                                                                                                        "
+"   /▍                                                                                                       "
+"                                                                                                            "
 "   commands                                                                                                 "
 " ❯ /model        choose model                                                                   fake/small  "
 "   /think        choose think                                                                         high  "
@@ -32,3 +31,4 @@ expression: screen
 "   skills                                                                                                   "
 "   ▸ 19 skills · 1 guide                                                                                    "
 "   type to search commands, skills, sessions and keys together                                              "
+"   fake-1                                                        ↑↓ pick   ⏎ run   tab fill in   esc close  "

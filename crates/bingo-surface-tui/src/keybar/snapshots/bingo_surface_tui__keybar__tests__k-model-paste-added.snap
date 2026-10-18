@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                                     ⏎ pick a model · esc back to the list  "
+"⏎ pick a model   esc back to the list                                                                       "
 
 80 columns
-"                                         ⏎ pick a model · esc back to the list  "
+"⏎ pick a model   esc back to the list                                           "
 
 32 columns
-"          esc back to the list  "
+"esc back to the list            "

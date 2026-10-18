@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -15,8 +14,8 @@ expression: screen
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ /d                                                                                                       "
+"   /d▍                                                                                                      "
+"                                                                                                            "
 "   skills                                                                                                   "
 " ❯ /deploy          ship the current branch to staging                                             project  "
 "   /standup         write today's standup from the git log                                           yours  "
@@ -32,3 +31,4 @@ expression: screen
 "   ctrl+o        expand result · then all                                                                   "
 "   ctrl+t        tasks band on and off                                                                      "
 "   1-9 · y/a/n   answer the open dialog                                                                     "
+"   fake-1                                                        ↑↓ pick   ⏎ run   tab fill in   esc close  "

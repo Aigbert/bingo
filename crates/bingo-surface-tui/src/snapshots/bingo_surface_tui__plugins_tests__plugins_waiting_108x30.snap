@@ -2,7 +2,7 @@
 source: crates/bingo-surface-tui/src/plugins_tests.rs
 expression: output
 ---
-" bingo▍ /tmp/project                                                                             session 1  "
+"                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -28,7 +28,7 @@ expression: output
 "                                                        │ kept in ~/.bingo/settings.toml, never the repo    "
 "                                                        │                                                   "
 "                                                        │                                                   "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ /plugins › plugins and MCP servers                                                                       "
-"                                        ↑↓ tier · ⏎ grant · esc cancel · /plugins 1 from this repo waiting  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                               fake-1  "
+"                                                                                                            "
+"   /plugins › plugins and MCP servers                                                                       "
+"                                                                                                            "
+"   fake-1                                                                   ↑↓ tier   ⏎ grant   esc cancel  "

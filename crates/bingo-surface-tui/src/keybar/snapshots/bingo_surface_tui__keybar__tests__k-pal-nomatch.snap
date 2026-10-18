@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                                           ↑↓ pick · ⏎ nothing · esc close  "
+"↑↓ pick   ⏎ nothing   esc close                                                                             "
 
 80 columns
-"                                               ↑↓ pick · ⏎ nothing · esc close  "
+"↑↓ pick   ⏎ nothing   esc close                                                 "
 
 32 columns
-"         ⏎ nothing · esc close  "
+"↑↓ pick   ⏎ nothing   esc close "

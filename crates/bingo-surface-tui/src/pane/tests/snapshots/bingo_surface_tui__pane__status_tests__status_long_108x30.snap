@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/pane/tests/status.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                               The release · session 1  "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -28,7 +27,8 @@ expression: screen
 "   plugins    1 on · 0 off                                                                                  "
 "   mcp        1 connected · 8 tools                                                                         "
 "                                                                                                            "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ /status                                                                                                  "
-"                                                                       ↑↓ pick · ⏎ compact now · esc close  "
-" ⏵⏵ default   ◆ solo   ▰▰▰▰▰▰▰▱ 168k / 200k                                                         fake-1  "
+"                                                                                                            "
+"                                                                                                            "
+"   /status                                                                                                  "
+"                                                                                                            "
+"   fake-1 · context 84%                                                ↑↓ pick   ⏎ compact now   esc close  "

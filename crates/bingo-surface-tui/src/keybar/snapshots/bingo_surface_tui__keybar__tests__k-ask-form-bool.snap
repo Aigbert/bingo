@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                            tab next · space toggle · ⏎ send · esc decline  "
+"tab next   space toggle   ⏎ send   esc decline                                                              "
 
 80 columns
-"                                tab next · space toggle · ⏎ send · esc decline  "
+"tab next   space toggle   ⏎ send   esc decline                                  "
 
 32 columns
-"          ⏎ send · esc decline  "
+"⏎ send   esc decline            "

@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -19,10 +18,11 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ ⟲                                                                            "
+"   ⟲ ▍                                                                          "
+"                                                                                "
 "   this conversation                                                            "
 " ❯ ◆ project  idle                                                    this one  "
 "   sessions                                                                     "
 "   model migration                                      just now · 12 messages  "
 "   All sessions…                                                                "
+"   fake-1                                       ↑↓ pick   ⏎ resume   esc close  "

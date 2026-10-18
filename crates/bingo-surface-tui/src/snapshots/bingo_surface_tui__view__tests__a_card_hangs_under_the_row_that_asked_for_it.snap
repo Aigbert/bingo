@@ -1,9 +1,9 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
-assertion_line: 1021
 expression: screen
 ---
-" bingo▍ /tmp/project                                                 session 1  "
+"                                                                                "
+"                                                                                "
 "                                                                                "
 " › edit it                                                                      "
 "   ◆ edit                                                            needs you  "
@@ -21,9 +21,8 @@ expression: screen
 " ▍ after 9                                                                      "
 "                                                                                "
 "                                                                                "
-"                                                                                "
 " ▍ waiting for you                                                              "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ answer above · typing here leaves it for later                               "
-"                                    ↑↓ pick · ⏎ answer · esc no, stop the turn  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "
+"▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔"
+"   ▍Answer above, or type to tell bingo something else                          "
+"                                                                                "
+"   fake-1                           ↑↓ pick   ⏎ answer   esc no, stop the turn  "

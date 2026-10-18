@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/view.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                      #design · session 10  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -22,7 +21,8 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-"#design › post to the room                                                      "
-"                        / commands · ? keys · ctrl+r sessions · shift+tab mode  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                           "
+"                                                                                "
+"                                                                                "
+"   ▍Post to #design, @ to call on someone                                       "
+"                                                                                "
+"                                                 / commands   @ files   ? keys  "

@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                              ⏎ send the reason · esc back to the question  "
+"⏎ send the reason   esc back to the question                                                                "
 
 80 columns
-"                                  ⏎ send the reason · esc back to the question  "
+"⏎ send the reason   esc back to the question                                    "
 
 32 columns
-"      esc back to the question  "
+"esc back to the question        "

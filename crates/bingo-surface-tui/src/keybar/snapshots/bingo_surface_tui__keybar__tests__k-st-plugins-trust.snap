@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                                            ↑↓ tier · ⏎ grant · esc cancel  "
+"↑↓ tier   ⏎ grant   esc cancel                                                                              "
 
 80 columns
-"                                                ↑↓ tier · ⏎ grant · esc cancel  "
+"↑↓ tier   ⏎ grant   esc cancel                                                  "
 
 32 columns
-"          ⏎ grant · esc cancel  "
+"↑↓ tier   ⏎ grant   esc cancel  "

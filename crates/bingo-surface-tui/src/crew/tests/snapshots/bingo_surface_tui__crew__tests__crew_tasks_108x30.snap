@@ -2,8 +2,6 @@
 source: crates/bingo-surface-tui/src/crew/tests/mod.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                                             session 1  "
-"                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -28,7 +26,9 @@ expression: screen
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ /crew                                                                                                    "
-"                                        ] switch · ↑↓ pick · + add · space done/open · o owner · esc close  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                                               fake-1  "
+"                                                                                                            "
+"                                                                                                            "
+"                                                                                                            "
+"   /crew                                                                                                    "
+"                                                                                                            "
+"   fake-1                               ] switch   ↑↓ pick   + add   space done/open   o owner   esc close  "

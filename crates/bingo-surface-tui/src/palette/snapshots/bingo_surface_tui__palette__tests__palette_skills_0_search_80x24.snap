@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -12,8 +11,8 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ /d                                                                           "
+"   /d▍                                                                          "
+"                                                                                "
 "   commands                                                                     "
 " ❯ /model   choose model                                            fake/small  "
 "   this conversation                                                            "
@@ -26,3 +25,4 @@ expression: screen
 "   ctrl+t        tasks band on and off                                          "
 "   1-9 · y/a/n   answer the open dialog                                         "
 "   alt+b/f       move one word                                                  "
+"   fake-1                            ↑↓ pick   ⏎ run   tab fill in   esc close  "

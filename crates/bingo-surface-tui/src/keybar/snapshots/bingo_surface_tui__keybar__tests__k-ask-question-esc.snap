@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                                              esc stop · ⏎ queue a message  "
+"esc stop   ⏎ queue a message                                                                                "
 
 80 columns
-"                                                  esc stop · ⏎ queue a message  "
+"esc stop   ⏎ queue a message                                                    "
 
 32 columns
-"  esc stop · ⏎ queue a message  "
+"esc stop   ⏎ queue a message    "

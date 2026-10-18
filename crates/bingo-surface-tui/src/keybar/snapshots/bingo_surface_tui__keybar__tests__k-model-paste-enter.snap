@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                         ↑↓ field · type edit · ⏎ check and add · esc back  "
+"↑↓ field   type edit   ⏎ check and add   esc back                                                           "
 
 80 columns
-"                             ↑↓ field · type edit · ⏎ check and add · esc back  "
+"↑↓ field   type edit   ⏎ check and add   esc back                               "
 
 32 columns
-"    ⏎ check and add · esc back  "
+"⏎ check and add   esc back      "

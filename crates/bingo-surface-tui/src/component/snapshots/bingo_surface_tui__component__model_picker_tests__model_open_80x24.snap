@@ -2,7 +2,7 @@
 source: crates/bingo-surface-tui/src/component/model_picker_tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                 session 1  "
+"                                                                                "
 "                                                                                "
 "model                                                                           "
 "   5 models · 4 providers    ★ pinned · ∴ thinks · ▣ sees images                "
@@ -22,7 +22,7 @@ expression: screen
 "   ↓ 2 more                     │                                               "
 "                                                                                "
 "                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ ask anything                                                                 "
-"                        / commands · ? keys · ctrl+r sessions · shift+tab mode  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "
+"                                                                                "
+"   ▍Ask anything, or / for commands                                             "
+"                                                                                "
+"   fake-1                                        / commands   @ files   ? keys  "

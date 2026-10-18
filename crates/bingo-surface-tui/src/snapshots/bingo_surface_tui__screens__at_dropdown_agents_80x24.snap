@@ -1,9 +1,7 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 63
 expression: rows
 ---
-"                                                                                "
 " › line 6                                                                       "
 " › line 7                                                                       "
 " › line 8                                                                       "
@@ -16,13 +14,14 @@ expression: rows
 " › line 15                                                                      "
 " › line 16                                                                      "
 " › line 17                                                                      "
+" › line 18                                                                      "
 "Agents                                                                          "
 "❯ @reviewer                                                                     "
 "  @researcher                                                                   "
 "Files                                                                           "
 "  @src/reader.rs                                                                "
 "  @src/rewind.rs                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ @re                                                                          "
-"                        / commands · ? keys · ctrl+r sessions · shift+tab mode  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "
+"                                                                                "
+"   @re▍                                                                         "
+"                                                                                "
+"   fake-1                                                  ⏎ send   ⇧⏎ newline  "

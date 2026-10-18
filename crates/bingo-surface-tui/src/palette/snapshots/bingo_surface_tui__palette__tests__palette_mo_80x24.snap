@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                 session 1  "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -16,8 +15,8 @@ expression: screen
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ /mo                                                                          "
+"   /mo▍                                                                         "
+"                                                                                "
 "   commands                                                                     "
 " ❯ /model        choose model                                       fake/small  "
 "   /permission   choose permission                                     default  "
@@ -26,3 +25,4 @@ expression: screen
 "   keys                                                                         "
 "   shift+tab   cycle permission mode                                   default  "
 "   alt+b/f     move one word                                                    "
+"   fake-1                            ↑↓ pick   ⏎ run   tab fill in   esc close  "

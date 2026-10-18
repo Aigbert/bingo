@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-" unpinned gpt-6                                                                                             "
+"                                                                                                            "
 
 80 columns
-" unpinned gpt-6                                                                 "
+"                                                                                "
 
 32 columns
-" unpinned gpt-6                 "
+"                                "

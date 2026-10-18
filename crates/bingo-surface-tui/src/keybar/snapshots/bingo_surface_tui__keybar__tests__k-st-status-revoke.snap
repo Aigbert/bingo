@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-" revoked: edit src/** asks again                                                                            "
+"                                                                                                            "
 
 80 columns
-" revoked: edit src/** asks again                                                "
+"                                                                                "
 
 32 columns
-" revoked: edit src/** asks aga… "
+"                                "

@@ -2,7 +2,6 @@
 source: crates/bingo-surface-tui/src/palette/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                                                             session 1  "
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
@@ -26,9 +25,10 @@ expression: screen
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
-"────────────────────────────────────────────────────────────────────────────────────────────────────────────"
-" ▍ /permission                                                                                              "
+"   /permission ▍                                                                                            "
+"                                                                                                            "
 "   /permission  choose permission                                                                           "
 " ❯ default                                                                                             now  "
 "   acceptEdits                                                                                              "
 "   plan                                                                                                     "
+"   fake-1                                                                    ↑↓ pick   ⏎ choose   esc back  "

@@ -2,7 +2,7 @@
 source: crates/bingo-surface-tui/src/sessions/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                              session curr  "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -22,7 +22,7 @@ expression: screen
 "   review: action FIFO · open elsewhere                                         "
 "   fix the stale-edit race                                                      "
 "────────────────────────────────────────────────────────────────────────────────"
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ ⟲ filter sessions                                                            "
-"                                                                      esc back  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "
+"                                                                                "
+"   ⟲  filter sessions                                                           "
+"                                                                                "
+"   fake-1                                                             esc back  "

@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                                                     ⏎ rename · esc cancel  "
+"⏎ rename   esc cancel                                                                                       "
 
 80 columns
-"                                                         ⏎ rename · esc cancel  "
+"⏎ rename   esc cancel                                                           "
 
 32 columns
-"         ⏎ rename · esc cancel  "
+"⏎ rename   esc cancel           "

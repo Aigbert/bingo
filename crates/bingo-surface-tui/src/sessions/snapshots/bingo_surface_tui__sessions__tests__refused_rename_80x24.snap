@@ -2,7 +2,7 @@
 source: crates/bingo-surface-tui/src/sessions/tests.rs
 expression: screen
 ---
-" bingo▍ /tmp/project                                              session curr  "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -22,7 +22,7 @@ expression: screen
 "  schedule (1)                                                                 ▸"
 "────────────────────────────────────────────────────────────────────────────────"
 " session is open elsewhere; close it before renaming                            "
-"────────────────────────────────────────────────────────────────────────────────"
-" ▍ ⟲ filter sessions                                                            "
-"           → preview · r rename · d delete · f fork · tab here/all · esc close  "
-" ⏵⏵ default   ◆ solo   ▱▱▱▱▱▱▱▱ ? / ?                                   fake-1  "
+"                                                                                "
+"   ⟲  filter sessions                                                           "
+"                                                                                "
+"   fake-1              r rename   d delete   f fork   tab here/all   esc close  "

@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                                                                    ⏎ compact · esc cancel  "
+"⏎ compact   esc cancel                                                                                      "
 
 80 columns
-"                                                        ⏎ compact · esc cancel  "
+"⏎ compact   esc cancel                                                          "
 
 32 columns
-"        ⏎ compact · esc cancel  "
+"⏎ compact   esc cancel          "

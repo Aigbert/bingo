@@ -1,9 +1,12 @@
 ---
 source: crates/bingo-surface-tui/src/screens/teams.rs
-assertion_line: 316
 expression: screen
 ---
-" bingo▍ /tmp/project                                      #design · session 10  "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
+"                                                                                "
 "                                                                                "
 " ● watcher: post 1                                                              "
 "  members: reviewer, watcher                                                    "
@@ -12,13 +15,8 @@ expression: screen
 "   post 4                                                                       "
 "                                                                                "
 "                                                                                "
+"   ⟲ ▍                                                                          "
 "                                                                                "
-"                                                                                "
-"                                                                                "
-"                                                                                "
-"                                                                                "
-"────────────────────────────────────────────────────────────────────────────────"
-"#design › ⟲                                                                     "
 "   this conversation                                                            "
 "   ◆ project  idle · what is in this workspace?                                 "
 "   ◗~ reviewer  working · in #design · 3 unread · live · owes an answer · 22m   "
@@ -27,3 +25,4 @@ expression: screen
 " ❯ #design  2 seats · 1 owed                                          this one  "
 "   sessions                                                                     "
 "   All sessions…                                                                "
+"                                                ↑↓ pick   ⏎ resume   esc close  "

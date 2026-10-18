@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                 / commands · ? keys · ctrl+r sessions · shift+tab mode · alt+m next model  "
+"/ commands   ? keys   ctrl+r sessions   shift+tab mode   alt+m next model                                   "
 
 80 columns
-"     / commands · ? keys · ctrl+r sessions · shift+tab mode · alt+m next model  "
+"/ commands   ? keys   ctrl+r sessions   shift+tab mode   alt+m next model       "
 
 32 columns
-"              alt+m next model  "
+"alt+m next model                "

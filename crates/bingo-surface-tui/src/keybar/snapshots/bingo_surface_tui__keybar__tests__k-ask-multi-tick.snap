@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-"                                             ↑↓ pick · space tick · ⏎ answer with 2 · esc skip, it decides  "
+"↑↓ pick   space tick   ⏎ answer with 2   esc skip, it decides                                               "
 
 80 columns
-"                 ↑↓ pick · space tick · ⏎ answer with 2 · esc skip, it decides  "
+"↑↓ pick   space tick   ⏎ answer with 2   esc skip, it decides                   "
 
 32 columns
-"          esc skip, it decides  "
+"esc skip, it decides            "

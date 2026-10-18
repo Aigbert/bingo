@@ -3,10 +3,10 @@ source: crates/bingo-surface-tui/src/keybar/tests.rs
 expression: screens
 ---
 108 columns
-" bingo-mod-models off · /model takes a name; no list                                                        "
+"                                                                                                            "
 
 80 columns
-" bingo-mod-models off · /model takes a name; no list                            "
+"                                                                                "
 
 32 columns
-" bingo-mod-models off · /model… "
+"                                "
