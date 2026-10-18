@@ -149,6 +149,14 @@ async fn an_answered_denial_refreshes_once() {
         .await
         .unwrap();
     assert_eq!(count.load(Ordering::SeqCst), before + 1);
+    let receipt = actor
+        .state
+        .transcript
+        .items()
+        .iter()
+        .find(|item| matches!(item.body, ItemBody::PermissionReceipt { .. }))
+        .unwrap();
+    assert_eq!(receipt.turn, opened.turn);
     actor.running.take().unwrap().abandon();
 }
 
@@ -214,4 +222,19 @@ async fn a_dropped_turn_closes_its_open_ask() {
         i.body,
         ItemBody::PermissionReceipt { .. } | ItemBody::QuestionAnswer { .. }
     )));
+}
+
+#[tokio::test]
+async fn a_receipt_without_a_turn_is_refused_but_record_for_works_between_turns() {
+    let (mut actor, _) = storage::failing_actor().await;
+    let item = receipt(&actor, InteractionId::mint());
+    let (reply, answer) = oneshot::channel();
+    actor.receipt(item.clone(), reply).await.unwrap();
+    assert_eq!(
+        answer.await.unwrap().unwrap_err().code,
+        ErrorCode::Interrupted
+    );
+    assert!(actor.state.transcript.items().is_empty());
+    actor.record_for(None, item.body).await.unwrap();
+    assert_eq!(actor.state.transcript.items().len(), 1);
 }
