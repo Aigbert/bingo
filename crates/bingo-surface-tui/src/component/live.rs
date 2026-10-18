@@ -31,6 +31,9 @@ fn prepare<'a>(rows: &Rows<'a>) -> (Option<Row<'a>>, Option<Instant>) {
         matches!(item.body, ItemBody::ToolCall { .. }) && item.status == ItemStatus::Running
     });
     let busy = running
+        || items.iter().any(|item| {
+            bingo_sdk::transcript::call_wait(item).is_some_and(|(_, end)| end.is_none())
+        })
         || rows
             .state
             .interactions

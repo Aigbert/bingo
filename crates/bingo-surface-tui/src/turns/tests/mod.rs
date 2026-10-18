@@ -88,7 +88,7 @@ fn transcript_steps_keep_declared_targets() {
 }
 
 #[test]
-fn a_non_call_step_resolves_the_ascii_fallback() {
+fn a_non_call_has_no_step_state() {
     let state = folded(running_turn());
     let item = state
         .transcript
@@ -96,13 +96,7 @@ fn a_non_call_step_resolves_the_ascii_fallback() {
         .iter()
         .find(|i| !matches!(i.body, ItemBody::ToolCall { .. }))
         .unwrap();
-    let theme = crate::theme::Theme {
-        colors: crate::theme::Colors::Ansi,
-        glyphs: &crate::theme::ASCII,
-    };
-    crate::theme::with(theme, || {
-        assert_eq!(step(item, &state, &Default::default()).mark, '-');
-    });
+    assert_eq!(step_state(item, &state), None);
 }
 
 #[test]
@@ -230,15 +224,18 @@ fn only_person_visible_policy_reasons_appear_on_steps() {
 }
 
 #[test]
-fn a_running_steps_clock_starts_at_its_permission_receipt() {
+fn a_running_steps_clock_starts_at_began_at() {
     use crate::test_support::*;
-    let call = tool(
+    let mut call = tool(
         "call",
         "Inspect",
         serde_json::json!({}),
         None,
         ItemStatus::Running,
     );
+    if let ItemBody::ToolCall { began_at, .. } = &mut call.body {
+        *began_at = Some(ts() + jiff::SignedDuration::from_millis(4123));
+    }
     let mut receipt = item(
         "receipt",
         ItemStatus::Completed,
@@ -259,19 +256,18 @@ fn a_running_steps_clock_starts_at_its_permission_receipt() {
         frame(3, bingo_sdk::Event::ItemCompleted { item: receipt }),
     ]);
     let now = still(later(scene().1, 5122));
-    let answers = Answers::of(&state);
     assert_eq!(
-        running_for(&call, &answers, later(scene().1, 4122)),
+        running_for(&call, later(scene().1, 4122)),
         jiff::SignedDuration::ZERO
     );
-    assert_eq!(running_for(&call, &answers, now).as_millis(), 999);
+    assert_eq!(running_for(&call, now).as_millis(), 999);
     let step = step(&call, &state, &Default::default());
-    let (_, Props::Ledger(props)) = ledger(&call, &step, &answers, now) else {
+    let (_, Props::Ledger(props)) = ledger(&call, &step, now) else {
         panic!("ledger");
     };
     assert_eq!(props.steps[0].elapsed_ms, Some(0));
     assert_eq!(
-        bingo_sdk::transcript::next_second(now.wall, running_for(&call, &answers, now)),
+        bingo_sdk::transcript::next_second(now.wall, running_for(&call, now)),
         Some(ts() + jiff::SignedDuration::from_millis(5123))
     );
 }
@@ -289,7 +285,7 @@ fn step(item: &Item, state: &SessionState, tools: &crate::tool_rows::Looks) -> S
         crate::test_support::scene().1,
     );
     rows.tools = tools.clone();
-    super::step(item, &rows)
+    super::step(item, &rows).expect("visible step")
 }
 
 #[test]
@@ -333,3 +329,5 @@ fn a_changed_call_keeps_both_the_answer_and_the_policy_reason() {
     assert_eq!(value.answer, Some(Upshot::plain("changed by you")));
     assert_eq!(value.why.as_deref(), Some("accept edits"));
 }
+
+mod reached;

@@ -91,8 +91,12 @@ pub fn running_turn() -> Vec<Frame> {
     if let Some(last) = items.last_mut() {
         last.status = ItemStatus::Running;
         last.completed_at = None;
-        if let ItemBody::ToolCall { output, .. } = &mut last.body {
+        if let ItemBody::ToolCall {
+            output, began_at, ..
+        } = &mut last.body
+        {
             *output = None;
+            *began_at = Some(last.started_at);
         }
     }
     let mut frames = vec![frame(1, started("trn_1"))];
@@ -106,8 +110,12 @@ pub fn stopped_turn() -> Vec<Frame> {
     items.truncate(7);
     if let Some(last) = items.last_mut() {
         last.status = ItemStatus::Interrupted;
-        if let ItemBody::ToolCall { output, .. } = &mut last.body {
+        if let ItemBody::ToolCall {
+            output, began_at, ..
+        } = &mut last.body
+        {
             *output = None;
+            *began_at = Some(last.started_at);
         }
     }
     let marker = ItemBody::Interruption {

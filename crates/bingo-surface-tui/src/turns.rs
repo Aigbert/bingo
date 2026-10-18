@@ -1,5 +1,4 @@
 //! Each step retains its row throughout the turn (ADR-0097).
-use crate::ask::receipts::Answers;
 use crate::fold::Fold;
 use crate::paths;
 use crate::tree::Agents;
@@ -32,16 +31,20 @@ impl Roles {
                 continue;
             }
             let role = match &item.body {
-                ItemBody::ToolCall { quiet, output, .. }
-                    if (!*quiet || item.status.failed(output.as_deref()))
-                        && !agents.contains_key(&item.id)
-                        && !replaced.contains(&item.id) =>
-                {
-                    Role::Step {
-                        step: step(item, rows),
-                        opened: rows.folds.get(&item.id) == Some(&Fold::Open),
+                ItemBody::ToolCall { quiet, output, .. } => match step(item, rows) {
+                    None => Role::Hidden,
+                    Some(step)
+                        if (!*quiet || item.status.failed(output.as_deref()))
+                            && !agents.contains_key(&item.id)
+                            && !replaced.contains(&item.id) =>
+                    {
+                        Role::Step {
+                            step,
+                            opened: rows.folds.get(&item.id) == Some(&Fold::Open),
+                        }
                     }
-                }
+                    _ => continue,
+                },
                 ItemBody::Interruption { .. } | ItemBody::Reasoning { .. } => Role::Hidden,
                 ItemBody::Assistant { .. } if rows.followed.contains(&item.id) => Role::Narration,
                 _ => continue,
@@ -72,7 +75,7 @@ pub fn requests(
     rows: &crate::transcript::Rows<'_>,
 ) -> Vec<(String, Props)> {
     match role {
-        Role::Step { step, opened } => std::iter::once(ledger(item, step, &rows.answers, rows.now))
+        Role::Step { step, opened } => std::iter::once(ledger(item, step, rows.now))
             .chain(
                 crate::component::items::tail(item)
                     .filter(|props| matches!(props, Props::ToolProgress(_)))
@@ -91,15 +94,10 @@ pub fn result(item: &Item) -> Option<(String, Props)> {
     }
 }
 
-pub fn ledger(
-    item: &Item,
-    step: &Step,
-    answers: &Answers<'_>,
-    now: crate::clock::Now,
-) -> (String, Props) {
+pub fn ledger(item: &Item, step: &Step, now: crate::clock::Now) -> (String, Props) {
     let mut step = step.clone();
     if step.state == StepState::Running {
-        step.elapsed_ms = Some(running_for(item, answers, now).as_millis() as u64 / 1000 * 1000);
+        step.elapsed_ms = Some(running_for(item, now).as_millis() as u64 / 1000 * 1000);
     }
     let props = Props::Ledger(LedgerProps {
         steps: vec![step],
@@ -108,19 +106,11 @@ pub fn ledger(
     (crate::component::items::id(item), props)
 }
 
-/// M202 will move this start to the call's Running frame.
-pub fn running_for(
-    item: &Item,
-    answers: &Answers<'_>,
-    now: crate::clock::Now,
-) -> jiff::SignedDuration {
-    let start = answers
-        .to(&item.id)
-        .iter()
-        .filter(|receipt| matches!(receipt.body, ItemBody::PermissionReceipt { .. }))
-        .map(|receipt| receipt.started_at)
-        .max()
-        .unwrap_or(item.started_at);
+pub fn running_for(item: &Item, now: crate::clock::Now) -> jiff::SignedDuration {
+    let start = match item.body {
+        ItemBody::ToolCall { began_at, .. } => began_at.unwrap_or(item.started_at),
+        _ => item.started_at,
+    };
     now.wall
         .duration_since(start)
         .max(jiff::SignedDuration::ZERO)
@@ -171,7 +161,7 @@ fn refused(answers: &[&Item]) -> bool {
 }
 
 /// One call, in the words its row shows.
-pub fn step(item: &Item, rows: &crate::transcript::Rows<'_>) -> Step {
+pub fn step(item: &Item, rows: &crate::transcript::Rows<'_>) -> Option<Step> {
     let state = rows.state;
     let answers = &rows.answers;
     let tools = &rows.tools;
@@ -182,12 +172,7 @@ pub fn step(item: &Item, rows: &crate::transcript::Rows<'_>) -> Step {
         ..
     } = &item.body
     else {
-        return crate::tool_rows::resolve(
-            "",
-            &serde_json::Value::Null,
-            tools,
-            crate::theme::bullet().is_ascii(),
-        );
+        return None;
     };
     let mut step = crate::tool_rows::resolve(name, input, tools, crate::theme::bullet().is_ascii());
     step.target = paths::shorten_in(
@@ -198,13 +183,13 @@ pub fn step(item: &Item, rows: &crate::transcript::Rows<'_>) -> Step {
     step.state = if refused(answers.to(&item.id)) {
         StepState::Skipped
     } else {
-        step_state(item, state)
+        step_state(item, state)?
     };
     step.landed_at = item.completed_at.map(|time| time.as_millisecond());
     step.upshot = output.as_deref().and_then(bingo_sdk::ToolOutput::outcome);
     step.answer = answer(answers.to(&item.id), input);
     step.why = why(item, &rows.mode_labels);
-    step
+    Some(step)
 }
 
 fn why(item: &Item, modes: &BTreeMap<String, String>) -> Option<String> {
@@ -221,23 +206,32 @@ fn why(item: &Item, modes: &BTreeMap<String, String>) -> Option<String> {
     }
 }
 
-fn step_state(item: &Item, state: &SessionState) -> StepState {
-    let ItemBody::ToolCall { output, .. } = &item.body else {
-        return StepState::Done;
+fn step_state(item: &Item, state: &SessionState) -> Option<StepState> {
+    let ItemBody::ToolCall {
+        output,
+        asked_at,
+        began_at,
+        ..
+    } = &item.body
+    else {
+        return None;
     };
     let asked = || {
-        state
-            .interactions
-            .iter()
-            .any(|open| open.item.as_ref() == Some(&item.id))
+        bingo_sdk::transcript::call_wait(item).is_some_and(|(_, end)| end.is_none())
+            || state
+                .interactions
+                .iter()
+                .any(|open| open.item.as_ref() == Some(&item.id))
     };
-    match item.status {
+    Some(match item.status {
         ItemStatus::Pending | ItemStatus::Running if asked() => StepState::Asked,
-        ItemStatus::Pending | ItemStatus::Running => StepState::Running,
-        ItemStatus::Interrupted => StepState::Stopped,
+        ItemStatus::Running => StepState::Running,
+        ItemStatus::Pending => return None,
+        ItemStatus::Interrupted if asked_at.is_some() || began_at.is_some() => StepState::Stopped,
+        ItemStatus::Interrupted => return None,
         status if status.failed(output.as_deref()) => StepState::Failed,
         _ => StepState::Done,
-    }
+    })
 }
 
 fn answer(receipts: &[&Item], input: &serde_json::Value) -> Option<Upshot> {

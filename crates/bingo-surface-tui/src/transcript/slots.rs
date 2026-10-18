@@ -66,14 +66,14 @@ fn heading(
         return None;
     }
     if matches!(item.body, ItemBody::ToolCall { .. }) {
-        return Some(step_heading(
+        return step_heading(
             item,
             *mark,
             title.as_deref(),
             badge.as_deref(),
             caption.as_deref(),
             rows,
-        ));
+        );
     }
     title
         .as_ref()
@@ -113,8 +113,8 @@ fn step_heading(
     badge: Option<&str>,
     caption: Option<&str>,
     rows: &Rows<'_>,
-) -> crate::views::Drawing {
-    let mut step = crate::turns::step(item, rows);
+) -> Option<crate::views::Drawing> {
+    let mut step = crate::turns::step(item, rows)?;
     if let Some(mark) = mark {
         step.mark = bingo_sdk::look::mark(Some(mark), theme::bullet().is_ascii());
     }
@@ -128,11 +128,11 @@ fn step_heading(
         step.target.push(' ');
         step.target.push_str(caption);
     }
-    crate::views::marked(
+    Some(crate::views::marked(
         &step.drawing(&crate::turns::marks(), rows.width),
         rows.width,
         &crate::views::Marks::at(rows.now),
-    )
+    ))
 }
 
 fn replacement_heading(

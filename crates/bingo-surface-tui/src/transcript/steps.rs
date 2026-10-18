@@ -14,7 +14,7 @@ pub(super) fn part(item: &Item, role: &Role, rows: &Rows<'_>) -> Option<Block> {
 }
 
 pub(super) fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block {
-    let (id, props) = crate::turns::ledger(item, step, &rows.answers, rows.now);
+    let (id, props) = crate::turns::ledger(item, step, rows.now);
     let mut out = crate::component::resolve(
         rows.state,
         rows.pulled,
@@ -31,7 +31,7 @@ pub(super) fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>
             .chain(
                 bingo_sdk::transcript::next_second(
                     rows.now.wall,
-                    crate::turns::running_for(item, &rows.answers, rows.now),
+                    crate::turns::running_for(item, rows.now),
                 )
                 .map(|at| rows.now.deadline(at)),
             )
@@ -260,7 +260,7 @@ mod tests {
         let linked = Default::default();
         let rows = &Rows::of(&state, 80, &folds, &pictures, &linked, still(scene().1));
         {
-            let step = crate::turns::step(&call, rows);
+            let step = crate::turns::step(&call, rows).unwrap();
             let closed = step_block(&call, &step, false, rows);
             assert_eq!(closed.lines.len(), 1);
             let open = step_block(&call, &step, true, rows);

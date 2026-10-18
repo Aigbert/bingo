@@ -432,7 +432,7 @@ pub fn tool(
         ItemBody::ToolCall {
             allowed_by: None,
             asked_at: None,
-            began_at: None,
+            began_at: matches!(status, ItemStatus::Running | ItemStatus::Interrupted).then(ts),
             call_id: "call_1".into(),
             name: name.into(),
             quiet: ["TaskCreate", "TaskUpdate", "TaskGet", "TaskList"].contains(&name)
@@ -452,7 +452,7 @@ pub fn running_tool(id: &str, name: &str, progress: &str) -> Item {
         ItemBody::ToolCall {
             allowed_by: None,
             asked_at: None,
-            began_at: None,
+            began_at: Some(ts()),
             call_id: "call_1".into(),
             name: name.into(),
             input: json!({ "command": "cargo test" }),
@@ -473,7 +473,7 @@ pub fn running_command(id: &str, command: &str) -> Item {
         ItemBody::ToolCall {
             allowed_by: None,
             asked_at: None,
-            began_at: None,
+            began_at: Some(ts()),
             call_id: format!("call_{id}"),
             name: "Bash".into(),
             input: json!({ "command": command }),
