@@ -117,6 +117,46 @@ fn a_failed_git_lookup_leaves_the_preview_without_stakes() {
     );
 }
 
+#[test]
+fn missing_objects_in_a_partial_clone_are_never_fetched() {
+    let dir = repository();
+    add_remote_commit(dir.path(), "remote work");
+    let remote = tempfile::tempdir().unwrap();
+    git(
+        dir.path(),
+        &["clone", "--bare", ".", remote.path().to_str().unwrap()],
+    );
+    git(
+        dir.path(),
+        &[
+            "config",
+            "remote.origin.url",
+            remote.path().to_str().unwrap(),
+        ],
+    );
+    git(dir.path(), &["config", "remote.origin.promisor", "true"]);
+    git(dir.path(), &["config", "core.repositoryformatversion", "1"]);
+    git(dir.path(), &["config", "extensions.partialClone", "origin"]);
+    let hash = git(dir.path(), &["rev-parse", "refs/remotes/origin/dev"]);
+    let hash = hash.trim();
+    let object = dir
+        .path()
+        .join(".git/objects")
+        .join(&hash[..2])
+        .join(&hash[2..]);
+    std::fs::remove_file(&object).unwrap();
+    assert_eq!(tool_stakes(dir.path(), "git push --force origin dev"), None);
+    assert!(!object.exists(), "preview fetched the missing commit");
+    assert_eq!(
+        std::fs::read_dir(dir.path().join(".git/objects/pack"))
+            .unwrap()
+            .count(),
+        0
+    );
+    // The local bare remote can supply it, so failure above proves the fetch was suppressed.
+    assert!(git(dir.path(), &["log", "--oneline", "dev..origin/dev"]).contains("remote work"));
+}
+
 #[tokio::test]
 async fn timed_out_or_failed_output_supplies_no_stakes() {
     for mode in ["slow", "failed"] {

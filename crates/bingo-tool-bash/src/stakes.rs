@@ -87,6 +87,8 @@ fn git_log(cwd: &Path, remote: &str, branch: &str) -> Command {
     command
         .args([
             "--no-pager",
+            // An older Git must fail, not ignore an unknown no-fetch environment variable.
+            "--no-lazy-fetch",
             "log",
             "--oneline",
             "--no-decorate",
@@ -98,8 +100,6 @@ fn git_log(cwd: &Path, remote: &str, branch: &str) -> Command {
             "refs/heads/{branch}..refs/remotes/{remote}/{branch}"
         ))
         .arg("--")
-        // A partial clone must not fetch a missing object while asking permission.
-        .env("GIT_NO_LAZY_FETCH", "1")
         .current_dir(cwd)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
