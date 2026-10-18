@@ -1,0 +1,33 @@
+# caution · scene caution · 800 ms · 100x32 · light
+   ± edit    crates/bingo-core/src/session/queue.rs                                          +1 −1  
+   + write   crates/bingo-core/tests/queue_steer.rs                                            +20  
+   $ run     cargo test -p bingo-core queue                                               exit 101  
+   测试里的构造函数写错了，应该是 Message::text。                                                   
+   ± edit    crates/bingo-core/tests/queue_steer.rs                                          +1 −1  
+   $ run     cargo test -p bingo-core queue                                              12 passed  
+                                                                                                    
+   修好了。reset() 只重置 steer，排队的消息留给下一轮。                                             
+                                                                                                    
+   • session/queue.rs：reset() 不再清空队列                                                         
+   • tests/queue_steer.rs：2 个回归测试，覆盖 steer 之后排队、连续两次 steer                        
+   • 第一次跑测试没编过，是我写错了构造函数，已经改成 Message::text                                 
+                                                                                                    
+   cargo test -p bingo-core queue：12 个全部通过。                                                  
+                                                                                                    
+▍  把 dev 强推上去                                                                              1s  
+   $ run     git log --oneline origin/dev -3                                               3 lines  
+   ◆ run     git push --force origin dev                                                 needs you  
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Run this command?                                                       rewrites remote history  
+                                                                                                    
+     $ git push --force origin dev                                                                  
+     drops 2 commits that only origin/dev has                                                       
+       4e1a9c2 wip: queue experiments                                                               
+       b81f0d3 wip: try a ring buffer                                                               
+                                                                                                    
+   Yes, force-push                                                                                  
+ ▎ No, and tell it why  type to tell bingo why                                                      
+   Change it first                                                                                  
+                                                                                                    
+   opus-5.5 high                                                  ↑↓ choose   ⏎ confirm   esc stop  

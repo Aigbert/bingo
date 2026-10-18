@@ -1,0 +1,191 @@
+<header class="top"><div class="wrap topin">
+  <a class="brand" href="#top">bingo<i class="cur"></i><small>Ember · 终端界面提案</small></a>
+  <nav aria-label="页面导航"><a href="#proto">原型</a><a href="#gallery-s">场景</a><a href="#system">设计系统</a><a href="#compare">对比</a><a href="#plan">计划</a></nav>
+  <button class="tbtn" id="themeBtn" type="button" aria-label="切换浅色或深色"><i></i><span>深色</span></button>
+</div></header>
+
+<main class="wrap" id="top">
+<div class="hero">
+  <p class="eyebrow"><b></b>bingo · Ember · 终端界面设计提案 · 2026-10-18</p>
+  <h1>火光在哪，<span class="lit">注意力</span>就在哪<span class="cur"></span></h1>
+  <p class="lede">整个界面只有一种强调色：ember 橙。bingo 在忙，它是沿着输入区上沿跑过的一道彗星；需要你，它变成琥珀色，输入区就地变成那个问题；做完了，这一轮左边那道光由橙转绿，溅出三颗火星。其余的一切都保持安静：每一步落成一行，带着自己的图标；页脚只写例外。</p>
+  <div class="stats">
+    <span><b id="nScenes">36</b>个可操作场景</span><span><b>2</b>套主题</span><span><b>3</b>条带</span><span><b>1</b>种强调色</span><span><b>M192–M200</b>实施计划</span>
+  </div>
+</div>
+
+<section id="proto">
+  <div class="shead"><p class="num">01 · 原型</p><h2>直接上手</h2>
+    <p>点一下终端，用键盘操作。每个场景都是活的：可以打断、插话、排队、回答、展开、搜索、退出再回来。右边写着这一屏为什么这样画，以及可以试试什么。</p></div>
+  <div id="scenes" class="chips"></div>
+  <div class="toolbar">
+    <span class="lbl">尺寸</span>
+    <button class="tb" type="button" data-size="100x32" aria-pressed="true">100 × 32</button>
+    <button class="tb" type="button" data-size="80x24" aria-pressed="false">80 × 24</button>
+    <span class="sep"></span>
+    <button class="tb" type="button" id="asciiBtn" aria-pressed="false">ASCII</button>
+    <button class="tb" type="button" id="motionBtn" aria-pressed="false">减少动效</button>
+    <button class="tb" type="button" id="replayBtn">重放</button>
+  </div>
+  <div class="stagewrap"><div class="stage">
+    <div class="termcol">
+      <div class="win">
+        <div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl" id="ttl"></span><span class="sz" id="sz"></span></div>
+        <div class="term live" id="termwrap" tabindex="0" role="application" aria-label="bingo 终端原型，点一下之后可以用键盘操作"><div class="scr" id="term"></div></div>
+      </div>
+      <span class="hint" id="hint">点一下终端就能用键盘</span>
+      <p class="cap" id="cap"></p>
+      <div class="keys" id="keys">
+        <button type="button" data-k="up" aria-label="上">↑</button><button type="button" data-k="down" aria-label="下">↓</button><button type="button" data-k="left" aria-label="左">←</button><button type="button" data-k="right" aria-label="右">→</button><button type="button" data-k="enter" aria-label="回车">⏎</button><button type="button" data-k="tab">tab</button><button type="button" data-k="esc">esc</button><button type="button" data-k="shift+tab">⇧tab</button><button type="button" data-k="ctrl+o">ctrl+o</button><button type="button" data-k="ctrl+r">ctrl+r</button><button type="button" data-k="ctrl+f">ctrl+f</button><button type="button" data-k="ctrl+t">ctrl+t</button><button type="button" data-k="ctrl+b">ctrl+b</button><button type="button" data-k="ctrl+c">ctrl+c</button><button type="button" data-k="ctrl+g">ctrl+g</button><button type="button" data-k="space">space</button><button type="button" data-k="/">/</button><button type="button" data-k="@">@</button><button type="button" data-k="?">?</button>
+        <input class="typer" id="typer" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="send" placeholder="在这里打字，中文输入法也行" aria-label="向终端输入文字">
+      </div>
+    </div>
+    <aside class="rail">
+      <div class="notes" id="notes" aria-live="polite"></div>
+      <div class="nav2"><button type="button" id="prevScene">← 上一个</button><button type="button" id="nextScene">下一个 →</button></div>
+    </aside>
+  </div></div>
+</section>
+
+<section id="gallery-s">
+  <div class="shead"><p class="num">02 · 全部场景</p><h2>每一屏都画好了</h2>
+    <p>下面每一张都是同一个引擎按真实状态渲染出来的，不是截图。点任意一张，它会在上面的原型里打开，接着就能操作。</p></div>
+  <div class="gallery" id="gallery"></div>
+</section>
+
+<section id="system">
+  <div class="shead"><p class="num">03 · 设计系统</p><h2>东西很少，每一样都有用处</h2>
+    <p>一种强调色、一套网格、一张记号表、一组节奏、八种动效、一张按键表。实现时它们就是常量，屏幕上的每一格都能追溯到这里。</p></div>
+  <div class="pillars">
+    <div class="pillar"><span class="k">不繁琐</span><h3>三条带，一个动作区</h3><p>对话在上，输入区在下，页脚一行。询问、面板、搜索都在输入区里就地展开，从不叠窗口，也从不抢走你正在打的字。</p></div>
+    <div class="pillar"><span class="k">有设计感</span><h3>一种强调色，一套网格</h3><p>底色和文字色取自你的终端，只加一种 ember 橙表示注意力。所有内容对齐到第 0、3、5、13 列四条竖线。</p></div>
+    <div class="pillar"><span class="k">屏蔽冗余</span><h3>一步一行，图标说是什么</h3><p>每一步落成一行，图标、动词、参数、结果各在自己的列上；查东西的暗一档，动手的亮一档。输出收在行里，点开才看；只有最后一步失败的输出会留在屏幕上等你看。</p></div>
+    <div class="pillar"><span class="k">灵动</span><h3>只在状态变化时动</h3><p>彗星表示在忙，呼吸表示在等你，火星表示做完了。状态不变就不动；打开减少动效，一切都变成静止的。</p></div>
+    <div class="pillar"><span class="k">人机交互</span><h3>一个键只有一个意思</h3><p>esc 永远是停下或退一步，⏎ 永远是确定。它在跑的时候，⏎ 插话、tab 排队，你打字从来不会打断它。</p></div>
+  </div>
+
+  <div class="sub"><h3>解剖</h3><p>正在进行的一轮。上一轮的每一步都留在原地；这一轮左边的光在呼吸，正在跑的一步在转圈，彗星沿着输入区上沿跑，你排队的话等在输入框上面。</p></div>
+  <div class="anat">
+    <div class="win"><div class="bar"><span class="dots"><i></i><i></i><i></i></span><span class="ttl"><i class="st-live"></i>steer 吞掉排队消息 — ~/bingo-improve</span><span class="sz" id="anatSz">100×32</span></div>
+      <div class="term static"><div class="scr" id="anat"></div></div></div>
+    <ol class="callouts" id="callouts"></ol>
+  </div>
+
+  <div class="sub"><h3>网格</h3><p>四条竖线管住所有内容：边光在第 0 列，文字和图标从第 3 列开始，动词和井从第 5 列开始，步骤的参数对齐在第 13 列。右边留 2 列，正文最宽 100 列，宽屏上也不会拉成一长条。</p></div>
+  <div class="term static ruler"><div class="scr" data-scene="ledger" data-size="100x26" data-guides="1"></div></div>
+  <p class="cap">ctrl+o 细节。虚线是网格，上面的数字是列号。</p>
+
+  <div class="sub"><h3>记号</h3><p>十几个记号，每个只有一种意思，每个都有 ASCII 替身。终端不支持的时候，换成替身照样能读。</p></div>
+  <div class="tw"><table id="marks"></table></div>
+
+  <div class="sub"><h3>工具图标</h3><p>每一步前面的图标由这个工具所属的 mod 声明，和动词、参数的读法写在一起。内置功能本身就是 mod，外面装的 mod 和 MCP 服务器用同一份声明；没声明的工具是一个圆点加工具名。图标都取自等宽字体自带的字符，粗细和正文一致，SF Mono、Menlo、JetBrains Mono、Cascadia 都自带；每个都有 ASCII 替身，不是一格宽的字符一律退回圆点。</p></div>
+  <div class="term static icons"><div class="scr" data-scene="icons" data-size="100x27"></div></div>
+  <p class="cap">一轮里用到的所有图标。查东西的暗一档，动手的亮一档；队友用它自己的颜色。</p>
+  <div class="tw"><table id="tools"></table></div>
+  <div class="tw"><table>
+    <thead><tr><th>哪一块</th><th>谁说了算</th><th>怎么画</th></tr></thead>
+    <tbody>
+      <tr><td>图标、动词、参数的读法</td><td>工具的声明（ToolSpec）</td><td>mod 注册工具时一起声明；TUI 不认识任何一个工具名</td></tr>
+      <tr><td>右边的结果</td><td>工具返回的一句话</td><td>214 lines、12 passed、+1 −1，由工具自己写</td></tr>
+      <tr><td>打开后的井</td><td>mod 的 ToolOutput.display</td><td>diff、带行号的代码、命令输出、问答……mod 想怎么画就怎么画</td></tr>
+      <tr><td>整行</td><td>Ledger 站点</td><td>mod 可以接管自己工具的那一行，比如队友那一行用它的颜色</td></tr>
+    </tbody></table></div>
+
+  <div class="sub"><h3>颜色</h3><p>底色和文字色取自你的终端：浅色 #f9f4f2 / #3a342e，深色 #2c2a2e / #e6e2dc。灰阶都是这两种颜色的混合；强调色只有 ember 一种，绿、红、琥珀只表示结果和等待。</p></div>
+  <div class="inks" id="inks"></div>
+
+  <div class="sub"><h3>节奏</h3><p>空行是唯一的分隔符。没有边框，没有分割线，整个屏幕只有输入区上沿那一条横线。</p></div>
+  <div class="tw"><table>
+    <thead><tr><th>之间</th><th>空行</th><th>为什么</th></tr></thead>
+    <tbody>
+      <tr><td>两轮对话之间</td><td>1</td><td>一轮是一个整体，一行空白就够分开</td></tr>
+      <tr><td>你的话 → 第一步</td><td>0</td><td>步骤是这句话引出来的，紧贴着它</td></tr>
+      <tr><td>步骤之间</td><td>0</td><td>一步一行，旁白夹在中间，读起来是连着的一串</td></tr>
+      <tr><td>最后一步 → 回答</td><td>1</td><td>回答是要认真读的正文，给它留出呼吸</td></tr>
+      <tr><td>回答里的块之间</td><td>1</td><td>段落、代码、列表各成一块；标题后面不空行，它属于下面那块</td></tr>
+      <tr><td>对话 → 输入区上沿</td><td>1</td><td>上沿是屏幕上唯一的横线，不贴着字</td></tr>
+      <tr><td>输入区 → 页脚</td><td>1</td><td>页脚是背景信息，往后退一步</td></tr>
+      <tr><td>面板标题 → 列表</td><td>1</td><td>标题说这是什么，列表是让你选的</td></tr>
+    </tbody></table></div>
+
+  <div class="sub"><h3>动效</h3><p>动效只表达状态的变化，每一种都有固定的时长。打开减少动效后，彗星变成一条静止的淡线，呼吸停在一帧，火星不再出现。</p></div>
+  <div class="tw"><table id="motion">
+    <thead><tr><th>动效</th><th>样子</th><th>时长</th><th>什么时候出现</th></tr></thead>
+    <tbody>
+      <tr><td>彗星</td><td class="mini"><div class="scr" data-m="comet"></div></td><td>2200 ms 一趟</td><td>bingo 在忙。头亮尾冷，沿着输入区上沿跑</td></tr>
+      <tr><td>边光</td><td class="mini"><div class="scr" data-m="lamp"></div></td><td>320 ms 转绿，700 ms 火星</td><td>一轮做完。边光由橙转绿，溅出三颗火星</td></tr>
+      <tr><td>呼吸</td><td class="mini"><div class="scr" data-m="ask"></div></td><td>1400 ms</td><td>需要你。上沿变成琥珀色并呼吸；危险操作是红色，不呼吸</td></tr>
+      <tr><td>转圈</td><td class="mini"><div class="scr" data-m="spin"></div></td><td>80 ms 一帧，落地 420 ms</td><td>正在跑的那一步；跑完落成这一步的图标，从 ember 色褪到本色</td></tr>
+      <tr><td>流光</td><td class="mini"><div class="scr" data-m="shimmer"></div></td><td>2400 ms</td><td>在想，还没有动手</td></tr>
+      <tr><td>光标</td><td class="mini"><div class="scr" data-m="caret"></div></td><td>1200 ms</td><td>等你输入。柔和地明暗，从不硬闪</td></tr>
+      <tr><td>余温</td><td class="mini"><div class="scr" data-m="dry"></div></td><td>最后 10 个字</td><td>回答正在写出来，最新的字还带着 ember 的余温</td></tr>
+      <tr><td>提示</td><td class="mini"><div class="scr" data-m="toast"></div></td><td>160 / 2400 / 300 ms</td><td>确认一个动作。借用页脚左侧，然后还给原来的信息</td></tr>
+    </tbody></table></div>
+  <p class="cap">另外两种不在表里：输入区变高时每 14 ms 长出一行，变矮时立刻收回；欢迎页的字在你开口时化成光点飘走，用时 520 ms。</p>
+
+  <div class="sub"><h3>按键</h3><p>同一个键在哪里都是同一个意思。页脚右侧只列出此刻能用的键。</p></div>
+  <div class="rules">
+    <div class="rule"><kbd>esc</kbd><b>停下，或者退一步</b><span>在你的会话里：在跑就停下，在问你就是拒绝并停下；没在跑时，依次清空草稿、回到底部。在队友或房间里，esc 从不停下什么，只带你回来。</span></div>
+    <div class="rule"><kbd>⏎ / tab</kbd><b>插话，或者排队</b><span>它在跑的时候，⏎ 让这句话在下一步落地，tab 等这一轮结束再发。</span></div>
+    <div class="rule"><kbd>↑</kbd><b>拿回排队的话</b><span>输入框空着时，↑ 先取回最后排队的那一句，再往前翻历史。</span></div>
+    <div class="rule"><kbd>ctrl+c</kbd><b>一层一层收起</b><span>停下、关面板、收起细节、清空输入。什么都没有时，再按一次才退出。</span></div>
+    <div class="rule"><kbd>ctrl+g</kbd><b>去等你的那个</b><span>队友的询问在它自己的会话里等你；页脚写着谁在等，ctrl+g 直接过去，esc 回来。</span></div>
+    <div class="rule"><kbd>esc esc</kbd><b>回到某一句之前</b><span>输入框空着时连按两次，打开回退列表；对话和文件一起回去。</span></div>
+    <div class="rule"><kbd>ctrl+o</kbd><b>看这一轮的细节</b><span>步骤一直都在；ctrl+o 再加上想了什么和你插的话，↑↓ 选一步，⏎ 打开它的输出或 diff，esc 收起。</span></div>
+    <div class="rule"><kbd>ctrl+b</kbd><b>把命令放到后台</b><span>耗时的命令转到后台，这一轮照常结束；跑完会在对话里报一声。</span></div>
+    <div class="rule"><kbd>/</kbd><b>命令和技能</b><span>技能也在这里，右边写着它的来源。打字即过滤，tab 补全。</span></div>
+    <div class="rule"><kbd>@</kbd><b>引用文件或协作者</b><span>模糊匹配仓库里的文件和协作者，tab 插入；在房间里 @ 谁，谁就欠你一句回答。</span></div>
+    <div class="rule"><kbd>!</kbd><b>直接跑 shell</b><span>以 ! 开头的一行直接交给 shell，输出留在对话里。</span></div>
+    <div class="rule"><kbd>⇧tab</kbd><b>切换模式</b><span>默认、自动接受修改、只做计划、全部放行，依次切换；上沿闪一下颜色确认。</span></div>
+    <div class="rule"><kbd>?</kbd><b>所有按键</b><span>输入框空着时按 ?，按键按场合分组列出。</span></div>
+  </div>
+</section>
+
+<section id="compare">
+  <div class="shead"><p class="num">04 · 前后对比</p><h2>同一个时刻，两种画法</h2>
+    <p>左边是现在 dev 上的截图，右边是 Ember 在同一时刻的样子。每一组下面列出改了什么，以及为什么改。</p></div>
+  <div id="pairs"></div>
+</section>
+
+<section id="plan">
+  <div class="shead"><p class="num">05 · 实施计划</p><h2>九个里程碑，一次到位</h2>
+    <p>先立 ADR-0097，再按“砖块优先”从纯函数做到整屏。每个里程碑都要过全部门槛，附 TestBackend 快照和 tmux 实操记录；画面必须和这个原型逐格一致（ADR-0095）。</p></div>
+  <div class="plan">
+    <div class="ms"><div class="id">M192<small>基础</small></div><div><h3>调色板、记号表、网格和动效时钟</h3><p>从终端的底色和文字色推出整套灰阶和底色；记号表带 ASCII 替身；网格常量；呼吸、彗星、缓动都写成时间的纯函数。全部有单元测试，界面暂时不变。</p></div><div class="files">theme.rs<br>layout/grid.rs（新）<br>motion.rs<br>spinner.rs</div></div>
+    <div class="ms"><div class="id">M193<small>三条带</small></div><div><h3>对话、输入区、页脚</h3><p>新的整屏布局：输入区最高占 66%，变高时逐行长出；上沿是唯一的线，承载彗星、琥珀、红和模式闪色；页脚左边写例外、右边写此刻能用的键，提示临时借用左边。</p></div><div class="files">frame.rs<br>layout/canvas.rs<br>keybar/ · toast.rs<br>transcript/comet.rs</div></div>
+    <div class="ms"><div class="id">M194<small>一轮</small></div><div><h3>边光、一步一行、回答</h3><p>每轮带子左边缘一道边光，带状态机和火星；用时写在你的话右边；每步一行，图标、动词和参数的读法来自工具的声明，转圈跑完落成图标，查东西的暗一档；回答逐字写出，最后 10 个字带余温；最后一步失败时，它的输出留在屏幕上。</p></div><div class="files">turns.rs · ledger.rs<br>transcript/steps.rs<br>worked.rs（并入带子）<br>markdown/</div></div>
+    <div class="ms"><div class="id">M195<small>细节</small></div><div><h3>ctrl+o 细节、井、搜索</h3><p>ctrl+o 让想过的几段和你插过的话回到原位；⏎ 或点一下打开某一步的井：diff 按词标色、读到的代码带行号、思考全文、命令输出，由工具所属的 mod 画；TurnFold 退役；ctrl+f 在整段对话里搜索，当前命中用 ember 标出。</p></div><div class="files">fold.rs（退役）<br>transcript/output.rs<br>search.rs · scroll.rs<br>views/diff.rs</div></div>
+    <div class="ms"><div class="id">M196<small>输入区</small></div><div><h3>插话、排队、命令、引用</h3><p>⏎ 插话、tab 排队、↑ 拿回、停下时排队的话回到输入框；斜杠面板里命令和技能同列，右边标来源；@ 引用文件和协作者；! 直接跑 shell；图片作为输入框里的标签；esc 链和 ctrl+c 链。</p></div><div class="files">composer.rs · composer/<br>palette/ · mentions.rs<br>keys.rs · input.rs</div></div>
+    <div class="ms"><div class="id">M197<small>询问</small></div><div><h3>询问和提问都在输入区里</h3><p>输入区就地变成上下选择的列表，打开后 400 ms 内不接按键；危险操作默认停在安全的选项上；直接打字就是“不，原因是…”；多个问题用 ←→ 切换，可多选，宽屏带预览；esc 停下。</p></div><div class="files">ask/ · dialog.rs<br>form.rs<br>preview.rs</div></div>
+    <div class="ms"><div class="id">M198<small>面板</small></div><div><h3>一种结构的所有面板</h3><p>模型、状态、插件、会话、回退、按键、任务、定时、记忆、协作者、登录、唤醒、模式，全部是同一种结构：标题、列表、底注；都在输入区里打开，esc 关闭。</p></div><div class="files">pane/ · screens/<br>sessions/ · rewind.rs<br>plugins.rs · status.rs</div></div>
+    <div class="ms"><div class="id">M199<small>边界</small></div><div><h3>欢迎、退出、出错、窄屏</h3><p>欢迎页的字标、火星和化开；退出后的一行收据和带会话 id 的 bingo --resume；限流重试、登录失效、上下文告急；80 × 24、ASCII、减少动效；定时唤醒、后台命令。</p></div><div class="files">welcome.rs · opening/<br>embers.rs<br>lifecycle.rs</div></div>
+    <div class="ms"><div class="id">M200<small>队友</small></div><div><h3>队友和房间</h3><p>队友和房间各是自己的会话；/agents 里 ⏎ 走进去，esc 回来；ctrl+g 带你去等你的那个；房间里 @ 谁，谁就欠你一句话。</p></div><div class="files">crew/ · views.rs<br>rooms/<br>keys.rs</div></div>
+  </div>
+
+  <div class="sub"><h3>记录</h3><p>一份新 ADR，一处修订，以及这次会删掉的东西。</p></div>
+  <div class="cols">
+    <div><h3>ADR-0097 · Ember 视觉与交互系统</h3><ul><li>只有一种强调色；状态只由上沿、每轮的左沿和页脚表达</li><li>三条带布局，输入区最高 66%</li><li>一步一行，图标由工具所属的 mod 声明，取自等宽字体自带的字符</li><li>⏎ 插话、tab 排队、esc 停下</li><li>询问和面板都在输入区里展开</li><li>队友和房间各是自己的会话；你的输入区只属于你</li></ul></div>
+    <div><h3>修订 ADR-0095 · 画面跟随原型</h3><ul><li>这份原型就是规格，36 个场景就是验收快照</li><li>每个场景一个 TestBackend 快照，逐格比对</li><li>要改界面，先改原型，再改代码</li><li>Step 多出 mark 和 verb，来自 mod 的声明；TurnFold 退役，TurnDuration 画在带子上</li></ul></div>
+    <div><h3>会删掉的东西</h3><ul><li>▸ 折叠箭头和 “N steps” 那一行</li><li>“Worked for 6s · done 21:58” 这类状态行</li><li>“you: yes” 回显和 [ b background ] 按钮字样</li><li>独立的询问框和编号选项</li><li>页脚的模式图标、进度条和 “? / ?”</li></ul></div>
+  </div>
+
+  <div class="sub"><h3>需要你拍板的七件事</h3><p>这七条决定了实现的形状。你点头之后，我按上面的顺序开工。</p></div>
+  <ol class="asks">
+    <li><b>只有一种强调色</b><p>界面只用 ember 橙表示注意力；绿、红、琥珀只表示结果和等待。代码高亮和协作者的颜色不算强调色。</p></li>
+    <li><b>询问进输入区，esc 就是停下</b><p>询问不再弹框，输入区就地变成选项列表。esc 拒绝并停下这一轮；想说明原因，直接打字。在队友的会话里，esc 只带你回来。</p></li>
+    <li><b>一步一行，每个工具有自己的图标</b><p>一行一行往下推，做完也不折叠。图标取自等宽字体自带的字符，由工具所属的 mod 声明，转圈跑完落成图标；颜色只说状态：失败红、等你琥珀、查东西暗一档。点一下打开输出，ctrl+o 看想了什么。</p></li>
+    <li><b>⏎ 插话，tab 排队</b><p>它在跑时，⏎ 让这句话在下一步落地，tab 等这一轮结束；↑ 拿回排队的话，按 esc 停下时排队的话回到输入框。</p></li>
+    <li><b>页脚只写例外</b><p>平时只显示模型和思考强度；模式、上下文、后台命令、协作者、定时唤醒只在不寻常时出现。</p></li>
+    <li><b>退出时留一行收据和 --resume</b><p>退出后终端里留下一行收据：几轮、多久、改了几个文件，下一行就是 bingo --resume 加这个会话的 id，回来的一定是这一个会话。</p></li>
+    <li><b>你的输入区只属于你</b><p>队友要你点头时，询问留在它自己的会话里，不抢你的输入区；页脚写着谁在等你，ctrl+g 过去，esc 回来。房间里 @ 谁，谁就欠你一句回答。</p></li>
+  </ol>
+
+  <div class="sub"><h3>每个里程碑的门槛</h3></div>
+  <div class="cols">
+    <div><h3>代码</h3><ul><li>cargo fmt、check、clippy -D warnings、test</li><li>scripts/check_discipline.sh、scripts/budget.sh、cargo deny check</li><li>Windows 目标的 cargo check</li></ul></div>
+    <div><h3>画面</h3><ul><li>每个场景一个 TestBackend 快照，和原型逐格一致</li><li>80 × 24、ASCII、减少动效各一套快照</li><li>PTY 冒烟测试</li></ul></div>
+    <div><h3>手感</h3><ul><li>tmux 实操：打断、插话、排队、回答、展开、搜索、退出再回来</li><li>浅色和深色终端各走一遍</li></ul></div>
+  </div>
+</section>
+</main>
+<footer class="foot wrap"><span>bingo Ember · 终端界面设计提案 · 2026-10-18</span><span>原型里的模型、价格、会话和测试输出都是示例数据</span></footer>

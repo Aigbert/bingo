@@ -1,0 +1,33 @@
+# question-ticked · scene question · 2200 ms · 100x32 · light
+   / search  drain|reset                                                         9 hits in 3 files  
+   ¶ read    crates/bingo-core/src/turn/loop.rs                                          486 lines  
+                                                                                                    
+   问题不在 drain()，在 reset()：每一轮开始时，它把 queue 整个清空了。                              
+                                                                                                    
+                                                                                            rust    
+     pub fn reset(&mut self) {                                                                      
+         self.queue.clear();   // 排着的消息在这里丢了                                              
+         self.steer = None;                                                                         
+     }                                                                                              
+                                                                                                    
+                                                                                                    
+   你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 reset() 把还没  
+   发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。                                   
+                                                                                                    
+▍  修好它，加一个回归测试                                                                       2s  
+   先改 reset()，再补一个回归测试。                                                                 
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   * find    crates/bingo-core/tests/*.rs                                                  6 files  
+   ± edit    crates/bingo-core/src/session/queue.rs                                          +1 −1  
+   ◆ ask     回归测试放在哪？                                                            needs you  
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ✓ 位置    覆盖                                                                           2 of 2  
+   要覆盖哪些情况？                                                                                 
+                                                                                                    
+   ✓ steer 之后排队         这次丢消息的情况                                                        
+ ▎ ✓ 连续两次 steer         后一条替换前一条                                                        
+   · 工具调用中途 steer     等这一步做完才落地                                                      
+   Something else                                                                                   
+                                                                                                    
+   opus-5.5 high · accept edits                    ←→ questions   space tick   ⏎ choose   esc stop  

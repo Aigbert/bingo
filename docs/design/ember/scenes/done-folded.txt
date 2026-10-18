@@ -1,0 +1,33 @@
+# done-folded · scene done · 1340 ms · 100x32 · light
+   ¶ read    crates/bingo-core/src/turn/loop.rs                                          486 lines  
+                                                                                                    
+   问题不在 drain()，在 reset()：每一轮开始时，它把 queue 整个清空了。                              
+                                                                                                   ▕
+                                                                                            rust   ▕
+     pub fn reset(&mut self) {                                                                     ▕
+         self.queue.clear();   // 排着的消息在这里丢了                                             ▕
+         self.steer = None;                                                                        ▕
+     }                                                                                             ▕
+                                                                                                   ▕
+                                                                                                   ▕
+   你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 reset() 把还没 ▕
+   发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。                                  ▕
+                                                                                                   ▕
+▍  修好它，加一个回归测试                                                                       8s ▕
+   先改 reset()，再补一个回归测试。                                                                ▕
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines ▕
+   * find    crates/bingo-core/tests/*.rs                                                  6 files ▕
+   ± edit    crates/bingo-core/src/session/queue.rs                                          +1 −1 ▕
+   + write   crates/bingo-core/tests/queue_steer.rs                                            +20 ▕
+   $ run     cargo test -p bingo-core queue                                               exit 101 ▕
+   测试里的构造函数写错了，应该是 Message::text。                                                  ▕
+   ± edit    crates/bingo-core/tests/queue_steer.rs                                          +1 −1 ▕
+   $ run     cargo test -p bingo-core queue                                              12 passed ▕
+                                                                                                    
+   修好了。reset() 只重置 steer，排队的消息留给下一轮。                                             
+                                                                                                    
+                                          ↓ 5 lines below                                           
+                                                                                                    
+   ▍Reply, or / for commands                                                                        
+                                                                                                    
+   opus-5.5 high                                                          end latest   ctrl+f find  

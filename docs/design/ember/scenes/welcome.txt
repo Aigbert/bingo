@@ -1,0 +1,33 @@
+# welcome · scene welcome · 2600 ms · 100x32 · light
+                                                                                                    
+                                                     ⠠⠁                                             
+                                                      ⠂⡀                                            
+                                                      ⠠                                             
+                                                      ⢀                                             
+                        █      ▀                                                                    
+                        █▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█ ▍                                             
+                        █▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍                                             
+                                        ▄▄▄▄▄█        ▍                                             
+                                                                                                    
+                        opus-5.5 · high · default                                                   
+                        ~/bingo-improve on dev · 3 changed                                          
+                                                                                                    
+                        recent                                                                      
+                        steer 吞掉排队消息                               12m                        
+                        给 total 加标签                                   2h                        
+                        bingo-site 文档页                          yesterday                        
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+   ▍Ask anything, or / for commands                                                                 
+                                                                                                    
+   opus-5.5 high                                                    ↑ recent   / commands   ? keys  

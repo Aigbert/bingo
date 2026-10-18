@@ -1,0 +1,33 @@
+# wake · scene wake · 7400 ms · 100x32 · light
+   先看 queue.rs，再看谁在调用 drain() 和 reset()。                                                 
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   / search  drain|reset                                                         9 hits in 3 files  
+   ¶ read    crates/bingo-core/src/turn/loop.rs                                          486 lines  
+                                                                                                    
+   问题不在 drain()，在 reset()：每一轮开始时，它把 queue 整个清空了。                              
+                                                                                                    
+                                                                                            rust    
+     pub fn reset(&mut self) {                                                                      
+         self.queue.clear();   // 排着的消息在这里丢了                                              
+         self.steer = None;                                                                         
+     }                                                                                              
+                                                                                                    
+                                                                                                    
+   你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 reset() 把还没  
+   发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。                                   
+                                                                                                    
+   盯一下 CI，过了告诉我                                                                        2s  
+   $ run     gh run watch --exit-status                                              still running  
+   ∞ wake    in 5m                                                                             set  
+                                                                                                    
+   Linux 和 macOS 都过了，Windows 还在跑（7/12）。我 5 分钟后醒来再看一眼，过了就告诉你。           
+                                                                                                    
+▍  wake-up  再看一眼 CI，过了就告诉我                                                           1s  
+   $ run     gh run watch --exit-status                                                     passed  
+                                                                                                    
+   CI 全绿了，Windows 也过了。可以合了。                                                            
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands                                                                        
+                                                                                                    
+   opus-5.5 high                                              ctrl+o details   / commands   ? keys  

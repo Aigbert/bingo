@@ -1,0 +1,33 @@
+# ledger-up · scene ledger · 720 ms · 100x32 · light
+   ± edit    crates/bingo-core/src/session/queue.rs                                          +1 −1  
+   + write   crates/bingo-core/tests/queue_steer.rs                                            +20  
+                                                                                                    
+          1 + use bingo_core::session::Queue;                                                       
+          2 + use bingo_sdk::Message;                                                               
+          3 +                                                                                       
+          4 + #[test]                                                                               
+          5 + fn steer_then_queue_keeps_both() {                                                    
+          6 +     let mut q = Queue::default();                                                     
+          7 +     q.steer(Message::text("first"));                                                  
+          8 +     q.push(Message::user("second"));                                                  
+          9 +     assert_eq!(q.drain().map(|m| m.text()), Some("first".into()));                   ▕
+         10 +     q.reset();                                                                       ▕
+         11 +     assert_eq!(q.drain().map(|m| m.text()), Some("second".into()));                  ▕
+         12 + }                                                                                    ▕
+         13 +                                                                                      ▕
+         14 + #[test]                                                                              ▕
+         15 + fn a_second_steer_replaces_the_first() {                                             ▕
+         16 +     let mut q = Queue::default();                                                    ▕
+         17 +     q.steer(Message::text("old"));                                                   ▕
+         18 +     q.steer(Message::text("new"));                                                   ▕
+         19 +     assert_eq!(q.drain().map(|m| m.text()), Some("new".into()));                     ▕
+         20 + }                                                                                    ▕
+                                                                                                   ▕
+   $ run     cargo test -p bingo-core queue                                               exit 101  
+   测试里的构造函数写错了，应该是 Message::text。                                                   
+   ± edit    crates/bingo-core/tests/queue_steer.rs                                          +1 −1  
+                                          ↓ 9 lines below                                           
+                                                                                                    
+    Reply, or / for commands                                                                        
+                                                                                                    
+   opus-5.5 high                                                      ↑↓ step   ⏎ open   esc close  

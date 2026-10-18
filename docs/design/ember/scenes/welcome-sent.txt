@@ -1,0 +1,33 @@
+# welcome-sent · scene welcome · 4860 ms · 100x32 · light
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+▍  修好它                                                                                       1s  
+   先改 reset()，再补一个回归测试。                                                                 
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   * find    crates/bingo-core/tests/*.rs                                                  6 files  
+   ⠋ edit    crates/bingo-core/src/session/queue.rs                                                 
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Steer, or queue what comes next                                                                 
+                                                                                                    
+   opus-5.5 high                                                                          esc stop  

@@ -1,0 +1,33 @@
+# room-mention · scene room · 1140 ms · 100x32 · light
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+   ── #design · decide how reset() treats queued lines ───────────────────────────────────────────  
+                                                                                                    
+   you        reset() 要不要清空排队的消息？@ada @scout 说说看                                      
+                                                                                                    
+▎  ada        我倾向于 reset() 完全不碰队列：排队的消息是你说过的话，属于下一轮。                   
+                                                                                                    
+▎  scout      drain() 有 4 处调用，都在一轮开始时，在 reset() 之后。                                
+▎             所以 reset() 不清队列，drain() 也能拿到它们。                                         
+                                                                                                    
+                                                                                                    
+ ▎ reviewer                                                                           agent · idle  
+                                                                                                    
+   @rev▍                                                                                            
+                                                                                                    
+   #design  reviewer scout ada                                              ↑↓ choose   tab insert  

@@ -1,0 +1,33 @@
+# rewind-rewound · scene rewind · 1020 ms · 100x32 · light
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                      ⠂                                             
+                                                     ⠈                                              
+                        █      ▀                                                                    
+                        █▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀ ▍                                              
+                        █▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄ ▍                                              
+                                        ▄▄▄▄▄█       ▍                                              
+                                                                                                    
+                        opus-5.5 · high · default                                                   
+                        ~/bingo-improve on dev · 3 changed                                          
+                                                                                                    
+                        recent                                                                      
+                        steer 吞掉排队消息                               12m                        
+                        给 total 加标签                                   2h                        
+                        bingo-site 文档页                          yesterday                        
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+   看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉▍                         
+                                                                                                    
+   ✓ rewound · 2 files restored                                                ⏎ send   ⇧⏎ newline  

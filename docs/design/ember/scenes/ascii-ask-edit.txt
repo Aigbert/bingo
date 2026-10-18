@@ -1,0 +1,33 @@
+# ascii-ask-edit · scene ask-edit · 900 ms · 100x32 · ascii · light
+                                                                                                    
+                                                                                            rust    
+     pub fn reset(&mut self) {                                                                      
+         self.queue.clear();   // 排着的消息在这里丢了                                              
+         self.steer = None;                                                                         
+     }                                                                                              
+                                                                                                    
+                                                                                                    
+   你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 reset() 把还没  
+   发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。                                   
+                                                                                                    
+|  修好它，加一个回归测试                                                                       1s  
+   先改 reset()，再补一个回归测试。                                                                 
+   < read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   * find    crates/bingo-core/tests/*.rs                                                  6 files  
+   * edit    crates/bingo-core/src/session/queue.rs                                      needs you  
+                                                                                                    
+----------------------------------------------------------------------------------------------------
+   Edit session/queue.rs?                                                                    +1 -1  
+                                                                                                    
+         86       /// Called when a turn starts.                                                    
+         87       pub fn reset(&mut self) {                                                         
+         88 -         self.queue.clear();                                                           
+         88 +         // queued lines belong to the next turn; only the steer slot resets           
+         89           self.steer = None;                                                            
+         90       }                                                                                 
+                                                                                                    
+ | Yes                                                                                              
+   Yes, allow edits in src/session/ for this session                                                
+   No, and tell it why                                                                              
+                                                                                                    
+   opus-5.5 high                                         up/down choose   enter confirm   esc stop  

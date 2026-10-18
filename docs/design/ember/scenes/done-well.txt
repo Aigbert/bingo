@@ -1,0 +1,33 @@
+# done-well · scene done · 1080 ms · 100x32 · light
+   先改 reset()，再补一个回归测试。                                                                 
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+                                                                                                    
+          1   use std::collections::VecDeque;                                                       
+          2                                                                                         
+          3   use bingo_sdk::Message;                                                               
+          4                                                                                         
+          5   /// What you type while a turn runs: one steer slot, then the queue.                  
+          6   #[derive(Debug, Default)]                                                             
+          7   pub struct Queue {                                                                    
+          8       steer: Option<Message>,                                                          ▕
+          9       queue: VecDeque<Message>,                                                        ▕
+         10   }                                                                                    ▕
+         11                                                                                        ▕
+         12   impl Queue {                                                                         ▕
+       … 202 more lines                                                                            ▕
+                                                                                                   ▕
+   * find    crates/bingo-core/tests/*.rs                                                  6 files ▕
+   ± edit    crates/bingo-core/src/session/queue.rs                                          +1 −1 ▕
+   + write   crates/bingo-core/tests/queue_steer.rs                                            +20 ▕
+   $ run     cargo test -p bingo-core queue                                               exit 101 ▕
+   测试里的构造函数写错了，应该是 Message::text。                                                  ▕
+   ± edit    crates/bingo-core/tests/queue_steer.rs                                          +1 −1 ▕
+   $ run     cargo test -p bingo-core queue                                              12 passed ▕
+                                                                                                   ▕
+   修好了。reset() 只重置 steer，排队的消息留给下一轮。                                             
+                                                                                                    
+                                          ↓ 5 lines below                                           
+                                                                                                    
+    Reply, or / for commands                                                                        
+                                                                                                    
+   opus-5.5 high                                                      ↑↓ step   ⏎ open   esc close  

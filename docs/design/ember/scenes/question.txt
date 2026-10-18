@@ -1,0 +1,33 @@
+# question · scene question · 800 ms · 100x32 · light
+                                                                                            rust    
+     pub fn reset(&mut self) {                                                                      
+         self.queue.clear();   // 排着的消息在这里丢了                                              
+         self.steer = None;                                                                         
+     }                                                                                              
+                                                                                                    
+                                                                                                    
+   你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 reset() 把还没  
+   发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。                                   
+                                                                                                    
+▍  修好它，加一个回归测试                                                                       2s  
+   先改 reset()，再补一个回归测试。                                                                 
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   * find    crates/bingo-core/tests/*.rs                                                  6 files  
+   ± edit    crates/bingo-core/src/session/queue.rs                                          +1 −1  
+   ◆ ask     回归测试放在哪？                                                            needs you  
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   位置    覆盖                                                                             1 of 2  
+   回归测试放在哪？                                                                                 
+                                                                                                    
+ ▎ 集成测试         新建 tests/queue_steer.rs…        tests/queue_steer.rs                          
+   单元测试         写在 queue.rs 底部，能看到…                                                     
+   Something else                                     #[test]                                       
+                                                      fn steer_then_queue_keeps_both() {            
+                                                          let mut q = Queue::default();             
+                                                          q.steer(Message::text("first"));          
+                                                          q.push(Message::text("second"));          
+                                                          …                                         
+                                                      }                                             
+                                                                                                    
+   opus-5.5 high · accept edits                                 ←→ questions   ⏎ choose   esc stop  

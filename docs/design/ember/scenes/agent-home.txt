@@ -1,0 +1,33 @@
+# agent-home · scene agent · 5580 ms · 100x32 · light
+   ± edit    crates/bingo-core/src/session/queue.rs                                          +1 −1  
+   + write   crates/bingo-core/tests/queue_steer.rs                                            +20  
+   $ run     cargo test -p bingo-core queue                                               exit 101  
+   测试里的构造函数写错了，应该是 Message::text。                                                   
+   ± edit    crates/bingo-core/tests/queue_steer.rs                                          +1 −1  
+   $ run     cargo test -p bingo-core queue                                              12 passed  
+                                                                                                    
+   修好了。reset() 只重置 steer，排队的消息留给下一轮。                                             
+                                                                                                    
+   • session/queue.rs：reset() 不再清空队列                                                         
+   • tests/queue_steer.rs：2 个回归测试，覆盖 steer 之后排队、连续两次 steer                        
+   • 第一次跑测试没编过，是我写错了构造函数，已经改成 Message::text                                 
+                                                                                                    
+   cargo test -p bingo-core queue：12 个全部通过。                                                  
+                                                                                                    
+▍  让 scout 和 reviewer 并行：一个找 drain() 的调用点，一个审 queue.rs 的改动                   2s  
+   @ scout   find every caller of drain()                                                 reported  
+   @ reviewer  review the queue.rs diff                                                   reported  
+                                                                                                    
+   派出去了：scout 找所有调用 drain() 的地方，reviewer 看 queue.rs 的改动。它们做完会在这里说；要   
+   你点头的时候，页脚会告诉你，ctrl+g 过去。                                                        
+                                                                                                    
+▎  scout      找到 4 处调用 drain()：turn/loop.rs 两处、session/mod.rs 一处、rpc/steer.rs 一处。都  
+▎             只在一轮开始时调用，和 reset() 的顺序一致，改动不影响它们。                           
+                                                                                                    
+▎  reviewer   reset() 的改法没问题。建议在 a_second_steer_replaces_the_first 里再断言一次队列是空   
+▎             的，不然以后有人把 steer 改成追加，这个测试还是会过。                                 
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands                                                                        
+                                                                                                    
+   opus-5.5 high · accept edits                               ctrl+o details   / commands   ? keys  

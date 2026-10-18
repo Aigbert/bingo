@@ -1,0 +1,33 @@
+# sessions-switched · scene sessions · 1280 ms · 100x32 · light
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+▍  windows CI 超时                                                                              1s  
+   ¶ read    README.md                                                                    88 lines  
+                                                                                                    
+   这是「windows CI 超时」会话的最后一轮。往下接着说就行。                                          
+                                                                                                    
+                                                                                                    
+   ▍Reply, or / for commands                                                                        
+                                                                                                    
+   ✓ resumed · windows CI 超时                                ctrl+o details   / commands   ? keys  

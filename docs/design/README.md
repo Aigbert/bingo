@@ -11,5 +11,6 @@ These are the sources the ADRs draw from. They were written before the first lin
 - [upgrade-2026-10.md](upgrade-2026-10.md) — the upgrade that follows from it: eight phases, milestones M108–M151 (M143–M145 dropped), ADRs 0063–0081 (0080 rejected), the execution protocol and the hand-over prompt.
 - [mods-parity-2026-10.md](mods-parity-2026-10.md) — what a Claude Code mod can do, what bingo has, and the Phase 7 milestone that closes each gap.
 - [tui-identity-2026-10.md](tui-identity-2026-10.md) — Phase 8: the TUI's rough edges, the rail given back to the person, bingo's ember look and its crew.
+- [ember/](ember/) — bingo Ember, the terminal redesigned from nothing and approved whole (2026-10-18): the prototype's source, its short spec and 105 captures every scene's test compares against (ADR-0097, M192–M200).
 - `survey/` — what the old bingo had and where it hurt: [feature inventory](survey/feature-inventory.md), [engine map](survey/engine-map.md), [collaboration layer, protocol and health](survey/collab-protocol-health.md).
 - `research/` — verified library and reference-implementation research: [Rust crates](research/rust-crates.md), [TUI ecosystem](research/tui-ecosystem.md), [reference architectures](research/reference-architectures.md), [provider stream model](research/provider-stream-model.md).

@@ -1,0 +1,33 @@
+# crew-reviewer · scene crew · 4860 ms · 100x32 · light
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+   ── reviewer · reads diffs and says what breaks ────────────────────────────────────────────────  
+                                                                                                    
+▍  bingo  review the queue.rs diff                                                              1s  
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   ¶ read    crates/bingo-core/tests/queue_steer.rs                                        2 tests  
+   ◆ run     cargo test -p bingo-core queue                                              needs you  
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Run this command?                                                            in ~/bingo-improve  
+                                                                                                    
+     $ cargo test -p bingo-core queue                                                               
+     checks the fix before I sign off                                                               
+                                                                                                    
+ ▎ Yes                                                                                              
+   Yes, allow cargo test for this session                                                           
+   No, and tell it why                                                                              
+   Change it first                                                                                  
+                                                                                                    
+   reviewer · opus-5.5 high                                       ↑↓ choose   ⏎ confirm   esc back  

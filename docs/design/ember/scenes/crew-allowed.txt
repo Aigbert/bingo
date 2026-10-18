@@ -1,0 +1,33 @@
+# crew-allowed · scene crew · 8520 ms · 100x32 · light
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+   ── reviewer · reads diffs and says what breaks ────────────────────────────────────────────────  
+                                                                                                    
+▍  bingo  review the queue.rs diff                                                              3s  
+   ¶ read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   ¶ read    crates/bingo-core/tests/queue_steer.rs                                        2 tests  
+   $ run     cargo test -p bingo-core queue                                              12 passed  
+                                                                                                    
+   reset() 的改法没问题。建议在 a_second_steer_replaces_the_first 里再断言一次队列是空的，不然以后  
+   有人把 steer 改成追加，这个测试还是会过。                                                        
+                                                                                                    
+                                                                                                    
+   ▍Message reviewer                                                                                
+                                                                                                    
+   reviewer · opus-5.5 high                                                  esc back   / commands  

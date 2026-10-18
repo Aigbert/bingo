@@ -1,0 +1,1354 @@
+[
+ {
+  "file": "welcome",
+  "scene": "welcome",
+  "grp": "对话",
+  "name": "开场",
+  "card": "还没说话。字标、光标和最近的会话。",
+  "t": 2600,
+  "size": "100x32"
+ },
+ {
+  "file": "welcome-recent",
+  "scene": "welcome",
+  "grp": "对话",
+  "name": "开场",
+  "after": [
+   2700,
+   "up",
+   300
+  ],
+  "t": 3060,
+  "size": "100x32"
+ },
+ {
+  "file": "welcome-sent",
+  "scene": "welcome",
+  "grp": "对话",
+  "name": "开场",
+  "after": [
+   2700,
+   "up",
+   300,
+   "shot:recent",
+   "esc",
+   [
+    "修好它"
+   ],
+   "enter",
+   1500
+  ],
+  "t": 4860,
+  "size": "100x32"
+ },
+ {
+  "file": "live",
+  "scene": "live",
+  "grp": "对话",
+  "name": "在干活",
+  "card": "左边的光在呼吸，每一步落成一行，正在跑的一步在转圈。",
+  "t": 700,
+  "size": "100x32"
+ },
+ {
+  "file": "live-steered",
+  "scene": "live",
+  "grp": "对话",
+  "name": "在干活",
+  "after": [
+   800,
+   [
+    "测试名字用英文"
+   ],
+   "enter",
+   [
+    "再更新 CHANGELOG"
+   ],
+   "tab",
+   400
+  ],
+  "t": 2520,
+  "size": "100x32"
+ },
+ {
+  "file": "live-stopped",
+  "scene": "live",
+  "grp": "对话",
+  "name": "在干活",
+  "after": [
+   800,
+   [
+    "测试名字用英文"
+   ],
+   "enter",
+   [
+    "再更新 CHANGELOG"
+   ],
+   "tab",
+   400,
+   "shot:steered",
+   "esc",
+   600
+  ],
+  "t": 3180,
+  "size": "100x32"
+ },
+ {
+  "file": "done",
+  "scene": "done",
+  "grp": "对话",
+  "name": "做完了",
+  "card": "刚做完的一轮左边亮一道绿光；每一步留在原地，一步一行。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "done-detail",
+  "scene": "done",
+  "grp": "对话",
+  "name": "做完了",
+  "after": [
+   300,
+   "ctrl+o",
+   300
+  ],
+  "t": 660,
+  "size": "100x32"
+ },
+ {
+  "file": "done-well",
+  "scene": "done",
+  "grp": "对话",
+  "name": "做完了",
+  "after": [
+   300,
+   "ctrl+o",
+   300,
+   "shot:detail",
+   "down",
+   "enter",
+   300
+  ],
+  "t": 1080,
+  "size": "100x32"
+ },
+ {
+  "file": "done-folded",
+  "scene": "done",
+  "grp": "对话",
+  "name": "做完了",
+  "after": [
+   300,
+   "ctrl+o",
+   300,
+   "shot:detail",
+   "down",
+   "enter",
+   300,
+   "shot:well",
+   "esc",
+   200
+  ],
+  "t": 1340,
+  "size": "100x32"
+ },
+ {
+  "file": "ledger",
+  "scene": "ledger",
+  "grp": "对话",
+  "name": "细节",
+  "card": "ctrl+o：想过的和插过的话回到原位，失败那步的输出就地打开。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "ledger-up",
+  "scene": "ledger",
+  "grp": "对话",
+  "name": "细节",
+  "after": [
+   300,
+   "up",
+   "enter",
+   300
+  ],
+  "t": 720,
+  "size": "100x32"
+ },
+ {
+  "file": "stop",
+  "scene": "stop",
+  "grp": "对话",
+  "name": "停下",
+  "card": "esc 停下这一轮，排队的话回到输入框。",
+  "t": 2600,
+  "size": "100x32"
+ },
+ {
+  "file": "stop-resent",
+  "scene": "stop",
+  "grp": "对话",
+  "name": "停下",
+  "after": [
+   2900,
+   "enter",
+   800
+  ],
+  "t": 3760,
+  "size": "100x32"
+ },
+ {
+  "file": "steer",
+  "scene": "steer",
+  "grp": "对话",
+  "name": "转向和排队",
+  "card": "转向在下一步送到，排队等这一轮结束。",
+  "t": 200,
+  "size": "100x32"
+ },
+ {
+  "file": "steer-landed",
+  "scene": "steer",
+  "grp": "对话",
+  "name": "转向和排队",
+  "after": [
+   300,
+   4000
+  ],
+  "t": 4300,
+  "size": "100x32"
+ },
+ {
+  "file": "shell",
+  "scene": "shell",
+  "grp": "对话",
+  "name": "直接跑命令",
+  "card": "! 开头直接跑：不经过模型，命令和输出就是全部。",
+  "t": 600,
+  "size": "100x32"
+ },
+ {
+  "file": "shell-ls",
+  "scene": "shell",
+  "grp": "对话",
+  "name": "直接跑命令",
+  "after": [
+   800,
+   [
+    "!ls"
+   ],
+   "enter",
+   800
+  ],
+  "t": 1840,
+  "size": "100x32"
+ },
+ {
+  "file": "image",
+  "scene": "image",
+  "grp": "对话",
+  "name": "图片",
+  "card": "贴进来的图是一个标签，跟着这句话走。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "image-sent",
+  "scene": "image",
+  "grp": "对话",
+  "name": "图片",
+  "after": [
+   300,
+   "enter",
+   2500
+  ],
+  "t": 2860,
+  "size": "100x32"
+ },
+ {
+  "file": "ask-edit",
+  "scene": "ask-edit",
+  "grp": "询问",
+  "name": "要改文件",
+  "card": "琥珀色上沿在呼吸：这一步等你点头。",
+  "t": 700,
+  "size": "100x32"
+ },
+ {
+  "file": "ask-edit-down",
+  "scene": "ask-edit",
+  "grp": "询问",
+  "name": "要改文件",
+  "after": [
+   800,
+   "down",
+   300
+  ],
+  "t": 1160,
+  "size": "100x32"
+ },
+ {
+  "file": "ask-edit-allowed",
+  "scene": "ask-edit",
+  "grp": "询问",
+  "name": "要改文件",
+  "after": [
+   800,
+   "down",
+   300,
+   "shot:down",
+   "enter",
+   1500
+  ],
+  "t": 2720,
+  "size": "100x32"
+ },
+ {
+  "file": "ask-bash",
+  "scene": "ask-bash",
+  "grp": "询问",
+  "name": "要跑命令",
+  "card": "命令用代码色，下一行说为什么要跑。",
+  "t": 700,
+  "size": "100x32"
+ },
+ {
+  "file": "ask-bash-change",
+  "scene": "ask-bash",
+  "grp": "询问",
+  "name": "要跑命令",
+  "after": [
+   800,
+   "down",
+   "down",
+   "down",
+   300
+  ],
+  "t": 1280,
+  "size": "100x32"
+ },
+ {
+  "file": "ask-bash-editing",
+  "scene": "ask-bash",
+  "grp": "询问",
+  "name": "要跑命令",
+  "after": [
+   800,
+   "down",
+   "down",
+   "down",
+   300,
+   "shot:change",
+   "enter",
+   500
+  ],
+  "t": 1840,
+  "size": "100x32"
+ },
+ {
+  "file": "caution",
+  "scene": "caution",
+  "grp": "询问",
+  "name": "危险操作",
+  "card": "红色上沿不呼吸；默认停在“不”。",
+  "t": 800,
+  "size": "100x32"
+ },
+ {
+  "file": "caution-no",
+  "scene": "caution",
+  "grp": "询问",
+  "name": "危险操作",
+  "after": [
+   900,
+   "enter",
+   400
+  ],
+  "t": 1360,
+  "size": "100x32"
+ },
+ {
+  "file": "question",
+  "scene": "question",
+  "grp": "询问",
+  "name": "提问",
+  "card": "两个问题，←→ 切换，第二个可以多选。",
+  "t": 800,
+  "size": "100x32"
+ },
+ {
+  "file": "question-preview",
+  "scene": "question",
+  "grp": "询问",
+  "name": "提问",
+  "after": [
+   900,
+   "down",
+   300
+  ],
+  "t": 1260,
+  "size": "100x32"
+ },
+ {
+  "file": "question-second",
+  "scene": "question",
+  "grp": "询问",
+  "name": "提问",
+  "after": [
+   900,
+   "down",
+   300,
+   "shot:preview",
+   "enter",
+   400
+  ],
+  "t": 1720,
+  "size": "100x32"
+ },
+ {
+  "file": "question-ticked",
+  "scene": "question",
+  "grp": "询问",
+  "name": "提问",
+  "after": [
+   900,
+   "down",
+   300,
+   "shot:preview",
+   "enter",
+   400,
+   "shot:second",
+   "space",
+   "down",
+   "space",
+   300
+  ],
+  "t": 2200,
+  "size": "100x32"
+ },
+ {
+  "file": "question-answered",
+  "scene": "question",
+  "grp": "询问",
+  "name": "提问",
+  "after": [
+   900,
+   "down",
+   300,
+   "shot:preview",
+   "enter",
+   400,
+   "shot:second",
+   "space",
+   "down",
+   "space",
+   300,
+   "shot:ticked",
+   "enter",
+   1500
+  ],
+  "t": 3760,
+  "size": "100x32"
+ },
+ {
+  "file": "mode",
+  "scene": "mode",
+  "grp": "询问",
+  "name": "模式",
+  "card": "shift+tab 换模式：上沿闪一下它的颜色，页脚记住它。",
+  "t": 2300,
+  "size": "100x32"
+ },
+ {
+  "file": "mode-later",
+  "scene": "mode",
+  "grp": "询问",
+  "name": "模式",
+  "after": [
+   2400,
+   2000
+  ],
+  "t": 4400,
+  "size": "100x32"
+ },
+ {
+  "file": "palette",
+  "scene": "palette",
+  "grp": "面板",
+  "name": "命令",
+  "card": "/ 打开命令：模糊匹配，快捷键写在右边。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "palette-st",
+  "scene": "palette",
+  "grp": "面板",
+  "name": "命令",
+  "after": [
+   300,
+   [
+    "st"
+   ],
+   300
+  ],
+  "t": 720,
+  "size": "100x32"
+ },
+ {
+  "file": "palette-ran",
+  "scene": "palette",
+  "grp": "面板",
+  "name": "命令",
+  "after": [
+   300,
+   [
+    "st"
+   ],
+   300,
+   "shot:st",
+   "down",
+   "enter",
+   500
+  ],
+  "t": 1340,
+  "size": "100x32"
+ },
+ {
+  "file": "skills",
+  "scene": "skills",
+  "grp": "面板",
+  "name": "技能",
+  "card": "/re：命令在前，技能在后，标着来源。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "skills-review",
+  "scene": "skills",
+  "grp": "面板",
+  "name": "技能",
+  "after": [
+   300,
+   "down",
+   "down",
+   "down",
+   300
+  ],
+  "t": 780,
+  "size": "100x32"
+ },
+ {
+  "file": "skills-sent",
+  "scene": "skills",
+  "grp": "面板",
+  "name": "技能",
+  "after": [
+   300,
+   "down",
+   "down",
+   "down",
+   300,
+   "shot:review",
+   "enter",
+   1200
+  ],
+  "t": 2040,
+  "size": "100x32"
+ },
+ {
+  "file": "mention",
+  "scene": "mention",
+  "grp": "面板",
+  "name": "提到文件",
+  "card": "@ 列出文件，改过的、新建的标在右边。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "mention-inserted",
+  "scene": "mention",
+  "grp": "面板",
+  "name": "提到文件",
+  "after": [
+   300,
+   "down",
+   "tab",
+   300
+  ],
+  "t": 720,
+  "size": "100x32"
+ },
+ {
+  "file": "model",
+  "scene": "model",
+  "grp": "面板",
+  "name": "模型",
+  "card": "模型一行一个，读不了图的写明白；思考强度在下面。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "model-moved",
+  "scene": "model",
+  "grp": "面板",
+  "name": "模型",
+  "after": [
+   300,
+   "down",
+   "right",
+   300
+  ],
+  "t": 720,
+  "size": "100x32"
+ },
+ {
+  "file": "model-chosen",
+  "scene": "model",
+  "grp": "面板",
+  "name": "模型",
+  "after": [
+   300,
+   "down",
+   "right",
+   300,
+   "shot:moved",
+   "enter",
+   400
+  ],
+  "t": 1180,
+  "size": "100x32"
+ },
+ {
+  "file": "status",
+  "scene": "status",
+  "grp": "面板",
+  "name": "状态",
+  "card": "一屏看完这个会话：模型、模式、上下文、花费、插件。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "status-moved",
+  "scene": "status",
+  "grp": "面板",
+  "name": "状态",
+  "after": [
+   300,
+   "down",
+   "down",
+   "down",
+   300
+  ],
+  "t": 780,
+  "size": "100x32"
+ },
+ {
+  "file": "status-entered",
+  "scene": "status",
+  "grp": "面板",
+  "name": "状态",
+  "after": [
+   300,
+   "down",
+   "down",
+   "down",
+   300,
+   "shot:moved",
+   "enter",
+   400
+  ],
+  "t": 1240,
+  "size": "100x32"
+ },
+ {
+  "file": "plugins",
+  "scene": "plugins",
+  "grp": "面板",
+  "name": "插件",
+  "card": "出错的排最前；space 开关，下一轮生效。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "plugins-toggled",
+  "scene": "plugins",
+  "grp": "面板",
+  "name": "插件",
+  "after": [
+   300,
+   "down",
+   "space",
+   300
+  ],
+  "t": 720,
+  "size": "100x32"
+ },
+ {
+  "file": "plugins-github",
+  "scene": "plugins",
+  "grp": "面板",
+  "name": "插件",
+  "after": [
+   300,
+   "down",
+   "space",
+   300,
+   "shot:toggled",
+   "up",
+   "enter",
+   400
+  ],
+  "t": 1240,
+  "size": "100x32"
+ },
+ {
+  "file": "sessions",
+  "scene": "sessions",
+  "grp": "面板",
+  "name": "会话",
+  "card": "等你的会话排最前，灯告诉你它在干什么。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "sessions-filtered",
+  "scene": "sessions",
+  "grp": "面板",
+  "name": "会话",
+  "after": [
+   300,
+   [
+    "ci"
+   ],
+   300
+  ],
+  "t": 720,
+  "size": "100x32"
+ },
+ {
+  "file": "sessions-switched",
+  "scene": "sessions",
+  "grp": "面板",
+  "name": "会话",
+  "after": [
+   300,
+   [
+    "ci"
+   ],
+   300,
+   "shot:filtered",
+   "enter",
+   500
+  ],
+  "t": 1280,
+  "size": "100x32"
+ },
+ {
+  "file": "rewind",
+  "scene": "rewind",
+  "grp": "面板",
+  "name": "回退",
+  "card": "回到某句话之前：对话和文件一起回去。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "rewind-rewound",
+  "scene": "rewind",
+  "grp": "面板",
+  "name": "回退",
+  "after": [
+   300,
+   "down",
+   "enter",
+   600
+  ],
+  "t": 1020,
+  "size": "100x32"
+ },
+ {
+  "file": "keys",
+  "scene": "keys",
+  "grp": "面板",
+  "name": "按键",
+  "card": "? 打开按键表：四组，宽屏两列。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "keys-closed",
+  "scene": "keys",
+  "grp": "面板",
+  "name": "按键",
+  "after": [
+   300,
+   "esc",
+   200
+  ],
+  "t": 560,
+  "size": "100x32"
+ },
+ {
+  "file": "tasks",
+  "scene": "tasks",
+  "grp": "面板",
+  "name": "任务",
+  "card": "进行中的在转圈，用负责人的颜色；做完的打勾。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "tasks-again",
+  "scene": "tasks",
+  "grp": "面板",
+  "name": "任务",
+  "after": [
+   300,
+   "esc",
+   "ctrl+t",
+   300
+  ],
+  "t": 720,
+  "size": "100x32"
+ },
+ {
+  "file": "schedule",
+  "scene": "schedule",
+  "grp": "面板",
+  "name": "定时",
+  "card": "定时任务的灯慢慢呼吸；下一次什么时候跑写在右边。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "schedule-paused",
+  "scene": "schedule",
+  "grp": "面板",
+  "name": "定时",
+  "after": [
+   300,
+   "space",
+   300
+  ],
+  "t": 660,
+  "size": "100x32"
+ },
+ {
+  "file": "schedule-ran",
+  "scene": "schedule",
+  "grp": "面板",
+  "name": "定时",
+  "after": [
+   300,
+   "space",
+   300,
+   "shot:paused",
+   "down",
+   "enter",
+   400
+  ],
+  "t": 1180,
+  "size": "100x32"
+ },
+ {
+  "file": "memory",
+  "scene": "memory",
+  "grp": "面板",
+  "name": "记忆",
+  "card": "指令和记忆分开：指令在文件里，记忆可以删。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "memory-forgot",
+  "scene": "memory",
+  "grp": "面板",
+  "name": "记忆",
+  "after": [
+   300,
+   "down",
+   "down",
+   "down",
+   "backspace",
+   300
+  ],
+  "t": 840,
+  "size": "100x32"
+ },
+ {
+  "file": "find",
+  "scene": "find",
+  "grp": "面板",
+  "name": "查找",
+  "card": "所有匹配都标出来，当前这个是实心的 ember。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "find-up",
+  "scene": "find",
+  "grp": "面板",
+  "name": "查找",
+  "after": [
+   300,
+   "up",
+   300
+  ],
+  "t": 660,
+  "size": "100x32"
+ },
+ {
+  "file": "find-back",
+  "scene": "find",
+  "grp": "面板",
+  "name": "查找",
+  "after": [
+   300,
+   "up",
+   300,
+   "shot:up",
+   "esc",
+   300
+  ],
+  "t": 1020,
+  "size": "100x32"
+ },
+ {
+  "file": "crew",
+  "scene": "crew",
+  "grp": "协作",
+  "name": "一起干",
+  "card": "两个 agent 并行：做完的回来报告，要你点头的在页脚喊你。",
+  "t": 4000,
+  "size": "100x32"
+ },
+ {
+  "file": "crew-reviewer",
+  "scene": "crew",
+  "grp": "协作",
+  "name": "一起干",
+  "after": [
+   4200,
+   "ctrl+g",
+   600
+  ],
+  "t": 4860,
+  "size": "100x32"
+ },
+ {
+  "file": "crew-allowed",
+  "scene": "crew",
+  "grp": "协作",
+  "name": "一起干",
+  "after": [
+   4200,
+   "ctrl+g",
+   600,
+   "shot:reviewer",
+   "enter",
+   3600
+  ],
+  "t": 8520,
+  "size": "100x32"
+ },
+ {
+  "file": "crew-home",
+  "scene": "crew",
+  "grp": "协作",
+  "name": "一起干",
+  "after": [
+   4200,
+   "ctrl+g",
+   600,
+   "shot:reviewer",
+   "enter",
+   3600,
+   "shot:allowed",
+   "esc",
+   400
+  ],
+  "t": 8980,
+  "size": "100x32"
+ },
+ {
+  "file": "agent",
+  "scene": "agent",
+  "grp": "协作",
+  "name": "队友",
+  "card": "走进一个队友的会话：它在干什么、用什么模型，一眼看完。",
+  "t": 800,
+  "size": "100x32"
+ },
+ {
+  "file": "agent-reviewer",
+  "scene": "agent",
+  "grp": "协作",
+  "name": "队友",
+  "after": [
+   800,
+   "ctrl+g",
+   600
+  ],
+  "t": 1460,
+  "size": "100x32"
+ },
+ {
+  "file": "agent-allowed",
+  "scene": "agent",
+  "grp": "协作",
+  "name": "队友",
+  "after": [
+   800,
+   "ctrl+g",
+   600,
+   "shot:reviewer",
+   "enter",
+   3600
+  ],
+  "t": 5120,
+  "size": "100x32"
+ },
+ {
+  "file": "agent-home",
+  "scene": "agent",
+  "grp": "协作",
+  "name": "队友",
+  "after": [
+   800,
+   "ctrl+g",
+   600,
+   "shot:reviewer",
+   "enter",
+   3600,
+   "shot:allowed",
+   "esc",
+   400
+  ],
+  "t": 5580,
+  "size": "100x32"
+ },
+ {
+  "file": "room",
+  "scene": "room",
+  "grp": "协作",
+  "name": "房间",
+  "card": "房间里 @ 谁，谁就欠你一句话；它回了，债就清了。",
+  "t": 600,
+  "size": "100x32"
+ },
+ {
+  "file": "room-mention",
+  "scene": "room",
+  "grp": "协作",
+  "name": "房间",
+  "after": [
+   600,
+   [
+    "@rev"
+   ],
+   300
+  ],
+  "t": 1140,
+  "size": "100x32"
+ },
+ {
+  "file": "room-waiting",
+  "scene": "room",
+  "grp": "协作",
+  "name": "房间",
+  "after": [
+   600,
+   [
+    "@rev"
+   ],
+   300,
+   "shot:mention",
+   "tab",
+   [
+    "看一下 reset() 的注释"
+   ],
+   "enter",
+   1500
+  ],
+  "t": 3660,
+  "size": "100x32"
+ },
+ {
+  "file": "room-answered",
+  "scene": "room",
+  "grp": "协作",
+  "name": "房间",
+  "after": [
+   600,
+   [
+    "@rev"
+   ],
+   300,
+   "shot:mention",
+   "tab",
+   [
+    "看一下 reset() 的注释"
+   ],
+   "enter",
+   1500,
+   "shot:waiting",
+   3000
+  ],
+  "t": 6660,
+  "size": "100x32"
+ },
+ {
+  "file": "room-home",
+  "scene": "room",
+  "grp": "协作",
+  "name": "房间",
+  "after": [
+   600,
+   [
+    "@rev"
+   ],
+   300,
+   "shot:mention",
+   "tab",
+   [
+    "看一下 reset() 的注释"
+   ],
+   "enter",
+   1500,
+   "shot:waiting",
+   3000,
+   "shot:answered",
+   "esc",
+   400
+  ],
+  "t": 7120,
+  "size": "100x32"
+ },
+ {
+  "file": "background",
+  "scene": "background",
+  "grp": "协作",
+  "name": "后台",
+  "card": "ctrl+b 把跑着的命令放到后台，这一轮接着走。",
+  "t": 3400,
+  "size": "100x32"
+ },
+ {
+  "file": "background-notified",
+  "scene": "background",
+  "grp": "协作",
+  "name": "后台",
+  "after": [
+   3600,
+   9000
+  ],
+  "t": 12600,
+  "size": "100x32"
+ },
+ {
+  "file": "wake",
+  "scene": "wake",
+  "grp": "协作",
+  "name": "定时醒来",
+  "card": "bingo 给自己定的闹钟：时间到了，它自己开一轮。",
+  "t": 7400,
+  "size": "100x32"
+ },
+ {
+  "file": "wake-later",
+  "scene": "wake",
+  "grp": "协作",
+  "name": "定时醒来",
+  "after": [
+   7600,
+   3000
+  ],
+  "t": 10600,
+  "size": "100x32"
+ },
+ {
+  "file": "retry",
+  "scene": "retry",
+  "grp": "异常",
+  "name": "重试",
+  "card": "被限流了：上沿变琥珀色，倒计时写在那一行。",
+  "t": 500,
+  "size": "100x32"
+ },
+ {
+  "file": "retry-recovered",
+  "scene": "retry",
+  "grp": "异常",
+  "name": "重试",
+  "after": [
+   700,
+   4000
+  ],
+  "t": 4700,
+  "size": "100x32"
+ },
+ {
+  "file": "signedout",
+  "scene": "signedout",
+  "grp": "异常",
+  "name": "登录过期",
+  "card": "出错时先说出了什么事，再说怎么办。",
+  "t": 900,
+  "size": "100x32"
+ },
+ {
+  "file": "signedout-login",
+  "scene": "signedout",
+  "grp": "异常",
+  "name": "登录过期",
+  "after": [
+   1100,
+   [
+    "/login"
+   ],
+   "enter",
+   2500
+  ],
+  "t": 4020,
+  "size": "100x32"
+ },
+ {
+  "file": "context",
+  "scene": "context",
+  "grp": "异常",
+  "name": "上下文快满了",
+  "card": "页脚的上下文变成琥珀色；/compact 压缩。",
+  "t": 0,
+  "size": "100x32"
+ },
+ {
+  "file": "context-compacted",
+  "scene": "context",
+  "grp": "异常",
+  "name": "上下文快满了",
+  "after": [
+   300,
+   [
+    "/compact"
+   ],
+   "enter",
+   1500
+  ],
+  "t": 2340,
+  "size": "100x32"
+ },
+ {
+  "file": "exit",
+  "scene": "exit",
+  "grp": "边界",
+  "name": "退出之后",
+  "card": "回到 shell：一张小票，和回来的路。",
+  "t": 400,
+  "size": "100x32"
+ },
+ {
+  "file": "exit-back",
+  "scene": "exit",
+  "grp": "边界",
+  "name": "退出之后",
+  "after": [
+   600,
+   "enter",
+   800
+  ],
+  "t": 1460,
+  "size": "100x32"
+ },
+ {
+  "file": "narrow",
+  "scene": "narrow",
+  "grp": "边界",
+  "name": "80×24",
+  "card": "最小的终端：同样的一屏，什么都不丢。",
+  "t": 700,
+  "size": "80x24"
+ },
+ {
+  "file": "ascii-done",
+  "scene": "done",
+  "t": 300,
+  "size": "100x32",
+  "flags": {
+   "ascii": true
+  }
+ },
+ {
+  "file": "ascii-live",
+  "scene": "live",
+  "t": 900,
+  "size": "100x32",
+  "flags": {
+   "ascii": true
+  }
+ },
+ {
+  "file": "ascii-ask-edit",
+  "scene": "ask-edit",
+  "t": 900,
+  "size": "100x32",
+  "flags": {
+   "ascii": true
+  }
+ },
+ {
+  "file": "ascii-palette",
+  "scene": "palette",
+  "t": 300,
+  "size": "100x32",
+  "flags": {
+   "ascii": true
+  }
+ },
+ {
+  "file": "reduced-live",
+  "scene": "live",
+  "t": 900,
+  "size": "100x32",
+  "flags": {
+   "reduced": true
+  }
+ },
+ {
+  "file": "reduced-mode",
+  "scene": "mode",
+  "t": 2400,
+  "size": "100x32",
+  "flags": {
+   "reduced": true
+  }
+ },
+ {
+  "file": "small-done",
+  "scene": "done",
+  "t": 300,
+  "size": "80x24",
+  "flags": {}
+ },
+ {
+  "file": "small-ask-edit",
+  "scene": "ask-edit",
+  "t": 900,
+  "size": "80x24",
+  "flags": {}
+ },
+ {
+  "file": "small-palette",
+  "scene": "palette",
+  "t": 300,
+  "size": "80x24",
+  "flags": {}
+ },
+ {
+  "file": "small-crew",
+  "scene": "crew",
+  "t": 4200,
+  "size": "80x24",
+  "flags": {}
+ }
+]

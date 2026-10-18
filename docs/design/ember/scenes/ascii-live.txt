@@ -1,0 +1,33 @@
+# ascii-live · scene live · 900 ms · 100x32 · ascii · light
+                                                                                                    
+   看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉                      4s  
+   先看 queue.rs，再看谁在调用 drain() 和 reset()。                                                 
+   < read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   / search  drain|reset                                                         9 hits in 3 files  
+   < read    crates/bingo-core/src/turn/loop.rs                                          486 lines  
+                                                                                                    
+   问题不在 drain()，在 reset()：每一轮开始时，它把 queue 整个清空了。                              
+                                                                                                    
+                                                                                            rust    
+     pub fn reset(&mut self) {                                                                      
+         self.queue.clear();   // 排着的消息在这里丢了                                              
+         self.steer = None;                                                                         
+     }                                                                                              
+                                                                                                    
+                                                                                                    
+   你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 reset() 把还没  
+   发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。                                   
+                                                                                                    
+|  修好它，加一个回归测试                                                                       3s  
+   先改 reset()，再补一个回归测试。                                                                 
+   < read    crates/bingo-core/src/session/queue.rs                                      214 lines  
+   * find    crates/bingo-core/tests/*.rs                                                  6 files  
+   ~ edit    crates/bingo-core/src/session/queue.rs                                          +1 -1  
+   + write   crates/bingo-core/tests/queue_steer.rs                                            +20  
+   / run     cargo test -p bingo-core queue                                                         
+             Compiling bingo-core v0.6.3 (crates/bingo-core)                                        
+                                                                                                    
+----------------------------------------------------------------------------------------------------
+   |Steer, or queue what comes next                                                                 
+                                                                                                    
+   opus-5.5 high - accept edits                                       ctrl+b background   esc stop  

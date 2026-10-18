@@ -1,0 +1,33 @@
+# agent · scene agent · 800 ms · 100x32 · light
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+   ── scout · finds things in the codebase ───────────────────────────────────────────────────────  
+                                                                                                    
+▍  bingo  find every caller of drain()                                                          1s  
+   / search  drain\(                                                             4 hits in 3 files  
+   ¶ read    crates/bingo-core/src/turn/loop.rs                                          312 lines  
+   ⠙ read    crates/bingo-core/src/session/mod.rs                                                   
+                                                                                                    
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Steer scout, or queue what comes next                                                           
+                                                                                                    
+   scout · haiku-5.5 low · ◆ reviewer needs you             esc back   ctrl+g answer   ctrl+c stop  
