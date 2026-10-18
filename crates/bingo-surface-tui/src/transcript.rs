@@ -268,6 +268,7 @@ pub fn joins_the_row_above(item: &Item) -> bool {
 /// ([`crate::blocks`]), and a frame that draws no picture carries none.
 #[derive(Debug, Default)]
 pub struct Block {
+    pub next: Option<Instant>,
     pub lines: Vec<Line<'static>>,
     pub pictures: Vec<Picture>,
     /// The destinations this block's own words named (M51), whatever became
@@ -275,6 +276,24 @@ pub struct Block {
     /// a block is drawn once and cloned ever after, and the run reads this
     /// off the frame to go and fetch what the session has not got yet.
     pub wanted: Vec<String>,
+}
+
+impl From<crate::views::Drawing> for Block {
+    fn from(drawing: crate::views::Drawing) -> Self {
+        Self {
+            lines: drawing.lines,
+            next: drawing.next,
+            ..Self::default()
+        }
+    }
+}
+impl From<Block> for crate::views::Drawing {
+    fn from(block: Block) -> Self {
+        Self {
+            lines: block.lines,
+            next: block.next,
+        }
+    }
 }
 
 impl From<Vec<Line<'static>>> for Block {
@@ -361,7 +380,8 @@ pub fn item_block(
     // write, over the start its kind has. One question, asked once, here.
     let fold = fold::fold_of(rows.folds, item);
     let mut block = item_lines(item, place, agents, rows, cue, fold);
-    crate::ask::receipts::append(item, &mut block.lines, rows);
+    let next = crate::ask::receipts::append(item, &mut block.lines, rows);
+    block.next = block.next.into_iter().chain(next).min();
     pictured::under_the_words(item, block, fold, rows)
 }
 
@@ -457,7 +477,7 @@ fn called(
     fold: Fold,
     rows: &Rows<'_>,
     cue: Cue,
-) -> Vec<Line<'static>> {
+) -> crate::views::Drawing {
     let ItemBody::ToolCall {
         call_id,
         name,
@@ -468,21 +488,19 @@ fn called(
         ..
     } = &item.body
     else {
-        return Vec::new();
+        return crate::views::Drawing::default();
     };
     if *quiet && !item.status.failed(output.as_ref()) {
         return output
             .as_ref()
             .and_then(|output| output.display.as_ref())
             .map(|view| {
-                returns(
-                    crate::views::marked(
-                        view,
-                        rows.result_width(),
-                        &crate::views::Marks::at(rows.now),
-                    ),
-                    rows,
+                crate::views::marked(
+                    view,
+                    rows.result_width(),
+                    &crate::views::Marks::at(rows.now),
                 )
+                .map_lines(|lines| returns(lines, rows))
             })
             .unwrap_or_default();
     }
@@ -504,7 +522,7 @@ fn called(
         ),
     };
     match agents.get(&item.id) {
-        Some(child) => child_row(child, name, input, rows),
+        Some(child) => child_row(child, name, input, rows).into(),
         None => component_call(
             item,
             Call {
@@ -651,16 +669,16 @@ struct Call<'a> {
     fold: Fold,
 }
 
-fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> Vec<Line<'static>> {
+fn tool_call(call: Call<'_>, rows: &Rows<'_>, cue: Cue) -> crate::views::Drawing {
     let failed = call.status.failed(call.output);
     let style = live_bullet(call.status, failed, rows);
     let landing = Landing::of(cue, failed, rows);
-    let mut out = speaks(
+    let mut out = crate::views::Drawing::still(speaks(
         style,
         vec![signature(call.name, &call.about, rows, landing)],
         rows,
-    );
-    out.extend(result(&call, rows));
+    ));
+    out.append(result(&call, rows));
     out
 }
 
@@ -732,18 +750,18 @@ fn bullet_style(status: ItemStatus, failed: bool) -> Style {
 
 /// What is under a tool row: its tail while it runs, its output once it is
 /// done, folded to a line that says how much was left out.
-fn result(call: &Call<'_>, rows: &Rows<'_>) -> Vec<Line<'static>> {
+fn result(call: &Call<'_>, rows: &Rows<'_>) -> crate::views::Drawing {
     if call.status == ItemStatus::Running {
         let Some(progress) = call.progress else {
-            return Vec::new();
+            return crate::views::Drawing::default();
         };
-        return returns(tail(progress, TAIL_ROWS, rows.result_width()), rows);
+        return returns(tail(progress, TAIL_ROWS, rows.result_width()), rows).into();
     }
     let Some(output) = call.output else {
-        return Vec::new();
+        return crate::views::Drawing::default();
     };
-    let body = folded(output, call.fold, rows.result_width());
-    returns(body, rows)
+    let body = folded(output, call.fold, rows.result_width(), Some(rows.now));
+    body.map_lines(|lines| returns(lines, rows))
 }
 
 /// A sub-session is a row where it began: what it is, what it was asked, and
@@ -883,10 +901,10 @@ fn calls(item: &Item, tool: &str) -> bool {
 /// rather than one of them: it scrolls with the answer it closes (M84,
 /// 2026-09-08, user-directed — not a row pinned over the composer) and the
 /// next turn takes it away.
-pub fn closing(state: &SessionState, rows: &Rows<'_>) -> Vec<Line<'static>> {
+pub fn closing(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
     crate::component::closing::props(state)
         .iter()
-        .flat_map(|props| {
+        .map(|props| {
             crate::component::closing::draw(state, rows.pulled, props, rows.width, rows.now)
         })
         .collect()

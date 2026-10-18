@@ -250,7 +250,7 @@ mod tests {
                     theme::text()
                 ]
                 .contains(style),
-                "an ink outside the three: {style:?}"
+                "an ink outside the Ember syntax inks: {style:?}"
             );
         }
         assert!(

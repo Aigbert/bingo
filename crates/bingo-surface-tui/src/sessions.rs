@@ -91,11 +91,18 @@ pub fn draw(
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    crate::component::draw(&props, answer, usize::from(width), |_, _| {
-        vec![ratatui::text::Line::raw(
-            " Sessions is off · esc to close · ctrl+r for recent sessions",
-        )]
-    })
+    let drawing = crate::component::draw_marked(
+        &props,
+        answer,
+        usize::from(width),
+        &crate::views::Marks::at(now),
+        |_, _| {
+            vec![ratatui::text::Line::raw(
+                " Sessions is off · esc to close · ctrl+r for recent sessions",
+            )]
+        },
+    );
+    frame.collect(drawing)
 }
 pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
     if !active(ui) {

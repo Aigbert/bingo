@@ -10,6 +10,7 @@ pub fn draw(
     state: &bingo_sdk::SessionState,
     ui: &crate::ui::Ui,
     frame: &mut crate::layout::Layout,
+    now: crate::clock::Now,
 ) -> Drawing {
     use bingo_sdk::component::{AbovePromptProps, SiteScroll, SiteView};
     if ui.activity_hidden {
@@ -36,12 +37,14 @@ pub fn draw(
     let Some(key) = super::key(state, "AbovePrompt", &props, area.width, max_rows) else {
         return Drawing::default();
     };
-    let mut lines = super::draw(
+    let drawing = super::draw_marked(
         &props,
         ui.placed.pulled.display(&key),
         usize::from(area.width),
+        &crate::views::Marks::at(now),
         |_, _| Vec::new(),
     );
+    let mut lines = frame.collect(drawing);
     frame.pulls.push(key.clone());
     lines.truncate(usize::from(max_rows));
     let (mask, actions) = ui

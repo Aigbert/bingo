@@ -22,7 +22,7 @@ pub fn render(view: &View, width: usize) -> (Vec<Line<'static>>, Vec<ActionItem>
         },
     );
     let actions = targets.borrow().clone();
-    (lines, actions)
+    (lines.lines, actions)
 }
 
 pub(super) fn mask(view: &View, lines: Vec<Line<'static>>, marks: &Marks) -> Vec<Line<'static>> {

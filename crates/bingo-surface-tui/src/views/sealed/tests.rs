@@ -61,10 +61,11 @@ fn layout_must_preserve_every_host_cell() {
                     Line::from(""),
                     Line::from("host choices"),
                 ]
+                .into()
             },
         );
         assert_eq!(
-            whole(&mask, &expected.borrow(), 30, 10).is_some(),
+            whole(&mask.lines, &expected.borrow(), 30, 10).is_some(),
             accepted,
             "{view:?}: {mask:?}"
         );

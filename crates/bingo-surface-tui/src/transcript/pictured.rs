@@ -139,6 +139,7 @@ pub(super) fn in_the_words(
     rows: &Rows<'_>,
 ) -> Block {
     let mut block = Block {
+        next: None,
         lines,
         pictures: Vec::new(),
         wanted: images.iter().map(|image| image.dest.clone()).collect(),

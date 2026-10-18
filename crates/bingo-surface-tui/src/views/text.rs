@@ -17,7 +17,13 @@ pub fn lines(text: &str) -> Vec<Line<'static>> {
     )
 }
 pub fn styled(children: &[TextChild], props: &TextStyle, width: usize) -> Vec<Line<'static>> {
-    animated(children, props, width, None)
+    animated(children, props, width, None).lines
+}
+
+#[derive(Clone, Copy)]
+struct InkStyle {
+    style: Style,
+    ink: ratatui::style::Color,
 }
 
 pub fn animated(
@@ -25,40 +31,48 @@ pub fn animated(
     props: &TextStyle,
     width: usize,
     now: Option<crate::clock::Now>,
-) -> Vec<Line<'static>> {
-    let mut out = vec![Line::default()];
-    append_node(children, props, theme::text(), now, &mut out);
-    if out.len() > 1
-        && out
-            .last()
-            .is_some_and(|line| line.spans.iter().all(|span| span.content.is_empty()))
-    {
-        out.pop();
-    }
-    let out = if props.wrap.as_deref() == Some("wrap") && width > 0 {
-        crate::wrap::wrap_all(&out, width)
-    } else {
-        out
+) -> super::Drawing {
+    let mut out = super::Drawing::still(vec![Line::default()]);
+    let inherited = InkStyle {
+        style: theme::text(),
+        ink: theme::palette().fg(),
     };
-    out.into_iter()
-        .map(|line| fill(line, props.ground.as_deref(), width))
-        .collect()
+    append_node(children, props, inherited, now, &mut out);
+    out.map_lines(|mut lines| {
+        if lines.len() > 1
+            && lines
+                .last()
+                .is_some_and(|line| line.spans.iter().all(|span| span.content.is_empty()))
+        {
+            lines.pop();
+        }
+        let lines = if props.wrap.as_deref() == Some("wrap") && width > 0 {
+            crate::wrap::wrap_all(&lines, width)
+        } else {
+            lines
+        };
+        lines
+            .into_iter()
+            .map(|line| fill(line, props.ground.as_deref(), width))
+            .collect()
+    })
 }
 fn append(
     children: &[TextChild],
-    inherited: Style,
+    inherited: InkStyle,
     now: Option<crate::clock::Now>,
-    out: &mut Vec<Line<'static>>,
+    out: &mut super::Drawing,
 ) {
     for child in children {
         match child {
             TextChild::String(text) => {
                 for (index, part) in text.split('\n').enumerate() {
                     if index > 0 {
-                        out.push(Line::default());
+                        out.lines.push(Line::default());
                     }
-                    if let Some(line) = out.last_mut() {
-                        line.spans.push(Span::styled(part.to_string(), inherited));
+                    if let Some(line) = out.lines.last_mut() {
+                        line.spans
+                            .push(Span::styled(part.to_string(), inherited.style));
                     }
                 }
             }
@@ -73,9 +87,6 @@ fn append(
     }
 }
 pub fn color(style: Style, color: Option<&str>) -> Style {
-    if color == Some("attention") {
-        return style.patch(super::badge::style(bingo_sdk::Tone::Attention));
-    }
     color
         .and_then(theme::foreground)
         .map_or(style, |token| style.patch(token))
@@ -106,11 +117,35 @@ fn style(mut style: Style, props: &TextStyle) -> Style {
 fn append_node(
     children: &[TextChild],
     props: &TextStyle,
-    inherited: Style,
+    inherited: InkStyle,
     now: Option<crate::clock::Now>,
-    out: &mut Vec<Line<'static>>,
+    out: &mut super::Drawing,
 ) {
-    let style = super::motion::style(style(inherited, props), props.motion.as_deref(), now);
+    let ink = if props.dim_color == Some(true) {
+        theme::palette().dim()
+    } else {
+        props
+            .color
+            .as_deref()
+            .and_then(|name| theme::palette().named(name))
+            .unwrap_or(inherited.ink)
+    };
+    let style = InkStyle {
+        style: super::motion::style(
+            style(inherited.style, props),
+            ink,
+            props.motion.as_deref(),
+            now,
+        ),
+        ink,
+    };
+    let next = now.and_then(|now| {
+        props
+            .motion
+            .as_deref()
+            .and_then(|motion| super::motion::next(motion, now))
+    });
+    out.next = out.next.into_iter().chain(next).min();
     if props.motion.as_deref() == Some(&TextMotion::Spin) {
         let glyph = now
             .map(crate::spinner::glyph)
@@ -134,21 +169,4 @@ pub fn fill(line: Line<'static>, ground: Option<&str>, width: usize) -> Line<'st
         span.style = ground.patch(span.style);
     }
     line
-}
-
-pub fn next(
-    children: &[TextChild],
-    props: &TextStyle,
-    now: crate::clock::Now,
-) -> Option<std::time::Instant> {
-    props
-        .motion
-        .as_deref()
-        .and_then(|motion| super::motion::next(motion, now))
-        .into_iter()
-        .chain(children.iter().filter_map(|child| match child {
-            TextChild::Node(node) => super::next_change(node, now),
-            _ => None,
-        }))
-        .min()
 }

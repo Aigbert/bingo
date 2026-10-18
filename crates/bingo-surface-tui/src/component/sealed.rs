@@ -31,12 +31,25 @@ pub struct Site<'a> {
     pub agent: Option<&'a str>,
     pub width: usize,
     pub room: usize,
+    pub now: crate::clock::Now,
 }
 
 pub struct Drawing {
+    pub next: Option<std::time::Instant>,
     pub rows: Rows,
     pub options: Vec<(Rect, usize)>,
     pub actions: Vec<views::targets::Target>,
+}
+
+impl Drawing {
+    pub(super) fn plain(rows: Rows) -> Self {
+        Self {
+            rows,
+            next: None,
+            options: Vec::new(),
+            actions: Vec::new(),
+        }
+    }
 }
 
 impl Site<'_> {
@@ -44,19 +57,7 @@ impl Site<'_> {
         if !moving && let Some(drawing) = self.draw(pulls) {
             return drawing;
         }
-        Drawing {
-            rows: super::question::rows(
-                self.state,
-                self.ui,
-                self.interaction,
-                self.agent,
-                self.width,
-                self.room.saturating_sub(1),
-                pulls,
-            ),
-            options: Vec::new(),
-            actions: Vec::new(),
-        }
+        super::question::rows(self, pulls)
     }
 
     pub fn draw(&self, pulls: &mut Vec<crate::pulled::Key>) -> Option<Drawing> {
@@ -86,7 +87,7 @@ impl Site<'_> {
         let own = |_, _: &serde_json::Value, width| {
             let rows = self.own(props, width);
             *engine_options.borrow_mut() = rows.iter().map(|(_, option)| *option).collect();
-            rows.into_iter().map(|(line, _)| line).collect()
+            views::Drawing::still(rows.into_iter().map(|(line, _)| line).collect())
         };
         let expected = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
         let marks = views::Marks {
@@ -94,9 +95,9 @@ impl Site<'_> {
             ..Default::default()
         };
         let mask = views::marked_with(answer, self.width, &marks, &own);
-        let areas = views::sealed::whole(&mask, &expected.borrow(), self.width, self.room)?;
-        let lines = views::marked_with(answer, self.width, &views::Marks::default(), &own);
-        if lines.len() > self.room {
+        let areas = views::sealed::whole(&mask.lines, &expected.borrow(), self.width, self.room)?;
+        let lines = views::marked_with(answer, self.width, &views::Marks::at(self.now), &own);
+        if lines.lines.len() > self.room {
             return None;
         }
         let options = engine_options
@@ -112,12 +113,13 @@ impl Site<'_> {
         };
         let mask = views::marked_with(answer, self.width, &marks, &own);
         let actions = views::targets::cells(
-            &mask,
+            &mask.lines,
             &targets.borrow(),
             Rect::new(0, 0, self.width as u16, self.room as u16),
         );
         Some(Drawing {
-            rows: lines.into_iter().map(|line| (line, None)).collect(),
+            next: lines.next,
+            rows: lines.lines.into_iter().map(|line| (line, None)).collect(),
             options,
             actions,
         })
@@ -170,6 +172,7 @@ impl Site<'_> {
             None,
         ));
         Drawing {
+            next: None,
             rows,
             options: Vec::new(),
             actions: Vec::new(),

@@ -34,9 +34,10 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let state = tree.viewed();
     let draft = ui.composer.layout(inner_width(state, area.width as usize));
     let strip = strip(state, ui, &frame.measurements, area.width);
-    let mut activity = activity::components(tree, ui, area.width as usize, now, &mut frame.pulls);
+    let activity = activity::components(tree, ui, area.width as usize, now, &mut frame.pulls);
+    let mut activity = frame.collect(activity);
     let band_offset = activity.len();
-    let band = crate::component::band::draw(state, ui, frame);
+    let band = crate::component::band::draw(state, ui, frame, now);
     activity.extend(band.lines.iter().cloned());
     let palette = palette(tree, ui, frame, now);
     let mut regions = frame::regions(area, demand(&draft, &strip, &activity, &palette));
@@ -148,7 +149,14 @@ fn render_status(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now)
         return;
     }
     let area = crate::pane::status(ui, tree.viewed(), frame, area);
-    let (line, crew) = status::components(tree, ui, area.width as usize, now, &mut frame.pulls);
+    let (line, crew) = status::components(
+        tree,
+        ui,
+        area.width as usize,
+        now,
+        &mut frame.pulls,
+        &mut frame.next_frame,
+    );
     frame.crew = crew.map(|columns| {
         Rect::new(
             area.x + columns.start as u16,
@@ -189,14 +197,17 @@ fn render_activity(ui: &Ui, frame: &mut Layout, area: Rect, mut lines: Vec<Line<
 fn layers(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     let width = regions.transcript.width as usize;
     let above = regions.above();
+    let block = ui
+        .block
+        .as_ref()
+        .map(|view| views::marked(view, width, &views::Marks::at(now)))
+        .unwrap_or_default();
+    let block = frame.collect(block);
     over(
         frame,
         above,
         [
-            ui.block
-                .as_ref()
-                .map(|view| views::marked(view, width, &views::Marks::at(now)))
-                .unwrap_or_default(),
+            block,
             menu(
                 ui,
                 &tree.viewed().summary.cwd,
@@ -222,7 +233,7 @@ fn layer(
     above: Rect,
     reveal: layers::Reveal,
     _width: usize,
-    _now: Now,
+    now: Now,
 ) {
     // Every list a cursor walks is drawn in the room the layer has, and no
     // more of it than that: what is off the window's ends says so (§3).
@@ -230,7 +241,7 @@ fn layer(
     match ui.focus.open() {
         Open::Nothing => {}
         Open::Sessions(_) => {
-            let lines = crate::sessions::draw(ui, tree, frame, above.width, above.height, _now);
+            let lines = crate::sessions::draw(ui, tree, frame, above.width, above.height, now);
             over(frame, above, lines);
         }
         Open::Browse(_) => {
@@ -240,6 +251,7 @@ fn layer(
                 frame,
                 above.width,
                 above.height.min(frame.canvas.area().height / 2),
+                now,
             );
             let bar = ratatui::layout::Rect { height: 1, ..above };
             frame.render_widget(
@@ -251,7 +263,7 @@ fn layer(
             }
         }
         Open::Plugins(_) => {
-            let lines = crate::plugins::draw(ui, tree, frame, above.width, above.height);
+            let lines = crate::plugins::draw(ui, tree, frame, above.width, above.height, now);
             over(frame, above, lines);
         }
         // Drawn under the box, in its own rows (ADR-0095 §1).
@@ -344,12 +356,14 @@ fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     let mut drawing = crate::component::sealed::Site {
         state: owner,
         ui,
+        now,
         interaction,
         agent: agent.as_deref(),
         width,
         room: room + 1,
     }
     .rows(&mut frame.pulls, opening(interaction, now).moving());
+    frame.next_frame = frame.next_frame.into_iter().chain(drawing.next).min();
     let rows = wrapped_card_rows(std::mem::take(&mut drawing.rows), width);
     let rows = fitted_answers(rows, ui.dialog.focus, room);
     let lines: Vec<Line<'static>> = rows.iter().map(|(line, _)| line.clone()).collect();
@@ -496,24 +510,11 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     }
     let rows = area.height as usize;
     let state = tree.viewed();
-    let browse_folds = crate::browse::folds(ui, tree);
-    let commands = ui.catalogs.specs();
-    let mut rows_config = transcript::Rows::of(
-        state,
-        area.width as usize,
-        &browse_folds,
-        &commands,
-        &frame.measurements,
-        &ui.linked,
-        now,
-    )
-    .in_tree(tree)
-    .components(&ui.placed.pulled)
-    .saying(ui.welcome.update.as_deref())
-    .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
-    .measuring(ui.measure);
-    rows_config.tools = crate::tool_rows::Looks::in_ui(ui);
-    frame.height = frame.blocks.sync(state, &tree.agents(), &rows_config);
+    with_transcript_rows(tree, ui, frame, area, now, |blocks, agents, rows| {
+        blocks.sync(state, agents, rows);
+        None
+    });
+    frame.height = frame.blocks.height();
     let inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
     if let Some((_, removed, drawing)) = &inline {
         frame.height = frame.height - removed + drawing.rows.len();
@@ -525,6 +526,13 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     if let Some(top) = crate::browse::top(ui, tree, frame, rows.saturating_sub(1)) {
         frame.top = top;
     }
+    let visible = frame.visible_lines(rows);
+    with_transcript_rows(tree, ui, frame, area, now, |blocks, agents, config| {
+        visible
+            .into_iter()
+            .filter_map(|range| blocks.refresh(state, agents, config, range.start, range.len()))
+            .min()
+    });
     component_requests(state, ui, frame, area);
     crate::component::closing::requests(state, ui, frame, area.width, area.height, now);
     let mut shown = if let Some((at, removed, drawing)) = &inline {
@@ -545,6 +553,40 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
         crate::ask::drawing::place(frame, drawing, at, area);
     }
     mark_transcript(ui, frame, area, padding, now);
+}
+
+fn with_transcript_rows(
+    tree: &Tree,
+    ui: &Ui,
+    frame: &mut Layout,
+    area: Rect,
+    now: Now,
+    draw: impl FnOnce(
+        &mut crate::blocks::Blocks,
+        &crate::tree::Agents<'_>,
+        &transcript::Rows<'_>,
+    ) -> Option<std::time::Instant>,
+) {
+    let state = tree.viewed();
+    let browse_folds = crate::browse::folds(ui, tree);
+    let commands = ui.catalogs.specs();
+    let mut rows_config = transcript::Rows::of(
+        state,
+        area.width as usize,
+        &browse_folds,
+        &commands,
+        &frame.measurements,
+        &ui.linked,
+        now,
+    )
+    .in_tree(tree)
+    .components(&ui.placed.pulled)
+    .saying(ui.welcome.update.as_deref())
+    .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
+    .measuring(ui.measure);
+    rows_config.tools = crate::tool_rows::Looks::in_ui(ui);
+    let next = draw(&mut frame.blocks, &tree.agents(), &rows_config);
+    frame.next_frame = frame.next_frame.into_iter().chain(next).min();
 }
 
 fn prepare_lines(ui: &Ui, tree: &Tree, frame: &Layout, shown: &mut Vec<Line<'static>>) -> usize {

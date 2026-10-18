@@ -1,5 +1,5 @@
 //! A small cell layout: measure children, distribute spare cells, then decorate.
-use super::{Engine, Marks, fit, indent, marked_with, text};
+use super::{Drawing, Engine, Marks, fit, indent, marked_with, text};
 use crate::theme;
 use bingo_sdk::{
     View,
@@ -13,9 +13,9 @@ pub fn lines(
     width: usize,
     marks: &Marks,
     engine: &Engine<'_>,
-) -> Vec<Line<'static>> {
+) -> Drawing {
     if style.display.as_deref() == Some("none") || width == 0 {
-        return Vec::new();
+        return Drawing::default();
     }
     let mx = space(style.spacing.margin_x.or(style.spacing.margin)).min(width / 2);
     let my = space(style.spacing.margin_y.or(style.spacing.margin));
@@ -42,7 +42,8 @@ pub fn lines(
             .min(1024)
             .saturating_sub(2 * (py + border))
     });
-    let mut out = body(&children, style, inner, height, marks, engine);
+    let drawn = body(&children, style, inner, height, marks, engine);
+    let mut out = drawn.lines;
     if let Some(height) = height {
         out.resize(height, Line::default());
         out.truncate(height);
@@ -61,7 +62,10 @@ pub fn lines(
     if border > 0 {
         out = bordered(out, width, style);
     }
-    margins(out, width, mx, my, style.ground.as_deref())
+    Drawing {
+        lines: margins(out, width, mx, my, style.ground.as_deref()),
+        next: drawn.next,
+    }
 }
 
 fn margins(
@@ -112,7 +116,7 @@ fn body(
     height: Option<usize>,
     marks: &Marks,
     engine: &Engine<'_>,
-) -> Vec<Line<'static>> {
+) -> Drawing {
     let gap = space(style.gap);
     let desired: usize = children
         .iter()
@@ -139,12 +143,16 @@ fn column(
     gap: usize,
     marks: &Marks,
     engine: &Engine<'_>,
-) -> Vec<Line<'static>> {
+) -> Drawing {
     let mut drawn: Vec<_> = children
         .iter()
         .map(|child| column_child(child, style, width, marks, engine))
         .collect();
-    let used = drawn.iter().map(Vec::len).sum::<usize>() + gap * children.len().saturating_sub(1);
+    let used = drawn
+        .iter()
+        .map(|drawing| drawing.lines.len())
+        .sum::<usize>()
+        + gap * children.len().saturating_sub(1);
     let spare = height.unwrap_or(used).saturating_sub(used);
     let total: usize = children.iter().map(|child| grow(child)).sum();
     if total > 0 {
@@ -153,24 +161,28 @@ fn column(
             if extra > 0 {
                 let mut child = (*child).clone();
                 if let View::Box { layout, .. } = &mut child {
-                    layout.height = Some((lines.len() + extra).min(1024) as u16);
+                    layout.height = Some((lines.lines.len() + extra).min(1024) as u16);
                 }
                 *lines = column_child(&child, style, width, marks, engine);
             }
         }
     }
-    let used = drawn.iter().map(Vec::len).sum::<usize>() + gap * children.len().saturating_sub(1);
+    let used = drawn
+        .iter()
+        .map(|drawing| drawing.lines.len())
+        .sum::<usize>()
+        + gap * children.len().saturating_sub(1);
     let (before, extra) = justify(
         style.justify_content,
         height.unwrap_or(used).saturating_sub(used),
         children.len(),
     );
-    let mut out = vec![Line::default(); before];
+    let mut out = Drawing::still(vec![Line::default(); before]);
     for (index, lines) in drawn.into_iter().enumerate() {
         if index > 0 {
-            out.extend(vec![Line::default(); gap + extra]);
+            out.lines.extend(vec![Line::default(); gap + extra]);
         }
-        out.extend(lines);
+        out.append(lines);
     }
     out
 }
@@ -180,7 +192,7 @@ fn column_child(
     width: usize,
     marks: &Marks,
     engine: &Engine<'_>,
-) -> Vec<Line<'static>> {
+) -> Drawing {
     let child_width = if matches!(
         style.align_items,
         Some(Align::Center | Align::FlexEnd | Align::FlexStart)
@@ -195,9 +207,7 @@ fn column_child(
         _ => 0,
     };
     marked_with(child, child_width, marks, engine)
-        .into_iter()
-        .map(|line| indent(line, by))
-        .collect()
+        .map_lines(|lines| lines.into_iter().map(|line| indent(line, by)).collect())
 }
 
 fn row(
@@ -207,7 +217,7 @@ fn row(
     height: Option<usize>,
     marks: &Marks,
     engine: &Engine<'_>,
-) -> Vec<Line<'static>> {
+) -> Drawing {
     let gap = space(style.gap);
     let gaps = gap * children.len().saturating_sub(1);
     let mut widths: Vec<_> = children.iter().map(|child| hint(child)).collect();
@@ -229,31 +239,48 @@ fn row(
         .zip(&widths)
         .map(|(child, size)| marked_with(child, (*size).min(width), marks, engine))
         .collect();
-    let height = height.unwrap_or_else(|| drawn.iter().map(Vec::len).max().unwrap_or(0));
-    (0..height)
+    let height = height.unwrap_or_else(|| {
+        drawn
+            .iter()
+            .map(|drawing| drawing.lines.len())
+            .max()
+            .unwrap_or(0)
+    });
+    let next = drawn.iter().filter_map(|drawing| drawing.next).min();
+    let lines = (0..height)
         .map(|y| {
             let mut spans = vec![Span::raw(" ".repeat(before))];
-            for (index, lines) in drawn.iter().enumerate() {
+            for (index, drawing) in drawn.iter().enumerate() {
+                let lines = &drawing.lines;
                 if index > 0 {
                     spans.push(Span::raw(" ".repeat(gap + extra)));
                 }
-                let slack = height.saturating_sub(lines.len());
-                let top = match style.align_items {
-                    Some(Align::Center) => slack / 2,
-                    Some(Align::FlexEnd) => slack,
-                    _ => 0,
-                };
-                let line = y
-                    .checked_sub(top)
-                    .and_then(|y| lines.get(y))
-                    .cloned()
-                    .unwrap_or_default();
+                let line = aligned_child(lines, style.align_items, height, y);
                 spans.extend(fit(line, widths[index].min(width)).spans);
             }
             fit(Line::from(spans), width)
         })
-        .collect()
+        .collect();
+    Drawing { lines, next }
 }
+fn aligned_child(
+    lines: &[Line<'static>],
+    align: Option<Align>,
+    height: usize,
+    y: usize,
+) -> Line<'static> {
+    let slack = height.saturating_sub(lines.len());
+    let top = match align {
+        Some(Align::Center) => slack / 2,
+        Some(Align::FlexEnd) => slack,
+        _ => 0,
+    };
+    y.checked_sub(top)
+        .and_then(|y| lines.get(y))
+        .cloned()
+        .unwrap_or_default()
+}
+
 fn justify(justify: Option<Justify>, spare: usize, count: usize) -> (usize, usize) {
     match justify {
         Some(Justify::Center) => (spare / 2, 0),

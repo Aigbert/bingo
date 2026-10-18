@@ -53,6 +53,11 @@ pub struct Layout {
 }
 
 impl Layout {
+    pub fn collect(&mut self, drawing: crate::views::Drawing) -> Vec<ratatui::text::Line<'static>> {
+        self.next_frame = self.next_frame.into_iter().chain(drawing.next).min();
+        drawing.lines
+    }
+
     /// The picture a pointer is on, when it is on one. The cells under it say
     /// which picture they are cells of, and this frame's own list says which
     /// picture that is — so a click can only ever open a picture the screen is
@@ -85,6 +90,21 @@ impl Layout {
             Some((at, removed, count)) if line >= at + count => Some(line - count + removed),
             _ => Some(line),
         }
+    }
+
+    /// Visible cache ranges exclude the rows replaced by an inline card.
+    pub fn visible_lines(&self, height: usize) -> Vec<std::ops::Range<usize>> {
+        let mut ranges: Vec<std::ops::Range<usize>> = Vec::new();
+        for line in (0..height).filter_map(|row| self.line_at(row)) {
+            if let Some(last) = ranges.last_mut()
+                && last.end == line
+            {
+                last.end += 1;
+            } else {
+                ranges.push(line..line + 1);
+            }
+        }
+        ranges
     }
 
     /// The row of the transcript region a line was drawn at, when it is on the
@@ -145,9 +165,7 @@ fn compose(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> Layo
         ..Layout::default()
     };
     count::begin();
-    let (_, view_deadline) =
-        crate::views::motion::track(now, || crate::view::compose(tree, ui, &mut next, now));
-    next.next_frame = next.next_frame.into_iter().chain(view_deadline).min();
+    crate::view::compose(tree, ui, &mut next, now);
     count::finish(&mut next);
     next.next_frame = deadline::next(tree, ui, &next, now);
     next

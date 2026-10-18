@@ -47,22 +47,14 @@ const VERBS: [&str; 10] = [
     "tinkering",
 ];
 
-pub fn next_change(tree: &Tree, ui: &Ui, now: Now) -> Option<std::time::Instant> {
-    let motion = tree.sessions().any(SessionState::busy).then(|| {
+pub fn next_change(tree: &Tree, _ui: &Ui, now: Now) -> Option<std::time::Instant> {
+    tree.sessions().any(SessionState::busy).then(|| {
         if now.motion {
             now.instant + clock::FRAME
         } else {
             clock::next_tick(now, std::time::Duration::from_secs(1))
         }
-    });
-    let slots = bingo_sdk::slot::placed(tree.viewed());
-    let views = slots.iter().filter_map(|placed| match &placed.slot {
-        bingo_sdk::slot::Slot::Activity { view, .. } if !ui.activity_hidden => {
-            view.view().and_then(|view| views::next_change(view, now))
-        }
-        _ => None,
-    });
-    motion.into_iter().chain(views).min()
+    })
 }
 
 /// The rows between the transcript and the input box: what the turn is doing
@@ -74,16 +66,17 @@ pub(crate) fn components(
     width: usize,
     now: Now,
     pulls: &mut Vec<crate::pulled::Key>,
-) -> Vec<Line<'static>> {
+) -> views::Drawing {
     crate::layout::count::band(2);
     let state = tree.viewed();
     let slots = bingo_sdk::slot::placed(state);
     let mut out = band(tree, ui, &slots, width, now, pulls);
-    out.extend(queued(state));
+    out.lines.extend(queued(state));
     // A blank row between the transcript and these, as between any two blocks
     // (§3): they are not the tail of what was said, they are what is going on.
-    if !out.is_empty() {
-        out.insert(0, ui.embers.row(state, now, width, !ui.scroll.following()));
+    if !out.lines.is_empty() {
+        out.lines
+            .insert(0, ui.embers.row(state, now, width, !ui.scroll.following()));
     }
     out
 }
@@ -105,16 +98,19 @@ fn band(
     width: usize,
     now: Now,
     pulls: &mut Vec<crate::pulled::Key>,
-) -> Vec<Line<'static>> {
+) -> views::Drawing {
     let verb = slots.iter().find_map(|placed| match &placed.slot {
         bingo_sdk::slot::Slot::Activity { verb, .. } => verb.as_deref(),
         _ => None,
     });
+    let mut next = None;
     let mut site = crate::component::Site {
         state: tree.viewed(),
         memo: &ui.placed.pulled,
         width,
         pulls,
+        now,
+        next: &mut next,
     };
     let mut out = if let Some(line) = crate::ask::drawing::activity(tree, ui) {
         vec![line]
@@ -125,11 +121,12 @@ fn band(
         out.extend(waiting(tree, now));
     }
     let running = !out.is_empty();
+    let mut out = views::Drawing { lines: out, next };
     if !ui.activity_hidden {
         for placed in slots {
             if let bingo_sdk::slot::Slot::Activity { view, .. } = &placed.slot {
                 let Some(view) = ui.placed.pulled.view(view, tree.viewed(), width as u16) else {
-                    out.push(Line::from(theme::ellipsis()));
+                    out.lines.push(Line::from(theme::ellipsis()));
                     continue;
                 };
                 let view = match (running, view) {
@@ -137,37 +134,52 @@ fn band(
                     _ => view,
                 };
                 let lines = activity_view(view, width, now);
-                out.extend(if running {
-                    hung(lines)
-                } else {
-                    standing(lines)
-                });
+                out.append(lines.map_lines(|lines| {
+                    if running {
+                        hung(lines)
+                    } else {
+                        standing(lines)
+                    }
+                }));
             }
         }
     }
     out
 }
 
-fn activity_view(view: &bingo_sdk::View, width: usize, now: Now) -> Vec<Line<'static>> {
+fn activity_view(view: &bingo_sdk::View, width: usize, now: Now) -> views::Drawing {
     use bingo_sdk::View;
     match view {
         View::Panel { title, child } => {
             let mut out = vec![Line::from(Span::styled(title.clone(), theme::dim()))];
-            out.extend(activity_view(child, width, now));
-            out
+            activity_view(child, width, now).map_lines(|lines| {
+                out.extend(lines);
+                out
+            })
         }
         View::Box { children, .. } => children
             .iter()
-            .flat_map(|v| activity_view(v, width, now))
+            .map(|v| activity_view(v, width, now))
             .collect(),
         View::Tree { nodes } if nodes.iter().all(|n| n.children.is_empty()) => nodes
             .iter()
             .map(|node| activity_node(node, width))
-            .collect(),
-        View::Text { children, .. } => vec![Line::from(Span::styled(
-            bingo_sdk::view::text_children(children),
-            theme::dim(),
-        ))],
+            .collect::<Vec<_>>()
+            .into(),
+        View::Text { children, style } => {
+            let mut style = style.clone();
+            if style.color.is_none() {
+                style.color = Some("dim".into());
+            }
+            views::marked(
+                &View::Text {
+                    children: children.clone(),
+                    style,
+                },
+                width,
+                &views::Marks::at(now),
+            )
+        }
         _ => views::marked(view, width, &views::Marks::at(now)),
     }
 }
@@ -518,7 +530,7 @@ fn blocking(item: &bingo_sdk::Item) -> bool {
 
 #[cfg(test)]
 pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
-    components(tree, ui, width, now, &mut Vec::new())
+    components(tree, ui, width, now, &mut Vec::new()).lines
 }
 
 #[cfg(test)]

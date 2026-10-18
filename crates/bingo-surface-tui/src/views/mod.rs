@@ -13,6 +13,8 @@ mod button;
 /// (M11e).
 pub mod code;
 mod diff;
+mod drawing;
+pub use drawing::Drawing;
 mod flex;
 mod image;
 mod input;
@@ -69,71 +71,58 @@ impl Marks {
     }
 }
 
-/// Views rendered with a live clock report their next visible step.
-pub fn next_change(view: &View, now: Now) -> Option<std::time::Instant> {
-    if !now.motion {
-        return None;
-    }
-    match view {
-        View::Progress { total, .. } if total.unwrap_or(0) == 0 => Some(progress::next_change(now)),
-        View::Box { children, .. } => children
-            .iter()
-            .filter_map(|child| next_change(child, now))
-            .min(),
-        View::Panel { child, .. } => next_change(child, now),
-        View::Text { children, style } => text::next(children, style, now),
-        _ => None,
-    }
-}
-
 /// A view as styled lines at rest: a record — a finished output, a sheet of
 /// one — knows no frame and moves in none.
 pub fn render(view: &View, width: usize) -> Vec<Line<'static>> {
-    marked(view, width, &Marks::default())
+    marked(view, width, &Marks::default()).lines
 }
 
 /// A view as styled lines.
 pub type Engine<'a> =
-    dyn Fn(bingo_sdk::render::Component, &serde_json::Value, usize) -> Vec<Line<'static>> + 'a;
+    dyn Fn(bingo_sdk::render::Component, &serde_json::Value, usize) -> Drawing + 'a;
 
-pub fn marked(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
-    marked_with(view, width, marks, &|_, _, _| Vec::new())
+pub fn marked(view: &View, width: usize, marks: &Marks) -> Drawing {
+    marked_with(view, width, marks, &|_, _, _| Drawing::default())
 }
 
-pub fn marked_with(
-    view: &View,
-    width: usize,
-    marks: &Marks,
-    engine: &Engine<'_>,
-) -> Vec<Line<'static>> {
-    let marks = Marks {
-        now: marks.now.or_else(motion::now),
-        ..marks.clone()
-    };
-    let marks = &marks;
-    motion::observe(view, marks.now);
-    let lines = match view {
+pub fn marked_with(view: &View, width: usize, marks: &Marks, engine: &Engine<'_>) -> Drawing {
+    let drawn = match view {
         View::Text { children, style } => text::animated(children, style, width, marks.now),
+        View::Box { children, layout } => flex::lines(children, layout, width, marks, engine),
+        View::Panel { title, child } => panel::lines(title, child, width, marks, engine),
+        View::Engine { component, props } => engine(*component, props, width),
+        View::Progress {
+            value,
+            total,
+            label,
+        } => Drawing {
+            lines: progress::lines(
+                *value,
+                *total,
+                label.as_deref(),
+                width,
+                marks.now.map_or(0.0, progress::walk),
+            ),
+            next: marks
+                .now
+                .filter(|now| now.motion && total.unwrap_or(0) == 0)
+                .map(progress::next_change),
+        },
+        _ => Drawing::still(still_lines(view, width, marks)),
+    };
+    drawn.map_lines(|lines| sealed::mask(view, targets::mask(view, lines, marks), marks))
+}
+
+fn still_lines(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
+    match view {
         View::Markdown { text, dim_color } => markdown::lines(text, width, *dim_color),
         View::Code { language, source } => code::lines(language.as_deref(), source, width),
         View::Diff { unified } => diff::lines(unified),
         View::List { items } => list::lines(items),
         View::Table { headers, rows } => table::lines(headers, rows, width),
         View::KeyValue { rows } => keyvalue::lines(rows, width),
-        View::Progress {
-            value,
-            total,
-            label,
-        } => progress::lines(
-            *value,
-            *total,
-            label.as_deref(),
-            width,
-            marks.now.map_or(0.0, progress::walk),
-        ),
         View::Badge { text, tone } => badge::lines(text, *tone),
         View::Tree { nodes } => tree::lines(nodes),
-        View::Box { children, layout } => flex::lines(children, layout, width, marks, engine),
         View::Button { children, button } => button::lines(children, button, width, marks),
         View::Input { input } => input::lines(input, width),
         View::Select { select } => select::lines(select, width),
@@ -150,15 +139,13 @@ pub fn marked_with(
             cells,
         } => raster::lines(*columns, *rows, cells, width),
         View::Svg { alt, .. } => text::lines(alt),
-        View::Engine { component, props } => engine(*component, props, width),
-        View::Panel { title, child } => panel::lines(title, child, width, marks, engine),
         View::Actions { items } => actions::lines(items, width, marks),
         // A word this surface has not learned is the text its author wrote
         // for exactly this (ADR-0038 §1). Learning a kind richly is a
         // surface's own affair, and no kind is learned here yet.
         View::Custom { fold, .. } => text::lines(fold),
-    };
-    sealed::mask(view, targets::mask(view, lines, marks), marks)
+        _ => Vec::new(),
+    }
 }
 
 /// Whether a column of values reads as numbers, which is what right-aligning

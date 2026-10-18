@@ -30,7 +30,9 @@ pub(super) fn placed_row(
         block.lines.truncate(usize::from(!quiet));
         block.pictures.clear();
         block.wanted.clear();
-        block.lines.extend(placed_body(body, rows));
+        let drawn = placed_body(body, rows);
+        block.next = drawn.next;
+        block.lines.extend(drawn.lines);
     }
     if !quiet {
         if let Some(title) = title {
@@ -47,12 +49,14 @@ pub(super) fn placed_row(
         }
     }
     if !actions.is_empty() {
-        block.lines.extend(placed_body(
+        let drawn = placed_body(
             &bingo_sdk::View::Actions {
                 items: actions.clone(),
             },
             rows,
-        ));
+        );
+        block.next = block.next.into_iter().chain(drawn.next).min();
+        block.lines.extend(drawn.lines);
     }
     block
 }
@@ -107,18 +111,21 @@ pub(super) fn actions_under(item: &Item, indent: usize, rows: &Rows<'_>) -> Vec<
     };
     let width = rows.width.saturating_sub(indent).max(1);
     let body = crate::views::marked(&view, width, &crate::views::Marks::at(rows.now));
-    super::under(Span::raw(" ".repeat(indent)), body, indent, rows.width)
+    super::under(
+        Span::raw(" ".repeat(indent)),
+        body.lines,
+        indent,
+        rows.width,
+    )
 }
 
-fn placed_body(view: &bingo_sdk::View, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    returns(
-        crate::views::marked(
-            view,
-            rows.result_width(),
-            &crate::views::Marks::at(rows.now),
-        ),
-        rows,
+fn placed_body(view: &bingo_sdk::View, rows: &Rows<'_>) -> crate::views::Drawing {
+    crate::views::marked(
+        view,
+        rows.result_width(),
+        &crate::views::Marks::at(rows.now),
     )
+    .map_lines(|lines| returns(lines, rows))
 }
 
 impl Rows<'_> {

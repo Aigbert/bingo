@@ -44,21 +44,39 @@ pub(super) fn tail(arriving: &str, keep: usize, width: usize) -> Vec<Line<'stati
 /// What a person reads under a finished tool row: the display the tool drew
 /// for them when there is one (ADR-0013 §2, the block lane), else the text the
 /// model read, folded to what a row can spare either way.
-pub(super) fn folded(output: &ToolOutput, fold: Fold, width: usize) -> Vec<Line<'static>> {
-    let (rows, limit) = match &output.display {
-        // A diff is the one display a person reads by the dozen rows.
-        Some(view @ View::Diff { .. }) => (views::render(view, width), DIFF_ROWS),
-        Some(view @ View::Text { .. }) => (plain(&view.fold()), OUTPUT_ROWS),
-        Some(view) => (views::render(view, width), OUTPUT_ROWS),
-        None => (plain(&text_of(output)), OUTPUT_ROWS),
+pub(super) fn folded(
+    output: &ToolOutput,
+    fold: Fold,
+    width: usize,
+    now: Option<crate::clock::Now>,
+) -> views::Drawing {
+    if fold == Fold::Shut {
+        return views::Drawing::default();
+    }
+    let marks = views::Marks {
+        now,
+        ..Default::default()
     };
-    kept(rows, fold, limit, Some(EXPAND))
+    let (drawing, limit) = match &output.display {
+        Some(view @ View::Diff { .. }) => (views::marked(view, width, &marks), DIFF_ROWS),
+        Some(view @ View::Text { children, style })
+            if style == &Default::default()
+                && children
+                    .iter()
+                    .all(|child| matches!(child, bingo_sdk::view::TextChild::String(_))) =>
+        {
+            (plain(&view.fold()).into(), OUTPUT_ROWS)
+        }
+        Some(view) => (views::marked(view, width, &marks), OUTPUT_ROWS),
+        None => (plain(&text_of(output)).into(), OUTPUT_ROWS),
+    };
+    drawing.map_lines(|lines| kept(lines, fold, limit, Some(EXPAND)))
 }
 
 /// Everything a result says, with nothing folded away: what the pager opens
 /// (design §5 — a long output opens in a sheet).
 pub fn whole(output: &ToolOutput, width: usize) -> Vec<Line<'static>> {
-    folded(output, Fold::Open, width)
+    folded(output, Fold::Open, width, None).lines
 }
 
 pub(super) fn plain(text: &str) -> Vec<Line<'static>> {
@@ -138,6 +156,24 @@ mod tests {
         let mut output = ToolOutput::text("model text");
         output.display = Some(View::text("display text"));
         assert_eq!(whole(&output, 80), plain("display text"));
+    }
+
+    #[test]
+    fn nested_text_motion_keeps_its_clock_and_deadline() {
+        let mut output = ToolOutput::text("model text");
+        output.display = Some(
+            serde_json::from_value(serde_json::json!({
+                "kind": "Text", "children": [{
+                    "kind": "Text", "motion": {"kind": "spin"}, "children": ["waiting"]
+                }]
+            }))
+            .unwrap(),
+        );
+        let now = crate::test_support::scene().1;
+        let moving = folded(&output, Fold::Open, 80, Some(now));
+        assert_eq!(moving.lines[0].to_string(), crate::spinner::glyph(now));
+        assert_eq!(moving.next, Some(crate::spinner::next(now)));
+        assert_eq!(folded(&output, Fold::Open, 80, None).next, None);
     }
 
     use unicode_width::UnicodeWidthStr;

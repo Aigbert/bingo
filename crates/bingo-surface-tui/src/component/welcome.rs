@@ -1,6 +1,5 @@
 use crate::{transcript::Rows, welcome};
 use bingo_sdk::{SessionState, component::*};
-use ratatui::text::Line;
 
 pub fn props(rows: &Rows<'_>) -> Props {
     Props::Welcome(Box::new(WelcomeProps {
@@ -12,7 +11,7 @@ pub fn props(rows: &Rows<'_>) -> Props {
     }))
 }
 
-pub fn draw(rows: &Rows<'_>) -> Vec<Line<'static>> {
+pub fn draw(rows: &Rows<'_>) -> crate::views::Drawing {
     let props = props(rows);
     super::resolve(
         rows.state,
@@ -20,6 +19,7 @@ pub fn draw(rows: &Rows<'_>) -> Vec<Line<'static>> {
         "Welcome",
         &props,
         rows.width,
+        &crate::views::Marks::at(rows.now),
         |changed, width| {
             let Props::Welcome(facts) = changed else {
                 return Vec::new();

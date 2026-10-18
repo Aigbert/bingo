@@ -294,7 +294,7 @@ fn a_fired_button_wears_the_mark_until_the_answer_comes_back() {
         pending: Some(action("board.tick")),
         ..Marks::default()
     };
-    let drawn = marked(&actions(), 80, &marks)[0].to_string();
+    let drawn = marked(&actions(), 80, &marks).lines[0].to_string();
     assert!(drawn.contains("[ 1 Approve… ]"), "{drawn}");
     assert!(drawn.contains("[ 2 Next ]"), "{drawn}");
 }

@@ -238,3 +238,19 @@ fn layout_layer_send_and_drag_report_their_own_deadlines() {
     ui.drag_step(arrived);
     assert!(ui.select.dragging.is_none());
 }
+
+#[test]
+fn visible_cache_ranges_skip_inline_replacements() {
+    let mut frame = Layout {
+        height: 20,
+        top: 2,
+        inline: Some((4, 2, 5)),
+        ..Default::default()
+    };
+    assert_eq!(frame.visible_lines(10), vec![2..4, 6..9]);
+    frame.top = 5;
+    assert!(frame.visible_lines(3).is_empty());
+    frame.top = 9;
+    assert_eq!(frame.visible_lines(2), vec![6..8]);
+    assert!(frame.visible_lines(0).is_empty());
+}

@@ -10,39 +10,40 @@ pub mod question;
 pub mod sealed;
 pub mod welcome;
 
+#[cfg(test)]
 pub fn draw(
     props: &Props,
     answer: Option<&View>,
     width: usize,
     own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
 ) -> Vec<Line<'static>> {
-    draw_marked(props, answer, width, &crate::views::Marks::default(), own)
+    draw_marked(props, answer, width, &crate::views::Marks::default(), own).lines
 }
 
-pub fn draw_marked(
+pub fn draw_marked<R: Into<crate::views::Drawing>>(
     props: &Props,
     answer: Option<&View>,
     width: usize,
     marks: &crate::views::Marks,
-    own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
-) -> Vec<Line<'static>> {
+    own: impl Fn(&Props, usize) -> R,
+) -> crate::views::Drawing {
     let Some(answer) = answer else {
-        return own(props, width);
+        return own(props, width).into();
     };
     let invalid = std::cell::Cell::new(false);
     let engine = |component, value: &serde_json::Value, width| match Props::parse(
         component,
         value.clone(),
     ) {
-        Ok(changed) if changed.component() == props.component() => own(&changed, width),
+        Ok(changed) if changed.component() == props.component() => own(&changed, width).into(),
         _ => {
             invalid.set(true);
-            own(props, width)
+            own(props, width).into()
         }
     };
     let mut lines = crate::views::marked_with(answer, width, marks, &engine);
     if invalid.get() {
-        lines.extend(crate::views::render(
+        lines.lines.extend(crate::views::render(
             &View::Text {
                 children: vec![bingo_sdk::view::TextChild::String(
                     "invalid component props; showing the original drawing".into(),
@@ -195,22 +196,20 @@ mod band_tests {
 #[cfg(test)]
 mod sites_tests;
 
-pub fn resolve(
+pub fn resolve<R: Into<crate::views::Drawing>>(
     state: &bingo_sdk::SessionState,
     memo: Option<&crate::pulled::Memo>,
     id: &str,
     props: &Props,
     width: usize,
-    own: impl Fn(&Props, usize) -> Vec<Line<'static>>,
-) -> Vec<Line<'static>> {
-    let empty = crate::pulled::Memo::default();
-    Site {
-        state,
-        memo: memo.unwrap_or(&empty),
-        width,
-        pulls: &mut Vec::new(),
-    }
-    .draw(id, props, own)
+    marks: &crate::views::Marks,
+    own: impl Fn(&Props, usize) -> R,
+) -> crate::views::Drawing {
+    let key = key(state, id, props, width as u16, 0);
+    let answer = key
+        .as_ref()
+        .and_then(|key| memo.and_then(|memo| memo.display(key)));
+    draw_marked(props, answer, width, marks, own)
 }
 
 pub struct Site<'a> {
@@ -218,6 +217,8 @@ pub struct Site<'a> {
     pub memo: &'a crate::pulled::Memo,
     pub width: usize,
     pub pulls: &'a mut Vec<crate::pulled::Key>,
+    pub now: crate::clock::Now,
+    pub next: &'a mut Option<std::time::Instant>,
 }
 impl Site<'_> {
     pub fn draw(
@@ -231,7 +232,15 @@ impl Site<'_> {
         };
         let answer = self.memo.display(&key);
         self.pulls.push(key);
-        draw(props, answer, self.width, own)
+        let drawing = draw_marked(
+            props,
+            answer,
+            self.width,
+            &crate::views::Marks::at(self.now),
+            own,
+        );
+        *self.next = (*self.next).into_iter().chain(drawing.next).min();
+        drawing.lines
     }
 }
 

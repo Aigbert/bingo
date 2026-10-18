@@ -57,18 +57,20 @@ pub fn label(body: &ItemBody) -> Option<String> {
         _ => None,
     }
 }
-pub fn append(item: &Item, lines: &mut [Line<'static>], rows: &Rows<'_>) {
-    let Some(first) = lines.first_mut() else {
-        return;
-    };
-    let words = rows
+pub fn append(
+    item: &Item,
+    lines: &mut [Line<'static>],
+    rows: &Rows<'_>,
+) -> Option<std::time::Instant> {
+    let first = lines.first_mut()?;
+    let drawn: crate::views::Drawing = rows
         .answers
         .to(&item.id)
         .iter()
-        .flat_map(|receipt| {
+        .map(|receipt| {
             let own = label(&receipt.body).unwrap_or_default();
             let Some(props) = crate::component::items::props(receipt, false) else {
-                return vec![Line::from(own)];
+                return vec![Line::from(own)].into();
             };
             crate::component::resolve(
                 rows.state,
@@ -76,14 +78,19 @@ pub fn append(item: &Item, lines: &mut [Line<'static>], rows: &Rows<'_>) {
                 &crate::component::items::id(receipt),
                 &props,
                 rows.width,
+                &crate::views::Marks::at(rows.now),
                 |_, _| vec![Line::from(own.clone())],
             )
         })
+        .collect();
+    let words = drawn
+        .lines
+        .iter()
         .map(|line| line.to_string())
         .collect::<Vec<_>>()
         .join(" · ");
     if words.is_empty() {
-        return;
+        return None;
     }
     let gap = rows
         .width
@@ -91,4 +98,5 @@ pub fn append(item: &Item, lines: &mut [Line<'static>], rows: &Rows<'_>) {
         .max(2);
     first.spans.push(Span::raw(" ".repeat(gap)));
     first.spans.push(Span::styled(words, theme::dim()));
+    drawn.next
 }

@@ -63,6 +63,7 @@ pub fn draw(
     frame: &mut crate::layout::Layout,
     width: u16,
     rows: u16,
+    now: crate::clock::Now,
 ) -> Vec<ratatui::text::Line<'static>> {
     let Open::Plugins(open) = ui.focus.open() else {
         return vec![];
@@ -73,29 +74,36 @@ pub fn draw(
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    crate::component::draw(&props, answer, usize::from(width), |props, width| {
-        let Props::Plugins(props) = props else {
-            return vec![];
-        };
-        let view = View::Table {
-            headers: vec!["plugin".into(), "state".into(), "from".into()],
-            rows: props
-                .plugins
-                .iter()
-                .map(|entry| {
-                    vec![
-                        entry.id.clone(),
-                        entry.meta["state"]["kind"]
-                            .as_str()
-                            .unwrap_or_default()
-                            .into(),
-                        entry.meta["from"].as_str().unwrap_or_default().into(),
-                    ]
-                })
-                .collect(),
-        };
-        crate::views::render(&view, width)
-    })
+    let drawing = crate::component::draw_marked(
+        &props,
+        answer,
+        usize::from(width),
+        &crate::views::Marks::at(now),
+        |props, width| {
+            let Props::Plugins(props) = props else {
+                return vec![];
+            };
+            let view = View::Table {
+                headers: vec!["plugin".into(), "state".into(), "from".into()],
+                rows: props
+                    .plugins
+                    .iter()
+                    .map(|entry| {
+                        vec![
+                            entry.id.clone(),
+                            entry.meta["state"]["kind"]
+                                .as_str()
+                                .unwrap_or_default()
+                                .into(),
+                            entry.meta["from"].as_str().unwrap_or_default().into(),
+                        ]
+                    })
+                    .collect(),
+            };
+            crate::views::render(&view, width)
+        },
+    );
+    frame.collect(drawing)
 }
 fn handler(ui: &Ui) -> Option<Action> {
     let id = request(ui)?;

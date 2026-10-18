@@ -721,19 +721,10 @@ pub fn blended(from: &str, to: &str, weight: f64) -> Option<Style> {
     Some(depth::foreground(from, color))
 }
 
-pub fn blend_style(style: Style, with: &str, weight: f64) -> Option<Style> {
-    let palette = palette();
-    let from = match style.fg {
-        Some(Color::Rgb(r, g, b)) => Color::Rgb(r, g, b),
-        _ => palette.fg(),
-    };
-    let to = palette.named(with)?;
-    let color = ink::mix(from, to, weight);
-    Some(style.patch(depth::foreground(with, color)))
-}
-
 // The composer adopts this fade when its Ember layout lands.
 #[allow(dead_code)]
 pub fn caret_ink(now: crate::clock::Now, base: &str, ground: &str) -> Option<Style> {
     blended(base, ground, crate::clock::caret_fade(now))
 }
+
+pub(crate) use depth::literal;

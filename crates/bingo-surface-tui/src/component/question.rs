@@ -1,5 +1,4 @@
-use bingo_sdk::{Interaction, InteractionKind, SessionState, component::*};
-use ratatui::text::Line;
+use bingo_sdk::{Interaction, InteractionKind, component::*};
 
 pub fn props(interaction: &Interaction) -> Option<Props> {
     let questions = match &interaction.kind {
@@ -19,79 +18,95 @@ pub fn props(interaction: &Interaction) -> Option<Props> {
     }))
 }
 
+type Rows = Vec<(ratatui::text::Line<'static>, Option<usize>)>;
+
 pub fn rows(
-    state: &SessionState,
-    ui: &crate::ui::Ui,
-    interaction: &Interaction,
-    agent: Option<&str>,
-    width: usize,
-    room: usize,
+    site: &super::sealed::Site<'_>,
     pulls: &mut Vec<crate::pulled::Key>,
-) -> Vec<(Line<'static>, Option<usize>)> {
-    let own = |interaction: &Interaction, width| {
-        crate::dialog::rows(
-            &ui.dialog,
-            interaction,
-            agent,
-            &state.summary.cwd,
-            width,
-            room,
-            &crate::tool_rows::Looks::in_ui(ui),
-        )
-    };
-    let original = own(interaction, width);
-    let Some(props) = props(interaction) else {
-        return original;
+) -> super::sealed::Drawing {
+    let original = own(site, site.interaction, site.width);
+    let Some(props) = props(site.interaction) else {
+        return super::sealed::Drawing::plain(original);
     };
     let Some(key) = super::key(
-        state,
-        interaction.id.as_str(),
+        site.state,
+        site.interaction.id.as_str(),
         &props,
-        width as u16,
-        room as u16,
+        site.width as u16,
+        site.room.saturating_sub(1) as u16,
     ) else {
-        return original;
+        return super::sealed::Drawing::plain(original);
     };
     pulls.push(key.clone());
-    let Some(answer) = ui.placed.pulled.display(&key) else {
-        return original;
+    let Some(answer) = site.ui.placed.pulled.display(&key) else {
+        return super::sealed::Drawing::plain(original);
     };
     let options = std::cell::RefCell::new(Vec::new());
-    let lines = super::draw(&props, Some(answer), width, |changed, width| {
-        let mut changed_interaction = interaction.clone();
-        if let Props::Question(props) = changed {
-            match &mut changed_interaction.kind {
-                InteractionKind::Question(question) => {
-                    if let Some(first) = props.questions.first() {
-                        *question = first.clone();
-                    }
+    let drawing = super::draw_marked(
+        &props,
+        Some(answer),
+        site.width,
+        &crate::views::Marks::at(site.now),
+        |props, width| {
+            let interaction = rewritten(site.interaction, props);
+            let rows = own(site, &interaction, width);
+            options
+                .borrow_mut()
+                .extend(rows.iter().filter_map(|(line, option)| {
+                    option.map(|option| (line.to_string().trim().to_owned(), option))
+                }));
+            rows.into_iter().map(|(line, _)| line).collect::<Vec<_>>()
+        },
+    );
+    mark_options(drawing, &options.borrow())
+}
+
+fn own(site: &super::sealed::Site<'_>, interaction: &Interaction, width: usize) -> Rows {
+    crate::dialog::rows(
+        &site.ui.dialog,
+        interaction,
+        site.agent,
+        &site.state.summary.cwd,
+        width,
+        site.room.saturating_sub(1),
+        &crate::tool_rows::Looks::in_ui(site.ui),
+    )
+}
+
+fn rewritten(interaction: &Interaction, props: &Props) -> Interaction {
+    let mut interaction = interaction.clone();
+    if let Props::Question(props) = props {
+        match &mut interaction.kind {
+            InteractionKind::Question(question) => {
+                if let Some(first) = props.questions.first() {
+                    *question = first.clone();
                 }
-                InteractionKind::Form { questions, .. } => *questions = props.questions.clone(),
-                _ => {}
             }
+            InteractionKind::Form { questions, .. } => *questions = props.questions.clone(),
+            _ => {}
         }
-        own(&changed_interaction, width)
-            .into_iter()
-            .map(|(line, option)| {
-                if let Some(option) = option {
-                    options
-                        .borrow_mut()
-                        .push((line.to_string().trim().to_owned(), option));
-                }
-                line
-            })
-            .collect()
-    });
-    lines
+    }
+    interaction
+}
+
+fn mark_options(
+    drawing: crate::views::Drawing,
+    options: &[(String, usize)],
+) -> super::sealed::Drawing {
+    let rows = drawing
+        .lines
         .into_iter()
         .map(|line| {
             let text = line.to_string();
             let option = options
-                .borrow()
                 .iter()
                 .find(|(label, _)| label == text.trim())
                 .map(|(_, option)| *option);
             (line, option)
         })
-        .collect()
+        .collect();
+    super::sealed::Drawing {
+        next: drawing.next,
+        ..super::sealed::Drawing::plain(rows)
+    }
 }

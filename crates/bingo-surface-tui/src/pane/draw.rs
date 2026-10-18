@@ -64,7 +64,8 @@ fn draw_one(
         area.width,
         area.height.saturating_sub(super::heading_rows(pane)),
     );
-    let lines = lines(ui, state, pane, seated, now);
+    let drawing = lines(ui, state, pane, seated, now);
+    let lines = frame.collect(drawing);
     let top = offset(ui, seated, lines.len(), super::heading_rows(pane));
     frame.render_widget(
         Paragraph::new(lines.into_iter().skip(top).collect::<Vec<_>>()),
@@ -91,12 +92,12 @@ pub(super) fn lines(
     pane: &Pane,
     seated: &Seated,
     now: Now,
-) -> Vec<Line<'static>> {
+) -> views::Drawing {
     let Some(view) = view(ui, state, pane, seated) else {
         return if crate::component::pane::matched(state, &super::shown(ui, pane, seated)) {
-            vec![Line::from(theme::ellipsis())]
+            vec![Line::from(theme::ellipsis())].into()
         } else {
-            Vec::new()
+            views::Drawing::default()
         };
     };
     let mut view = view.clone();

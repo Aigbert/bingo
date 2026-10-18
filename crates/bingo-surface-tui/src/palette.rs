@@ -175,9 +175,14 @@ pub fn draw(
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    let mut lines = crate::component::draw(&props, answer, usize::from(width), |props, width| {
-        fallback::draw(props, open.fallback_at, width, rows)
-    });
+    let drawing = crate::component::draw_marked(
+        &props,
+        answer,
+        usize::from(width),
+        &crate::views::Marks::at(now),
+        |props, width| fallback::draw(props, open.fallback_at, width, rows),
+    );
+    let mut lines = frame.collect(drawing);
     if answer.is_some() {
         let previous = frame
             .palette_height

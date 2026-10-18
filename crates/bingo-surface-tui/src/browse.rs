@@ -135,6 +135,7 @@ pub fn draw(
     frame: &mut crate::layout::Layout,
     width: u16,
     rows: u16,
+    now: crate::clock::Now,
 ) -> Vec<ratatui::text::Line<'static>> {
     let Some(props) = props(ui, tree) else {
         return vec![];
@@ -148,17 +149,23 @@ pub fn draw(
         rows,
     );
     let answer = key.as_ref().and_then(|key| ui.placed.pulled.display(key));
-    let lines = crate::component::draw(&props, answer, width.into(), |_, _| {
-        vec![ratatui::text::Line::from(if offered(ui, tree) {
-            "browse · loading · esc close"
-        } else {
-            "browse unavailable · ctrl+f line search · esc close"
-        })]
-    });
+    let drawing = crate::component::draw_marked(
+        &props,
+        answer,
+        width.into(),
+        &crate::views::Marks::at(now),
+        |_, _| {
+            vec![ratatui::text::Line::from(if offered(ui, tree) {
+                "browse · loading · esc close"
+            } else {
+                "browse unavailable · ctrl+f line search · esc close"
+            })]
+        },
+    );
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    lines
+    frame.collect(drawing)
 }
 pub fn waiting(ui: &Ui, tree: &Tree) -> bool {
     if !active(ui) || !offered(ui, tree) {

@@ -110,12 +110,13 @@ fn a_failure_flares_and_cools_into_the_words_behind_it() {
                 .map(|(_, style)| style)
                 .expect("the row's name")
         };
+        let landed = name(0);
         assert_eq!(
-            name(0),
+            landed,
             theme::as_drawn(theme::cooling(0.0).patch(theme::bold())),
             "it lands in `bad`"
         );
-        assert_ne!(name(198), name(0), "and cools out of it");
+        assert_ne!(name(198), landed, "and cools out of it");
         assert_eq!(
             name(396),
             theme::as_drawn(theme::bold()),

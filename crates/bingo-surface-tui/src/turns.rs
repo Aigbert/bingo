@@ -82,6 +82,7 @@ impl Roles {
     }
 
     /// Whether a step is running: its spinner turns on its own clock.
+    #[cfg(test)]
     pub fn spinning(&self) -> bool {
         self.0
             .values()

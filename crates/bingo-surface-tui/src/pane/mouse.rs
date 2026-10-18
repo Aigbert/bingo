@@ -138,7 +138,9 @@ fn cell(ui: &Ui, state: &SessionState, seat: &Seated, event: MouseEvent, now: No
     let lines = placed(state)
         .iter()
         .find(|pane| pane.key == seat.key)
-        .map_or(0, |pane| draw::lines(ui, state, pane, seat, now).len());
+        .map_or(0, |pane| {
+            draw::lines(ui, state, pane, seat, now).lines.len()
+        });
     let header = heading(state, seat);
     let top = draw::offset(ui, seat, lines, header);
     Cell {
@@ -162,6 +164,7 @@ fn scroll(ui: &mut Ui, state: &SessionState, seat: &Seated, down: bool, now: Now
         return;
     };
     let max = draw::lines(ui, state, &pane, seat, now)
+        .lines
         .len()
         .saturating_sub(usize::from(
             seat.area.height.saturating_sub(super::heading_rows(&pane)),
@@ -181,6 +184,7 @@ fn copy(ui: &mut Ui, state: &SessionState, seat: &Seated, now: Now) -> Vec<Effec
         return vec![];
     };
     let lines = draw::lines(ui, state, &pane, seat, now)
+        .lines
         .iter()
         .map(ToString::to_string)
         .collect::<Vec<_>>();

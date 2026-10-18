@@ -35,8 +35,10 @@ pub(super) fn render(
     if let Some(key) = crate::component::welcome::request(&rows) {
         frame.pulls.push(key);
     }
-    let lines = crate::component::welcome::draw(&rows);
-    let lines = match rows.opening {
+    let drawing = crate::component::welcome::draw(&rows);
+    let opening = rows.opening;
+    let lines = frame.collect(drawing);
+    let lines = match opening {
         Some(t) => crate::opening::frame(t, &lines),
         None => lines,
     };

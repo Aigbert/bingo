@@ -32,6 +32,7 @@ pub fn splice(
     let mut drawing = Site {
         state: owner,
         ui,
+        now,
         interaction,
         agent: agent.as_deref(),
         width: area.width as usize,
@@ -92,6 +93,10 @@ pub fn place(frame: &mut Layout, mut drawing: Drawing, at: usize, area: Rect) {
     };
     let y = area.y + row as u16;
     let height = (drawing.rows.len() as u16).min(area.bottom().saturating_sub(y));
+    if height == 0 {
+        return;
+    }
+    frame.next_frame = frame.next_frame.into_iter().chain(drawing.next).min();
     let rect = Rect::new(area.x, y, area.width, height);
     drawing.place(rect);
     frame.card_actions = drawing.actions;

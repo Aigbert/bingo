@@ -19,6 +19,7 @@ pub fn components(
     width: usize,
     now: Now,
     pulls: &mut Vec<crate::pulled::Key>,
+    next: &mut Option<std::time::Instant>,
 ) -> (Line<'static>, Option<std::ops::Range<usize>>) {
     crate::layout::count::band(3);
     let mut site = crate::component::Site {
@@ -26,6 +27,8 @@ pub fn components(
         memo: &ui.placed.pulled,
         width,
         pulls,
+        now,
+        next,
     };
     let right = right(tree, &mut site, now);
     let left = mode(tree.viewed(), &mut site);
@@ -353,7 +356,7 @@ pub fn compose(
     width: usize,
     now: Now,
 ) -> (Line<'static>, Option<std::ops::Range<usize>>) {
-    components(tree, ui, width, now, &mut Vec::new())
+    components(tree, ui, width, now, &mut Vec::new(), &mut None)
 }
 
 #[cfg(test)]

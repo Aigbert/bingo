@@ -38,7 +38,6 @@ struct Revision {
     /// Names and room data affect prose even when an item's bytes stay put.
     names: Vec<crate::markdown::mentions::Name>,
     room: Option<Seq>,
-    agent_pulse: Option<ratatui::style::Style>,
     /// How much the body holds. Anything that grows a block grows this: the
     /// text of an answer, a tail, an output.
     size: usize,
@@ -111,19 +110,6 @@ fn revision(
         status: item.status,
         names: rows.names.clone(),
         room: (rows.state.summary.driver == bingo_sdk::Driver::Log).then_some(rows.state.seq),
-        agent_pulse: agent.map(|child| {
-            crate::face::pulse(
-                &crate::tree::name(child),
-                matches!(
-                    bingo_collab::lifecycle::Lifecycle::of_state(child),
-                    Some(
-                        bingo_collab::lifecycle::Lifecycle::Working
-                            | bingo_collab::lifecycle::Lifecycle::Asking
-                    )
-                ),
-                rows.now,
-            )
-        }),
         size: size(&item.body),
         agent: agent.map(|child| child.seq),
         fold,
@@ -229,6 +215,35 @@ fn settles(item: &Item, flip: bool, moving: bool) -> Duration {
     }
 }
 
+fn cue_deadline(
+    item: &Item,
+    agent: Option<&SessionState>,
+    role: &Role,
+    motion: Motion,
+    now: Now,
+) -> Option<Instant> {
+    let child_moves = agent.is_some_and(|child| {
+        matches!(
+            bingo_collab::lifecycle::Lifecycle::of_state(child),
+            Some(
+                bingo_collab::lifecycle::Lifecycle::Working
+                    | bingo_collab::lifecycle::Lifecycle::Asking
+            )
+        )
+    });
+    if !now.motion {
+        return (!item.is_terminal()).then(|| crate::clock::next_tick(now, Duration::from_secs(1)));
+    }
+    if child_moves || motion.redraw(now.instant) {
+        return Some(now.instant + crate::clock::FRAME);
+    }
+    if matches!(role, Role::Step { step, .. } if step.state == bingo_sdk::component::StepState::Running)
+    {
+        return Some(crate::spinner::next(now));
+    }
+    (!item.is_terminal()).then_some(now.instant + crate::clock::FRAME)
+}
+
 struct Entry {
     id: ItemId,
     revision: Revision,
@@ -245,7 +260,7 @@ struct Entry {
     /// The destinations these words named (M51), for the same reason.
     wanted: Vec<String>,
     motion: Motion,
-    view_deadline: Option<Instant>,
+    next: Option<Instant>,
 }
 
 /// One run of lines in the stacked transcript: the welcome box, an item's
@@ -274,13 +289,10 @@ pub struct Blocks {
     /// What closes the last turn — its failure, its cost — which belongs to
     /// no item.
     tail: Vec<Line<'static>>,
-    /// How many blocks have been drawn since this cache was made. A test
-    /// watches it: scrolling must not move it.
+    tail_next: Option<Instant>,
+    /// How many blocks have been drawn since this cache was made. Tests
+    /// distinguish memo hits from visible motion refreshes.
     renders: usize,
-    /// Whether any block would draw differently on the next frame, as the
-    /// last sync left it.
-    moving: bool,
-    /// The part each item played in its turn, as the last sync read it.
     roles: Roles,
 }
 
@@ -297,12 +309,13 @@ impl Blocks {
         for (at, item) in state.transcript.items().iter().enumerate() {
             let role = self.roles.of_item(&item.id).clone();
             let place = Place::of(state.transcript.items(), at).playing(role);
-            kept += self.block(kept, item, &place, agents, rows);
+            kept += self.block(kept, item, &place, agents, rows, false);
         }
         // Whatever is left behind the last item was rewound away.
         self.blocks.truncate(kept);
-        self.tail = transcript::closing(state, rows);
-        self.moving = self.still_moving(rows.now);
+        let tail = transcript::closing(state, rows);
+        self.tail = tail.lines;
+        self.tail_next = tail.next;
         self.height = self.measure();
         self.height
     }
@@ -319,31 +332,69 @@ impl Blocks {
         self.measure = rows.measure;
     }
 
-    /// Whether any block would draw differently on the next frame, as of this
-    /// one.
-    fn still_moving(&self, now: Now) -> bool {
-        self.blocks
-            .iter()
-            .any(|entry| entry.motion.redraw(now.instant))
-    }
-
-    /// Whether any block would draw differently on the next frame, as the last
-    /// [`sync`] left it: a tail cooling, or a completion flashing.
-    ///
-    /// [`sync`]: Blocks::sync
+    #[cfg(test)]
     pub fn moving(&self) -> bool {
-        self.moving
+        self.blocks.iter().any(|entry| entry.motion.moved)
     }
 
-    /// When the transcript next draws differently: the next frame while a
-    /// block moves, the spinner's next turn while a step runs.
-    pub fn next_change(&self, now: Now) -> Option<Instant> {
-        let frame = self.moving().then_some(now.instant + crate::clock::FRAME);
-        let spin = (self.roles.spinning() && now.motion).then(|| crate::spinner::next(now));
-        frame
-            .into_iter()
-            .chain(spin)
-            .chain(self.blocks.iter().filter_map(|entry| entry.view_deadline))
+    fn visible(&self, from: usize, height: usize) -> impl Iterator<Item = usize> + '_ {
+        let mut y = 0;
+        self.segments()
+            .enumerate()
+            .filter_map(move |(index, segment)| {
+                y += usize::from(segment.gap);
+                let start = y;
+                y += segment.lines.len();
+                (height > 0
+                    && segment.id.is_some()
+                    && y > from
+                    && start < from.saturating_add(height))
+                .then_some(index)
+            })
+    }
+
+    /// Only visible expired drawings are sampled again; history keeps its memo.
+    pub fn refresh(
+        &mut self,
+        state: &SessionState,
+        agents: &Agents<'_>,
+        rows: &Rows<'_>,
+        from: usize,
+        height: usize,
+    ) -> Option<Instant> {
+        let visible: Vec<_> = self.visible(from, height).collect();
+        for index in visible {
+            let entry = &self.blocks[index];
+            if entry.next.is_none_or(|at| at > rows.now.instant) {
+                continue;
+            }
+            let Some(at) = state
+                .transcript
+                .items()
+                .iter()
+                .position(|item| item.id == entry.id)
+            else {
+                continue;
+            };
+            let item = &state.transcript.items()[at];
+            let place = Place::of(state.transcript.items(), at)
+                .playing(self.roles.of_item(&item.id).clone());
+            self.block(index, item, &place, agents, rows, true);
+        }
+        self.height = self.measure();
+        self.next_change(from, height)
+    }
+
+    pub fn next_change(&self, from: usize, height: usize) -> Option<Instant> {
+        if height == 0 {
+            return None;
+        }
+        let tail = (self.closing_start() < from.saturating_add(height) && self.height > from)
+            .then_some(self.tail_next)
+            .flatten();
+        self.visible(from, height)
+            .filter_map(|index| self.blocks[index].next)
+            .chain(tail)
             .min()
     }
 
@@ -357,6 +408,7 @@ impl Blocks {
         place: &Place<'_>,
         agents: &Agents<'_>,
         rows: &Rows<'_>,
+        refresh: bool,
     ) -> usize {
         let now = rows.now.instant;
         let agent = agents.get(&item.id).copied();
@@ -367,19 +419,17 @@ impl Blocks {
         // An item that has only just finished is not yet terminal for this
         // cache: it has a frame of flashing left to do, and a frame after that
         // to settle into.
-        if same
-            && item.is_terminal()
-            && !held.is_some_and(|e| {
-                e.motion.redraw(now) || e.view_deadline.is_some_and(|at| now >= at)
-            })
-        {
+        if same && !refresh {
             return 1;
         }
         let motion = self.motion(held, item, &revision, rows.now);
         self.renders += 1;
-        let (drawn, view_deadline) = crate::views::motion::track(rows.now, || {
-            transcript::item_block(item, place, agents, rows, motion.cue(now))
-        });
+        let drawn = transcript::item_block(item, place, agents, rows, motion.cue(now));
+        let next = drawn
+            .next
+            .into_iter()
+            .chain(cue_deadline(item, agent, &place.role, motion, rows.now))
+            .min();
         if drawn.lines.is_empty() {
             // An item with nothing to say is not a block at all — and one that
             // said something until this frame gives its slot back with its
@@ -401,7 +451,7 @@ impl Blocks {
             pictures: drawn.pictures,
             wanted: drawn.wanted,
             motion,
-            view_deadline,
+            next,
         };
         match self.blocks.get_mut(at) {
             Some(slot) if slot.id == item.id => *slot = entry,
@@ -625,7 +675,9 @@ mod tests {
         let pictures = crate::graphics::Decoded::default();
         let linked = crate::graphics::Linked::default();
         let rows = Rows::of(state, width, &folds, &[], &pictures, &linked, now);
-        blocks.sync(state, &Agents::new(), &rows)
+        let height = blocks.sync(state, &Agents::new(), &rows);
+        blocks.refresh(state, &Agents::new(), &rows, 0, height);
+        blocks.height()
     }
 
     #[test]
@@ -762,9 +814,15 @@ mod tests {
             item: assistant("itm_live", "half a s", ItemStatus::Running),
         });
         let mut blocks = cache();
-        sync(&mut blocks, &state, 80);
+        let now = scene().1;
+        sync_at(&mut blocks, &state, 80, now);
         assert_eq!(blocks.renders(), 4);
-        sync(&mut blocks, &state, 80);
+        sync_at(
+            &mut blocks,
+            &state,
+            80,
+            later(now, crate::clock::FRAME.as_millis() as i64),
+        );
         assert_eq!(blocks.renders(), 5, "one block, not four");
     }
 

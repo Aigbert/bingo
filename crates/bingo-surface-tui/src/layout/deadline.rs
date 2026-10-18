@@ -14,13 +14,9 @@ pub(super) fn next(tree: &Tree, ui: &Ui, layout: &Layout, now: Now) -> Option<In
         ui.focus.next_change(now),
         ui.notice().and_then(|notice| notice.next_change(now)),
         ui.next_change(now),
-        layout.blocks.next_change(now),
         crate::status::next_change(tree, now),
         interaction(tree, now),
         layout.next_frame,
-        ui.block
-            .as_ref()
-            .and_then(|view| crate::views::next_change(view, now)),
     ]
     .into_iter()
     .flatten()

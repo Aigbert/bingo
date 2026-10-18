@@ -23,7 +23,14 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Line<'static>
     attention(tree, ui, now, &mut pairs);
     let props = Props::KeyBar(KeyBarProps {
         pairs,
-        toast: crate::toast::components(ui, tree.viewed(), now, width, &mut frame.pulls),
+        toast: crate::toast::components(
+            ui,
+            tree.viewed(),
+            now,
+            width,
+            &mut frame.pulls,
+            &mut frame.next_frame,
+        ),
     });
     if tree.open_interaction().is_some() {
         return own(&props, width).remove(0);
@@ -33,7 +40,10 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Line<'static>
     if let Some(key) = key {
         frame.pulls.push(key);
     }
-    crate::component::draw(&props, answer, width, own)
+    let drawing =
+        crate::component::draw_marked(&props, answer, width, &crate::views::Marks::at(now), own);
+    frame
+        .collect(drawing)
         .into_iter()
         .next()
         .unwrap_or_default()

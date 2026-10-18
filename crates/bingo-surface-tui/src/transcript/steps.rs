@@ -36,17 +36,19 @@ fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>) -> Block 
         &id,
         &props,
         rows.width,
+        &crate::views::Marks::at(rows.now),
         |changed, width| ledger(changed, width, rows.now),
     );
     // An action is on what the step is doing; a step that has ended is doing
     // nothing, whatever a producer last said.
     if matches!(step.state, StepState::Running | StepState::Asked) {
-        out.extend(super::slots::actions_under(item, HANG, rows));
+        out.lines
+            .extend(super::slots::actions_under(item, HANG, rows));
     }
     if !opened {
         return out.into();
     }
-    out.extend(result(item, rows));
+    out.append(result(item, rows));
     let mut block = Block::from(out);
     pictured::under_the_step(&mut block, item, HANG, rows);
     block
@@ -92,10 +94,12 @@ fn fold_block(item: &Item, fold: &TurnFoldProps, then: Option<&Role>, rows: &Row
         &id,
         &props,
         rows.width,
+        &crate::views::Marks::at(rows.now),
         folded_line,
     );
     let mut block = Block::from(out);
     if let Some(under) = then.and_then(|then| part(item, then, rows)) {
+        block.next = block.next.into_iter().chain(under.next).min();
         block.lines.extend(under.lines);
         block.pictures.extend(under.pictures);
     }
@@ -114,9 +118,9 @@ fn folded_line(props: &Props, width: usize) -> Vec<Line<'static>> {
 }
 
 /// What came back from a step, through the site that owns it.
-fn result(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
+fn result(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
     let Some((id, props)) = crate::turns::result(item) else {
-        return Vec::new();
+        return crate::views::Drawing::default();
     };
     crate::component::resolve(
         rows.state,
@@ -124,9 +128,10 @@ fn result(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
         &id,
         &props,
         rows.width,
+        &crate::views::Marks::at(rows.now),
         |changed, width| {
             let Props::ToolResult(result) = changed else {
-                return Vec::new();
+                return crate::views::Drawing::default();
             };
             let output = crate::component::items::output_of(&result.output);
             hung(
@@ -142,13 +147,15 @@ fn result(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
 
 /// What came back from a step, under its words, nothing of it folded: the
 /// turn was opened to be read.
-fn hung(output: &ToolOutput, rows: &Rows<'_>) -> Vec<Line<'static>> {
+fn hung(output: &ToolOutput, rows: &Rows<'_>) -> crate::views::Drawing {
     let inner = rows.width.saturating_sub(HANG).max(1);
-    let body = folded(output, Fold::Open, inner)
-        .into_iter()
-        .map(|line| shortened(line, rows))
-        .collect();
-    under(Span::raw(" ".repeat(HANG)), body, HANG, rows.width)
+    folded(output, Fold::Open, inner, Some(rows.now)).map_lines(|lines| {
+        let body = lines
+            .into_iter()
+            .map(|line| shortened(line, rows))
+            .collect();
+        under(Span::raw(" ".repeat(HANG)), body, HANG, rows.width)
+    })
 }
 
 /// A line of output with the paths in it read from this session's directory.
@@ -162,9 +169,9 @@ fn shortened(line: Line<'static>, rows: &Rows<'_>) -> Line<'static> {
 }
 
 /// A thought of an opened turn, through the site that owns it.
-fn thought_block(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
+fn thought_block(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
     let Some((id, props)) = crate::turns::fact(item) else {
-        return Vec::new();
+        return crate::views::Drawing::default();
     };
     crate::component::resolve(
         rows.state,
@@ -172,6 +179,7 @@ fn thought_block(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
         &id,
         &props,
         rows.width,
+        &crate::views::Marks::at(rows.now),
         |changed, width| {
             let Props::Reasoning(reasoning) = changed else {
                 return Vec::new();
@@ -189,13 +197,19 @@ fn thought(text: &str, width: usize) -> Vec<Line<'static>> {
 /// Where the person stopped the turn, through the site that owns the stop.
 /// The stop line counts the turn's steps, which the site's props do not
 /// carry, so the surface's own drawing is that line whatever they say.
-fn stop_block(item: &Item, ran: usize, total: usize, rows: &Rows<'_>) -> Vec<Line<'static>> {
+fn stop_block(item: &Item, ran: usize, total: usize, rows: &Rows<'_>) -> crate::views::Drawing {
     let Some((id, props)) = crate::turns::fact(item) else {
-        return vec![stop_line(ran, total)];
+        return vec![stop_line(ran, total)].into();
     };
-    crate::component::resolve(rows.state, rows.pulled, &id, &props, rows.width, |_, _| {
-        vec![stop_line(ran, total)]
-    })
+    crate::component::resolve(
+        rows.state,
+        rows.pulled,
+        &id,
+        &props,
+        rows.width,
+        &crate::views::Marks::at(rows.now),
+        |_, _| vec![stop_line(ran, total)],
+    )
 }
 
 /// The line a stopped turn ends on: `■ you stopped the turn · 2 of 3 steps

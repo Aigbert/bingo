@@ -15,18 +15,22 @@ pub(super) fn item_lines(
 ) -> Block {
     let mut block = component_item(item, place, agents, rows, cue, fold);
     if let Some(props) = crate::component::items::group(item, fold == Fold::Open) {
-        block.lines = crate::component::resolve(
+        let drawn = crate::component::resolve(
             rows.state,
             rows.pulled,
             &crate::component::items::id(item),
             &props,
             rows.width,
+            &crate::views::Marks::at(rows.now),
             |changed, width| {
                 if changed == &props && width == rows.width {
-                    return block.lines.clone();
+                    return crate::views::Drawing {
+                        lines: block.lines.clone(),
+                        next: block.next,
+                    };
                 }
                 let bingo_sdk::component::Props::ToolGroup(group) = changed else {
-                    return Vec::new();
+                    return crate::views::Drawing::default();
                 };
                 let rows = Rows {
                     width,
@@ -35,7 +39,7 @@ pub(super) fn item_lines(
                 group
                     .calls
                     .iter()
-                    .flat_map(|call| {
+                    .map(|call| {
                         let item = crate::component::items::changed(
                             item,
                             &bingo_sdk::component::Props::ToolUse(call.clone()),
@@ -48,11 +52,13 @@ pub(super) fn item_lines(
                             cue,
                             if group.is_expanded { Fold::Open } else { fold },
                         )
-                        .lines
+                        .into()
                     })
                     .collect()
             },
         );
+        block.lines = drawn.lines;
+        block.next = drawn.next;
     }
     match rows.placed_on(&item.id).next_back() {
         Some(slot) => slots::placed_row(item, slot, rows, cue, block),
@@ -70,15 +76,19 @@ fn component_item(
 ) -> Block {
     let mut block = default_item_lines(item, place, agents, rows, cue, fold);
     if let Some(props) = crate::component::items::props(item, fold == Fold::Open) {
-        block.lines = crate::component::resolve(
+        let drawn = crate::component::resolve(
             rows.state,
             rows.pulled,
             &crate::component::items::id(item),
             &props,
             rows.width,
+            &crate::views::Marks::at(rows.now),
             |changed, width| {
                 if changed == &props && width == rows.width {
-                    return block.lines.clone();
+                    return crate::views::Drawing {
+                        lines: block.lines.clone(),
+                        next: block.next,
+                    };
                 }
                 let rows = &Rows {
                     width,
@@ -91,9 +101,18 @@ fn component_item(
                     }
                     _ => fold,
                 };
-                default_item_lines(&changed_item, place, agents, rows, cue, fold).lines
+                crate::views::Drawing::from(default_item_lines(
+                    &changed_item,
+                    place,
+                    agents,
+                    rows,
+                    cue,
+                    fold,
+                ))
             },
         );
+        block.lines = drawn.lines;
+        block.next = drawn.next;
     }
     block
 }
@@ -103,7 +122,7 @@ pub(super) fn component_call(
     call: Call<'_>,
     rows: &Rows<'_>,
     cue: Cue,
-) -> Vec<Line<'static>> {
+) -> crate::views::Drawing {
     let mut head = call.clone();
     head.output = None;
     head.progress = None;
@@ -111,12 +130,13 @@ pub(super) fn component_call(
     let Some(props) = crate::component::items::tail(item) else {
         return out;
     };
-    out.extend(crate::component::resolve(
+    out.append(crate::component::resolve(
         rows.state,
         rows.pulled,
         &crate::component::items::id(item),
         &props,
         rows.width,
+        &crate::views::Marks::at(rows.now),
         |changed, width| {
             let rows = Rows {
                 width,
@@ -137,9 +157,9 @@ pub(super) fn component_call(
                     result(&call, &rows)
                 }
                 bingo_sdk::component::Props::ToolProgress(props) => {
-                    returns(tail(&props.hint, TAIL_ROWS, rows.result_width()), &rows)
+                    returns(tail(&props.hint, TAIL_ROWS, rows.result_width()), &rows).into()
                 }
-                _ => Vec::new(),
+                _ => crate::views::Drawing::default(),
             }
         },
     ));
