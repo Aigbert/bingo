@@ -40,7 +40,7 @@ impl std::ops::DerefMut for Ui {
 pub const NOTICE: Duration = TOAST_HOLD.saturating_add(TOAST_FADE);
 const TOAST_HOLD: Duration = Duration::from_millis(2400);
 /// A second ctrl+c within this window leaves.
-pub const EXIT_WINDOW: Duration = Duration::from_secs(2);
+pub use crate::keys::EXIT_WINDOW;
 /// A transcript that has just been stepped into crossfades through dim over
 /// this long: two frames (§6).
 pub const SWITCH: Duration = Duration::from_millis(2 * FRAME.as_millis() as u64);
@@ -72,10 +72,12 @@ pub const TOAST_FADE: Duration = Duration::from_millis(300);
 pub struct Notice {
     pub kind: NoticeKind,
     said: Instant,
+    hold: Duration,
 }
 impl Notice {
     pub fn new(kind: NoticeKind, said: Instant) -> Self {
-        Self { kind, said }
+        let hold = kind.hold();
+        Self { kind, said, hold }
     }
     pub fn plain(&self) -> Option<&Message> {
         match &self.kind {
@@ -83,11 +85,14 @@ impl Notice {
             NoticeKind::Mode => None,
         }
     }
+    pub(crate) fn hold(&self) -> Duration {
+        self.hold
+    }
     pub(crate) fn said(&self) -> Instant {
         self.said
     }
     pub(crate) fn gone(&self, now: Instant) -> bool {
-        now.saturating_duration_since(self.said) >= self.kind.hold() + TOAST_FADE
+        now.saturating_duration_since(self.said) >= self.hold + TOAST_FADE
     }
     #[cfg(test)]
     pub fn strength(&self, now: Now) -> f32 {
@@ -332,6 +337,13 @@ impl Ui {
         self.say(level, text.into(), None, now);
     }
 
+    pub fn notify_for(&mut self, text: &str, hold: Duration, now: Instant) {
+        self.notify(Level::Info, text, now);
+        if let Some(notice) = &mut self.notice {
+            notice.hold = hold;
+        }
+    }
+
     /// A notice that names what it is about — the line an intent carried,
     /// said after it in dim.
     pub fn notify_about(&mut self, level: Level, text: String, about: String, now: Instant) {
@@ -488,7 +500,7 @@ impl Ui {
     /// Whether a second ctrl+c would leave.
     pub fn exit_armed(&self, now: Instant) -> bool {
         self.armed
-            .is_some_and(|at| now.duration_since(at) < EXIT_WINDOW)
+            .is_some_and(|at| now.saturating_duration_since(at) < EXIT_WINDOW)
     }
 
     /// How tall the transcript came out last frame and how many rows it had
@@ -684,7 +696,7 @@ mod tests {
         let now = Instant::now();
         let mut ui = ui();
         ui.armed = Some(now);
-        assert!(ui.exit_armed(now + Duration::from_millis(1999)));
+        assert!(ui.exit_armed(now + Duration::from_millis(1499)));
         assert!(!ui.exit_armed(now + EXIT_WINDOW));
     }
 

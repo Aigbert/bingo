@@ -97,6 +97,7 @@ mod plugins;
 mod pointer;
 mod preview;
 mod pulled;
+mod queue_rows;
 mod render;
 mod rewind;
 mod run;

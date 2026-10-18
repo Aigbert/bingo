@@ -24,24 +24,43 @@ use crate::tree::Tree;
 use crate::ui::{Menu, Open, Ui};
 use crate::views;
 
+#[cfg(test)]
+mod acting_tests;
 mod interaction;
 mod mode;
 
 pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
-/// What the first ctrl+c on an empty composer says.
 /// What shift+tab says when no policy published a mode it can walk.
 pub const UNKNOWN_MODE: &str = "permission mode unknown — /permission <mode>";
 /// What ctrl+b says when no shell command is running to background.
-pub const NOTHING_RUNNING: &str = "no shell command is running";
+pub const NOTHING_RUNNING: &str = "nothing running to send to the background";
 
 pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     if key.kind == KeyEventKind::Release {
         return Vec::new();
     }
     ui.prepare(&tree.viewed().summary.cwd);
-    if key == KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL) && ui.composer.is_empty() {
-        return vec![Effect::Exit];
+    if key == KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT) && split_return(ui, tree, key) {
+        let mut effects = on_key(
+            ui,
+            tree,
+            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            now,
+        );
+        effects.extend(on_key(
+            ui,
+            tree,
+            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            now,
+        ));
+        return effects;
+    }
+    if key.code != KeyCode::Esc {
+        ui.escaped_at = None;
+    }
+    if let Some(effects) = leaving(ui, tree, key, now) {
+        return effects;
     }
     if crate::sessions::active(ui) {
         return crate::sessions::key(ui, tree, key, now);
@@ -59,7 +78,7 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return pager::keys(ui, tree, key, now);
     }
     if key.code == KeyCode::Esc && tree.open_interaction().is_some() {
-        return cancel(ui, tree);
+        return escape(ui, tree, now);
     }
     if key == KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL) && ui.dialog.aside {
         ui.dialog.aside = false;
@@ -67,10 +86,6 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     }
     let owner = crate::focus::owner(ui, tree);
     ui.block = None;
-    ui.esc_armed &= key.code == KeyCode::Esc;
-    if let Some(effects) = leaving(ui, tree.viewed(), key, now) {
-        return effects;
-    }
     owned_keys(ui, tree, key, now, owner)
 }
 
@@ -432,39 +447,69 @@ pub fn on_paste(ui: &mut Ui, text: &str) {
 
 /// The two chords that can end the run, checked before anything may swallow
 /// them: a dialog that ate ctrl+c would turn the interrupt into a letter.
-fn leaving(ui: &mut Ui, state: &SessionState, key: KeyEvent, now: Now) -> Option<Vec<Effect>> {
+fn leaving(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effect>> {
     if !key.modifiers.contains(KeyModifiers::CONTROL) {
         return None;
     }
     match key.code {
-        KeyCode::Char('c') => Some(interrupt_or_exit(ui, state, now)),
+        KeyCode::Char('c') => Some(interrupt_or_exit(ui, tree, now)),
         KeyCode::Char('d') if ui.composer.is_empty() => Some(vec![Effect::Exit]),
         _ => None,
     }
 }
 
-/// What ctrl+c does is [`keys::interrupt`]'s table; this is only the doing of
-/// it.
-fn interrupt_or_exit(ui: &mut Ui, state: &SessionState, now: Now) -> Vec<Effect> {
+fn split_return(ui: &Ui, tree: &Tree, key: KeyEvent) -> bool {
+    let owner = crate::focus::owner(ui, tree);
+    let bound = crate::pane::key_handler(ui, tree.viewed(), key).is_some()
+        || tree
+            .open_interaction()
+            .is_some_and(|(_, ask)| crate::ask::handler(ui, ask, key).is_some());
+    keys::split_return(owner, ui.dialog.aside, bound)
+}
+
+fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    use crate::focus::Owner;
+    let owner = crate::focus::owner(ui, tree);
     let pressed = keys::Pressed {
-        busy: state.busy(),
+        busy: tree.viewed().busy(),
+        dock: !matches!(ui.focus.open(), Open::Pager(_))
+            && matches!(
+                owner,
+                Owner::Layer | Owner::Search | Owner::Pane | Owner::Interaction | Owner::Menu
+            ),
+        detail: matches!(owner, Owner::Select | Owner::Row)
+            || matches!(ui.focus.open(), Open::Pager(_)),
         typing: !ui.composer.is_empty(),
         armed: ui.exit_armed(now.instant),
     };
-    match keys::interrupt(pressed) {
-        keys::Interrupt::Turn => return ask_to_stop(ui, state),
-        keys::Interrupt::Clear => {
-            ui.composer.clear();
-            ui.edited();
+    let rung = keys::interrupt(pressed);
+    if rung != keys::Interrupt::Exit && rung != keys::Interrupt::Arm {
+        ui.armed = None;
+    }
+    match rung {
+        keys::Interrupt::Turn => return ask_to_stop(ui, tree.viewed()),
+        keys::Interrupt::Close => {
+            ui.focus = crate::focus::Focus::Composer;
+            ui.menu.dismissed = true;
         }
+        keys::Interrupt::Fold => {
+            ui.focus = crate::focus::Focus::Composer;
+            ui.folds.clear();
+        }
+        keys::Interrupt::Clear => clear_draft(ui),
         keys::Interrupt::Exit => return vec![Effect::Exit],
         keys::Interrupt::Arm => {
             ui.armed = Some(now.instant);
-            ui.notice = None;
-            ui.placed.toasts.discard();
+            ui.notify_for("ctrl+c again to quit", keys::EXIT_WINDOW, now.instant);
         }
     }
     Vec::new()
+}
+
+fn clear_draft(ui: &mut Ui) {
+    let text = ui.composer.take();
+    ui.edited();
+    ui.history.remember(&text);
 }
 
 /// Esc closes the innermost thing that is open and then interrupts, in the
@@ -477,19 +522,40 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     let open = keys::Open {
         // One layer is open at a time, whichever form it takes.
         sheet: ui.focus.showing(),
-        card: tree.open_interaction().is_some(),
+        card: tree.is_root(tree.view()) && tree.open_interaction().is_some(),
         dropdown: !suggestions(ui, tree).is_empty(),
         busy: tree.viewed().busy(),
-        subsession: !tree.is_root(tree.view()) && ui.composer.is_empty(),
+        subsession: !tree.is_root(tree.view()),
+        typing: !ui.composer.is_empty(),
+        scrolled: !ui.scroll.following(),
+        rewind: rewind::offered(&ui.commands())
+            && !bingo_sdk::transcript::turns(&tree.viewed().transcript).is_empty(),
+        armed: keys::twice(ui.escaped_at, now.instant, keys::ESC_WINDOW),
     };
     // An `esc` that closed something is not half of a gesture.
     let rung = keys::escape(open);
-    ui.esc_armed &= rung.is_none();
+    if rung != Some(keys::Escape::Rewind) {
+        ui.escaped_at = None;
+    }
     match rung {
         Some(keys::Escape::Sheet) => ui.focus.close(now.instant),
         Some(keys::Escape::Card) => return cancel(ui, tree),
         Some(keys::Escape::Dropdown) => ui.menu.dismissed = true,
         Some(keys::Escape::Interrupt) => return ask_to_stop(ui, tree.viewed()),
+        Some(keys::Escape::Clear) => {
+            clear_draft(ui);
+            ui.notify_for(
+                "cleared · ↑ brings it back",
+                std::time::Duration::from_millis(1800),
+                now.instant,
+            );
+        }
+        Some(keys::Escape::Latest) => ui.scroll.end(now.instant),
+        Some(keys::Escape::Rewind) => twice(ui, now),
+        Some(keys::Escape::Arm) => {
+            ui.escaped_at = Some(now.instant);
+            ui.notify_for("esc again to rewind", keys::ESC_WINDOW, now.instant);
+        }
         Some(keys::Escape::Back) => {
             let parent = tree
                 .viewed()
@@ -500,7 +566,7 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
             return vec![Effect::View(parent)];
         }
         // The stack was empty, so this `esc` is one of `esc esc`.
-        None => twice(ui, tree, now),
+        None => {}
     }
     Vec::new()
 }
@@ -514,27 +580,27 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 /// already follows — a fact about the keypress, not a copy of session state.
 fn ask_to_stop(ui: &mut Ui, state: &SessionState) -> Vec<Effect> {
     ui.stop_asked = state.turn.as_ref().map(|turn| turn.id.clone());
-    vec![Effect::Interrupt]
+    ui.armed = None;
+    ui.escaped_at = None;
+    let mut effects = Vec::new();
+    if ui.composer.is_empty() {
+        effects.extend(
+            state
+                .queue
+                .iter()
+                .filter(|entry| entry.origin.surface == SURFACE_ID)
+                .map(|entry| Effect::Withdraw(entry.intent.clone())),
+        );
+    }
+    effects.push(Effect::Interrupt);
+    effects
 }
 
 /// `esc esc` on an empty composer opens the rewind picker (design §3). The
 /// first press arms it; the second opens the card, when the session has a
 /// `/rewind` for it to run.
-fn twice(ui: &mut Ui, tree: &Tree, now: Now) {
-    if !ui.composer.is_empty() {
-        return;
-    }
-    if !std::mem::replace(&mut ui.esc_armed, true) {
-        return;
-    }
-    ui.esc_armed = false;
-    if !rewind::offered(&ui.commands()) {
-        return;
-    }
-    let turns = bingo_sdk::transcript::turns(&tree.viewed().transcript);
-    if turns.is_empty() {
-        return;
-    }
+fn twice(ui: &mut Ui, now: Now) {
+    ui.escaped_at = None;
     ui.focus.show(Open::Rewind(Rewind::default()), now.instant);
 }
 
@@ -724,7 +790,7 @@ fn accept(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
 
 fn editing(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
-        return control(ui, key);
+        return control(ui, tree, key, now);
     }
     if key.modifiers.contains(KeyModifiers::ALT) {
         return alt(ui, key);
@@ -732,7 +798,7 @@ fn editing(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     plain(ui, tree, key, now)
 }
 
-fn control(ui: &mut Ui, key: KeyEvent) -> Vec<Effect> {
+fn control(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     match key.code {
         KeyCode::Char('a') => ui.composer.home(),
         KeyCode::Char('e') => ui.composer.end(),
@@ -740,7 +806,11 @@ fn control(ui: &mut Ui, key: KeyEvent) -> Vec<Effect> {
         KeyCode::Char('w') => edit(ui, |c| c.delete_word_left()),
         KeyCode::Char('u') => edit(ui, |c| c.delete_to_line_start()),
         KeyCode::Char('k') => edit(ui, |c| c.delete_to_line_end()),
-        KeyCode::Char('v') => return vec![Effect::PasteImage],
+        KeyCode::Char('v') => {
+            if !crate::pictures::refuse(ui, tree.viewed(), now) {
+                return vec![Effect::PasteImage];
+            }
+        }
         // Claude Code's own key for its own list (M74): the rows go off the
         // band and come back, and nothing opens.
         KeyCode::Char('t') => ui.activity_hidden = !ui.activity_hidden,
@@ -783,7 +853,7 @@ fn plain(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::Char('/') if ui.composer.is_empty() => {
             return crate::palette::open(ui, bingo_sdk::component::PaletteOpen::Commands, now);
         }
-        KeyCode::Char('?') if ui.composer.is_empty() => {
+        KeyCode::Char('?') if ui.composer.is_empty() && !tree.viewed().busy() => {
             return command_line(ui, tree, now, "/help".into());
         }
         KeyCode::Char('v') if reading(ui) => start_selection(ui),
@@ -910,8 +980,13 @@ fn walk_back(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
     if ui.composer.up() {
         return Vec::new();
     }
-    if let Some(intent) = newest_of_ours(tree.viewed()) {
+    if ui.composer.is_empty()
+        && let Some(intent) = newest_of_ours(tree.viewed())
+    {
         return vec![Effect::Withdraw(intent)];
+    }
+    if !ui.composer.is_empty() && !ui.history.walking() {
+        return Vec::new();
     }
     let older = ui.older();
     recall(ui, older);
@@ -1072,7 +1147,7 @@ mod tests {
     }
 
     /// A transcript of two turns, and a session that can rewind to one.
-    fn rewindable() -> (SessionState, Vec<bingo_sdk::CommandSpec>) {
+    pub(super) fn rewindable() -> (SessionState, Vec<bingo_sdk::CommandSpec>) {
         let mut state = state();
         state.transcript = vec![
             in_turn(
@@ -1117,7 +1192,10 @@ mod tests {
         let (mut ui, now) = scene();
         ui.catalogs.commands = crate::commands::entries(commands);
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(ui.esc_armed, "the first one arms it and closes nothing");
+        assert!(
+            ui.escaped_at.is_some(),
+            "the first one arms it and closes nothing"
+        );
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         assert!(ui.focus.is(&Open::Rewind(Rewind::default())));
 
@@ -1141,7 +1219,7 @@ mod tests {
         ui.catalogs.commands = crate::commands::entries(commands);
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         on_key(&mut ui, &tree, typed('a'), now);
-        assert!(!ui.esc_armed);
+        assert!(ui.escaped_at.is_none());
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         assert!(!ui.focus.showing(), "and a half-typed line is not empty");
     }
@@ -1460,8 +1538,10 @@ mod tests {
         assert!(ui.composer.is_empty(), "text goes first");
 
         assert!(press(&mut ui, &state(), ctrl('c'), now).is_empty());
-        let line = crate::keybar::hints(&solo(&state()), &ui, 80, now, &mut Vec::new()).to_string();
-        assert!(line.contains("ctrl+c again to exit"), "{line}");
+        assert_eq!(
+            ui.notice().unwrap().plain().unwrap().text,
+            "ctrl+c again to quit"
+        );
         let late = Now {
             instant: now.instant + crate::ui::EXIT_WINDOW,
             ..now
@@ -1799,7 +1879,7 @@ mod tests {
         press(&mut ui, &state(), key(KeyCode::Up), now);
         assert_eq!(ui.composer.text(), "one\ntwo", "the caret only moved");
         press(&mut ui, &state(), key(KeyCode::Up), now);
-        assert_eq!(ui.composer.text(), "history");
+        assert_eq!(ui.composer.text(), "one\ntwo");
     }
 
     #[test]
@@ -2134,29 +2214,16 @@ mod tests {
     /// A click on a fold is one gesture that opens it and folds it again — the
     /// set `ctrl+o` fills, reached from the mouse (design §7).
     #[test]
-    fn a_click_opens_a_fold_and_a_second_click_folds_it() {
+    fn shell_output_stays_whole_when_clicked() {
         let state = long_result();
         let tree = solo(&state);
         let (mut ui, now) = scene();
-        assert!(render(&state, &mut ui, now).contains("+4 lines (ctrl+o to expand)"));
-
+        let screen = render(&state, &mut ui, now);
+        assert!(screen.contains("line 9"));
+        assert!(!screen.contains("ctrl+o to expand"));
         let row = last_row(&ui);
         on_mouse(&mut ui, &tree, click(6, row), now);
-        let opened = render(&state, &mut ui, now);
-        assert!(opened.contains("line 9"), "{opened}");
-        assert!(!opened.contains("+4 lines"), "{opened}");
-        assert_eq!(
-            ui.select.block,
-            Some(bingo_sdk::ItemId::from_raw("itm_1")),
-            "and the click still takes the focus"
-        );
-
-        let row = last_row(&ui);
-        on_mouse(&mut ui, &tree, click(6, row), now);
-        assert!(
-            render(&state, &mut ui, now).contains("+4 lines (ctrl+o to expand)"),
-            "the same gesture on the same row takes it back"
-        );
+        assert!(render(&state, &mut ui, now).contains("line 9"));
     }
 
     /// A notice folds without promising a key (2026-09-01), so the click is
@@ -2805,81 +2872,14 @@ mod tests {
         assert!(on_mouse(&mut ui, &solo(&state), click(6, row), now).is_empty());
     }
 
-    /// The strip's thumbnails answer the same way, so the picture about to be
-    /// sent is as clickable as the ones already said (M56).
+    /// A chip occupies the input, with no invisible thumbnail hit target.
     #[test]
-    fn a_click_on_a_strips_thumbnail_opens_it() {
-        let state = state();
+    fn a_click_on_a_strips_thumbnail_has_no_thumbnail_target() {
         let (mut ui, now) = scene();
-        let token = crate::test_support::drafted(&mut ui, bingo_pictures::testing::png(100, 100));
-        crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &mut ui, now);
-            let row = cells_row(&screen);
-            let effects = on_mouse(&mut ui, &solo(&state), click(3, row), now);
-            assert_eq!(
-                effects,
-                vec![Effect::OpenPicture(
-                    crate::graphics::picture::Source::Draft { token }
-                )]
-            );
-        });
-    }
-
-    /// The column a row's placeholder cells start in.
-    fn cells_column(screen: &str, row: u16) -> u16 {
-        let line = screen.lines().nth(usize::from(row)).expect("that row");
-        let before = line
-            .chars()
-            .take_while(|c| *c != crate::graphics::kitty::PLACEHOLDER)
-            .count();
-        u16::try_from(before).expect("a column of the screen")
-    }
-
-    /// A person's own line with a picture behind its token (M45).
-    fn sent_a_picture() -> SessionState {
-        folded(vec![frame(
-            1,
-            bingo_sdk::Event::ItemCompleted {
-                item: item(
-                    "itm_1",
-                    bingo_sdk::ItemStatus::Completed,
-                    bingo_sdk::ItemBody::User {
-                        parts: vec![
-                            bingo_sdk::ContentPart::text("what is this? [image 1]"),
-                            bingo_sdk::ContentPart::Image(bingo_pictures::testing::png(100, 200)),
-                        ],
-                        origin: crate::origin(),
-                    },
-                ),
-            },
-        )])
-    }
-
-    /// The band above a person's own line answers the same way (M62): the
-    /// thumbnail is a smaller rectangle of the very same picture, so the cells
-    /// under the pointer still say which one, and the click still opens it.
-    #[test]
-    fn a_click_on_the_band_above_a_persons_line_opens_it() {
-        let state = sent_a_picture();
-        let (mut ui, now) = scene();
-        crate::graphics::with(crate::graphics::drawing(), || {
-            let screen = render(&state, &mut ui, now);
-            let row = cells_row(&screen);
-            let column = cells_column(&screen, row);
-            assert!(
-                row < row_carrying(&screen, "what is this?"),
-                "the band is above the words:\n{screen}"
-            );
-            let effects = on_mouse(&mut ui, &solo(&state), click(column, row), now);
-            assert_eq!(effects, vec![Effect::OpenPicture(journal_picture())]);
-            assert!(ui.folds.is_empty(), "and it is not the block's fold");
-            // The thumbnail is three cells wide; past it the band is air, and
-            // a click there is the block's as it always was.
-            assert!(
-                on_mouse(&mut ui, &solo(&state), click(column + 6, row), now).is_empty(),
-                "and beside the thumbnail it is the block's again:\n{screen}"
-            );
-        });
+        drafted(&mut ui, bingo_pictures::testing::png(40, 40));
+        let screen = render(&state(), &mut ui, now);
+        assert!(screen.contains("[image 1]"));
+        assert!(ui.shown.cells.is_empty());
     }
 
     #[test]
@@ -3373,7 +3373,7 @@ mod return_tests {
         tree.fold.apply(&log_frame(2, started("trn_room")));
         assert_eq!(
             on_key(&mut ui, &tree, key(KeyCode::Esc), now),
-            [Effect::Interrupt]
+            [Effect::View(tree.root_id().clone())]
         );
     }
 }

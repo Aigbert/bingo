@@ -34,7 +34,7 @@ pub fn tokens(line: &str) -> Vec<u32> {
 }
 
 /// Where each token sits in the line, as byte ranges, with its number.
-fn spans(line: &str) -> Vec<(Range<usize>, u32)> {
+pub(crate) fn spans(line: &str) -> Vec<(Range<usize>, u32)> {
     let mut found = Vec::new();
     let mut from = 0;
     while let Some(at) = line[from..].find(OPEN) {
@@ -107,8 +107,7 @@ impl Held {
             .collect()
     }
 
-    /// The same, each under the token that names it: what the strip draws,
-    /// which needs the token to know the picture by (M48 brick 3).
+    /// The live chips, each with the path its token names.
     pub fn shown(&self, line: &str) -> Vec<(u32, &Path)> {
         tokens(line)
             .into_iter()
@@ -125,6 +124,27 @@ impl Held {
     /// The file one token names, whatever the line says.
     pub fn under(&self, token: u32) -> Option<&Path> {
         self.by_token.get(&token).map(PathBuf::as_path)
+    }
+
+    /// Merge another draft without confusing local image numbers or mentioned files.
+    pub fn append(&mut self, draft: &str, line: &str, other: &Self) -> String {
+        let mut out = draft.to_owned();
+        if !out.is_empty() {
+            out.push('\n');
+        }
+        let mut from = 0;
+        for (range, token) in spans(line) {
+            out.push_str(&line[from..range.start]);
+            if let Some(path) = other.under(token) {
+                let n = self.hold(&out, path.to_path_buf());
+                out.push_str(&placeholder(n));
+            } else {
+                out.push_str(&line[range.clone()]);
+            }
+            from = range.end;
+        }
+        out.push_str(&line[from..]);
+        out
     }
 
     pub fn clear(&mut self) {
@@ -144,6 +164,38 @@ impl Held {
             .filter_map(|(token, image)| Some((token, image.path?)))
             .collect();
     }
+}
+
+pub(crate) fn accepts(ui: &crate::ui::Ui, state: &bingo_sdk::SessionState) -> bool {
+    let Some(model) = &state.summary.model else {
+        return true;
+    };
+    let provider = state.summary.provider.as_deref().unwrap_or_default();
+    let id = format!("{provider}/{model}");
+    ui.catalogs
+        .values
+        .get("models")
+        .into_iter()
+        .flatten()
+        .find(|entry| entry.id == id)
+        .is_none_or(|entry| entry.meta["images"] != false)
+}
+
+pub(crate) fn refuse(
+    ui: &mut crate::ui::Ui,
+    state: &bingo_sdk::SessionState,
+    now: crate::clock::Now,
+) -> bool {
+    if accepts(ui, state) {
+        return false;
+    }
+    let model = state.summary.model.as_deref().unwrap_or("this model");
+    ui.notify(
+        bingo_sdk::Level::Warn,
+        format!("{model} can't read images · alt+m switches model"),
+        now.instant,
+    );
+    true
 }
 
 #[cfg(test)]

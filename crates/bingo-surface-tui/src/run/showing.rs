@@ -103,8 +103,7 @@ pub(super) fn read_linked(run: &mut Run) {
         return;
     }
     // The draft's own pictures are files too (ADR-0052), read the same way.
-    let mut wanted = run.ui.shown.blocks.wanted();
-    wanted.extend(run.ui.pictures.wanted(run.ui.composer.text()));
+    let wanted = run.ui.shown.blocks.wanted();
     let cwd = std::path::PathBuf::from(&run.session.tree.viewed().summary.cwd);
     let reads = run.ui.linked.take_all(wanted, &cwd, crate::paths::home());
     for (dest, source) in reads {

@@ -101,6 +101,7 @@ enum Reply {
     /// whole rather than through `Failed`, because a line the turn took first
     /// is a note about a race and not a refusal of anything.
     Withdrawn(IntentId, Box<Result<Input, KernelError>>),
+    Stopped(Vec<(IntentId, Result<Input, KernelError>)>),
     Failed(KernelError),
 }
 
@@ -522,6 +523,14 @@ impl Run {
     }
 
     fn fold(&mut self, frame: &bingo_sdk::Frame) -> bool {
+        if let Event::QueueChanged { entries, .. } = &frame.event
+            && let Some(state) = self.session.tree.state(&frame.session)
+            && frame.seq > state.seq
+        {
+            self.ui
+                .queue_arrivals
+                .observe(&state.queue, entries, self.detection.now().instant);
+        }
         let tokens = self
             .session
             .tree
@@ -752,6 +761,10 @@ impl Run {
     }
 
     fn apply(&mut self, effects: Vec<Effect>) {
+        if let Some(intents) = withdraw::stopping(&effects) {
+            withdraw::stop(self, intents);
+            return;
+        }
         for effect in effects {
             self.effect(effect);
         }
@@ -792,6 +805,13 @@ impl Run {
     /// (ADR-0052 §1), becomes `[image N]` in the line, and that file is held
     /// under the token; a clipboard with none leaves the line alone.
     fn paste_image(&mut self) {
+        if pictures::refuse(
+            &mut self.ui,
+            self.session.tree.viewed(),
+            self.detection.now(),
+        ) {
+            return;
+        }
         let Some(bytes) = clipboard::image() else {
             return;
         };
@@ -925,6 +945,7 @@ impl Run {
             Reply::Fitted(fitted) => self.ui.decoded.answered(*fitted),
             Reply::Update(version) => self.told_of(version),
             Reply::Withdrawn(intent, taken) => withdraw::took(self, intent, *taken),
+            Reply::Stopped(taken) => withdraw::stopped(self, taken),
             Reply::Failed(error) => {
                 self.ui.opening = false;
                 self.ui.notify(Level::Error, error.message, Instant::now());
@@ -2272,90 +2293,26 @@ mod tests {
         assert!(waiting.try_recv().is_err(), "and nothing was fitted twice");
     }
 
-    /// The pictures behind the composer's line go to the terminal like any
-    /// others — at the strip's own small size (M48 brick 3). When the token
-    /// leaves the line the terminal keeps holding it, as it keeps every
-    /// picture until the cap pushes it out: nothing is deleted for a frame
-    /// that did not place it, so nothing flickers on the way back.
-    ///
-    /// And a paste waits for nothing (M61, the user's word after seeing it):
-    /// the frame it lands on has the `[image 1]` in the line and the strip's
-    /// slot under the box, and reads and fits no picture at all. The paste
-    /// is a file (ADR-0052), read back off the loop's thread like an
-    /// answer's `![…](path)`, then fitted the same way — the thumbnail
-    /// arrives on the frame after both have landed.
     #[tokio::test]
-    async fn a_carried_picture_is_sent_small_and_kept_when_its_token_goes() {
-        use base64::Engine;
+    async fn a_carried_picture_is_a_chip_and_never_requests_a_thumbnail() {
         let (mut run, mut waiting) = replying(state());
-        let dir = tempfile::tempdir().expect("a directory");
+        let dir = tempfile::tempdir().unwrap();
         run.data_dir = dir.path().to_path_buf();
         let mut recorder = Recorder::default();
         let now = crate::test_support::scene().1;
         crate::graphics::with(crate::graphics::drawing(), || {
             run.detection = crate::render::current().into();
-            let path = pasted(&run.data_dir, &bingo_pictures::testing::png_bytes(400, 300))
-                .expect("written");
-            assert!(path.starts_with(dir.path().join(viewer::DIR).join(PASTED)));
+            let path =
+                pasted(&run.data_dir, &bingo_pictures::testing::png_bytes(400, 300)).unwrap();
             let token = run.ui.pictures.hold("", path);
             run.ui.composer.insert(&pictures::placeholder(token));
-            run.paint(&mut recorder, Wake::Frame, now).expect("a frame");
+            run.paint(&mut recorder, Wake::Frame, now).unwrap();
         });
-        assert!(
-            recorder.places.is_empty(),
-            "the paste fitted nothing on the loop's thread: {:?}",
-            places(&recorder)
-        );
-        assert!(
-            recorder.last().contains("[image 1]"),
-            "and the token is in the line at once: {}",
-            recorder.last()
-        );
-
-        // The file read back, then the strip asks for a fit of it.
-        settle(&mut run, &mut waiting).await;
-        crate::graphics::with(crate::graphics::drawing(), || {
-            run.detection = crate::render::current().into();
-            run.paint(&mut recorder, Wake::Frame, now)
-                .expect("the read landed");
-        });
-        assert!(recorder.places.is_empty(), "{:?}", places(&recorder));
-        settle(&mut run, &mut waiting).await;
-        crate::graphics::with(crate::graphics::drawing(), || {
-            run.detection = crate::render::current().into();
-            run.paint(&mut recorder, Wake::Frame, now).expect("another");
-            // What a submit leaves behind: the line taken and the pictures
-            // let go (`input::submit`, `Run::send_text`).
-            run.ui.composer.take();
-            run.ui.pictures.clear();
-            run.paint(&mut recorder, Wake::Frame, now).expect("a third");
-        });
-        let sent = places(&recorder);
-        assert_eq!(sent.len(), 1, "one send and nothing else: {sent:?}");
-        // 400×300 pixels of a 10×20 cell is 40 by 15 cells, and the strip's
-        // three rows cut that to eight by three.
-        assert!(sent[0].starts_with("\x1b_Ga=T,f=100,q=2,U=1,"), "{sent:?}");
-        assert!(sent[0].contains("c=8,r=3"), "{sent:?}");
-        let png = base64::engine::general_purpose::STANDARD
-            .decode(
-                sent[0]
-                    .split_once(';')
-                    .expect("a payload")
-                    .1
-                    .trim_end_matches("\x1b\\"),
-            )
-            .expect("base64");
-        assert_eq!(
-            bingo_pictures::png_size(&png),
-            Some((80, 60)),
-            "the pixels of eight cells by three, not the picture's own"
-        );
+        assert!(recorder.last().contains("[image 1]"));
+        assert!(recorder.places.is_empty());
+        assert!(waiting.try_recv().is_err());
     }
 
-    /// A picture an answer's own words named, through the whole seam (M51):
-    /// the first frame draws the chip and sends the loop after the file, the
-    /// read comes back, the frame after it measures the picture and owes the
-    /// fitting, and the frame after *that* puts it on the wire (M61).
     #[tokio::test]
     async fn a_picture_an_answer_named_is_read_in_between_frames_and_sent() {
         let dir = tempfile::tempdir().expect("a directory");

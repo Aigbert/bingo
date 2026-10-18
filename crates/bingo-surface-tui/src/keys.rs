@@ -144,8 +144,12 @@ pub enum Escape {
     Dropdown,
     /// Nothing is open, so the turn is what `esc` stops.
     Interrupt,
+    Clear,
+    Latest,
     /// An idle sub-session with an empty composer returns to its parent.
     Back,
+    Rewind,
+    Arm,
 }
 
 /// The stack, in the order it is closed, with the word the help prints.
@@ -154,7 +158,11 @@ pub const ESCAPES: &[(Escape, &str)] = &[
     (Escape::Card, "card"),
     (Escape::Dropdown, "dropdown"),
     (Escape::Interrupt, "interrupt"),
+    (Escape::Clear, "clear"),
+    (Escape::Latest, "latest"),
     (Escape::Back, "back"),
+    (Escape::Rewind, "rewind"),
+    (Escape::Arm, "arm rewind"),
 ];
 
 /// What is open when `esc` is pressed.
@@ -165,6 +173,10 @@ pub struct Open {
     pub dropdown: bool,
     pub busy: bool,
     pub subsession: bool,
+    pub typing: bool,
+    pub scrolled: bool,
+    pub rewind: bool,
+    pub armed: bool,
 }
 
 impl Open {
@@ -173,7 +185,11 @@ impl Open {
             Escape::Sheet => self.sheet,
             Escape::Card => self.card,
             Escape::Dropdown => self.dropdown,
-            Escape::Interrupt => self.busy,
+            Escape::Interrupt => self.busy && !self.subsession,
+            Escape::Clear => self.typing,
+            Escape::Latest => self.scrolled,
+            Escape::Rewind => self.rewind && self.armed,
+            Escape::Arm => self.rewind,
             Escape::Back => self.subsession,
         }
     }
@@ -244,6 +260,8 @@ pub fn tab(at: Tabbed) -> Option<Tab> {
 pub enum Interrupt {
     /// A turn is running: stop it, and leave the composer alone.
     Turn,
+    Close,
+    Fold,
     /// Something is half-typed: clear it.
     Clear,
     /// Nothing to stop and nothing to clear: say how to leave.
@@ -256,24 +274,130 @@ pub enum Interrupt {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Pressed {
     pub busy: bool,
+    pub dock: bool,
+    pub detail: bool,
     pub typing: bool,
     /// A first `ctrl+c` inside the window said how to leave.
     pub armed: bool,
 }
 
-pub fn interrupt(at: Pressed) -> Interrupt {
-    match (at.busy, at.typing, at.armed) {
-        (true, _, _) => Interrupt::Turn,
-        (false, true, _) => Interrupt::Clear,
-        (false, false, true) => Interrupt::Exit,
-        (false, false, false) => Interrupt::Arm,
+pub const ESC_WINDOW: std::time::Duration = std::time::Duration::from_millis(600);
+pub const EXIT_WINDOW: std::time::Duration = std::time::Duration::from_millis(1500);
+
+pub fn twice(
+    first: Option<std::time::Instant>,
+    now: std::time::Instant,
+    window: std::time::Duration,
+) -> bool {
+    first.is_some_and(|first| now.saturating_duration_since(first) < window)
+}
+
+const INTERRUPTS: &[Interrupt] = &[
+    Interrupt::Turn,
+    Interrupt::Close,
+    Interrupt::Fold,
+    Interrupt::Clear,
+    Interrupt::Exit,
+    Interrupt::Arm,
+];
+
+impl Pressed {
+    fn has(self, rung: Interrupt) -> bool {
+        match rung {
+            Interrupt::Turn => self.busy,
+            Interrupt::Close => self.dock,
+            Interrupt::Fold => self.detail,
+            Interrupt::Clear => self.typing,
+            Interrupt::Exit => self.armed,
+            Interrupt::Arm => true,
+        }
     }
+}
+
+pub fn interrupt(at: Pressed) -> Interrupt {
+    INTERRUPTS
+        .iter()
+        .copied()
+        .find(|rung| at.has(*rung))
+        .unwrap_or(Interrupt::Arm)
+}
+
+/// Legacy terminals fold ESC CR into alt+Enter. A real binding keeps it.
+pub fn split_return(owner: crate::focus::Owner, aside: bool, bound: bool) -> bool {
+    !bound
+        && (aside
+            || !matches!(
+                owner,
+                crate::focus::Owner::Composer | crate::focus::Owner::Menu
+            ))
 }
 
 #[cfg(test)]
 mod tests {
 
     use super::*;
+
+    #[test]
+    fn every_acting_rung_obeys_the_policy_order() {
+        let all = Open {
+            typing: true,
+            scrolled: true,
+            rewind: true,
+            armed: true,
+            ..Open::default()
+        };
+        assert_eq!(escape(all), Some(Escape::Clear));
+        assert_eq!(
+            escape(Open {
+                typing: false,
+                ..all
+            }),
+            Some(Escape::Latest)
+        );
+        assert_eq!(
+            escape(Open {
+                typing: false,
+                scrolled: false,
+                ..all
+            }),
+            Some(Escape::Rewind)
+        );
+        assert_eq!(
+            escape(Open {
+                typing: false,
+                scrolled: false,
+                armed: false,
+                ..all
+            }),
+            Some(Escape::Arm)
+        );
+        assert_eq!(
+            escape(Open {
+                busy: true,
+                subsession: true,
+                ..Open::default()
+            }),
+            Some(Escape::Back)
+        );
+        let mut pressed = Pressed {
+            busy: true,
+            dock: true,
+            detail: true,
+            typing: true,
+            armed: true,
+        };
+        assert_eq!(interrupt(pressed), Interrupt::Turn);
+        pressed.busy = false;
+        assert_eq!(interrupt(pressed), Interrupt::Close);
+        pressed.dock = false;
+        assert_eq!(interrupt(pressed), Interrupt::Fold);
+        pressed.detail = false;
+        assert_eq!(interrupt(pressed), Interrupt::Clear);
+        pressed.typing = false;
+        assert_eq!(interrupt(pressed), Interrupt::Exit);
+        pressed.armed = false;
+        assert_eq!(interrupt(pressed), Interrupt::Arm);
+    }
 
     #[test]
     fn every_chord_is_listed_once() {
@@ -296,6 +420,7 @@ mod tests {
             dropdown: true,
             busy: true,
             subsession: true,
+            ..Open::default()
         };
         assert_eq!(escape(all), Some(Escape::Sheet));
         assert_eq!(
@@ -394,6 +519,7 @@ mod tests {
                 busy,
                 typing,
                 armed,
+                ..Pressed::default()
             })
         };
         assert_eq!(pressed(true, true, true), Interrupt::Turn);

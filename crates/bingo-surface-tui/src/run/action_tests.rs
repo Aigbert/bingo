@@ -217,6 +217,7 @@ async fn escape_on_an_ask_discards_its_owners_waiting_actions_only() {
     }));
     run.frame(&frame(1, opened(permission(None, None))), &mut screen)
         .unwrap();
+    run.session.tree.show(&state().summary.id);
     run.heard(Term::Key(key(crossterm::event::KeyCode::Esc)));
     assert_eq!(root.interrupts(), 1);
     assert_eq!(child.interrupts(), 0);

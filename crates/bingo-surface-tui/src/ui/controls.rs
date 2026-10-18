@@ -22,6 +22,7 @@ pub struct Controls {
     /// The pasted pictures behind the composer's line, by their `[image N]`.
     pub pictures: Held,
     pub history: PromptHistory,
+    pub queue_arrivals: crate::queue_rows::Arrivals,
     pub dialog: Dialog,
     pub last_typed: Option<jiff::Timestamp>,
     pub menu: Menu,
@@ -37,9 +38,8 @@ pub struct Controls {
     /// is a fact about the keypress, not a copy of session state, and it is
     /// kept by turn id so it can never speak for the turn after this one.
     pub stop_asked: Option<TurnId>,
-    /// An `esc` closed nothing, so the next one is the second of `esc esc`.
-    /// It needs no clock: any other key clears it.
-    pub esc_armed: bool,
+    /// The frame clock of an esc that closed nothing.
+    pub escaped_at: Option<Instant>,
     /// What the kernel offers the dropdown, read once at start.
     pub catalogs: Catalogs,
     /// An `open` is in flight; the swap happens when it lands.
@@ -60,6 +60,7 @@ impl Controls {
             composer: Composer::default(),
             pictures: Held::default(),
             history: PromptHistory::new(history),
+            queue_arrivals: Default::default(),
             dialog: Dialog::default(),
             last_typed: None,
             menu: Menu::default(),
@@ -67,7 +68,7 @@ impl Controls {
             focus: Focus::Composer,
             armed: None,
             stop_asked: None,
-            esc_armed: false,
+            escaped_at: None,
             catalogs: Catalogs::default(),
             opening: false,
         }

@@ -59,6 +59,10 @@ impl PromptHistory {
         }
     }
 
+    pub fn walking(&self) -> bool {
+        self.cursor.is_some()
+    }
+
     /// One step towards the oldest prompt. `current` becomes the draft the
     /// walk returns to.
     pub fn older(&mut self, current: &str) -> Option<String> {

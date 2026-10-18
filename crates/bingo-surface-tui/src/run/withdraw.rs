@@ -61,3 +61,81 @@ fn refused(run: &mut Run, error: KernelError) {
     };
     run.ui.notify(level, message, Instant::now());
 }
+
+/// The key table expresses stop as ordered withdrawals followed by interrupt.
+pub(super) fn stopping(effects: &[crate::effect::Effect]) -> Option<Vec<IntentId>> {
+    use crate::effect::Effect;
+    let (Effect::Interrupt, before) = effects.split_last()? else {
+        return None;
+    };
+    if before.is_empty() {
+        return None;
+    }
+    before
+        .iter()
+        .map(|effect| match effect {
+            Effect::Withdraw(intent) => Some(intent.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+pub(super) fn stop(run: &mut Run, intents: Vec<IntentId>) {
+    let Some(handle) = run.session.writer() else {
+        return run.not_yet();
+    };
+    let session = run.session.tree.view().clone();
+    run.discard_actions(&[session.clone()]);
+    let interrupt = run.mint(super::Submission::Ordinary(None));
+    let host = run.host.clone();
+    run.spawn(async move {
+        let mut taken = Vec::new();
+        for intent in intents {
+            let input = host.withdraw(&session, &intent, identity()).await;
+            taken.push((intent, input));
+        }
+        handle.interrupt(interrupt, bingo_sdk::InterruptScope::Head);
+        Ok(Reply::Stopped(taken))
+    });
+}
+
+pub(super) fn stopped(run: &mut Run, taken: Vec<(IntentId, Result<Input, KernelError>)>) {
+    let mut text = String::new();
+    let mut held = crate::pictures::Held::default();
+    for (intent, input) in taken {
+        match input {
+            Ok(Input::Text {
+                text: line,
+                images: pictures,
+                ..
+            }) => {
+                run.mine.remove(&intent);
+                run.rewind_prompts.cancel(&intent);
+                let mut restored = crate::pictures::Held::default();
+                restored.restore(&line, pictures);
+                text = held.append(&text, &line, &restored);
+            }
+            Err(error) if error.code != ErrorCode::NotFound => refused(run, error),
+            _ => {}
+        }
+    }
+    if text.is_empty() {
+        return;
+    }
+    let draft = run.ui.composer.text().to_string();
+    // A key typed while withdrawal was in flight still belongs to the person.
+    if !draft.is_empty() {
+        text = held.append(&text, &draft, &run.ui.pictures);
+    }
+    run.ui.pictures = held;
+    run.ui.composer.set(&text);
+    run.ui.edited();
+    run.ui.notify(
+        Level::Info,
+        "stopped · what you queued is back in the input",
+        run.detection.now().instant,
+    );
+}
+
+#[cfg(test)]
+mod tests;
