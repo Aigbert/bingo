@@ -101,7 +101,7 @@ enum Reply {
     /// whole rather than through `Failed`, because a line the turn took first
     /// is a note about a race and not a refusal of anything.
     Withdrawn(IntentId, Box<Result<Input, KernelError>>),
-    Stopped(Vec<(IntentId, Result<Input, KernelError>)>),
+    Stopped(SessionId, Vec<(IntentId, Result<Input, KernelError>)>),
     Failed(KernelError),
 }
 
@@ -761,10 +761,6 @@ impl Run {
     }
 
     fn apply(&mut self, effects: Vec<Effect>) {
-        if let Some(intents) = withdraw::stopping(&effects) {
-            withdraw::stop(self, intents);
-            return;
-        }
         for effect in effects {
             self.effect(effect);
         }
@@ -778,7 +774,8 @@ impl Run {
             Effect::AwaitSiteKey(key) => typeahead::queue(self, key),
             Effect::SiteKey { action, key } => site_keys::send(self, action, key),
             Effect::Withdraw(intent) => withdraw::ask(self, intent),
-            Effect::Interrupt => self.interrupt(),
+            Effect::Interrupt => self.interrupt(self.session.tree.view().clone()),
+            Effect::Stop { withdraw } => withdraw::stop(self, withdraw),
             Effect::StopInteraction {
                 session,
                 interaction,
@@ -826,11 +823,10 @@ impl Run {
         }
     }
 
-    fn interrupt(&mut self) {
-        let Some(handle) = self.session.writer() else {
+    fn interrupt(&mut self, session: SessionId) {
+        let Some(handle) = self.session.handles.get(&session).cloned() else {
             return self.not_yet();
         };
-        let session = self.session.tree.viewed().summary.id.clone();
         self.discard_actions(&[session]);
         let intent = self.mint(Submission::Ordinary(None));
         handle.interrupt(intent, InterruptScope::Head);
@@ -944,7 +940,7 @@ impl Run {
             Reply::Fitted(fitted) => self.ui.decoded.answered(*fitted),
             Reply::Update(version) => self.told_of(version),
             Reply::Withdrawn(intent, taken) => withdraw::took(self, intent, *taken),
-            Reply::Stopped(taken) => withdraw::stopped(self, taken),
+            Reply::Stopped(session, taken) => withdraw::stopped(self, session, taken),
             Reply::Failed(error) => {
                 self.ui.opening = false;
                 self.ui.notify(Level::Error, error.message, Instant::now());

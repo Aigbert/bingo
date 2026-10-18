@@ -313,3 +313,18 @@ async fn completion_is_scripted_and_recorded_like_the_other_host_doors() {
         matches!(host.calls().as_slice(), [HostCall::Complete {request,..}] if request.plugin == "p")
     );
 }
+
+#[tokio::test]
+async fn withdrawal_scripts_record_the_call_and_return_the_input() {
+    let host = TestHost::default();
+    host.on_withdraw(|_, _, _| async { Ok(Input::text("taken", Origin::default())) });
+    let session = SessionId::from_raw("session");
+    let intent = IntentId::from_raw("intent");
+    assert_eq!(
+        host.withdraw(&session, &intent, who()).await.unwrap(),
+        Input::text("taken", Origin::default())
+    );
+    assert!(
+        matches!(host.calls().as_slice(), [HostCall::Withdraw { session: seen_session, intent: seen_intent, who: seen_who }] if seen_session == &session && seen_intent == &intent && seen_who == &who())
+    );
+}

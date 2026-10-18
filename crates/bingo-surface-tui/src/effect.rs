@@ -24,6 +24,10 @@ pub enum Effect {
     Withdraw(IntentId),
     AwaitSiteKey(crossterm::event::KeyEvent),
     Interrupt,
+    /// Withdraw this queue before interrupting, so completion cannot drain it.
+    Stop {
+        withdraw: Vec<IntentId>,
+    },
     StopInteraction {
         session: SessionId,
         interaction: InteractionId,

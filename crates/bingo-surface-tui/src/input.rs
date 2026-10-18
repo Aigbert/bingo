@@ -587,18 +587,13 @@ fn ask_to_stop(ui: &mut Ui, state: &SessionState) -> Vec<Effect> {
     ui.stop_asked = state.turn.as_ref().map(|turn| turn.id.clone());
     ui.armed = None;
     ui.escaped_at = None;
-    let mut effects = Vec::new();
-    if ui.composer.is_empty() {
-        effects.extend(
-            state
-                .queue
-                .iter()
-                .filter(|entry| entry.origin.surface == SURFACE_ID)
-                .map(|entry| Effect::Withdraw(entry.intent.clone())),
-        );
-    }
-    effects.push(Effect::Interrupt);
-    effects
+    let withdraw = state
+        .queue
+        .iter()
+        .filter(|entry| ui.composer.is_empty() && entry.origin.surface == SURFACE_ID)
+        .map(|entry| entry.intent.clone())
+        .collect();
+    vec![Effect::Stop { withdraw }]
 }
 
 /// `esc esc` on an empty composer opens the rewind picker (design §3). The
@@ -1535,7 +1530,7 @@ mod tests {
         let (mut ui, now) = scene();
         assert_eq!(
             press(&mut ui, &busy(), ctrl('c'), now),
-            vec![Effect::Interrupt]
+            vec![Effect::Stop { withdraw: vec![] }]
         );
 
         write(&mut ui, &state(), "draft", now);
@@ -1576,7 +1571,10 @@ mod tests {
         for stop in [key(KeyCode::Esc), ctrl('c')] {
             let (mut ui, now) = scene();
             assert_eq!(ui.stop_asked, None);
-            assert_eq!(press(&mut ui, &busy(), stop, now), vec![Effect::Interrupt]);
+            assert_eq!(
+                press(&mut ui, &busy(), stop, now),
+                vec![Effect::Stop { withdraw: vec![] }]
+            );
             assert_eq!(ui.stop_asked, Some(TurnId::from_raw("trn_1")));
         }
     }
@@ -1922,7 +1920,7 @@ mod tests {
         assert!(!ui.focus.showing());
         assert_eq!(
             press_tree(&mut ui, &tree, key(KeyCode::Esc), now),
-            vec![Effect::Interrupt],
+            vec![Effect::Stop { withdraw: vec![] }],
             "and the next one is the turn's again"
         );
     }

@@ -46,7 +46,7 @@ fn ctrl_c_uses_the_frame_clock_and_stopping_disarms_exit() {
     let busy = solo(&folded(vec![frame(1, started("trn_1"))]));
     assert_eq!(
         on_key(&mut ui, &busy, ctrl_c, later(now, 1510)),
-        vec![Effect::Interrupt]
+        vec![Effect::Stop { withdraw: vec![] }]
     );
     assert!(ui.armed.is_none());
     assert!(on_key(&mut ui, &tree, ctrl_c, later(now, 1520)).is_empty());
@@ -124,15 +124,19 @@ fn stop_withdraws_the_home_queue_in_order_and_preserves_a_draft() {
         let (mut ui, now) = scene();
         assert_eq!(
             on_key(&mut ui, &tree, stop, now),
-            vec![
-                Effect::Withdraw(IntentId::from_raw("q0")),
-                Effect::Withdraw(IntentId::from_raw("q1")),
-                Effect::Withdraw(IntentId::from_raw("q2")),
-                Effect::Interrupt,
-            ]
+            vec![Effect::Stop {
+                withdraw: vec![
+                    IntentId::from_raw("q0"),
+                    IntentId::from_raw("q1"),
+                    IntentId::from_raw("q2"),
+                ]
+            }]
         );
         ui.composer.set("draft");
-        assert_eq!(on_key(&mut ui, &tree, stop, now), vec![Effect::Interrupt]);
+        assert_eq!(
+            on_key(&mut ui, &tree, stop, now),
+            vec![Effect::Stop { withdraw: vec![] }]
+        );
         assert_eq!(ui.composer.text(), "draft");
         assert!(ui.armed.is_none() && ui.escaped_at.is_none());
     }

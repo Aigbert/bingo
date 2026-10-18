@@ -319,6 +319,10 @@ impl HostApi for TestHost {
             intent: intent.clone(),
             who: who.clone(),
         });
+        let script = locked(&self.inner.scripts).withdraw.clone();
+        if let Some(script) = script {
+            return script((session.clone(), intent.clone(), who)).await;
+        }
         NoHost.withdraw(session, intent, who).await
     }
 

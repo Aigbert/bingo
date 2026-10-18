@@ -114,7 +114,7 @@ fn an_interrupt_discards_waiting_edits_instead_of_replaying_them_on_ack() {
         run.heard(Term::Key(typed(letter)));
     }
     let first = session.submissions()[0].0.clone();
-    run.interrupt();
+    run.interrupt(run.session.tree.view().clone());
     run.ack(&first, &IntentOutcome::Applied { result: json!({}) });
     assert_eq!(session.submitted().len(), 1);
     assert_eq!(session.interrupts(), 1);

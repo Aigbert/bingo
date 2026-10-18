@@ -31,6 +31,7 @@ pub(super) struct Scripts {
     pub extend: Option<Script<(SessionId, String, String, Value), ()>>,
     pub signal: Option<Script<(SessionId, String, String, Value), ()>>,
     pub invoke: Option<Script<(SessionId, ToolCall), ToolOutcome>>,
+    pub withdraw: Option<Script<(SessionId, IntentId, ClientIdentity), Input>>,
     pub rewind: Option<Script<(SessionId, TurnId), u32>>,
     pub reconfigure: Option<Script<(SessionId, SessionChange), ()>>,
     pub catalog: CatalogScripts,
@@ -66,6 +67,16 @@ pub(super) struct ImmediateScripts {
 }
 
 impl TestHost {
+    pub fn on_withdraw<F, Fut>(&self, script: F)
+    where
+        F: Fn(SessionId, IntentId, ClientIdentity) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<Input, KernelError>> + Send + 'static,
+    {
+        locked(&self.inner.scripts).withdraw = Some(Arc::new(move |(session, intent, who)| {
+            Box::pin(script(session, intent, who))
+        }));
+    }
+
     pub fn on_read<F, Fut>(&self, script: F)
     where
         F: Fn(SessionId) -> Fut + Send + Sync + 'static,
