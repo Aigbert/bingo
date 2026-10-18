@@ -87,16 +87,16 @@ foot.rs,composer.rs,crew.rs,welcome.rs,opening.rs,run/look.rs,terminal.rs}`; new
 
 ## Exit criteria
 
-- [ ] The dock and footer bands of `live`, `done`, `mode`, `mode-later`, `reduced-mode`,
+- [x] The dock and footer bands of `live`, `done`, `mode`, `mode-later`, `reduced-mode`,
       `reduced-live`, `ascii-live`, `ascii-done`, `narrow`, `small-done` and `welcome` pass the
       harness.
-- [ ] Edge line states at named instants: the comet at three moments, the 1.1 s end flash at
+- [x] Edge line states at named instants: the comet at three moments, the 1.1 s end flash at
       0/550/1100 ms, the mode flash, reduced. Each is a band test or a `moved` assertion.
-- [ ] Growth: a dock going from 3 to 14 rows shows the intermediate heights at 14 ms steps;
+- [x] Growth: a dock going from 3 to 14 rows shows the intermediate heights at 14 ms steps;
       shrinking is immediate.
 - [ ] Whichever of M193 and M194 lands second also passes the full frame of `live`, `done`,
       `ascii-live`, `ascii-done`, `reduced-live`, `small-done`, `mode` and `mode-later`.
-- [ ] `scripts/tui-smoke.sh` waits for a footer string, not `/ commands` in the old `KeyBar`
+- [x] `scripts/tui-smoke.sh` waits for a footer string, not `/ commands` in the old `KeyBar`
       row, and passes.
 - [ ] Gates and checks as in M192. tmux drive: idle, live, mode cycle, 80×24, a toast.
 
@@ -114,3 +114,33 @@ behaviour (M196); asks (M197); sheets (M198); the needs-you lead, view segments 
   terminal and the TUI owns it.
 - **Growth animation.** Keep the deadline scheduler (`layout/deadline.rs`) as the only source of
   wakes, so an idle frame costs nothing.
+
+## Verified
+
+- [x] Bands — `cargo test --workspace --locked`: `m193_capture_dock_and_footer_bands ... ok` (all 11 named captures; dock and footer, exact size/moment/flags, folded session frames).
+- [x] Edge — same command: `m193_edge_comet_end_mode_and_reduced_have_deadlines ... ok` (three comet samples; end 0/550/1100 ms; mode and reduced).
+- [x] Growth — same command: `growth_samples_each_fourteen_ms_step_and_shrinks_at_once ... ok` (3→14, every 14 ms, immediate shrink).
+- [x] Smoke — `TUI_SMOKE_SOCKET_PREFIX=m193-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`; readiness now waits for footer `fake-1`.
+- [x] Drive — `python3 docs/verification/m193/drive.py`: `PASS 100x32` / `PASS 80x24`, each followed by `CLEAN`; idle/live/done, four modes, toast expiry and moving edge; private fake-provider HOME/data/cwd. Text and ANSI captures in `docs/verification/m193/`.
+- [x] `cargo fmt --all -- --check`: exit 0, no output.
+- [x] `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 2.31s`.
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 4.35s`.
+- [x] `cargo test --workspace --locked` (provider credentials unset): 123 result lines, **6442 passed; 0 failed; 0 ignored**; TUI 1388, PTY 19. `cargo build -p bingo --locked`: exit 0.
+- [x] `scripts/check_discipline.sh`: `discipline ok` (advisory warnings only).
+- [x] `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `0s`, TUI relink `0 crates`; `target/debug: 8 GB (soft max 5)` warning; `budget ok`.
+- [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] Windows command: `cargo check -p bingo-mod-keybar --all-targets --target x86_64-pc-windows-msvc`: exit 0, `Finished dev profile ... in 3.03s`.
+- [ ] Same Windows command for `bingo-surface-tui` and `bingo`: exit 101; `aws-lc-sys` lacks `stdlib.h`/`windows.h`; `bingo` also hits `rquickjs-sys` rejecting MSVC `/std:c11`. Same native-toolchain blocker as M192; these checks remain owed, with no bypass.
+- [ ] Full frames: explicitly deferred by the task until the reviewer assigns the second-to-land criterion; M194's stream rows/fold retirement remain untouched.
+- Departures: prototype mode toast holds 2800 ms plus 300 ms fade (ordinary toast 2400+300); brick 5 only names 2400. `p8-page.js::paintBar` retains ` — <dir>` in child titles, unlike brick 6/ADR's shorter spelling; prototype followed.
+- Prototype wins: idle edge is blank; a focused caret fades and schedules frames. “Idle costs nothing” means no invisible/expired animation wakes; unfocused and reduced idle frames stay still.
+- Harness fix: M192 omitted snapshot/capture's `T0 = 10_000_000`; `Capture::now` now includes that origin, needed for the exact `mode-later` caret ink. Scene captures and prototype are unchanged.
+- Smoke found the retired opening's invisible focus swallowing the first character after a pane closed; removed it and pinned `the_first_key_is_typed ... ok`. Two PTY expectations changed for the embedded caret and footer clipping; no unrelated test failures remained.
+- Snapshots: sampled before bulk re-pin; 408 updated for removed header/notice/key/status/crew rows, bottom anchoring, embedded caret and footer ink. Twelve deleted because the old opening animation is gone; M199 owns the replacement wordmark.
+- Deleted under `crates/bingo-surface-tui/src/opening/snapshots/`, each with prefix `bingo_surface_tui__opening__storyboard__`:
+  `shot_0_0_80.snap`, `shot_0_5_80.snap`, `shot_1_2_80.snap`, `shot_2_0_80.snap`, `shot_2_4_80.snap`.
+- Deleted under `crates/bingo-surface-tui/src/screens/snapshots/`, each with prefix `bingo_surface_tui__screens__opening__`:
+  `opening_line_120x40.snap`, `opening_line_80x24.snap`, `opening_rest_120x40.snap`, `opening_rest_80x24.snap`,
+  `opening_words_120x40.snap`, `opening_words_80x24.snap`, `opening_words_daylight.snap`.
+- Shared-file changes: `pointer.rs` only removes six lines intercepting the retired Intro focus; `blocks.rs`/`worked.rs` only adjust geometry/copy tests. Shared snapshots only reflect these bands; no M194 merge attempted.
+- No dependency additions. Site/footer/activity clocks return `Drawing` deadlines; Layout collects them. Mode flash reuses the existing acknowledgement timestamp; end flash reads `last_turn`.
