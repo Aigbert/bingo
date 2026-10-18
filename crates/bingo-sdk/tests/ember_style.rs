@@ -47,3 +47,11 @@ fn unknown_motion_round_trips_its_original_fields() {
     let view: View = serde_json::from_value(value.clone()).unwrap();
     assert_eq!(serde_json::to_value(view).unwrap(), value);
 }
+
+#[test]
+fn malformed_known_motion_never_becomes_other() {
+    let value = json!({
+        "kind":"Text", "motion":{"kind":"breathe", "with":5}, "children":["hello"]
+    });
+    assert!(serde_json::from_value::<View>(value).is_err());
+}
