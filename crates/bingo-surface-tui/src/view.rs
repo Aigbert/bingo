@@ -587,7 +587,6 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
         frame.blocks.window(frame.top, rows)
     };
     let padding = prepare_lines(ui, tree, frame, &mut shown);
-    frame.padding = padding;
     // Where the pictures among those lines landed, for a click on one (M56).
     frame.cells = graphics::placed::cells(&shown, area);
     frame.render_widget(Paragraph::new(shown), area);
@@ -604,7 +603,6 @@ fn transcript_window(tree: &Tree, ui: &Ui, frame: &mut Layout, rows: usize, now:
         frame.height = frame.height - removed + count;
     }
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
-    frame.padding = rows.saturating_sub(frame.height);
     if let Some((at, _, count)) = frame.inline {
         frame.top = (at + count).saturating_sub(rows);
     }
@@ -648,7 +646,7 @@ fn prepare_lines(ui: &Ui, tree: &Tree, frame: &Layout, shown: &mut Vec<Line<'sta
     if !tree.viewed().transcript.items().is_empty() && frame.top + shown.len() < frame.height {
         shown.push(Line::default());
     }
-    let padding = usize::from(frame.regions.transcript.height).saturating_sub(shown.len());
+    let padding = frame.padding();
     shown.splice(0..0, std::iter::repeat_n(Line::default(), padding));
     padding
 }
@@ -831,10 +829,8 @@ fn render_draft(
         return;
     }
     let props = crate::keybar::composer(state, ui, frame);
-    let active = matches!(
-        ui.focus,
-        crate::focus::Focus::Composer | crate::focus::Focus::Intro(_)
-    ) || matches!(&ui.focus, crate::focus::Focus::Layer(layer) if !layer.showing() || matches!(layer.open, Open::Palette(_)));
+    let active = matches!(ui.focus, crate::focus::Focus::Composer)
+        || matches!(&ui.focus, crate::focus::Focus::Layer(layer) if !layer.showing() || matches!(layer.open, Open::Palette(_)));
     let drawing = prompt::drawing(
         &layout,
         &props,

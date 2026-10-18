@@ -2,10 +2,8 @@
 
 use ratatui::layout::Rect;
 
-/// The rule and one row to type in.
+/// The edge, one input row and the bottom pad.
 pub const COMPOSER_MIN: u16 = 3;
-/// The rule and ten rows of draft.
-pub const COMPOSER_MAX: u16 = 11;
 
 /// What the frame must make room for, measured before the geometry is cut.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -22,9 +20,8 @@ pub struct Demand {
     pub palette: u16,
 }
 
-/// The frame, top to bottom. Every region may be empty; the status line and
-/// the input box are the last to go, and an open palette takes the status
-/// line's and the hint row's place.
+/// The frame, top to bottom. Every region may be empty; the footer and
+/// the input are the last to go.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Regions {
     pub transcript: Rect,
@@ -79,12 +76,9 @@ fn palette_rows(want: u16, room: u16) -> u16 {
     want.min(room.saturating_sub(COMPOSER_MIN))
 }
 
-/// The box grows with the draft and stops at ten rows; it never shrinks below
-/// one row, and it takes what is left when even that does not fit.
+/// The dock takes its body, edge and pad, bounded by the available rows.
 fn composer_rows(text: u16, room: u16) -> u16 {
-    text.saturating_add(2)
-        .clamp(COMPOSER_MIN, COMPOSER_MAX)
-        .min(room)
+    text.saturating_add(2).max(COMPOSER_MIN).min(room)
 }
 
 /// The strip is rows of its own above the box, never rows out of it: a
@@ -141,7 +135,10 @@ mod tests {
             composer: 40,
             ..Demand::default()
         });
-        assert_eq!(r.composer.height, COMPOSER_MAX);
+        assert_eq!(
+            r.composer.height,
+            crate::layout::grid::dock_cap(24) as u16 + 2
+        );
         let r = at(Demand {
             composer: 1,
             palette: 8,

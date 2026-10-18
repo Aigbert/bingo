@@ -12,7 +12,7 @@ fn apply(state: &mut SessionState, at: i64, event: Event) {
 }
 
 /// The prompt and step sequence from p4b-data.js, independent of stream drawing.
-fn past(state: &mut SessionState) {
+fn past(state: &mut SessionState, turns: usize) {
     for (turn, prompt, answer) in [
         (
             "t1",
@@ -24,7 +24,10 @@ fn past(state: &mut SessionState) {
             "修好它，加一个回归测试",
             "修好了。reset() 只重置 steer，排队的消息留给下一轮。",
         ),
-    ] {
+    ]
+    .into_iter()
+    .take(turns)
+    {
         apply(state, -10_000_000, started(turn));
         apply(
             state,
@@ -56,8 +59,9 @@ fn fixture(capture: &Capture) -> (SessionState, Ui) {
         ui.welcome.resume = Some(state.summary.clone());
         return (state, ui);
     }
-    past(&mut state);
-    if capture.entry.scene == "live" || capture.entry.scene == "narrow" {
+    let live = matches!(capture.entry.scene.as_str(), "live" | "narrow");
+    past(&mut state, if live { 1 } else { 2 });
+    if live {
         apply(&mut state, -2600, permission_view("acceptEdits"));
         apply(&mut state, -2600, started("live"));
         apply(

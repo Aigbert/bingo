@@ -387,14 +387,6 @@ pub fn warming(t: f32) -> Style {
     }
 }
 
-/// Whether this run draws twenty-four bits. Every beat of the opening is a
-/// ramp — the tail behind the light, the mark cooling, the words settling — and
-/// eight colours are a ramp with three steps in it, so the piece does not play
-/// at all where they are all there is (§11).
-pub fn full_colour() -> bool {
-    matches!(current().colors, Colors::True(_))
-}
-
 /// A share of something, held to 0 and 1 — and to 0 where the arithmetic it
 /// came out of had nothing to divide, so no `NaN` ever reaches a colour.
 fn settled(share: f32) -> f32 {

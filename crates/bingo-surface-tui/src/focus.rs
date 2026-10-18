@@ -1,6 +1,5 @@
 //! The single surface owner shared by keys and pointer events.
 
-use crate::opening::Playing;
 use crate::search::Search;
 use crate::select::Run;
 use crate::ui::Layer;
@@ -10,7 +9,6 @@ use bingo_sdk::ItemId;
 pub enum Focus {
     #[default]
     Composer,
-    Intro(Playing),
     Select(Run),
     Search(Search),
     Layer(Layer),
@@ -21,7 +19,6 @@ pub enum Focus {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
     Composer,
-    Intro,
     Select,
     Search,
     Layer,
@@ -42,7 +39,6 @@ pub fn owner(ui: &crate::ui::Ui, tree: &crate::tree::Tree) -> Owner {
 
 fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
     match focus {
-        Focus::Intro(_) => Owner::Intro,
         Focus::Select(_) => Owner::Select,
         Focus::Search(_) => Owner::Search,
         Focus::Layer(layer) if layer.showing() => Owner::Layer,
@@ -55,14 +51,6 @@ fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
 }
 
 impl Focus {
-    #[cfg(test)]
-    pub fn intro(&self) -> Option<&Playing> {
-        if let Self::Intro(value) = self {
-            Some(value)
-        } else {
-            None
-        }
-    }
     pub fn search(&self) -> Option<&Search> {
         if let Self::Search(value) = self {
             Some(value)
@@ -150,7 +138,6 @@ impl Focus {
     }
     pub fn expire(&mut self, now: crate::clock::Now) {
         let over = match self {
-            Self::Intro(intro) => intro.over(now),
             Self::Layer(layer) => layer.drawn(now).is_none(),
             _ => false,
         };
@@ -177,7 +164,6 @@ mod tests {
         layer.show(Open::Rewind(Default::default()), now.instant);
         let cases = [
             (Focus::Composer, Owner::Composer),
-            (Focus::Intro(Playing::from(now.instant)), Owner::Intro),
             (
                 Focus::Select(Run {
                     anchor: Default::default(),
@@ -214,29 +200,7 @@ mod tests {
 mod dispatch_tests {
     use super::*;
     use crate::test_support::*;
-    use crossterm::event::{
-        KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
-    };
-
-    #[test]
-    fn focus_dispatch_spends_opening_events_without_touching_the_composer() {
-        for key in [
-            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::NONE),
-            KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
-            KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE),
-            KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL),
-            KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
-            KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
-        ] {
-            let (mut ui, now) = scene();
-            ui.focus = Focus::Intro(Playing::from(now.instant));
-            let tree = solo(&state());
-            assert_eq!(owner(&ui, &tree), Owner::Intro);
-            assert!(crate::input::on_key(&mut ui, &tree, key, now).is_empty());
-            assert_eq!(owner(&ui, &tree), Owner::Composer);
-            assert!(ui.composer.is_empty());
-        }
-    }
+    use crossterm::event::{KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 
     #[test]
     fn focus_dispatch_keeps_stale_transcript_targets_behind_the_owner() {
@@ -261,14 +225,9 @@ mod dispatch_tests {
             row: ui.shown.regions.transcript.y + ui.shown.row_of(0).expect("a transcript row"),
             modifiers: KeyModifiers::NONE,
         };
-        for focus in [
-            Focus::Intro(Playing::from(now.instant)),
-            Focus::Search(Search::open()),
-        ] {
-            ui.focus = focus;
-            assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
-            assert!(ui.focus.selection().is_none());
-        }
+        ui.focus = Focus::Search(Search::open());
+        assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, now).is_empty());
+        assert!(ui.focus.selection().is_none());
         ui.focus
             .show(crate::ui::Open::Rewind(Default::default()), now.instant);
         assert_eq!(owner(&ui, &tree), Owner::Layer);

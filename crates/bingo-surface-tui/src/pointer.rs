@@ -28,12 +28,6 @@ pub const WHEEL: isize = 3;
 /// row, or on a card's option.
 pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
     match crate::focus::owner(ui, tree) {
-        crate::focus::Owner::Intro => {
-            if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-                ui.focus = crate::focus::Focus::Composer;
-            }
-            return Vec::new();
-        }
         crate::focus::Owner::Search => return Vec::new(),
         crate::focus::Owner::Layer => return Vec::new(),
         crate::focus::Owner::Interaction => {

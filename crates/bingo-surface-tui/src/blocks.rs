@@ -1121,7 +1121,7 @@ mod refresh_tests {
         let area = ui.shown.regions.transcript;
         let card = ui.shown.card.as_ref().unwrap();
         assert_eq!(
-            usize::from(card.area.y - area.y) + ui.shown.top - ui.shown.padding,
+            usize::from(card.area.y - area.y) + ui.shown.top - ui.shown.padding(),
             at
         );
         let end = ui.shown.blocks.span(&ItemId::from_raw("itm_1")).unwrap().1;
@@ -1129,14 +1129,14 @@ mod refresh_tests {
             .map(|x| {
                 ui.shown.canvas.buffer[(
                     x,
-                    area.y + (end - ui.shown.top - 1 + ui.shown.padding) as u16,
+                    area.y + (end - ui.shown.top - 1 + ui.shown.padding()) as u16,
                 )]
                     .symbol()
             })
             .collect();
         assert!(above.contains("last line"), "{above:?}");
         assert_eq!(
-            ui.shown.line_at(at - ui.shown.top - 1 + ui.shown.padding),
+            ui.shown.line_at(at - ui.shown.top - 1 + ui.shown.padding()),
             Some(at - 1)
         );
     }

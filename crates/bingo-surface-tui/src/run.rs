@@ -231,7 +231,7 @@ pub(crate) async fn drive(
 ) -> Result<Farewell, KernelError> {
     let (tx, mut replies) = mpsc::channel(16);
     let (mut run, mut events, mut gateway) =
-        standing(host, opts, surface, screen.size(), tx, screen.detection()).await?;
+        standing(host, opts, surface, tx, screen.detection()).await?;
     loop {
         // `biased`, keys first: a person outranks the machine, and a
         // keystroke is never continuously ready, so checking it first
@@ -289,18 +289,12 @@ async fn standing(
     host: &HostHandle,
     opts: SurfaceOptions,
     surface: crate::TuiSurface,
-    screen: (u16, u16),
     replies: mpsc::Sender<Reply>,
     detection: crate::render::Detection,
 ) -> Result<(Run, Option<FrameStream>, Option<GatewayStream>), KernelError> {
-    // A run given work on the command line goes and does it, so what the
-    // opening is decided from is read before the prompt is spent.
-    let asked = opts.prompt.is_some();
     let (mut run, events) = attach(host, opts, surface, replies).await?;
     run.detection = detection;
     notices::raise(&mut run.ui, run.detection.notice(), Instant::now());
-    let now = run.detection.now();
-    opening::begin(&mut run, screen, asked, now);
     opening::find_resume(&mut run);
     Ok((run, events, Some(host.gateway_events())))
 }
@@ -925,9 +919,10 @@ impl Run {
 /// `bingo — <directory>`, and the session in view when it is not the root.
 fn title(tree: &Tree) -> String {
     let title = tree.root().summary.title.as_deref().unwrap_or("bingo");
+    let directory = tree::directory(&tree.root().summary.cwd);
     match tree.viewing() {
-        Some(child) => format!("{title} › {}", tree::name(child)),
-        None => format!("{title} — {}", tree::directory(&tree.root().summary.cwd)),
+        Some(child) => format!("{title} › {} — {directory}", tree::name(child)),
+        None => format!("{title} — {directory}"),
     }
 }
 
@@ -1108,6 +1103,14 @@ mod tests {
             "{:?}",
             harness.recorder.titles
         );
+    }
+
+    #[test]
+    fn a_child_title_keeps_the_home_directory_like_the_prototype() {
+        let mut tree = solo(&state());
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.show(&child_id());
+        assert_eq!(title(&tree), "bingo › reviewer — project");
     }
 
     #[test]

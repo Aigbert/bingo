@@ -88,7 +88,6 @@ mod mentions;
 mod mode;
 /// The opening (M149): the wordmark arriving, out of the motions the
 /// product already has.
-mod opening;
 mod pager;
 mod palette;
 mod pane;
