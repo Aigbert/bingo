@@ -49,7 +49,7 @@ pub fn splice(
         .flatten();
     let (at, removed) = span
         .map(|(from, to)| (from, to - from))
-        .unwrap_or((frame.height, 0));
+        .unwrap_or((frame.blocks.height(), 0));
     if !matches!(interaction.kind, InteractionKind::Permission { .. }) {
         drawing.rows.insert(0, (asking(), None));
     }

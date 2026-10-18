@@ -254,3 +254,26 @@ fn visible_cache_ranges_skip_inline_replacements() {
     assert_eq!(frame.visible_lines(2), vec![6..8]);
     assert!(frame.visible_lines(0).is_empty());
 }
+
+#[test]
+fn round3_idle_nonterminal_item_schedules_nothing() {
+    let (ui, now) = scene();
+    let mut unfinished = user("unfinished", "a resumed item");
+    unfinished.status = bingo_sdk::ItemStatus::Running;
+    let state = folded(vec![frame(
+        1,
+        bingo_sdk::Event::ItemStarted { item: unfinished },
+    )]);
+    assert!(!state.busy());
+    for motion in [true, false] {
+        let drawn = layout(
+            Layout::default(),
+            &solo(&state),
+            &ui,
+            SIZE,
+            crate::clock::Now { motion, ..now },
+        );
+        assert!(drawn.blocks.height() > 0);
+        assert_eq!(drawn.next_frame, None, "motion={motion}");
+    }
+}

@@ -216,7 +216,6 @@ fn settles(item: &Item, flip: bool, moving: bool) -> Duration {
 }
 
 fn cue_deadline(
-    item: &Item,
     agent: Option<&SessionState>,
     role: &Role,
     motion: Motion,
@@ -231,17 +230,15 @@ fn cue_deadline(
             )
         )
     });
-    if !now.motion {
-        return (!item.is_terminal()).then(|| crate::clock::next_tick(now, Duration::from_secs(1)));
-    }
-    if child_moves || motion.redraw(now.instant) {
+    if (child_moves && now.motion) || motion.redraw(now.instant) {
         return Some(now.instant + crate::clock::FRAME);
     }
-    if matches!(role, Role::Step { step, .. } if step.state == bingo_sdk::component::StepState::Running)
+    if now.motion
+        && matches!(role, Role::Step { step, .. } if step.state == bingo_sdk::component::StepState::Running)
     {
         return Some(crate::spinner::next(now));
     }
-    (!item.is_terminal()).then_some(now.instant + crate::clock::FRAME)
+    None
 }
 
 struct Entry {
@@ -361,9 +358,9 @@ impl Blocks {
         rows: &Rows<'_>,
         from: usize,
         height: usize,
-    ) -> Option<Instant> {
+    ) {
         let visible: Vec<_> = self.visible(from, height).collect();
-        for index in visible {
+        for index in visible.into_iter().rev() {
             let entry = &self.blocks[index];
             if entry.next.is_none_or(|at| at > rows.now.instant) {
                 continue;
@@ -382,7 +379,6 @@ impl Blocks {
             self.block(index, item, &place, agents, rows, true);
         }
         self.height = self.measure();
-        self.next_change(from, height)
     }
 
     pub fn next_change(&self, from: usize, height: usize) -> Option<Instant> {
@@ -428,7 +424,7 @@ impl Blocks {
         let next = drawn
             .next
             .into_iter()
-            .chain(cue_deadline(item, agent, &place.role, motion, rows.now))
+            .chain(cue_deadline(agent, &place.role, motion, rows.now))
             .min();
         if drawn.lines.is_empty() {
             // An item with nothing to say is not a block at all — and one that
@@ -1035,5 +1031,94 @@ mod tests {
         let whole = blocks.window(0, height);
         assert_eq!(tail[3], whole[height - 1].to_string().trim_end());
         assert!(tail[3].contains("Answer 9"), "{tail:?}");
+    }
+}
+
+#[cfg(test)]
+mod refresh_tests {
+    use super::*;
+    use crate::test_support::*;
+    use bingo_sdk::Event;
+
+    #[test]
+    fn round3_refresh_can_remove_the_first_of_two_expiring_entries() {
+        let mut state = folded(vec![
+            frame(
+                1,
+                Event::ItemCompleted {
+                    item: assistant("first", "vanishing", ItemStatus::Completed),
+                },
+            ),
+            frame(
+                2,
+                Event::ItemCompleted {
+                    item: assistant("second", "remaining", ItemStatus::Completed),
+                },
+            ),
+        ]);
+        let (mut ui, now) = scene();
+        draw_tree(80, 24, &solo(&state), &mut ui, now);
+        let blocks = &mut ui.shown.blocks;
+        assert_eq!(blocks.blocks.len(), 2);
+        for entry in &mut blocks.blocks {
+            entry.next = Some(now.instant);
+        }
+        state.apply(&frame(
+            3,
+            Event::ItemCompleted {
+                item: assistant("first", "", ItemStatus::Completed),
+            },
+        ));
+        let folds = crate::fold::Folds::new();
+        let pictures = crate::graphics::Decoded::default();
+        let linked = crate::graphics::Linked::default();
+        let rows = Rows::of(&state, 80, &folds, &[], &pictures, &linked, now);
+        let before = blocks.renders();
+        blocks.refresh(&state, &Agents::new(), &rows, 0, blocks.height());
+        assert_eq!(blocks.blocks.len(), 1);
+        assert_eq!(blocks.blocks[0].id, ItemId::from_raw("second"));
+        assert_eq!(blocks.renders(), before + 2);
+    }
+
+    #[test]
+    fn round3_refresh_growth_updates_height_and_followed_bottom() {
+        let state = folded(
+            (0..30)
+                .map(|i| {
+                    frame(
+                        i + 1,
+                        Event::ItemCompleted {
+                            item: assistant(
+                                &format!("item-{i}"),
+                                "first line\n\nlast line",
+                                ItemStatus::Completed,
+                            ),
+                        },
+                    )
+                })
+                .collect(),
+        );
+        let (mut ui, now) = scene();
+        let tree = solo(&state);
+        draw_tree(80, 24, &tree, &mut ui, now);
+        let expected_height = ui.shown.blocks.height();
+        // Hold a shorter, expired drawing so refresh must restore its last row.
+        let last = ui.shown.blocks.blocks.last_mut().unwrap();
+        last.lines.pop().unwrap();
+        last.next = Some(now.instant);
+        ui.shown.blocks.height = ui.shown.blocks.measure();
+        draw_tree(80, 24, &tree, &mut ui, later(now, 40));
+        assert_eq!(ui.shown.blocks.height(), expected_height);
+        assert_eq!(ui.shown.height, expected_height);
+        let area = ui.shown.regions.transcript;
+        assert_eq!(ui.shown.top + usize::from(area.height), expected_height);
+        let bottom: String = (area.x..area.right())
+            .map(|x| ui.shown.canvas.buffer[(x, area.bottom() - 1)].symbol())
+            .collect();
+        assert!(bottom.contains("last line"), "{bottom:?}");
+        assert_eq!(
+            ui.shown.line_at(usize::from(area.height) - 1),
+            Some(expected_height - 1)
+        );
     }
 }

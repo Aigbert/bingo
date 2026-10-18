@@ -512,27 +512,25 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     let state = tree.viewed();
     with_transcript_rows(tree, ui, frame, area, now, |blocks, agents, rows| {
         blocks.sync(state, agents, rows);
-        None
     });
-    frame.height = frame.blocks.height();
     let inline = crate::ask::drawing::splice(tree, ui, frame, area, now);
-    if let Some((_, removed, drawing)) = &inline {
-        frame.height = frame.height - removed + drawing.rows.len();
-    }
-    frame.top = ui.scroll.top(frame.height, rows, now.instant);
-    if let Some((at, _, drawing)) = &inline {
-        frame.top = (at + drawing.rows.len()).saturating_sub(rows);
-    }
-    if let Some(top) = crate::browse::top(ui, tree, frame, rows.saturating_sub(1)) {
-        frame.top = top;
-    }
+    transcript_window(tree, ui, frame, rows, now);
+    let height = frame.blocks.height();
     let visible = frame.visible_lines(rows);
     with_transcript_rows(tree, ui, frame, area, now, |blocks, agents, config| {
-        visible
-            .into_iter()
-            .filter_map(|range| blocks.refresh(state, agents, config, range.start, range.len()))
-            .min()
+        for range in visible {
+            blocks.refresh(state, agents, config, range.start, range.len());
+        }
     });
+    if frame.blocks.height() != height {
+        transcript_window(tree, ui, frame, rows, now);
+    }
+    let next = frame
+        .visible_lines(rows)
+        .into_iter()
+        .filter_map(|range| frame.blocks.next_change(range.start, range.len()))
+        .min();
+    frame.next_frame = frame.next_frame.into_iter().chain(next).min();
     component_requests(state, ui, frame, area);
     crate::component::closing::requests(state, ui, frame, area.width, area.height, now);
     let mut shown = if let Some((at, removed, drawing)) = &inline {
@@ -555,17 +553,27 @@ fn render_transcript(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: 
     mark_transcript(ui, frame, area, padding, now);
 }
 
+fn transcript_window(tree: &Tree, ui: &Ui, frame: &mut Layout, rows: usize, now: Now) {
+    frame.height = frame.blocks.height();
+    if let Some((_, removed, count)) = frame.inline {
+        frame.height = frame.height - removed + count;
+    }
+    frame.top = ui.scroll.top(frame.height, rows, now.instant);
+    if let Some((at, _, count)) = frame.inline {
+        frame.top = (at + count).saturating_sub(rows);
+    }
+    if let Some(top) = crate::browse::top(ui, tree, frame, rows.saturating_sub(1)) {
+        frame.top = top;
+    }
+}
+
 fn with_transcript_rows(
     tree: &Tree,
     ui: &Ui,
     frame: &mut Layout,
     area: Rect,
     now: Now,
-    draw: impl FnOnce(
-        &mut crate::blocks::Blocks,
-        &crate::tree::Agents<'_>,
-        &transcript::Rows<'_>,
-    ) -> Option<std::time::Instant>,
+    draw: impl FnOnce(&mut crate::blocks::Blocks, &crate::tree::Agents<'_>, &transcript::Rows<'_>),
 ) {
     let state = tree.viewed();
     let browse_folds = crate::browse::folds(ui, tree);
@@ -585,8 +593,7 @@ fn with_transcript_rows(
     .entrance(frame.canvas.buffer.area.height, ui.welcome.resume.as_ref())
     .measuring(ui.measure);
     rows_config.tools = crate::tool_rows::Looks::in_ui(ui);
-    let next = draw(&mut frame.blocks, &tree.agents(), &rows_config);
-    frame.next_frame = frame.next_frame.into_iter().chain(next).min();
+    draw(&mut frame.blocks, &tree.agents(), &rows_config);
 }
 
 fn prepare_lines(ui: &Ui, tree: &Tree, frame: &Layout, shown: &mut Vec<Line<'static>>) -> usize {
