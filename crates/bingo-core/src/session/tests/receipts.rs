@@ -200,7 +200,14 @@ async fn stopped(question: bool) {
         .unwrap()
         .started_at;
     let clock = bingo_sdk::transcript::clock(&state, &turn, Timestamp::now()).unwrap();
-    assert_eq!(clock.elapsed, ask.opened_at.duration_since(start));
+    let wait_start = if question {
+        ask.opened_at
+    } else {
+        bingo_sdk::transcript::call_wait(state.transcript.get(ask.item.as_ref().unwrap()).unwrap())
+            .unwrap()
+            .0
+    };
+    assert_eq!(clock.elapsed, wait_start.duration_since(start));
     let interruption = state
         .transcript
         .items()

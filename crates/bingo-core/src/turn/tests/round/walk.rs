@@ -31,9 +31,9 @@ impl TurnHost for Person {
     }
     async fn ask(
         &self,
-        _: Option<ItemId>,
+        item: Option<ItemId>,
         kind: InteractionKind,
-        _: Vec<AnswerSpec>,
+        answers: Vec<AnswerSpec>,
     ) -> Result<crate::gate::Answered, KernelError> {
         let mut transcript = Transcript::new();
         for event in self
@@ -54,6 +54,20 @@ impl TurnHost for Person {
                 _ => None,
             })
             .collect();
+        let opened = Interaction {
+            id: InteractionId::mint(),
+            session: SessionId::from_raw("s"),
+            turn: None,
+            item,
+            opened_at: Timestamp::now(),
+            guard_until: None,
+            expires_at: None,
+            kind: kind.clone(),
+            answers,
+        };
+        self.emit(Event::InteractionOpened {
+            interaction: opened.clone(),
+        });
         let (reply, answer) = oneshot::channel();
         self.asks
             .send(Ask {
@@ -64,8 +78,8 @@ impl TurnHost for Person {
             .map_err(|_| KernelError::new(ErrorCode::Interrupted, "test ask receiver closed"))?;
         Ok(crate::gate::Answered {
             ask: crate::gate::Asked {
-                id: InteractionId::mint(),
-                opened_at: Timestamp::now(),
+                id: opened.id,
+                opened_at: opened.opened_at,
             },
             answer: answer
                 .await
@@ -228,6 +242,27 @@ impl Rig {
             .unwrap()
             .status
     }
+    fn stamps(&self, index: usize) -> (Option<Timestamp>, Option<Timestamp>) {
+        let events = self.recorded.lock().unwrap();
+        let mut transcript = Transcript::new();
+        for event in events.iter() {
+            transcript.apply(event);
+        }
+        transcript
+            .items()
+            .iter()
+            .find_map(|item| match &item.body {
+                ItemBody::ToolCall {
+                    call_id,
+                    asked_at,
+                    began_at,
+                    ..
+                } if call_id == &format!("c{index}") => Some((*asked_at, *began_at)),
+                _ => None,
+            })
+            .expect("streamed call")
+    }
+
     async fn landed(&mut self) -> String {
         loop {
             if let Event::ItemCompleted { item } = self
@@ -271,10 +306,23 @@ async fn read_lands_before_edit_asks_and_edit_lands_before_bash_is_reached() {
     );
     assert_eq!(rig.starts.recv().await, Some(0));
     assert_eq!(rig.status(1), ItemStatus::Pending);
+    assert_eq!(rig.stamps(0).0, None);
+    assert!(rig.stamps(0).1.is_some());
     assert_eq!(rig.status(2), ItemStatus::Pending);
+    assert_eq!(rig.stamps(2), (None, None));
     rig.release(0);
     rig.answer("Edit", Answer::AllowOnce).await;
     assert_eq!(rig.status(0), ItemStatus::Completed);
+    assert!(rig.stamps(1).0.is_some());
+    assert_eq!(rig.stamps(2), (None, None));
+    let events = rig.recorded.lock().unwrap().clone();
+    let stamp = events.iter().position(|e| matches!(e, Event::ItemUpdated { item }
+        if matches!(&item.body, ItemBody::ToolCall { call_id, asked_at: Some(_), .. } if call_id == "c1"))).unwrap();
+    let opened = events
+        .iter()
+        .position(|e| matches!(e, Event::InteractionOpened { .. }))
+        .unwrap();
+    assert!(stamp < opened);
     assert_eq!(seen.lock().unwrap().len(), 2);
     assert_eq!(rig.starts.recv().await, Some(1));
     assert_eq!(rig.status(2), ItemStatus::Pending);
@@ -431,6 +479,8 @@ async fn yes_for_the_session_answers_the_next_edit_in_the_same_round() {
     rig.release(0);
     assert_eq!(rig.starts.recv().await, Some(1));
     assert!(rig.asks.try_recv().is_err());
+    assert_eq!(rig.stamps(1).0, None);
+    assert!(rig.stamps(1).1.is_some());
     rig.release(1);
     let out = rig.task.await.unwrap();
     assert_eq!(out.status, TurnStatus::Completed);
@@ -459,6 +509,7 @@ async fn a_denial_lands_without_waiting_and_does_not_stop_the_walk() {
     assert_eq!(rig.landed().await, "c1");
     assert_eq!(rig.status(0), ItemStatus::Running);
     assert_eq!(rig.status(1), ItemStatus::Failed);
+    assert_eq!(rig.stamps(1), (None, None));
     rig.release(0);
     rig.release(2);
     assert_eq!(rig.task.await.unwrap().status, TurnStatus::Completed);
@@ -588,4 +639,40 @@ async fn a_finished_turn_closes_every_rig_receiver() {
     rig.release(0);
     assert_eq!((&mut rig.task).await.unwrap().status, TurnStatus::Completed);
     assert_receivers_closed(&rig);
+}
+
+#[tokio::test]
+async fn an_unknown_call_fails_without_an_ask_or_stamps() {
+    let mut rig = Rig::new(&["Missing"], &[], None, HookSet::default());
+    assert_eq!(rig.landed().await, "c0");
+    assert_eq!(rig.stamps(0), (None, None));
+    assert!(
+        !rig.recorded
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|event| matches!(event,
+        Event::ItemStarted { item } | Event::ItemUpdated { item } | Event::ItemCompleted { item }
+        if matches!(&item.body, ItemBody::ToolCall { .. }) && item.status == ItemStatus::Running))
+    );
+    let out = rig.task.await.unwrap();
+    assert!(rig.asks.recv().await.is_none());
+    assert!(out.items.iter().any(|item| matches!(&item.body,
+        ItemBody::ToolCall { output: Some(output), .. }
+        if item.status == ItemStatus::Failed && output.parts[0].as_text() == Some("tool not found: Missing"))));
+}
+
+#[tokio::test]
+async fn a_persons_no_stamps_only_the_ask() {
+    let mut rig = Rig::new(
+        &["Edit"],
+        &[("Edit", false, false)],
+        None,
+        HookSet::default(),
+    );
+    rig.answer("Edit", Answer::Deny { feedback: None }).await;
+    assert_eq!(rig.landed().await, "c0");
+    assert!(rig.stamps(0).0.is_some());
+    assert_eq!(rig.stamps(0).1, None);
+    rig.task.await.unwrap();
 }

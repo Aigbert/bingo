@@ -143,6 +143,7 @@ impl Round<'_> {
         match decided {
             Decided::Settled(gated) => Some(*gated),
             decided @ Decided::Ask(_) => {
+                self.mark_asked(input.item);
                 let prompter = AskVia {
                     host: self.host,
                     item: input.item.clone(),
@@ -235,6 +236,15 @@ impl Round<'_> {
         outcomes.push(outcome);
     }
 
+    fn mark_asked(&mut self, id: &ItemId) {
+        if let Some(mut item) = self.transcript.get(id).cloned()
+            && let ItemBody::ToolCall { asked_at, .. } = &mut item.body
+        {
+            *asked_at = Some(Timestamp::now());
+            emit_and_fold(self.transcript, self.host, Event::ItemUpdated { item });
+        }
+    }
+
     fn mark_gated(&mut self, item_id: &ItemId, gated: &mut crate::gate::Gated) {
         if let Some(mut item) = self.transcript.get(item_id).cloned()
             && (gated.gate == Gate::Allowed
@@ -244,9 +254,15 @@ impl Round<'_> {
                 item.status = ItemStatus::Running;
             }
             if let ItemBody::ToolCall {
-                input, allowed_by, ..
+                input,
+                allowed_by,
+                began_at,
+                ..
             } = &mut item.body
             {
+                if gated.gate == Gate::Allowed {
+                    *began_at = Some(Timestamp::now());
+                }
                 *input = gated.call.input.clone();
                 *allowed_by = gated.allowed_by.take().map(Box::new);
             }
