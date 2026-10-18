@@ -69,24 +69,30 @@ person is asked about a call whose turn has not come.
      `interrupted` does today.
    - The after-tool hooks see the round once.
    - Every await in the new loop races the cancel token (`racing`).
-6. **The surface draws what was reached.**
-   - A call the run has not reached is `Pending` with no open ask, and the TUI does not draw it.
-     It appears when its ask opens (`◆ needs you`) or when it starts (the spinner), as a
-     prototype step appears when it begins.
-   - `--print`, the RPC, ACP and the channels change only in frame order.
-7. **A stop says once when the person was asked** (handed on by M201's review).
-   - Today the turn builds its Interruption with no `asked_at`, and `emit` stamps the journal's
-     copy on its way in. The turn's outcome and the turn-end hooks hold `None`; the journal holds
-     the time.
-   - The actor sets that time before it cancels the turn's token, as the door's `completed` is
-     set. The turn reads it when it builds its Interruption, and nothing rewrites an item on its
-     way to the journal. A stop during a re-asked call's second ask still counts from that ask.
+6. **The surface draws what was reached** (prototype `stopTurn`, `deny`).
+   A call is drawn once it asks or runs: from its `askedAt` or `beganAt` (brick 8), or an
+   open ask on it. A `Pending` call with none is not reached and is not drawn. It reads
+   `needs you` while its wait is open; its spinner and clock count from `beganAt`.
+   It reads `said no` after a Deny, and `stopped` when a stop closes a call that asked or ran.
+   A call stopped before it was reached is not drawn. Rows keep call order. Print, RPC,
+   ACP and channels change only in frame order and the new fields.
+7. **A stop says once when the person was asked.** The actor shares the earliest open ask
+   before cancelling; the turn, hooks and journal read the same value without a rewrite.
+   An ask a call holds (brick 8) leaves its time to the call: its receipt and the Interruption
+   carry no `asked_at`. A re-asked call counts its wait from its first ask.
+8. **A call says when it was asked and when it began.** Optional `askedAt` and `beganAt`,
+   contract first, preserve old journals. The round stamps its own calls; bridged calls use
+   `CallAsked` and `CallAllowed`; an agent call's `beganAt` is its start. One sdk `call_wait`
+   reads the wait. Questions, tool-host and judge asks keep their own `asked_at`.
 
 ## Files
 
 - `crates/bingo-core/src/{turn.rs,gate.rs,executor.rs}`, and the pure brick in a module of its
   own beside them (`round.rs`). For brick 7, `session.rs` and `session/{inputs,running}.rs`.
-- `crates/bingo-surface-tui/src/turns.rs`, for the unreached call.
+- SDK `event.rs`, `transcript/clock.rs`, contract/clock tests and generated schemas/types.
+- Core `gate{,/asking}.rs`, `turn/{round,agent}.rs`, `session/{inputs,invoke,mailbox,interactions}.rs`.
+- TUI `turns.rs`, `transcript{,/steps,/slots,/band}.rs`, `component/live.rs`, tests.
+- Crew `cards.rs`; `docs/verification/m202/{drive.sh,round-3.md}`.
 - Core turn and executor tests. RPC, print and ACP black-box tests where they pin frame order.
 
 ## Exit criteria
@@ -104,10 +110,14 @@ person is asked about a call whose turn has not come.
     receipt;
   - esc during a parallel batch: as today;
   - the after-tool hooks see the whole round once;
-  - a stop during a permission ask, and one during a question: the turn's outcome, the
-    turn-end hooks and the journal hold the ask's `opened_at`; with no ask open, none does.
+  - a stop during a question: outcome, turn-end hooks and journal Interruption hold its
+    `opened_at`. During a call permission ask, the call holds `askedAt`, Interruption none.
+    With no ask open, none does.
 - [ ] TUI: three calls where the second asks. The first row has landed, the second reads
-      `needs you`, and the third is not drawn until it starts.
+      `needs you`, and the third is not drawn until it starts. Stop during that ask: the
+      second reads `stopped`, the third is never drawn. Evidence: TUI tests and drive.sh.
+- [ ] ToolCall contract: round trip, old fixture, regenerated schemas and TypeScript.
+- [ ] Turn clock never jumps across an ask: frame-by-frame literal tests.
 - [x] RPC, print and ACP black-box tests pass. Each test re-pinned for frame order is named in
       Verified.
 - [x] Gates, one at a time, and the Windows check for `bingo-core`.
@@ -126,25 +136,11 @@ person is asked about a call whose turn has not come.
   (M200) must still come from the child's open ask.
 - **esc latency.** The new loop has more awaits. One that does not race the cancel token
   brings back the 2026-09-09 bug.
-- **Old journals.** A session killed mid-round must not leave a `Pending` call that the TUI
-  hides forever. Check how resume closes it.
+- **Old journals.** Recovery keeps stamps; an old interrupted call with neither is hidden.
+- **ItemUpdated.** Clients must not read a stamp-only update as activity; audit each client.
+- Tool-host and judge asks still have no call wait; follow-up, outside this round.
 
 ## Verified
 
-Round 1: [verification](../verification/m202/round-1.md). Round 2, 2026-10-19: kernel review fixes, [verification](../verification/m202/round-2.md).
-- [x] Table before loop: `cargo test -p bingo-core --lib round --locked` → `17 passed; 0 failed`;
-  contract commit `e290a457` precedes the walk. The original esc bug was pinned there too.
-- [x] Kernel: `cargo test --workspace --locked` → `test result: ok. 703 passed; 0 failed`.
-  Channels pin reach, asks, sliding admission, landings, esc, hooks, shared ask time and recovery.
-- [x] Wire, same command: CLI `309 passed; 0 failed`, RPC `104 passed; 0 failed`, wire `43 passed`.
-  Final full run: 6,522 passed, zero failed. No black-box re-pins; ACP fixture was present.
-- [x] `cargo fmt --all -- --check`: exit 0. Workspace check and Clippy `-D warnings`: `Finished`.
-  `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `budget ok` (423 dependencies).
-  `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
-- [x] `cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked`: `Finished`.
-  The same check for `bingo` stops in aws-lc-sys/rquickjs-sys native cross-toolchain setup.
-- One existing CLI recovery timeout passed alone unchanged, then passed in the full rerun.
-  Budget retains a 7 GB debug-directory soft warning. Detailed outputs and risk audit are linked above.
-- Departures: remove unused batch entry points; round/recovery own functions to meet cohesion limits.
-  Accepted cost: a stop during a second ask counts from that ask. No prototype conflict found.
-- [ ] Brick 6 and its TUI criterion remain for round 3 after M194 part B; both excluded crates are untouched.
+Rounds 1–2b: [round 1](../verification/m202/round-1.md), [round 2 and 2b](../verification/m202/round-2.md).
+Round 3 verification is being recorded in [round 3](../verification/m202/round-3.md).
