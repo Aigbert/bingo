@@ -1,0 +1,86 @@
+Rebase base: 37261d45
+Previous M192 tip: 6b622186
+
+Conflicts and resolutions:
+schema/plugin-2.json: restored dev; regenerated from its frozen compatibility baseline.
+schema/rpc.json: restored dev; regenerated from the combined Rust contracts.
+crates/bingo-surface-tui/src/component/question.rs: retained Drawing/frame clock and passed dev Looks into the extracted dialog renderer.
+crates/bingo-surface-tui/src/transcript.rs: retained the child tool-name argument and declared targets; converted the child rows to Drawing.
+crates/bingo-surface-tui/src/view.rs: retained Looks in the shared sync/refresh helper; retained round-3 callback and final-window deadline collection (conflicted in two replayed commits).
+
+No behavior tradeoff was required. Dev tool-look resolution and M192 motion/deadline behavior are both retained.
+
+Generated outputs changed from the dev baseline:
+schema/dollar.json
+schema/events.json
+schema/plugin-2.json
+schema/plugin.json
+schema/rpc.json
+sdk/typescript/src/dollar-types.ts
+sdk/typescript/src/events.ts
+sdk/typescript/src/wire.ts
+
+Regeneration (one sequential pass):
+$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked
+286 passed; 0 failed; 0 ignored; exit 0
+$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods --locked
+139 passed; 0 failed; 0 ignored; exit 0
+$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc --locked
+185 passed; 0 failed; 0 ignored; exit 0
+$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-surface-rpc --locked
+62 passed; 0 failed; 0 ignored; exit 0
+
+Combined generated plugin contract:
+ToolSpec.look; Step.mark/reads/tier; Text.ground/motion; Box.ground: present.
+Published TextMotion kinds: breathe, spin, fade.
+unknown_motion_round_trips_its_original_fields ... ok
+unknown_motion_is_not_an_authoring_variant ... ok
+crates/bingo-sdk/src/component/props.json: unchanged from dev.
+No generated output was merged by hand.
+
+Native gates (sequential):
+$ cargo fmt --all -- --check
+exit 0; no output
+$ cargo check --workspace --all-targets --locked
+Finished dev profile in 38.42s; exit 0
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished dev profile in 42.39s; exit 0
+$ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
+123 test result lines: 6458 passed; 0 failed; 0 ignored; exit 0. TUI: 1411 passed. No wall-clock retry.
+$ scripts/check_discipline.sh
+discipline ok (advisory warnings); exit 0
+$ scripts/budget.sh
+dependencies: 423 (max 423); core warm check: 0s; relink isolation: 0 crates; target/debug: 21 GB (soft max 5); budget ok; exit 0
+$ cargo deny check
+advisories ok, bans ok, licenses ok, sources ok; exit 0
+
+Windows (sequential):
+$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc
+Finished dev profile in 7.06s; exit 0
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc
+aws-lc-sys: fatal error: 'stdlib.h' file not found; 'windows.h' file not found; exit 101
+$ cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc
+rquickjs-sys: clang rejects '/DWIN32_LEAN_AND_MEAN', '/std:c11', '/experimental:c11atomics'; aws-lc-sys: missing stdlib.h/windows.h; exit 101
+$ cargo check -p bingo-plugin-rpc --all-targets --target x86_64-pc-windows-msvc
+aws-lc-sys: fatal error: 'stdlib.h' file not found; 'windows.h' file not found; exit 101
+$ cargo check -p bingo-surface-rpc --all-targets --target x86_64-pc-windows-msvc
+Finished dev profile in 6.73s; exit 0
+
+$ cargo build -p bingo --locked
+Finished dev profile in 31.39s; exit 0
+
+$ TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh
+tui-smoke ok; exit 0
+
+$ python3 docs/verification/m192/drive.py
+PASS 100x32: fake-provider reply captured; private HOME/data/cwd
+CLEAN 100x32: owned tmux server stopped; temporary files removed
+PASS 80x24: fake-provider reply captured; private HOME/data/cwd
+CLEAN 80x24: owned tmux server stopped; temporary files removed
+exit 0
+
+$ python3 docs/verification/m192/check-snapshots.py
+PASS: four syntax snapshots retain every character after removing ink annotations
+PASS: the only other snapshot change is palette values
+PASS: Cargo.lock, prototype and all scene captures are unchanged
+exit 0

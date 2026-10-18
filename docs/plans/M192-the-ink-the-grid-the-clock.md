@@ -165,19 +165,20 @@ Any screen's layout or keys; the characters of today's snapshots; node or playwr
 - R3.4 — same command: `round3_unknown_motion_ink_has_no_deadline` and `round3_flattened_toast_has_no_motion_deadline`: FAILED → `ok`; shared `moves`, still toast/receipt drawings.
 - R3.5 — same command: `round3_styled_and_nested_text_displays_keep_plain_layout`: FAILED → `ok`; workspace: `a_box_display_keeps_its_clock_and_deadline ... ok`; `a_breathing_row_off_screen_neither_redraws_nor_schedules ... ok`.
 - R3.6 — `cargo test -p bingo-sdk --locked --test ember_style unknown_motion_round_trips_its_original_fields -- --exact`: `0 passed; 1 failed` before; `cargo test -p bingo-sdk --locked`: round-trip, schema exclusion and generated catalogue fixture `ok`; `Other(Value)` preserves unknown fields; generated files unchanged.
-- R3.7 — workspace TUI: `1403 passed; 0 failed`; `scripts/check_discipline.sh`: `discipline ok`; still Actions, named text-only Block conversion, unused activity argument removed; `mismatch` 54 lines.
+- R3.7 — workspace TUI: `1411 passed; 0 failed`; `scripts/check_discipline.sh`: `discipline ok`; still Actions, named text-only Block conversion, unused activity argument removed; `mismatch` 54 lines.
+- Rebase — base `37261d45`; `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` for `bingo-sdk`, `bingo-mods`, `bingo-plugin-rpc`, `bingo-surface-rpc`: all exit 0; regenerated `schema/{dollar,events,plugin-2,plugin,rpc}.json` and `sdk/typescript/src/{dollar-types,events,wire}.ts`. [Conflicts and results](../verification/m192/rebase.txt).
 
 ### Gates
 
 - `cargo fmt --all -- --check`: exit 0, no output.
-- `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 43.15s`.
-- `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 43.04s`.
-- `env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked`: 120 result lines, **6394 passed; 0 failed; 0 ignored**; no wall-clock retry needed.
+- `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 38.42s`.
+- `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 42.39s`.
+- `env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked`: 123 result lines, **6458 passed; 0 failed; 0 ignored**; no wall-clock retry needed.
 - `scripts/check_discipline.sh`: `discipline ok` (advisory warnings only).
-- `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `0s`, TUI relink `0 crates`; `target/debug: 14 GB (soft max 5)`; `budget ok`.
+- `scripts/budget.sh`: `dependencies (unique, normal): 423 (max 423)`; core warm check `0s`, TUI relink `0 crates`; `target/debug: 21 GB (soft max 5)`; `budget ok`.
 - `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
-- `cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc`: `Finished dev profile ... in 6.36s`; prior `bingo-surface-rpc` check: exit 0.
-- `cargo build -p bingo --locked`: `Finished dev profile ... in 36.28s`; `TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`.
+- `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc`: `bingo-sdk` / `bingo-surface-rpc`: `Finished dev profile` in 7.06s / 6.73s; both exit 0.
+- `cargo build -p bingo --locked`: `Finished dev profile ... in 31.39s`; `TUI_SMOKE_SOCKET_PREFIX=m192-drive-smoke scripts/tui-smoke.sh`: `tui-smoke ok`.
 - `python3 docs/verification/m192/drive.py`: `PASS 100x32` / `PASS 80x24`, fake provider and private HOME/data/cwd; both `CLEAN` lines confirm owned server and temporary-file cleanup; captures in `docs/verification/m192/`.
 
 ### Departures and owed
@@ -186,4 +187,4 @@ Any screen's layout or keys; the characters of today's snapshots; node or playwr
 - No new round-3 departures; Text displays retain dev's layout. Motion stays boxed; drawing clocks/deadlines are explicit; no `views::next_change` remains. No dependency, prototype or scene-capture changes.
 - M199: retain legacy `breath` beside `breathe`, `paths::elide` beside `short_path`, and old accessor names until their screens are redrawn.
 - M193: retain Site/status/toast deadline accumulators; accepted `kept()`/pane-truncation deadlines remain.
-- Owed — Windows `bingo-surface-tui` (rerun, exit 101) and `bingo-plugin-rpc` (prior check): `aws-lc-sys`, missing `stdlib.h` / `windows.h`; `bingo-mods` (prior check) also lacks the rquickjs MSVC toolchain (`/std:c11` rejected). CI's Windows job is the backstop; no bypasses.
+- Owed — Windows `bingo-surface-tui` / `bingo-plugin-rpc` (both exit 101): `aws-lc-sys`, missing `stdlib.h` / `windows.h`; `bingo-mods` (exit 101) also lacks the rquickjs MSVC toolchain (`/std:c11` rejected). CI's Windows job is the backstop; no bypasses.

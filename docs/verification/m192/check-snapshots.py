@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Compare snapshot characters and immutable inputs with M192's starting commit."""
+"""Compare snapshot characters and immutable inputs with M192's rebase commit."""
 from pathlib import Path
 import re
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[3]
-BASE = "25a22320c9273f08beaf749626629a8f7da252d1"
+BASE = "37261d45fe01c78050da9e4ed550918ce82debec"
 
 
 def git(*args):
