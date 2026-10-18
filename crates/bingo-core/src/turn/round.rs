@@ -250,9 +250,6 @@ impl Round<'_> {
             && (gated.gate == Gate::Allowed
                 || matches!(&item.body, ItemBody::ToolCall { input, .. } if *input != gated.call.input))
         {
-            if gated.gate == Gate::Allowed {
-                item.status = ItemStatus::Running;
-            }
             if let ItemBody::ToolCall {
                 input,
                 allowed_by,
@@ -261,6 +258,7 @@ impl Round<'_> {
             } = &mut item.body
             {
                 if gated.gate == Gate::Allowed {
+                    item.status = ItemStatus::Running;
                     *began_at = Some(Timestamp::now());
                 }
                 *input = gated.call.input.clone();

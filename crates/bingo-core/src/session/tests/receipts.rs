@@ -188,12 +188,9 @@ async fn questioning() -> (Mailbox, SessionState, FrameStream) {
     (mailbox, state, events)
 }
 
-async fn stopped(question: bool) {
-    let (mailbox, mut state, mut events) = if question {
-        questioning().await
-    } else {
-        prompted().await
-    };
+async fn stop_opened(
+    (mailbox, mut state, mut events): (Mailbox, SessionState, FrameStream),
+) -> (SessionState, Interaction) {
     let ask = state.interactions[0].clone();
     mailbox.interrupt(IntentId::mint(), InterruptScope::Head);
     drive(&mut events, &mut state, turn_completed).await;
@@ -204,41 +201,25 @@ async fn stopped(question: bool) {
     let model =
         serde_json::to_string(&crate::context::ContextView::model_view(&state.transcript)).unwrap();
     assert!(!model.contains("skipped") && !model.contains("Where?"));
-    let turn = ask.turn.unwrap();
+    (state, ask)
+}
+
+fn assert_stopped_clock(
+    state: &SessionState,
+    ask: &Interaction,
+    wait_start: Timestamp,
+    tail: jiff::SignedDuration,
+    asked_at: Option<Timestamp>,
+) {
+    let turn = ask.turn.as_ref().unwrap();
     let start = state
         .transcript
         .items()
         .iter()
-        .find(|i| i.turn.as_ref() == Some(&turn))
+        .find(|i| i.turn.as_ref() == Some(turn))
         .unwrap()
         .started_at;
-    let clock = bingo_sdk::transcript::clock(&state, &turn, Timestamp::now()).unwrap();
-    let wait_start = if question {
-        ask.opened_at
-    } else {
-        bingo_sdk::transcript::call_wait(state.transcript.get(ask.item.as_ref().unwrap()).unwrap())
-            .unwrap()
-            .0
-    };
-    let ended = state
-        .transcript
-        .items()
-        .iter()
-        .filter_map(|i| i.completed_at)
-        .max()
-        .unwrap();
-    let tail = if question {
-        jiff::SignedDuration::ZERO
-    } else {
-        ended.duration_since(
-            state
-                .transcript
-                .get(ask.item.as_ref().unwrap())
-                .unwrap()
-                .completed_at
-                .unwrap(),
-        )
-    };
+    let clock = bingo_sdk::transcript::clock(state, turn, Timestamp::now()).unwrap();
     assert_eq!(clock.elapsed, wait_start.duration_since(start) + tail);
     let interruption = state
         .transcript
@@ -248,20 +229,41 @@ async fn stopped(question: bool) {
         .unwrap();
     assert_eq!(
         serde_json::to_value(&interruption.body).unwrap()["askedAt"],
-        if question {
-            json!(ask.opened_at)
-        } else {
-            serde_json::Value::Null
-        }
+        json!(asked_at)
     );
 }
+
 #[tokio::test]
 async fn stopping_a_permission_does_not_invent_an_answer() {
-    stopped(false).await;
+    let (state, ask) = stop_opened(prompted().await).await;
+    let call = state.transcript.get(ask.item.as_ref().unwrap()).unwrap();
+    let (wait_start, wait_end) = bingo_sdk::transcript::call_wait(call).unwrap();
+    let ended = state
+        .transcript
+        .items()
+        .iter()
+        .filter_map(|i| i.completed_at)
+        .max()
+        .unwrap();
+    assert_stopped_clock(
+        &state,
+        &ask,
+        wait_start,
+        ended.duration_since(wait_end.unwrap()),
+        None,
+    );
 }
+
 #[tokio::test]
 async fn stopping_a_question_does_not_invent_an_answer() {
-    stopped(true).await;
+    let (state, ask) = stop_opened(questioning().await).await;
+    assert_stopped_clock(
+        &state,
+        &ask,
+        ask.opened_at,
+        jiff::SignedDuration::ZERO,
+        Some(ask.opened_at),
+    );
 }
 
 #[tokio::test]
