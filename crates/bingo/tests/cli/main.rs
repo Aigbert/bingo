@@ -97,16 +97,31 @@ fn exit_within(
 }
 
 /// `run`, for a scenario whose failure is a hang: past `limit` the process is
-/// killed and the test fails, instead of the suite waiting on it. The output
-/// is read once the process has exited, so it must fit the pipe.
+/// killed and the test fails, instead of the suite waiting on it.
 fn run_within(cmd: &mut Command, limit: Duration) -> Output {
     run_before(cmd, limit, &format!("bingo did not exit within {limit:?}"))
 }
 
 fn run_before(cmd: &mut Command, limit: Duration, failure: &str) -> Output {
     let mut child = cmd.spawn().expect("the binary runs");
-    exit_within(&mut child, limit, failure);
-    child.wait_with_output().expect("output")
+    let stdout = output::Pipe::start(child.stdout.take());
+    let stderr = output::Pipe::start(child.stderr.take());
+    let finished = output::wait(&mut child, &stdout, &stderr, limit);
+    if !finished {
+        let _ = child.kill();
+    }
+    let output = Output {
+        status: child.wait().expect("the child exits"),
+        stdout: stdout.collect(),
+        stderr: stderr.collect(),
+    };
+    assert!(
+        finished,
+        "{failure}\nstdout: {}\nstderr: {}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    output
 }
 
 /// The binary with a person at the keyboard: every line is answered in order,
@@ -812,6 +827,7 @@ mod login;
 mod mcp;
 mod mentions;
 mod models;
+mod output;
 mod palette;
 mod peers;
 mod persona;
