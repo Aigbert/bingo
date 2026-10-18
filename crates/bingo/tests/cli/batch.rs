@@ -1,4 +1,4 @@
-//! A step that holds more than one call: both come back, in landing order.
+//! A step that holds more than one call: both come back.
 
 use super::*;
 
@@ -35,8 +35,6 @@ fn two_commands_in_one_step_both_come_back() {
         stdout(&out)
     );
     assert_both_returned(&frames);
-    let reversed: Vec<_> = frames.into_iter().rev().collect();
-    assert_both_returned(&reversed);
 }
 
 fn assert_both_returned(frames: &[bingo_sdk::Frame]) {
