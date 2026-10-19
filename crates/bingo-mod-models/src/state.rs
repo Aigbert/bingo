@@ -39,10 +39,10 @@ pub async fn publish(
     let pane = slot::Slot::Pane {
         hints: None,
         id: picker.id.clone(),
-        title: "model".into(),
+        title: String::new(),
         focus: true,
         close_on_escape: true,
-        hold_toasts: true,
+        hold_toasts: false,
         asked: true,
         place: placement(),
         size,
@@ -79,6 +79,7 @@ pub async fn models(
 }
 pub fn chat(state: &SessionState) -> crate::card::Chat {
     crate::card::Chat {
+        effort: state.summary.effort,
         current: format!("{}/{}",state.summary.provider.as_deref().unwrap_or_default(),state.summary.model.as_deref().unwrap_or_default()),
         used: state.context.map_or(0,|context|context.used),
         pictures: state.transcript.model_items().any(|item| matches!(&item.body,ItemBody::User {parts,..} if parts.iter().any(|part|matches!(part,ContentPart::Image(_))))),
@@ -86,11 +87,5 @@ pub fn chat(state: &SessionState) -> crate::card::Chat {
 }
 
 pub fn placement() -> Vec<slot::Place> {
-    vec![slot::Place::Rect(slot::Rect {
-        anchor: slot::Anchor::BottomLeft,
-        x: slot::Length::Cells(0),
-        y: slot::Length::Cells(0),
-        width: slot::Length::Percent(100),
-        height: slot::Length::Cells(18),
-    })]
+    vec![slot::Place::Dock]
 }

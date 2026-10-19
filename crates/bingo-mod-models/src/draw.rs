@@ -12,7 +12,7 @@ impl Interceptor for Drawing {
     }
     fn matcher(&self) -> LinkMatcher {
         LinkMatcher {
-            prefilter: json!({"component":self.1,"surface":"terminal"}),
+            prefilter: json!({"component":self.1}),
             ..LinkMatcher::at(catalogue::UI_RENDER)
         }
     }
@@ -23,6 +23,11 @@ impl Interceptor for Drawing {
         value: Value,
         next: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
+        let request: render::RenderRequest =
+            serde_json::from_value(value.clone()).map_err(crate::error)?;
+        if !request.surface.shows_sheets() {
+            return next.run(value).await;
+        }
         let component = value["component"].as_str().unwrap_or_default();
         if component == "InfoNotice"
             && let Some(text) = value["props"]["text"]
@@ -34,8 +39,6 @@ impl Interceptor for Drawing {
         if component != "ModelPicker" {
             return next.run(value).await;
         }
-        let request: render::RenderRequest =
-            serde_json::from_value(value.clone()).map_err(crate::error)?;
         let picker = self
             .0
             .lock()
@@ -55,6 +58,7 @@ impl Interceptor for Drawing {
             &crate::state::chat(&attached.snapshot),
             request.viewport.columns,
             request.viewport.rows,
+            request.viewport.glyphs,
         ))
         .map_err(crate::error)
     }
@@ -66,245 +70,124 @@ pub fn tree(
     chat: &crate::card::Chat,
     width: u16,
     height: u16,
+    glyphs: bingo_sdk::glyph::GlyphSet,
 ) -> View {
-    let rows = crate::rows::rows(models, providers, &picker.props.filter, picker.all);
-    let at = crate::rows::cursor(&rows, picker.props.selected.as_deref());
-    let children = if let Some(sheet) = &picker.sheet {
-        crate::sheet::lines(sheet, providers)
-            .into_iter()
-            .map(dim)
-            .collect()
-    } else {
-        let list = List {
-            rows: &rows,
-            at,
-            models,
-            providers,
-            chat,
-        };
-        list.draw(picker, width, height)
+    use bingo_sdk::{pick, sheet::Sheet};
+    let listed = crate::rows::rows(models, &picker.props.filter, picker.all);
+    let at = crate::rows::cursor(&listed, picker.props.selected.as_deref());
+    let rows = listed
+        .iter()
+        .enumerate()
+        .map(|(i, row)| model_row(row, models, chat, at == Some(i)))
+        .collect();
+    let model = at
+        .and_then(|i| listed[i].model())
+        .and_then(|id| models.iter().find(|m| m.id == id));
+    let mut sheet = Sheet {
+        head: "Model".into(),
+        fact: Some(pick::text(
+            format!("{} {}", short(&chat.current), Effort::word(chat.effort)),
+            "dim",
+        )),
+        top: vec![],
+        rows,
+        selected: at.map(|i| listed[i].key()),
+        foot: model
+            .map(|m| effort_scale(m, picker.props.effort))
+            .unwrap_or_default(),
+        pick: true,
     };
-    View::Box {
-        children,
-        layout: Box::new(view::BoxStyle {
-            hints: Some(chrome(picker, &rows, at, models, providers, chat)),
-            on_key: Some(on_key(picker)),
-            ..Default::default()
-        }),
+    if let Some(manage) = &picker.sheet {
+        sheet = manage.build(providers);
     }
-}
-/// A key names only itself: it acts on the row the picker keeps selected,
-/// which a key queued behind a redraw has already moved.
-fn on_key(picker: &Picker) -> Action {
-    Action {
-        name: "bingo.mod.models:ui".into(),
-        args: json!({"handler":picker.id,"event":"press"}),
+    let mut view = sheet.view(width, height, glyphs);
+    if let View::Box { layout, .. } = &mut view {
+        layout.on_key = Some(Action {
+            name: "bingo.mod.models:ui".into(),
+            args: json!({"handler":picker.id,"event":"press"}),
+        });
+        layout.hints = Some(component::SiteHints::new([
+            component::KeyPair::new("↑↓", "model"),
+            component::KeyPair::new("←→", "effort"),
+            component::KeyPair::new("⏎", "use"),
+            component::KeyPair::new("esc", "close"),
+        ]));
     }
+    bingo_sdk::sheet::clicks(view)
 }
-struct List<'a> {
-    rows: &'a [Row],
-    at: Option<usize>,
-    models: &'a [CatalogEntry],
-    providers: &'a [CatalogEntry],
-    chat: &'a crate::card::Chat,
+fn short(id: &str) -> &str {
+    id.split_once('/').map_or(id, |(_, name)| name)
 }
-impl List<'_> {
-    fn draw(&self, picker: &Picker, width: u16, height: u16) -> Vec<View> {
-        let unlisted = crate::rows::unlisted(self.rows, &picker.props.filter, &self.chat.current);
-        let row = self.at.map(|i| &self.rows[i]);
-        let details = match &unlisted {
-            Some(id) => self::unlisted(id),
-            None => details(row, self.models, self.providers, self.chat, picker),
-        };
-        let left_width = if width >= 100 {
-            56
-        } else {
-            width.saturating_mul(2) / 5
-        };
-        let mut children = vec![dim(format!(
-            "   {}    ★ pinned · ∴ thinks · ▣ sees images",
-            header(self.rows, &picker.props.filter, self.providers.len())
-        ))];
-        let room = usize::from(height).saturating_sub(4).max(1);
-        children.extend((0..room).map(|i| {
-            self.line(
-                i,
-                room,
-                &details,
-                left_width,
-                width.saturating_sub(left_width),
-            )
-        }));
-        children
-    }
-    /// One visible line: a keyed row on the left, a line of the card on the right.
-    fn line(&self, i: usize, room: usize, details: &[String], left: u16, right: u16) -> View {
-        let selected = self.at.unwrap_or(0);
-        let start = selected
-            .saturating_sub(room / 2)
-            .min(self.rows.len().saturating_sub(room));
-        let index = start + i;
-        let more = i + 1 == room && start + room < self.rows.len() && selected != index;
-        let (text, key) = match self.rows.get(index) {
-            _ if more => (format!("↓ {} more", self.rows.len() - index), None),
-            Some(row) => (
-                row_text(row, self.models, self.providers, self.chat),
-                Some(row.key()),
-            ),
-            None => (String::new(), None),
-        };
-        let chosen = self.at == Some(index);
-        let mark = if chosen { " ❯ " } else { "   " };
-        let detail = details.get(i).map(String::as_str).unwrap_or_default();
-        View::Box {
-            children: vec![
-                cell(format!("{mark}{text}"), left, chosen),
-                cell(format!("│ {detail}"), right, false),
-            ],
-            layout: Box::new(view::BoxStyle {
-                flex_direction: Some(view::Direction::Row),
-                key,
-                ..Default::default()
-            }),
-        }
-    }
-}
-/// What the list holds now: matches for a filter, else models and providers.
-pub fn header(rows: &[Row], filter: &str, providers: usize) -> String {
-    let models = rows.iter().filter(|r| matches!(r, Row::Model(_))).count();
-    if filter.is_empty() {
-        format!("{models} models · {providers} providers")
-    } else {
-        let matches = if models == 1 { "match" } else { "matches" };
-        format!("{models} {matches} for “{filter}”")
-    }
-}
-fn row_text(
+fn model_row(
     row: &Row,
     models: &[CatalogEntry],
-    providers: &[CatalogEntry],
     chat: &crate::card::Chat,
-) -> String {
-    match row {
-        Row::Heading => "pinned".into(),
-        Row::Provider(id) => format!(
-            "{id}  {}",
-            providers
-                .iter()
-                .find(|p| &p.id == id)
-                .map(crate::label::status)
-                .unwrap_or_default()
-        ),
-        Row::Hidden(_, count) => format!("   · {count} hidden"),
-        Row::Add => "+ add a provider".into(),
-        Row::Pinned(id) | Row::Model(id) => models
-            .iter()
-            .find(|m| &m.id == id)
-            .map(|m| {
-                format!(
-                    "{} {} {} {} {}{}",
-                    if m.meta["pinned"] == true { "★" } else { " " },
-                    if id == &chat.current { "●" } else { " " },
-                    id.split_once('/').map_or(id.as_str(), |(_, m)| m),
-                    crate::card::known(&m.meta["context"])
-                        .map(crate::card::tokens)
-                        .unwrap_or_else(|| "—".into()),
-                    if m.meta["reasoning"] == true {
-                        "∴"
-                    } else {
-                        " "
-                    },
-                    if m.meta["images"] == true { "▣" } else { " " }
-                )
-            })
-            .unwrap_or_default(),
+    selected: bool,
+) -> pick::Row {
+    use bingo_sdk::pick::{bold, line, text};
+    let Some(model) = row
+        .model()
+        .and_then(|id| models.iter().find(|m| m.id == id))
+    else {
+        return pick::Row::new(row.key(), text("", "dim"));
+    };
+    let name = short(&model.id);
+    let provider = model.meta["provider"].as_str().unwrap_or_default();
+    let context = crate::card::known(&model.meta["context"])
+        .map(crate::card::tokens)
+        .unwrap_or_default();
+    let images = match model.meta["images"].as_bool() {
+        Some(true) => "reads images",
+        Some(false) => "text only",
+        None => "",
+    };
+    let left = line([
+        if selected {
+            pick::pad(bold(name, "fg"), 15)
+        } else {
+            pick::pad(text(name, "muted"), 15)
+        },
+        pick::line([
+            pick::pad(text(provider, "dim"), 12),
+            pick::pad(text(context, "dim"), 7),
+            text(images, "dim"),
+        ]),
+    ]);
+    let mut row = pick::Row::new(row.key(), left);
+    if model.id == chat.current {
+        row.right = Some(text("in use", "good"));
     }
+    row
 }
-fn details(
-    row: Option<&Row>,
-    models: &[CatalogEntry],
-    providers: &[CatalogEntry],
-    chat: &crate::card::Chat,
-    picker: &Picker,
-) -> Vec<String> {
-    match row {
-        Some(Row::Pinned(id) | Row::Model(id)) => models
-            .iter()
-            .find(|m| &m.id == id)
-            .map(|m| crate::card::card(m, chat, picker.props.effort, picker.keep()))
-            .unwrap_or_default(),
-        Some(Row::Provider(id)) => providers
-            .iter()
-            .find(|p| &p.id == id)
-            .map(|p| {
-                vec![
-                    id.clone(),
-                    String::new(),
-                    format!(
-                        "address   {}",
-                        p.meta["address"].as_str().unwrap_or("provider managed")
-                    ),
-                    format!(
-                        "key       {}",
-                        p.meta["auth"]["from"].as_str().unwrap_or("none")
-                    ),
-                    crate::label::status(p),
-                    String::new(),
-                    "test, sign in or manage".into(),
-                ]
-            })
-            .unwrap_or_default(),
-        Some(Row::Hidden(..)) => vec![
-            "Hidden models".into(),
-            "Snapshots and non-chat models".into(),
-            "hidden models".into(),
-        ],
-        Some(Row::Add) => vec![
-            "add a provider".into(),
-            "paste a key or an address".into(),
-            String::new(),
-            "sk-ant-…   Anthropic".into(),
-            "sk-or-…    OpenRouter".into(),
-            "sk-…       paste its address next".into(),
-            "localhost:11434   Ollama".into(),
-            "localhost:1234    LM Studio".into(),
-            "any http(s) address".into(),
-        ],
-        _ => vec!["No matching models".into()],
+fn effort_scale(model: &CatalogEntry, effort: Option<Effort>) -> Vec<View> {
+    use bingo_sdk::pick::{bold, line, text};
+    let effort = crate::card::clamp(model, effort);
+    let mut runs = vec![text("effort   ", "dim")];
+    for (i, value) in crate::card::levels(model).iter().enumerate() {
+        if i > 0 {
+            runs.push(text("  ", "dim"));
+        }
+        runs.push(if *value == effort {
+            bold(Effort::word(*value), "glow")
+        } else {
+            text(Effort::word(*value), "dim")
+        });
     }
-}
-fn unlisted(id: &str) -> Vec<String> {
     vec![
-        "No matching models".into(),
-        String::new(),
-        format!("use {id}"),
-        "the provider decides whether it exists".into(),
+        line(runs),
+        text(effort_words(Effort::word(effort)), "muted"),
     ]
 }
-fn cell(text: String, width: u16, selected: bool) -> View {
-    View::Box {
-        children: vec![View::Text {
-            children: vec![view::TextChild::String(text)],
-            style: view::TextStyle {
-                bold: Some(selected),
-                dim_color: Some(!selected),
-                wrap: Some("truncate".into()),
-                ..Default::default()
-            },
-        }],
-        layout: Box::new(view::BoxStyle {
-            width: Some(width),
-            ..Default::default()
-        }),
-    }
-}
-fn dim(text: String) -> View {
-    View::Text {
-        children: vec![view::TextChild::String(text)],
-        style: view::TextStyle {
-            dim_color: Some(true),
-            ..Default::default()
-        },
+pub(crate) fn effort_words(effort: &str) -> &str {
+    match effort {
+        "off" => "answers without thinking",
+        "minimal" => "barely thinks",
+        "low" => "a short think on hard steps",
+        "medium" => "thinks on most steps",
+        "high" => "thinks before most answers",
+        "xhigh" => "thinks long on hard problems",
+        "max" => "thinks as long as it needs",
+        _ => "",
     }
 }
 pub fn outcome(text: &str) -> View {
@@ -327,122 +210,41 @@ pub fn outcome(text: &str) -> View {
     }
 }
 
-fn action_label(
-    row: Option<&Row>,
-    models: &[CatalogEntry],
-    providers: &[CatalogEntry],
-    picker: &Picker,
-) -> String {
-    match row {
-        Some(Row::Pinned(id) | Row::Model(id)) => models
-            .iter()
-            .find(|m| &m.id == id)
-            .and_then(|m| {
-                providers
-                    .iter()
-                    .find(|p| m.meta["provider"] == p.id)
-                    .map(|p| crate::label::label(m, p, picker.keep()))
-            })
-            .unwrap_or_default(),
-        Some(Row::Provider(_)) => "manage".into(),
-        Some(Row::Hidden(..)) => "show hidden".into(),
-        Some(Row::Add) => "add".into(),
-        _ => String::new(),
-    }
-}
-
-fn chrome(
-    picker: &Picker,
-    rows: &[Row],
-    at: Option<usize>,
-    models: &[CatalogEntry],
-    providers: &[CatalogEntry],
-    chat: &crate::card::Chat,
-) -> component::SiteHints {
-    use component::{KeyPair as Pair, SiteHints};
-    if let Some(sheet) = &picker.sheet {
-        return sheet_hints(sheet);
-    }
-    let row = at.and_then(|i| rows.get(i));
-    let mut pairs = vec![Pair::new("↑↓", "pick")];
-    if let Some(id) = row.and_then(Row::model) {
-        let pinned = models
-            .iter()
-            .any(|m| m.id == id && m.meta["pinned"] == true);
-        pairs.extend([
-            Pair::new("←→", "thinking"),
-            Pair::new("*", if pinned { "unpin" } else { "pin" }),
-            Pair::new("tab", if picker.keep() { "here only" } else { "keep" }),
-        ]);
-    } else {
-        pairs.push(Pair::new("+", "add provider"));
-    }
-    pairs.extend([
-        Pair::new(
-            "⏎",
-            crate::rows::unlisted(rows, &picker.props.filter, &chat.current).map_or_else(
-                || action_label(row, models, providers, picker),
-                |id| format!("use {id}"),
-            ),
-        ),
-        Pair::new("esc", "close"),
-    ]);
-    SiteHints::new(pairs).composer(format!("/model {}", picker.props.filter), "")
-}
-
-fn sheet_hints(sheet: &crate::sheet::Sheet) -> component::SiteHints {
-    use component::{KeyPair as Pair, SiteHints};
-    let pairs = match sheet {
-        crate::sheet::Sheet::Add { selected, .. } => vec![
-            Pair::new("↑↓", "field"),
-            Pair::new(
-                "⏎",
-                if *selected == 4 {
-                    "check and add"
-                } else {
-                    "edit"
-                },
-            ),
-            Pair::new("esc", "back"),
-        ],
-        _ => vec![
-            Pair::new("↑↓", "pick"),
-            Pair::new("⏎", "do it"),
-            Pair::new("esc", "back"),
-        ],
-    };
-    SiteHints::new(pairs).composer(format!("/model › {}", sheet.title()), "")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn the_header_counts_what_the_list_holds() {
-        let rows = [
-            Row::Heading,
-            Row::Pinned("fake/a".into()),
-            Row::Provider("fake".into()),
-            Row::Model("fake/a".into()),
-            Row::Model("fake/b".into()),
-        ];
-        assert_eq!(header(&rows, "", 3), "2 models · 3 providers");
-        assert_eq!(header(&rows, "a", 3), "2 matches for “a”");
-        assert_eq!(header(&rows[..4], "a", 3), "1 match for “a”");
-    }
-    #[test]
-    fn a_window_nobody_reported_is_a_dash() {
-        let models = [CatalogEntry {
-            id: "openai/chatgpt-image-latest".into(),
-            label: String::new(),
-            meta: json!({"context": 0}),
-        }];
-        let text = row_text(
-            &Row::Model(models[0].id.clone()),
+    fn models_use_the_shared_sheet_window_and_ground() {
+        let models = (0..12)
+            .map(|i| CatalogEntry {
+                id: format!("p/model-{i}"),
+                label: String::new(),
+                meta: json!({"provider":"p"}),
+            })
+            .collect::<Vec<_>>();
+        let picker = Picker {
+            props: component::ModelPickerProps {
+                selected: Some("model:p/model-11".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let view = tree(
+            &picker,
             &models,
             &[],
-            &crate::card::Chat::default(),
+            &Default::default(),
+            100,
+            18,
+            Default::default(),
         );
-        assert!(text.contains("chatgpt-image-latest —"), "{text}");
+        assert!(view.fold().contains("8 of 12"));
+        assert!(!view.fold().contains("model-0"));
+        assert!(!view.fold().contains("text only"));
+        assert!(
+            serde_json::to_string(&view)
+                .unwrap()
+                .contains("\"ground\":\"pick\"")
+        );
     }
 }

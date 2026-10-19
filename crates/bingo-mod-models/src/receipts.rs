@@ -1,8 +1,7 @@
-//! A model or effort switch is a line in the transcript whichever client asked
-//! for it: the receipt is recorded, and its ack still carries the words.
+//! Terminal switches acknowledge in the footer; text clients retain their receipt.
 use bingo_sdk::*;
 use serde_json::Value;
-pub struct Receipts;
+pub struct Receipts(pub crate::Shared);
 #[async_trait::async_trait]
 impl Interceptor for Receipts {
     fn id(&self) -> &str {
@@ -14,37 +13,51 @@ impl Interceptor for Receipts {
     async fn chain(
         &self,
         _: &catalogue::Entry,
-        _: &HookContext,
+        cx: &HookContext,
         value: Value,
         next: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
-        let switches = matches!(value["command"].as_str(), Some("model" | "think"));
+        let run: catalogue::CommandRun =
+            serde_json::from_value(value.clone()).map_err(crate::error)?;
+        let sheets = run.surface.is_some_and(render::SurfaceName::shows_sheets);
+        let switches = matches!(run.name.as_str(), "model" | "think");
+        let command = run.name;
         let value = next.run(value).await?;
-        if switches { outcome(value) } else { Ok(value) }
+        let Some(record) = switches.then(|| receipt(&value)).flatten() else {
+            return Ok(value);
+        };
+        let choosing = self
+            .0
+            .lock()
+            .map_err(crate::error)?
+            .contains_key(&cx.session);
+        if !sheets || !choosing {
+            crate::toast::announce(cx, &command).await?;
+        }
+        if sheets {
+            return Ok(serde_json::json!({"kind":"applied"}));
+        }
+        serde_json::to_value(record).map_err(crate::error)
     }
 }
-fn outcome(value: Value) -> Result<Value, KernelError> {
+/// The transcript line a switch leaves; anything else the command said is not one.
+fn receipt(value: &Value) -> Option<CommandOutcome> {
     if value["kind"] != "applied" {
-        return Ok(value);
+        return None;
     }
-    let Some(message) = value["message"].as_str() else {
-        return Ok(value);
-    };
+    let message = value["message"].as_str()?;
     let text = if message.starts_with('⇄') {
         message.to_owned()
-    } else if let Some(effort) = message.strip_prefix("thinking: ") {
-        format!("⇄ thinking {effort}")
     } else {
-        return Ok(value);
+        format!("⇄ thinking {}", message.strip_prefix("thinking: ")?)
     };
-    serde_json::to_value(CommandOutcome::Record {
+    Some(CommandOutcome::Record {
         body: Box::new(ItemBody::Notice {
             level: Level::Info,
             code: "model.choice".into(),
             text,
         }),
     })
-    .map_err(crate::error)
 }
 #[cfg(test)]
 mod tests {
@@ -52,11 +65,56 @@ mod tests {
     use serde_json::json;
     #[test]
     fn choice_receipts_are_recorded_and_other_outcomes_are_unchanged() {
-        let value = outcome(json!({"kind":"applied","message":"⇄ small · here"})).unwrap();
+        let value = receipt(&json!({"kind":"applied","message":"⇄ small · here"}));
         assert!(
-            matches!(serde_json::from_value::<CommandOutcome>(value).unwrap(), CommandOutcome::Record { body } if matches!(body.as_ref(), ItemBody::Notice {text, ..} if text == "⇄ small · here"))
+            matches!(value, Some(CommandOutcome::Record { body }) if matches!(body.as_ref(), ItemBody::Notice {text, ..} if text == "⇄ small · here"))
         );
-        let other = json!({"kind":"applied","message":"pinned"});
-        assert_eq!(outcome(other.clone()).unwrap(), other);
+        assert!(receipt(&json!({"kind":"applied","message":"pinned"})).is_none());
+    }
+    #[tokio::test]
+    async fn sheet_choice_receipts_leave_no_notice_or_duplicate_toast() {
+        let (host, command) = crate::test_support::host();
+        let shared = crate::Shared::default();
+        shared
+            .lock()
+            .unwrap()
+            .insert(command.session.clone(), Default::default());
+        let cx = HookContext {
+            session: command.session,
+            cwd: command.cwd,
+            host: command.host,
+            turn: None,
+            item: None,
+            provider: None,
+            model: None,
+        };
+        for name in ["model", "think"] {
+            let result = Receipts(shared.clone())
+                .chain(
+                    catalogue::COMMAND_RUN,
+                    &cx,
+                    json!({"command":name,"args":"chosen","surface":"terminal"}),
+                    Next::new(|_| {
+                        Box::pin(async { Ok(json!({"kind":"applied","message":"⇄ chosen"})) })
+                    }),
+                )
+                .await
+                .unwrap();
+            assert_eq!(result, json!({"kind":"applied"}));
+        }
+        crate::pins::announce(
+            &CommandContext {
+                surface: Some(render::SurfaceName::Terminal),
+                session: cx.session,
+                cwd: cx.cwd,
+                host: cx.host,
+                cancel: Default::default(),
+            },
+            vec!["chosen high".into()],
+            Tone::Good,
+        )
+        .await
+        .unwrap();
+        assert_eq!(host.calls().iter().filter(|call| matches!(call, testing::HostCall::Signal { kind, .. } if kind == "pin" || kind == "choice")).count(), 1);
     }
 }

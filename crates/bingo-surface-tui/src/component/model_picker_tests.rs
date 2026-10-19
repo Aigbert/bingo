@@ -13,7 +13,7 @@ fn prototype_scenes_at_both_terminal_sizes() {
     let (models, providers) = entries();
     for (width, height) in [(108, 30), (80, 24)] {
         for scene in [
-            "open", "direct", "long", "down", "codex", "paste", "all", "quick", "manage",
+            "open", "direct", "long", "down", "codex", "all", "quick", "manage",
         ] {
             if scene == "quick" {
                 insta::assert_snapshot!(
@@ -35,7 +35,15 @@ fn prototype_scenes_at_both_terminal_sizes() {
                     model.meta["compacts"] = json!(model.id != chat.current);
                 }
             }
-            let view = bingo_mod_models::draw::tree(&picker, &models, &providers, &chat, width, 18);
+            let view = bingo_mod_models::draw::tree(
+                &picker,
+                &models,
+                &providers,
+                &chat,
+                width,
+                18,
+                Default::default(),
+            );
             let text = serde_json::to_string(&view).unwrap();
             assert!(!text.contains("sk-dummy-never-draw-this"));
             assert!(
@@ -183,7 +191,7 @@ fn scenario_sheet(scene: &str) -> Option<Sheet> {
         "down" | "manage" => {
             return Some(Sheet::Manage {
                 provider: "work".into(),
-                selected: 0,
+                selected: None,
                 pending: Some("work/qwen3-coder-30b".into()),
                 confirm: false,
             });
@@ -191,19 +199,8 @@ fn scenario_sheet(scene: &str) -> Option<Sheet> {
         "codex" => {
             return Some(Sheet::SignIn {
                 provider: "codex".into(),
-                selected: 0,
+                selected: None,
                 pending: Some("codex/gpt-6".into()),
-            });
-        }
-        "paste" => {
-            return Some(Sheet::Add {
-                guess: bingo_mod_models::guess::Guess {
-                    name: "work".into(),
-                    shape: "openai".into(),
-                    address: "http://localhost:11434/v1".into(),
-                    key: Some("sk-dummy-never-draw-this".into()),
-                },
-                selected: 0,
             });
         }
         _ => {}
@@ -273,13 +270,29 @@ fn a_filtered_picker_reflows_its_cursor_when_the_pane_shrinks() {
     assert!(memo.request(&tall));
     memo.answer(
         tall,
-        bingo_mod_models::draw::tree(&picker, &models, &providers, &Chat::default(), 108, 18),
+        bingo_mod_models::draw::tree(
+            &picker,
+            &models,
+            &providers,
+            &Chat::default(),
+            108,
+            18,
+            Default::default(),
+        ),
     );
     let short = crate::pulled::Key::new(&state, &request, 108, 8);
     assert!(memo.request(&short), "a short pane needs a new row window");
     memo.answer(
         short.clone(),
-        bingo_mod_models::draw::tree(&picker, &models, &providers, &Chat::default(), 108, 8),
+        bingo_mod_models::draw::tree(
+            &picker,
+            &models,
+            &providers,
+            &Chat::default(),
+            108,
+            8,
+            Default::default(),
+        ),
     );
     let view = memo.get(&short).unwrap();
     let lines = crate::views::render(view, 108);
@@ -296,7 +309,7 @@ fn a_filtered_picker_reflows_its_cursor_when_the_pane_shrinks() {
     assert!(
         screen
             .lines()
-            .any(|line| line.contains('❯') && line.contains("m29")),
+            .any(|line| line.contains('▎') && line.contains("m29")),
         "{screen}"
     );
 }

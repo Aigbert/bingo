@@ -40,6 +40,94 @@ pub(super) fn show(state: &mut SessionState, ui: &mut crate::ui::Ui, owner: &str
     ));
     ui.sync_panes(state);
 }
+fn models(selected: usize, width: u16, height: u16) -> View {
+    let models = crate::test_support::ember::world::rows("models").into_iter().map(|row| {
+        let id = row["id"].as_str().unwrap();
+        let provider = row["prov"].as_str().unwrap();
+        let ctx = row["ctx"].as_str().unwrap();
+        let context = ctx[..ctx.len()-1].parse::<u64>().unwrap() * if ctx.ends_with('M') { 1_000_000 } else { 1000 };
+        CatalogEntry { id: format!("{provider}/{id}"), label: id.into(), meta: json!({"provider":provider,"context":context,"images":row["img"],"efforts":row["effs"]}) }
+    }).collect::<Vec<_>>();
+    let picker = bingo_mod_models::state::Picker {
+        id: "model".into(),
+        props: bingo_sdk::component::ModelPickerProps {
+            selected: Some(format!("model:{}", models[selected].id)),
+            effort: Some(if selected == 1 {
+                Effort::Max
+            } else {
+                Effort::High
+            }),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    bingo_mod_models::draw::tree(
+        &picker,
+        &models,
+        &[],
+        &bingo_mod_models::card::Chat {
+            effort: Some(Effort::High),
+            current: models[0].id.clone(),
+            ..Default::default()
+        },
+        width,
+        height,
+        Default::default(),
+    )
+}
+#[test]
+fn m198_model_full_frame() {
+    let capture = Capture::load("model");
+    capture.render(|| {
+        let (mut state, mut ui) = fixture(&capture);
+        let size = capture.size();
+        show(
+            &mut state,
+            &mut ui,
+            "bingo.mod.models",
+            models(
+                0,
+                size.width,
+                crate::layout::grid::dock_cap(size.height.into()),
+            ),
+        );
+        let screen = drawn(
+            size.width,
+            size.height,
+            &solo(&state),
+            &mut ui,
+            capture.now(),
+        );
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
+}
+
+#[test]
+fn m198_model_moved_full_frame() {
+    let capture = Capture::load("model-moved");
+    capture.render(|| {
+        let (mut state, mut ui) = fixture(&capture);
+        let size = capture.size();
+        show(
+            &mut state,
+            &mut ui,
+            "bingo.mod.models",
+            models(
+                1,
+                size.width,
+                crate::layout::grid::dock_cap(size.height.into()),
+            ),
+        );
+        let screen = drawn(
+            size.width,
+            size.height,
+            &solo(&state),
+            &mut ui,
+            capture.now(),
+        );
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
+}
 
 #[test]
 fn m198_keys_closed_full_frame() {
@@ -105,6 +193,24 @@ fn band_lines(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::Rect) -> 
         .collect()
 }
 
+#[test]
+fn m198_model_chosen_full_frame() {
+    let capture = Capture::load("model-chosen");
+    capture.render(|| {
+        let (mut state, mut ui) = fixture(&capture);
+        let mut summary = state.summary.clone();
+        summary.model = Some("sonnet-5.5".into());
+        summary.effort = Some(Effort::Max);
+        state.apply(&frame(state.seq.0 + 1, Event::SessionUpdated { summary }));
+        ui.notify(
+            Level::Info,
+            "✓ sonnet-5.5 max",
+            capture.now().instant - std::time::Duration::from_millis(400),
+        );
+        let screen = drawn(100, 32, &solo(&state), &mut ui, capture.now());
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
+}
 #[test]
 fn m198_rewind_full_frame() {
     let capture = Capture::load("rewind");

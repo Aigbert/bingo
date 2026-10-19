@@ -2,34 +2,22 @@ use bingo_sdk::CatalogEntry;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Row {
-    Heading,
-    /// A pinned model at the top; the same model is listed again under its provider.
-    Pinned(String),
     Model(String),
-    Provider(String),
-    Hidden(String, usize),
-    Add,
 }
 impl Row {
     pub fn selectable(&self) -> bool {
-        !matches!(self, Self::Heading)
+        true
     }
     /// The model this row stands for, wherever it is listed.
     pub fn model(&self) -> Option<&str> {
         match self {
-            Self::Pinned(id) | Self::Model(id) => Some(id),
-            _ => None,
+            Self::Model(id) => Some(id),
         }
     }
     /// Names the row across redraws, so a key acts on the row a person saw.
     pub fn key(&self) -> String {
         match self {
-            Self::Heading => "heading".into(),
-            Self::Pinned(id) => format!("pin:{id}"),
             Self::Model(id) => format!("model:{id}"),
-            Self::Provider(id) => format!("provider:{id}"),
-            Self::Hidden(id, _) => format!("hidden:{id}"),
-            Self::Add => "add".into(),
         }
     }
 }
@@ -45,47 +33,12 @@ pub fn cursor(rows: &[Row], selected: Option<&str>) -> Option<usize> {
         .or_else(|| rows.iter().position(|r| r.model().is_some()))
         .or_else(|| rows.iter().position(Row::selectable))
 }
-pub fn rows(
-    models: &[CatalogEntry],
-    providers: &[CatalogEntry],
-    filter: &str,
-    show_all: bool,
-) -> Vec<Row> {
-    let mut rows = Vec::new();
-    if filter.is_empty() {
-        let pins: Vec<_> = models
-            .iter()
-            .filter(|m| m.meta["pinned"] == true)
-            .map(|m| Row::Pinned(m.id.clone()))
-            .collect();
-        if !pins.is_empty() {
-            rows.push(Row::Heading);
-            rows.extend(pins);
-        }
-    }
-    for provider in providers {
-        let offered: Vec<_> = models
-            .iter()
-            .filter(|m| m.meta["provider"] == provider.id)
-            .collect();
-        let matches: Vec<_> = offered
-            .iter()
-            .filter(|m| (show_all || !hidden(m)) && matched(&m.id, filter))
-            .collect();
-        if !filter.is_empty() && matches.is_empty() && !matched(&provider.id, filter) {
-            continue;
-        }
-        rows.push(Row::Provider(provider.id.clone()));
-        rows.extend(matches.iter().map(|m| Row::Model(m.id.clone())));
-        let hidden = offered.iter().filter(|m| hidden(m)).count();
-        if !show_all && filter.is_empty() && hidden > 0 {
-            rows.push(Row::Hidden(provider.id.clone(), hidden));
-        }
-    }
-    if filter.is_empty() {
-        rows.push(Row::Add);
-    }
-    rows
+pub fn rows(models: &[CatalogEntry], filter: &str, show_all: bool) -> Vec<Row> {
+    models
+        .iter()
+        .filter(|m| (show_all || !hidden(m)) && matched(&m.id, filter))
+        .map(|m| Row::Model(m.id.clone()))
+        .collect()
 }
 /// A filter that lists no model offers itself as the model to use: a
 /// `provider/model` as typed, a bare name under the current model's provider.
@@ -122,67 +75,29 @@ fn subsequence(text: &str, query: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     #[test]
-    fn pins_groups_hidden_and_provider_prefixes() {
-        let providers = vec![CatalogEntry {
-            id: "p".into(),
-            label: "p".into(),
-            meta: json!({}),
-        }];
-        let models = [
-            ("a", json!({"pinned":true})),
-            ("a-20261015", json!({"aliasOf":"a"})),
-            ("embed", json!({"chat":false})),
-        ]
-        .into_iter()
-        .map(|(id, mut meta)| {
-            meta["provider"] = json!("p");
+    fn catalogue_order_and_identity_survive_insertion() {
+        let (mut models, _) = crate::test_support::entries();
+        let selected = format!("model:{}", models[1].id);
+        models.insert(
+            0,
             CatalogEntry {
-                id: format!("p/{id}"),
-                label: id.into(),
-                meta,
-            }
-        })
-        .collect::<Vec<_>>();
+                id: "p/new".into(),
+                label: "new".into(),
+                meta: serde_json::json!({}),
+            },
+        );
+        let rows = rows(&models, "", false);
+        assert_eq!(rows[0], Row::Model("p/new".into()));
         assert_eq!(
-            rows(&models, &providers, "", false),
-            vec![
-                Row::Heading,
-                Row::Pinned("p/a".into()),
-                Row::Provider("p".into()),
-                Row::Model("p/a".into()),
-                Row::Hidden("p".into(), 2),
-                Row::Add
-            ]
+            rows[cursor(&rows, Some(&selected)).unwrap()].key(),
+            selected
         );
         assert_eq!(
-            rows(&models, &providers, "p/a", false),
-            vec![Row::Provider("p".into()), Row::Model("p/a".into())]
-        );
-        assert_eq!(
-            rows(&models, &providers, "", true)
-                .iter()
-                .filter(|r| r.model().is_some())
+            rows.iter()
+                .filter(|r| r.model() == Some("p/second"))
                 .count(),
-            4
+            1
         );
-        assert!(rows(&models, &providers, "other/", false).is_empty());
-        let listed = rows(&models, &providers, "", false);
-        assert_eq!(cursor(&listed, Some("model:p/a")), Some(3));
-        assert_eq!(cursor(&listed, Some("model:p/gone")), Some(1));
-        assert_eq!(cursor(&listed, Some("heading")), Some(1));
-        assert_eq!(cursor(&listed, None), Some(1));
-        assert_eq!(cursor(&[Row::Heading, Row::Add], None), Some(1));
-        assert_eq!(cursor(&[], Some("add")), None);
-        let unlisted_as = |filter: &str, current: &str| {
-            unlisted(&rows(&models, &providers, filter, false), filter, current)
-        };
-        assert_eq!(unlisted_as("p/zzz", "q/x").as_deref(), Some("p/zzz"));
-        assert_eq!(unlisted_as("zzz", "q/x").as_deref(), Some("q/zzz"));
-        assert_eq!(unlisted_as("zzz", "/"), None, "no provider to name");
-        assert_eq!(unlisted_as("other/", "q/x"), None, "no model to name");
-        assert_eq!(unlisted_as("p/a", "q/x"), None);
-        assert_eq!(unlisted_as("", "q/x"), None);
     }
 }

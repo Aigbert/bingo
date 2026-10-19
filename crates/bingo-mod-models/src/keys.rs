@@ -25,19 +25,22 @@ impl Command for Handler {
         if args["handler"] != picker.id {
             return Ok(handled());
         }
-        let key = if args["event"] == "close" {
-            "esc"
+        let press_value = if args["event"] == "close" {
+            bingo_sdk::sheet::Press::Key("esc".into())
         } else {
-            args["value"]["key"].as_str().unwrap_or_default()
+            let Some(press) = bingo_sdk::sheet::pressed(&args) else {
+                return Ok(handled());
+            };
+            press
         };
         let result = tokio::select! {
             _=cx.cancel.cancelled()=>Err(crate::error("picker action cancelled")),
-            result=press(&mut picker,key,cx)=>result,
+            result=press(&mut picker,&press_value,cx)=>result,
         };
         let close = match result {
             Ok(close) => close,
             Err(error) => {
-                crate::pins::announce(cx, error.message).await?;
+                crate::pins::say(cx, error.message).await?;
                 false
             }
         };
@@ -57,24 +60,33 @@ impl Command for Handler {
 fn handled() -> CommandOutcome {
     CommandOutcome::Handled { handled: true }
 }
-async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bool, KernelError> {
+async fn press(
+    picker: &mut Picker,
+    press: &bingo_sdk::sheet::Press,
+    cx: &CommandContext,
+) -> Result<bool, KernelError> {
+    let key = press.key().unwrap_or("enter");
     if key == "esc" {
         return Ok(back(picker));
     }
     if picker.sheet.is_some() {
-        return sheet_key(picker, key, cx).await;
+        return sheet_key(picker, press, cx).await;
     }
-    if key == "+" || key == "shift++" {
-        return add(picker, cx).await;
-    }
-    let edited = edit(picker, key);
-    let models = cx.host.catalog(CatalogKind::Models).await?.entries;
-    let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
-    let rows = crate::rows::rows(&models, &providers, &picker.props.filter, picker.all);
-    if edited {
-        keep_cursor(picker, &rows);
+    if !matches!(key, "up" | "down" | "left" | "right" | "enter") {
         return Ok(false);
     }
+    let models = cx.host.catalog(CatalogKind::Models).await?.entries;
+    let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
+    let rows = crate::rows::rows(&models, &picker.props.filter, picker.all);
+    let key = if let Some(id) = press.picked() {
+        if !rows.iter().any(|row| row.key() == id) {
+            return Ok(false);
+        }
+        picker.props.selected = Some(id.into());
+        "enter"
+    } else {
+        key
+    };
     if key == "enter"
         && let Some(id) = unlisted(picker, &rows, cx).await?
     {
@@ -90,40 +102,13 @@ async fn press(picker: &mut Picker, key: &str, cx: &CommandContext) -> Result<bo
     }
     Ok(false)
 }
-/// Keys that change the filter or the scope, whatever row is under the cursor.
-fn edit(picker: &mut Picker, key: &str) -> bool {
-    let text = key.strip_prefix("shift+").unwrap_or(key);
-    match key {
-        "tab" => {
-            picker.props.scope = if picker.keep() {
-                component::ModelScope::Session
-            } else {
-                component::ModelScope::Keep
-            }
-        }
-        "backspace" => {
-            picker.props.filter.pop();
-            picker.props.selected = None;
-        }
-        _ if text.chars().count() == 1 && text != "*" => {
-            picker.props.filter.push_str(text);
-            picker.props.selected = None;
-        }
-        _ => return false,
-    }
-    true
-}
 /// Moves from where the cursor is drawn to the next row that can be chosen.
 fn step(picker: &mut Picker, rows: &[Row], forward: bool) {
-    let Some(at) = crate::rows::cursor(rows, picker.props.selected.as_deref()) else {
-        return;
-    };
-    let next = if forward {
-        (at + 1..rows.len()).find(|i| rows[*i].selectable())
-    } else {
-        (0..at).rev().find(|i| rows[*i].selectable())
-    };
-    picker.props.selected = Some(rows[next.unwrap_or(at)].key());
+    let rows = rows
+        .iter()
+        .map(|row| pick::Row::new(row.key(), pick::text("", "fg")))
+        .collect::<Vec<_>>();
+    picker.props.selected = pick::moved(&rows, picker.props.selected.as_deref(), forward);
 }
 /// A new filter puts the cursor on its first row; keeping that row by name
 /// holds the cursor there while probes add rows above it.
@@ -154,11 +139,6 @@ async fn act(
 ) -> Result<bool, KernelError> {
     match key {
         "left" | "right" => dial(picker, row, models, key == "right"),
-        "*" | "shift+*" => {
-            if let Some(id) = row.model() {
-                crate::pins::toggle(picker, cx, id, models).await?;
-            }
-        }
         "enter" => return activate(picker, row, models, providers, cx).await,
         _ => {}
     }
@@ -171,22 +151,19 @@ fn dial(picker: &mut Picker, row: &Row, models: &[CatalogEntry], forward: bool) 
     else {
         return;
     };
-    let efforts = crate::card::efforts(model);
+    let efforts = crate::card::levels(model);
     if efforts.is_empty() {
         picker.props.effort = None;
         return;
     }
     let current = crate::card::clamp(model, picker.props.effort);
-    let index = efforts
-        .iter()
-        .position(|e| Some(*e) == current)
-        .unwrap_or(0);
+    let index = efforts.iter().position(|e| *e == current).unwrap_or(0);
     let index = if forward {
         (index + 1).min(efforts.len() - 1)
     } else {
         index.saturating_sub(1)
     };
-    picker.props.effort = Some(efforts[index]);
+    picker.props.effort = efforts[index];
 }
 async fn activate(
     picker: &mut Picker,
@@ -196,26 +173,12 @@ async fn activate(
     cx: &CommandContext,
 ) -> Result<bool, KernelError> {
     match row {
-        Row::Add => add(picker, cx).await,
-        Row::Hidden(_, _) => {
-            picker.all = true;
-            Ok(false)
-        }
-        Row::Provider(id) => {
-            picker.sheet = Some(Sheet::Manage {
-                provider: id.clone(),
-                selected: 0,
-                pending: None,
-                confirm: false,
-            });
-            Ok(false)
-        }
-        Row::Pinned(id) | Row::Model(id) => {
+        Row::Model(id) => {
             let Some(model) = models.iter().find(|m| &m.id == id) else {
                 return Ok(false);
             };
             if model.meta["chat"] == false {
-                crate::pins::announce(cx, "This model can't hold a chat.".into()).await?;
+                crate::pins::say(cx, "This model can't hold a chat.".into()).await?;
                 return Ok(false);
             }
             let Some(provider) = providers.iter().find(|p| model.meta["provider"] == p.id) else {
@@ -229,7 +192,7 @@ async fn activate(
                 crate::label::Reach::Down => {
                     picker.sheet = Some(Sheet::Manage {
                         provider: provider.id.clone(),
-                        selected: 0,
+                        selected: None,
                         pending: Some(id.clone()),
                         confirm: false,
                     });
@@ -239,17 +202,19 @@ async fn activate(
                 crate::label::Reach::Ready => choose(picker, model, cx).await,
             }
         }
-        _ => Ok(false),
     }
 }
 fn signin(provider: &CatalogEntry, pending: Option<String>) -> Sheet {
     Sheet::SignIn {
         provider: provider.id.clone(),
-        selected: if provider.meta["shape"] == "codex" {
-            0
-        } else {
-            2
-        },
+        selected: Some(
+            if provider.meta["shape"] == "codex" {
+                "browser"
+            } else {
+                "paste"
+            }
+            .into(),
+        ),
         pending,
     }
 }
@@ -265,6 +230,7 @@ pub(crate) async fn choose(
         "model",
         &format!("{}{keep}", model.id),
         None,
+        cx.surface,
     )
     .await?;
     if model.meta["efforts"].is_array() {
@@ -277,9 +243,19 @@ pub(crate) async fn choose(
                 Effort::word(crate::card::clamp(model, picker.props.effort))
             ),
             None,
+            cx.surface,
         )
         .await?;
     }
+    let chosen = format!(
+        "{} {}",
+        model
+            .id
+            .split_once('/')
+            .map_or(model.id.as_str(), |(_, id)| id),
+        Effort::word(crate::card::clamp(model, picker.props.effort))
+    );
+    crate::pins::announce(cx, vec![chosen.into()], Tone::Good).await?;
     Ok(true)
 }
 /// The model the filter names when nothing listed matches it.
@@ -300,48 +276,36 @@ async fn unlisted(
 /// as a filter and open the picker again.
 async fn use_unlisted(picker: &Picker, id: &str, cx: &CommandContext) -> Result<bool, KernelError> {
     let keep = if picker.keep() { " --keep" } else { "" };
-    crate::bridge::run(&cx.host, &cx.session, "model", &format!("{id}{keep}"), None).await?;
-    Ok(true)
-}
-async fn add(picker: &mut Picker, cx: &CommandContext) -> Result<bool, KernelError> {
-    let Some(value) = crate::bridge::paste(
+    crate::bridge::run(
         &cx.host,
         &cx.session,
-        "add a provider · paste a key or server address",
+        "model",
+        &format!("{id}{keep}"),
+        None,
+        cx.surface,
     )
-    .await?
-    else {
-        return Ok(false);
-    };
-    let names = cx
-        .host
-        .catalog(CatalogKind::Providers)
-        .await?
-        .entries
-        .into_iter()
-        .map(|p| p.id)
-        .chain(["openai".into(), "anthropic".into(), "codex".into()])
-        .collect::<Vec<_>>();
-    let guess = crate::guess::guess(&value, &names)
-        .ok_or_else(|| crate::error("Use an API key or an http(s) server address."))?;
-    // An unknown vendor opens on its address, the one thing still to say.
-    let selected = if guess.address.is_empty() { 2 } else { 0 };
-    picker.sheet = Some(Sheet::Add { guess, selected });
-    Ok(false)
+    .await?;
+    Ok(true)
 }
 async fn sheet_key(
     picker: &mut Picker,
-    key: &str,
+    press: &bingo_sdk::sheet::Press,
     cx: &CommandContext,
 ) -> Result<bool, KernelError> {
     let Some(mut sheet) = picker.sheet.take() else {
         return Ok(false);
     };
     let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
-    let result = match &mut sheet {
-        Sheet::Add { guess, selected } => {
-            crate::sheet_actions::add_key(guess, selected, key, picker, cx).await
+    let rows = sheet.build(&providers).rows;
+    if let Some(id) = press.picked() {
+        if !rows.iter().any(|row| row.id == id) {
+            picker.sheet = Some(sheet);
+            return Ok(false);
         }
+        *sheet.selected_mut() = Some(id.into());
+    }
+    let key = press.key().unwrap_or("enter");
+    let result = match &mut sheet {
         Sheet::SignIn {
             provider,
             selected,
@@ -367,7 +331,7 @@ async fn sheet_key(
 }
 async fn manage_key(
     provider: &CatalogEntry,
-    selected: &mut usize,
+    selected: &mut Option<String>,
     pending: &Option<String>,
     confirm: &mut bool,
     key: &str,
@@ -375,15 +339,20 @@ async fn manage_key(
     cx: &CommandContext,
 ) -> Result<bool, KernelError> {
     let actions = crate::sheet::actions(provider, pending.is_some());
-    crate::sheet_actions::navigate(selected, key, actions.len());
+    let rows = actions
+        .iter()
+        .map(|(op, label, _)| pick::Row::new(op.id(), pick::text(*label, "fg")))
+        .collect::<Vec<_>>();
+    crate::sheet_actions::navigate(selected, key, &rows);
     if key != "enter" {
         return Ok(false);
     }
-    let Some((op, _, enabled)) = actions.get(*selected) else {
+    let id = &rows[pick::selected(&rows, selected.as_deref())].id;
+    let Some((op, _, enabled)) = actions.iter().find(|(op, _, _)| op.id() == id) else {
         return Ok(false);
     };
     if !enabled {
-        crate::pins::announce(cx, "Unset the environment credential in your shell.".into()).await?;
+        crate::pins::say(cx, "Unset the environment credential in your shell.".into()).await?;
         return Ok(false);
     }
     match op {
@@ -401,13 +370,22 @@ async fn manage_key(
                 "provider",
                 &format!("remove {}", provider.id),
                 None,
+                cx.surface,
             )
             .await?;
             return Ok(true);
         }
         Operation::Address => change_address(provider, cx).await?,
         Operation::Logout => {
-            crate::bridge::run(&cx.host, &cx.session, "logout", &provider.id, None).await?
+            crate::bridge::run(
+                &cx.host,
+                &cx.session,
+                "logout",
+                &provider.id,
+                None,
+                cx.surface,
+            )
+            .await?
         }
         Operation::Test | Operation::Refresh => {
             crate::bridge::run(
@@ -416,6 +394,7 @@ async fn manage_key(
                 "models",
                 &format!("refresh {}", provider.id),
                 None,
+                cx.surface,
             )
             .await?
         }
@@ -435,6 +414,7 @@ async fn check_then_use(
         "models",
         &format!("refresh {}", provider.id),
         None,
+        cx.surface,
     )
     .await?;
     let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
@@ -447,7 +427,7 @@ async fn check_then_use(
     }
     picker.sheet = Some(Sheet::Manage {
         provider: provider.id.clone(),
-        selected: 0,
+        selected: None,
         pending: Some(model.id.clone()),
         confirm: false,
     });
@@ -474,6 +454,7 @@ async fn change_address(provider: &CatalogEntry, cx: &CommandContext) -> Result<
                 )
             ),
             None,
+            cx.surface,
         )
         .await?;
     }

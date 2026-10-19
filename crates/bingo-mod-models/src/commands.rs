@@ -18,11 +18,14 @@ impl Interceptor for Commands {
     ) -> Result<Value, KernelError> {
         let command: catalogue::CommandRun =
             serde_json::from_value(value.clone()).map_err(crate::error)?;
-        if command.surface != Some(render::SurfaceName::Terminal) {
+        if !command
+            .surface
+            .is_some_and(render::SurfaceName::shows_sheets)
+        {
             return next.run(value).await;
         }
-        let name = value["command"].as_str().unwrap_or_default();
-        let args = value["args"].as_str().unwrap_or_default().trim();
+        let name = command.name.as_str();
+        let args = command.args.trim();
         if !opens(name, args, &cx.host).await? {
             return next.run(value).await;
         }
@@ -33,7 +36,7 @@ impl Interceptor for Commands {
             .map_err(crate::error)?
             .insert(cx.session.clone(), picker.clone());
         crate::state::publish(&cx.host, &cx.session, &picker).await?;
-        probe(&cx.host, &cx.session, &providers);
+        probe(&cx.host, &cx.session, &providers, command.surface);
         Ok(
             json!({"kind":"surface","action":{"name":"Pane","args":{"plugin":"bingo.mod.models","id":picker.id}},"fallback":fallback}),
         )
@@ -41,7 +44,12 @@ impl Interceptor for Commands {
 }
 /// Ask every provider not yet heard from, all at once and after the picker is up: its
 /// rows answer as each probe does, and the command never waits on an endpoint.
-fn probe(host: &HostHandle, session: &SessionId, providers: &[CatalogEntry]) {
+fn probe(
+    host: &HostHandle,
+    session: &SessionId,
+    providers: &[CatalogEntry],
+    surface: Option<render::SurfaceName>,
+) {
     let refreshes: Vec<String> = providers
         .iter()
         .filter(|p| crate::label::reach(p) == crate::label::Reach::Unchecked)
@@ -55,7 +63,7 @@ fn probe(host: &HostHandle, session: &SessionId, providers: &[CatalogEntry]) {
         futures::future::join_all(
             refreshes
                 .iter()
-                .map(|args| crate::bridge::run(&host, &session, "models", args, None)),
+                .map(|args| crate::bridge::run(&host, &session, "models", args, None, surface)),
         )
         .await;
     });
@@ -129,7 +137,7 @@ async fn opening(
     };
     let models = cx.host.catalog(CatalogKind::Models).await?.entries;
     let providers = cx.host.catalog(CatalogKind::Providers).await?.entries;
-    let rows = crate::rows::rows(&models, &providers, &picker.props.filter, picker.all);
+    let rows = crate::rows::rows(&models, &picker.props.filter, picker.all);
     let current = crate::state::chat(&attached.snapshot).current;
     picker.props.selected = rows
         .iter()
@@ -146,27 +154,17 @@ fn start_provider(
     current: &str,
     name: &str,
 ) {
-    if !matches!(name, "login" | "logout") {
+    if name != "logout" {
         return;
     }
     let provider = providers
         .iter()
-        .find(|p| name == "login" && crate::label::reach(p) == crate::label::Reach::Missing)
-        .or_else(|| {
-            providers
-                .iter()
-                .find(|p| current.split_once('/').is_some_and(|(id, _)| p.id == id))
-        })
+        .find(|p| current.split_once('/').is_some_and(|(id, _)| p.id == id))
         .or_else(|| providers.first());
-    let Some(provider) = provider else {
-        return;
-    };
-    if name == "login" {
-        picker.props.selected = Some(crate::rows::Row::Provider(provider.id.clone()).key());
-    } else {
+    if let Some(provider) = provider {
         picker.sheet = Some(crate::sheet::Sheet::Manage {
             provider: provider.id.clone(),
-            selected: 0,
+            selected: None,
             pending: None,
             confirm: false,
         });
@@ -285,7 +283,7 @@ mod tests {
         assert!(!filters("/gpt-5"));
     }
     #[tokio::test]
-    async fn login_opens_on_an_unsigned_provider_and_one_escape_closes_it() {
+    async fn login_opens_the_model_list_and_one_escape_closes_it() {
         let (host, command) = crate::test_support::host();
         let (models, mut providers) = crate::test_support::entries();
         providers.push(CatalogEntry {
@@ -311,8 +309,14 @@ mod tests {
             model: None,
         };
         let (picker, _) = opening("login", "", &cx).await.unwrap();
-        assert!(picker.sheet.is_none(), "login starts at the provider list");
-        assert_eq!(picker.props.selected.as_deref(), Some("provider:unsigned"));
+        assert!(picker.sheet.is_none());
+        assert!(
+            !picker
+                .props
+                .selected
+                .as_deref()
+                .is_some_and(|id| id.starts_with("provider:"))
+        );
         let shared = crate::Shared::default();
         shared
             .lock()

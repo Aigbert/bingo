@@ -1,11 +1,8 @@
-use crate::{guess::Guess, state::Picker};
+use crate::state::Picker;
 use bingo_sdk::*;
-pub fn navigate(selected: &mut usize, key: &str, count: usize) {
-    *selected = (*selected).min(count.saturating_sub(1));
-    match key {
-        "up" => *selected = selected.saturating_sub(1),
-        "down" => *selected = (*selected + 1).min(count.saturating_sub(1)),
-        _ => {}
+pub fn navigate(selected: &mut Option<String>, key: &str, rows: &[pick::Row]) {
+    if matches!(key, "up" | "down") {
+        *selected = pick::moved(rows, selected.as_deref(), key == "down");
     }
 }
 pub async fn choose_id(
@@ -25,23 +22,25 @@ pub async fn choose_id(
 }
 pub async fn signin_key(
     provider: &str,
-    selected: &mut usize,
+    selected: &mut Option<String>,
     pending: &Option<String>,
     key: &str,
     picker: &mut Picker,
     cx: &CommandContext,
 ) -> Result<bool, KernelError> {
-    navigate(selected, key, 3);
+    let rows = crate::sheet::signin_rows();
+    navigate(selected, key, &rows);
     if key != "enter" {
         return Ok(false);
     }
-    let method = ["browser", "device", "paste"][*selected];
+    let method = &rows[pick::selected(&rows, selected.as_deref())].id;
     crate::bridge::run(
         &cx.host,
         &cx.session,
         "login",
         &format!("{provider} {method}"),
         None,
+        cx.surface,
     )
     .await?;
     crate::bridge::run(
@@ -50,6 +49,7 @@ pub async fn signin_key(
         "models",
         &format!("refresh {provider}"),
         None,
+        cx.surface,
     )
     .await?;
     if let Some(id) = pending {
@@ -57,94 +57,9 @@ pub async fn signin_key(
     }
     picker.sheet = Some(crate::sheet::Sheet::Manage {
         provider: provider.into(),
-        selected: 0,
+        selected: None,
         pending: None,
         confirm: false,
     });
     Ok(false)
-}
-pub async fn add_key(
-    guess: &mut Guess,
-    selected: &mut usize,
-    key: &str,
-    picker: &mut Picker,
-    cx: &CommandContext,
-) -> Result<bool, KernelError> {
-    navigate(selected, key, 5);
-    if key != "enter" {
-        return Ok(false);
-    }
-    match *selected {
-        0 => {
-            if let Some(name) = crate::bridge::paste(&cx.host, &cx.session, "provider name").await?
-            {
-                if !bingo_sdk::provider::valid_provider_name(&name) {
-                    return Err(crate::error(
-                        "Use letters, digits, hyphens or underscores for the name.",
-                    ));
-                }
-                guess.name = name;
-            }
-        }
-        1 => {
-            guess.shape = if guess.shape == "openai" {
-                "anthropic"
-            } else {
-                "openai"
-            }
-            .into()
-        }
-        2 => {
-            if let Some(address) =
-                crate::bridge::paste(&cx.host, &cx.session, "provider address").await?
-            {
-                guess.address = crate::guess::guess(&address, &[])
-                    .filter(|g| g.key.is_none())
-                    .ok_or_else(|| crate::error("Use an http(s) address without credentials."))?
-                    .address;
-            }
-        }
-        3 => {
-            guess.key = crate::bridge::paste(&cx.host, &cx.session, "provider key")
-                .await?
-                .and_then(|pasted| crate::guess::key(&pasted))
-        }
-        _ => save_provider(guess, picker, cx).await?,
-    }
-    Ok(false)
-}
-
-async fn save_provider(
-    guess: &mut Guess,
-    picker: &mut Picker,
-    cx: &CommandContext,
-) -> Result<(), KernelError> {
-    if guess.address.is_empty() {
-        return Err(crate::error(
-            "Paste the provider's address first: an sk- key does not say whose it is.",
-        ));
-    }
-    crate::bridge::run(
-        &cx.host,
-        &cx.session,
-        "provider",
-        &format!(
-            "add {} {} {}",
-            guess.name,
-            guess.shape,
-            crate::guess::wire_address(&guess.shape, &guess.address)
-        ),
-        guess.key.take().map(|key| (guess.name.clone(), key)),
-    )
-    .await?;
-    picker.props.filter = format!("{}/", guess.name);
-    picker.props.selected = None;
-    picker.sheet = Some(crate::sheet::Sheet::Manage {
-        provider: guess.name.clone(),
-        selected: 0,
-        pending: None,
-        confirm: false,
-    });
-    crate::pins::announce(cx, "Provider added".into()).await?;
-    Ok(())
 }

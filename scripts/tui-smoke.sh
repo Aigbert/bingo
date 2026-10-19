@@ -180,19 +180,19 @@ finish
 step 'the model picker opens and gives the composer back'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '/model' Enter
-await '↑↓ pick'
-await 'own place ▾'
+# The model sheet opens in the dock, and its keys replace the composer's.
+await '↑↓ model'
 keys Escape
-vanish 'own place ▾'
+vanish '↑↓ model'
 finish
 
 step 'login opens one pane and one escape closes it'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '/login' Enter
-# The palette's KeyBar says `↑↓ pick` too: wait for the pane itself.
-await 'own place ▾'
+# Signing in opens the model sheet in the dock.
+await '↑↓ model'
 keys Escape
-vanish 'own place ▾'
+vanish '↑↓ model'
 keys 'composer returned'
 await 'composer returned▍'
 finish

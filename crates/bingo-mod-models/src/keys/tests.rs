@@ -1,99 +1,110 @@
 use super::*;
 use crate::test_support::*;
-use serde_json::json;
-
 #[tokio::test]
-async fn unpin_keeps_the_model_row_and_reports_the_change() {
-    let (host, cx) = host();
+async fn letters_leave_the_model_and_scope_alone() {
+    let (_, cx) = host();
     let (models, providers) = entries();
     let mut picker = Picker {
         props: component::ModelPickerProps {
-            selected: Some("pin:p/second".into()),
+            selected: Some("model:p/second".into()),
             ..Default::default()
         },
         ..Default::default()
     };
-    act(
-        &mut picker,
-        "*",
-        &Row::Pinned("p/second".into()),
-        &models,
-        &providers,
-        &cx,
-    )
-    .await
-    .unwrap();
+    for key in ["a", "*", "tab"] {
+        act(
+            &mut picker,
+            key,
+            &Row::Model("p/second".into()),
+            &models,
+            &providers,
+            &cx,
+        )
+        .await
+        .unwrap();
+    }
     assert_eq!(picker.props.selected.as_deref(), Some("model:p/second"));
-    assert!(host.calls().iter().any(|call| matches!(call,
-        testing::HostCall::Signal { payload, .. } if payload["slots"][0]["text"] == "unpinned second"
-    )));
-    let mut updated = models;
-    updated[1].meta["pinned"] = json!(false);
-    let rows = crate::rows::rows(&updated, &providers, "", false);
-    let at = crate::rows::cursor(&rows, picker.props.selected.as_deref()).unwrap();
-    assert_eq!(rows[at], Row::Model("p/second".into()));
+    assert!(picker.props.filter.is_empty());
 }
-
 #[test]
-fn a_pinned_models_hint_offers_unpin() {
+fn model_hints_are_only_the_prototypes_keys() {
     let (models, providers) = entries();
-    let picker = Picker {
-        props: component::ModelPickerProps {
-            selected: Some("pin:p/second".into()),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
     let view = crate::draw::tree(
-        &picker,
+        &Picker::default(),
         &models,
         &providers,
-        &crate::card::Chat::default(),
-        108,
+        &Default::default(),
+        100,
         18,
-    );
-    assert!(
-        !view.fold().contains("* unpin"),
-        "hints stay out of the body"
+        Default::default(),
     );
     bingo_sdk::testing::assert_separate_hints(&view);
     let View::Box { layout, .. } = view else {
-        panic!("site");
+        panic!("sheet")
     };
-    assert!(
-        layout
-            .hints
-            .unwrap()
+    let hints = layout.hints.unwrap();
+    assert_eq!(
+        hints
             .pairs
             .iter()
-            .any(|p| p.keys == "*" && p.action == "unpin")
+            .map(|p| p.keys.as_str())
+            .collect::<Vec<_>>(),
+        ["↑↓", "←→", "⏎", "esc"]
     );
 }
 
 #[tokio::test]
-async fn unpinning_a_hidden_alias_keeps_its_provider_row_visible() {
+async fn plus_does_not_open_a_provider_sub_sheet() {
     let (_, cx) = host();
-    let (mut models, providers) = entries();
-    models[1].meta["aliasOf"] = json!("first");
-    let mut picker = Picker {
-        props: component::ModelPickerProps {
-            selected: Some("pin:p/second".into()),
-            ..Default::default()
-        },
-        ..Default::default()
+    let mut picker = Picker::default();
+    press(&mut picker, &bingo_sdk::sheet::Press::Key("+".into()), &cx)
+        .await
+        .unwrap();
+    assert!(picker.sheet.is_none());
+}
+
+#[test]
+fn provider_sub_sheets_use_stable_action_ids_and_the_builder() {
+    let provider = CatalogEntry {
+        id: "p".into(),
+        label: "p".into(),
+        meta: serde_json::json!({}),
     };
-    act(
-        &mut picker,
-        "*",
-        &Row::Pinned("p/second".into()),
-        &models,
-        &providers,
-        &cx,
-    )
-    .await
-    .unwrap();
-    models[1].meta["pinned"] = json!(false);
-    let rows = crate::rows::rows(&models, &providers, "", picker.all);
-    let at = crate::rows::cursor(&rows, picker.props.selected.as_deref()).unwrap();
-    assert_eq!(rows[at], Row::Model("p/second".into()));
+    let mut sheet = Sheet::Manage {
+        provider: "p".into(),
+        selected: Some("refresh".into()),
+        pending: None,
+        confirm: false,
+    };
+    let before = sheet.build(std::slice::from_ref(&provider));
+    assert_eq!(
+        before.rows[pick::selected(&before.rows, before.selected.as_deref())].id,
+        "refresh"
+    );
+    if let Sheet::Manage { pending, .. } = &mut sheet {
+        *pending = Some("p/model".into());
+    }
+    let after = sheet.build(&[provider]);
+    assert_eq!(
+        after.rows[pick::selected(&after.rows, after.selected.as_deref())].id,
+        "refresh"
+    );
+    assert!(
+        serde_json::to_string(&after.view(100, 18, Default::default()))
+            .unwrap()
+            .contains("\"ground\":\"pick\"")
+    );
+    let signin = Sheet::SignIn {
+        provider: "p".into(),
+        selected: Some("paste".into()),
+        pending: None,
+    }
+    .build(&[]);
+    assert_eq!(signin.rows[2].id, "paste");
+    assert!(
+        !signin
+            .view(100, 18, Default::default())
+            .fold()
+            .contains("model ›")
+    );
 }

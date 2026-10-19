@@ -13,6 +13,7 @@ async fn start(home: &Path, source: Option<&str>, disabled: bool) -> (Arc<Host>,
         Box::new(bingo_mod_sessions::Sessions),
         Box::new(bingo_mod_plugins::Plugins),
         Box::new(bingo_mod_models::Models),
+        Box::new(Counted(Arc::new(std::sync::atomic::AtomicUsize::new(0)))),
     ];
     if let Some(source) = source {
         let root = home.join("outside");
@@ -578,7 +579,12 @@ async fn outside_wraps_model_picker_and_disabled_uses_engine() {
         .await
         .unwrap();
     assert!(tree.fold().contains("Outside picker"));
-    assert!(tree.fold().contains("+ add a provider"), "{}", tree.fold());
+    assert!(tree.fold().contains("Model"), "{}", tree.fold());
+    assert!(
+        tree.fold().lines().any(|line| line.trim() == "[one            counted                                                                                 ]"),
+        "{}",
+        tree.fold()
+    );
     host.shutdown().await;
     let other = tempfile::tempdir().unwrap();
     let (host, attachment) = start(other.path(), None, true).await;

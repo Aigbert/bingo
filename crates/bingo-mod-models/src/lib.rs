@@ -16,6 +16,7 @@ pub mod rows;
 pub mod sheet;
 mod sheet_actions;
 pub mod state;
+mod toast;
 use bingo_sdk::{
     CommandFold, Contribution, ErrorCode, Interceptor, KernelError, Plugin, PluginError,
     PluginManifest, Registrar, SessionId, plugin, render,
@@ -59,7 +60,7 @@ impl Plugin for Models {
         ))));
         for link in [
             Arc::new(commands::Commands(state.clone())) as Arc<dyn Interceptor>,
-            Arc::new(receipts::Receipts),
+            Arc::new(receipts::Receipts(state.clone())),
             Arc::new(describe::Describe),
             Arc::new(draw::Drawing(state.clone(), render::Component::ModelPicker)),
             Arc::new(draw::Drawing(state, render::Component::InfoNotice)),

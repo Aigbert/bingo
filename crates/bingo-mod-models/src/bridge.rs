@@ -8,7 +8,7 @@ pub async fn attach(host: &HostHandle, session: &SessionId) -> Result<Attachment
         },
         ClientIdentity {
             name: "bingo.mod.models".into(),
-            surface: "terminal".into(),
+            surface: String::new(),
         },
         OpenOptions::default(),
     )
@@ -20,13 +20,16 @@ pub async fn run(
     name: &str,
     args: &str,
     key: Option<(String, String)>,
+    surface: Option<render::SurfaceName>,
 ) -> Result<(), KernelError> {
     let mut attached = attach(host, session).await?;
     let intent = IntentId::mint();
+    let mut origin = Origin::surface("plugin:bingo.mod.models");
+    origin.render_surface = surface;
     attached.handle.submit(
         intent.clone(),
         Input::Action {
-            origin: Some(Origin::surface("plugin:bingo.mod.models")),
+            origin: Some(origin),
             action: Action {
                 name: name.into(),
                 args: args.into(),

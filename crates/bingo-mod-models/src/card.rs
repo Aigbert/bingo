@@ -1,13 +1,14 @@
 use bingo_sdk::{CatalogEntry, Effort};
 #[derive(Clone, Debug, Default)]
 pub struct Chat {
+    pub effort: Option<Effort>,
     pub current: String,
     pub used: u64,
     pub pictures: bool,
 }
 pub fn tokens(value: u64) -> String {
     if value >= 1_000_000 {
-        format!("{:.1}M", value as f64 / 1_000_000.0)
+        format!("{}M", value as f64 / 1_000_000.0)
     } else if value >= 1000 {
         format!("{}k", value / 1000)
     } else {
@@ -15,13 +16,38 @@ pub fn tokens(value: u64) -> String {
     }
 }
 pub fn efforts(model: &CatalogEntry) -> Vec<Effort> {
-    serde_json::from_value(model.meta["efforts"].clone()).unwrap_or_default()
+    levels(model).into_iter().flatten().collect()
+}
+pub fn levels(model: &CatalogEntry) -> Vec<Option<Effort>> {
+    let levels = model.meta["efforts"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|value| {
+            if value.is_null() {
+                return Some(None);
+            }
+            serde_json::from_value::<Effort>(value.clone())
+                .ok()
+                .map(Some)
+                .or_else(|| value.as_str().and_then(Effort::spoken))
+        })
+        .collect::<Vec<_>>();
+    if levels.is_empty() {
+        vec![None]
+    } else {
+        levels
+    }
 }
 pub fn clamp(model: &CatalogEntry, effort: Option<Effort>) -> Option<Effort> {
-    let levels = efforts(model);
-    effort
-        .filter(|e| levels.contains(e))
-        .or_else(|| levels.first().copied())
+    let levels = levels(model);
+    if levels.contains(&effort) {
+        effort
+    } else if levels.contains(&Some(Effort::High)) {
+        Some(Effort::High)
+    } else {
+        levels.last().copied().flatten()
+    }
 }
 pub fn card(model: &CatalogEntry, chat: &Chat, effort: Option<Effort>, keep: bool) -> Vec<String> {
     let meta = &model.meta;

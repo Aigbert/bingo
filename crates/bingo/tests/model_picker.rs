@@ -91,7 +91,7 @@ async fn private_press(session: &mut Attachment, id: &str, key: &str, value: &st
     session.handle.submit(
         intent.clone(),
         Input::Action {
-            origin: Some(Origin::surface("rpc")),
+            origin: Some(Origin::surface("rpc").on(render::SurfaceName::Terminal)),
             action: Action {
                 name: "bingo.mod.models:ui".into(),
                 args: press(id, key),
@@ -114,87 +114,51 @@ async fn endpoint(id: &str) -> MockServer {
     server
 }
 #[tokio::test(flavor = "multi_thread")]
-async fn pasted_key_is_masked_in_frames_and_absent_from_the_journal() {
-    let endpoint = endpoint("picker-local").await;
-    let mut server = Server::spawn(SCRIPT);
+async fn signin_key_is_absent_from_frames_and_the_journal() {
+    let endpoint = endpoint("claude-fable-5").await;
+    let home = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
+    std::fs::write(
+        home.path().join(".bingo/settings.toml"),
+        format!(
+            "[update]\ncheck = false\n[anthropic]\nbaseUrl = \"{}\"\n",
+            endpoint.uri()
+        ),
+    )
+    .unwrap();
+    let mut server = Server::spawn_at(home, SCRIPT, &[]);
     let kernel = ready(&mut server).await;
     let mut session = kernel
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    assert!(matches!(
-        command(&mut session, "model", json!("")).await,
-        IntentOutcome::Applied { .. }
-    ));
+    command(&mut session, "login", json!("")).await;
     let req = request(&kernel, &mut session).await;
-    let id = req.request_id;
-    private_press(&mut session, &id, "+", SECRET).await;
-    let req = request(&kernel, &mut session).await;
-    let view = kernel.render(&session.session, req).await.unwrap();
-    assert!(view.fold().contains("••••••••"), "{}", view.fold());
-    assert!(!serde_json::to_string(&view).unwrap().contains(SECRET));
-    // An `sk-` key names no vendor: the sheet waits on its address and adds nothing without one.
-    assert!(
-        view.fold()
-            .contains("❯ address    none · paste whose key this is"),
-        "{}",
-        view.fold()
-    );
-    command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
-    command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
-    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
-    let req = request(&kernel, &mut session).await;
-    let refused = kernel.render(&session.session, req).await.unwrap().fold();
-    assert!(
-        !refused.contains("Paste the provider's address first"),
-        "{refused}"
-    );
-    assert!(
-        slot::placed(&session.snapshot).iter().any(|placed| {
-            matches!(&placed.slot, slot::Slot::Toast { parts, .. }
-            if parts.iter().any(|part| matches!(part, view::TextChild::String(text)
-                if text.contains("Paste the provider's address first"))))
-        }),
-        "the refusal belongs to the KeyBar toast"
-    );
-    assert!(endpoint.received_requests().await.unwrap().is_empty());
-    command(&mut session, "bingo.mod.models:ui", press(&id, "up")).await;
-    command(&mut session, "bingo.mod.models:ui", press(&id, "up")).await;
-    private_press(
+    let id = req.request_id.clone();
+    let model = kernel
+        .catalog(CatalogKind::Models)
+        .await
+        .unwrap()
+        .entries
+        .into_iter()
+        .find(|row| row.meta["provider"] == "anthropic" && row.meta["chat"] != false)
+        .unwrap();
+    command(
         &mut session,
-        &id,
-        "enter",
-        &format!("{}/v1", endpoint.uri()),
+        "bingo.mod.models:ui",
+        json!({"handler":id,"event":"press","value":{"pick":format!("model:{}", model.id)}}),
     )
     .await;
-    command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
-    command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
-    let outcome = command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
-    assert!(matches!(outcome, IntentOutcome::Applied { .. }));
-    let models = kernel.catalog(CatalogKind::Models).await.unwrap();
+    let req = request(&kernel, &mut session).await;
+    let before = kernel.render(&session.session, req).await.unwrap();
     assert!(
-        models
-            .entries
-            .iter()
-            .any(|m| m.id == "provider/picker-local")
+        before.fold().contains("sign in to anthropic"),
+        "{}",
+        before.fold()
     );
-    assert!(!endpoint.received_requests().await.unwrap().is_empty());
-    command(&mut session, "bingo.mod.models:ui", press(&id, "esc")).await;
-    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
-    let attached = kernel
-        .open(
-            SessionSelector::ById {
-                id: session.session.clone(),
-            },
-            who(),
-            OpenOptions::default(),
-        )
-        .await
-        .unwrap();
-    assert_eq!(
-        attached.snapshot.summary.model.as_deref(),
-        Some("picker-local")
-    );
+    private_press(&mut session, &id, "enter", SECRET).await;
+    let attached = reopen(&kernel, &session).await;
+    assert!(!picker_open(&attached));
     assert!(
         !serde_json::to_string(&attached.snapshot)
             .unwrap()
@@ -206,6 +170,7 @@ async fn pasted_key_is_masked_in_frames_and_absent_from_the_journal() {
         }
     }
 }
+
 fn walk(path: &std::path::Path) -> Vec<std::path::PathBuf> {
     let mut files = Vec::new();
     for entry in std::fs::read_dir(path).unwrap().flatten() {
@@ -394,24 +359,22 @@ async fn reopen(kernel: &impl HostApi, session: &Attachment) -> Attachment {
         .unwrap()
 }
 #[tokio::test(flavor = "multi_thread")]
-async fn unlisted_models_switch_by_path_and_by_the_typed_filter() {
+async fn unlisted_models_use_explicit_paths_and_sheet_letters_do_nothing() {
     let mut server = Server::spawn(SCRIPT);
     let kernel = ready(&mut server).await;
     let mut session = kernel
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    assert!(matches!(
-        command(&mut session, "model", json!("fake/other")).await,
-        IntentOutcome::Applied { .. }
-    ));
+    command(&mut session, "model", json!("fake/other")).await;
     session = reopen(&kernel, &session).await;
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("other"));
     assert!(!picker_open(&session));
     command(&mut session, "model", json!("")).await;
     let req = request(&kernel, &mut session).await;
     let id = req.request_id;
-    for letter in "fake/unlisted".chars() {
+    let before = cursor_line(&kernel, &mut session).await;
+    for letter in "fakeunlisted".chars() {
         command(
             &mut session,
             "bingo.mod.models:ui",
@@ -419,26 +382,12 @@ async fn unlisted_models_switch_by_path_and_by_the_typed_filter() {
         )
         .await;
     }
-    let req = request(&kernel, &mut session).await;
-    let view = kernel.render(&session.session, req).await.unwrap().fold();
-    assert!(view.contains("use fake/unlisted"), "{view}");
-    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
+    assert_eq!(cursor_line(&kernel, &mut session).await, before);
+    command(&mut session, "bingo.mod.models:ui", press(&id, "esc")).await;
+    command(&mut session, "model", json!("fake/unlisted")).await;
     session = reopen(&kernel, &session).await;
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("unlisted"));
     assert!(!picker_open(&session));
-    // A bare word names a model of the current provider.
-    command(&mut session, "model", json!("zeta")).await;
-    let req = request(&kernel, &mut session).await;
-    let id = req.request_id.clone();
-    let view = kernel.render(&session.session, req).await.unwrap().fold();
-    assert!(view.contains("use fake/zeta"), "{view}");
-    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
-    session = reopen(&kernel, &session).await;
-    assert_eq!(session.snapshot.summary.model.as_deref(), Some("zeta"));
-    assert!(!picker_open(&session));
-}
-fn row_press(id: &str, key: &str, row: &str) -> serde_json::Value {
-    json!({"handler":id,"event":"press","value":{"key":key,"row":row}})
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn keys_act_on_the_kept_row_and_never_on_a_heading() {
@@ -457,22 +406,18 @@ async fn keys_act_on_the_kept_row_and_never_on_a_heading() {
         command(&mut session, "bingo.mod.models:ui", press(&id, key)).await;
     }
     let req = request(&kernel, &mut session).await;
-    let view = kernel.render(&session.session, req).await.unwrap().fold();
-    let cursor = view.lines().find(|l| l.contains('❯')).unwrap();
+    let view = kernel.render(&session.session, req).await.unwrap();
+    let cursor = picked(&view).unwrap();
     assert!(
         cursor.contains("fake-1") && !cursor.contains("pinned"),
-        "{view}"
+        "{}",
+        view.fold()
     );
-    // The kept row is gone once the pin goes: enter takes no action.
+    // Pins do not duplicate or replace the catalogue row.
     command(&mut session, "model", json!("unpin fake/fake-1")).await;
     command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
     session = reopen(&kernel, &session).await;
-    assert_eq!(session.snapshot.summary.model.as_deref(), Some("other"));
-    assert!(picker_open(&session));
-    // The cursor landed on the first model row, and the next enter takes it.
-    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
-    session = reopen(&kernel, &session).await;
-    assert_ne!(session.snapshot.summary.model.as_deref(), Some("other"));
+    assert_eq!(session.snapshot.summary.model.as_deref(), Some("fake-1"));
     assert!(!picker_open(&session));
 }
 async fn listing(ids: &[&str]) -> (MockServer, tempfile::TempDir) {
@@ -495,13 +440,19 @@ async fn listing(ids: &[&str]) -> (MockServer, tempfile::TempDir) {
     .unwrap();
     (endpoint, home)
 }
+fn picked(view: &View) -> Option<String> {
+    if let View::Box { children, layout } = view {
+        if layout.ground.as_deref() == Some("pick") {
+            return Some(view.fold());
+        }
+        return children.iter().find_map(picked);
+    }
+    None
+}
 async fn cursor_line(kernel: &impl HostApi, session: &mut Attachment) -> String {
     let req = request(kernel, session).await;
-    let view = kernel.render(&session.session, req).await.unwrap().fold();
-    view.lines()
-        .find(|l| l.contains('❯'))
-        .unwrap_or_else(|| panic!("no cursor: {view}"))
-        .to_owned()
+    let view = kernel.render(&session.session, req).await.unwrap();
+    picked(&view).unwrap_or_else(|| panic!("no cursor: {}", view.fold()))
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn a_queued_enter_takes_the_row_the_cursor_moved_to() {
@@ -517,13 +468,8 @@ async fn a_queued_enter_takes_the_row_the_cursor_moved_to() {
     let id = request(&kernel, &mut session).await.request_id;
     assert!(cursor_line(&kernel, &mut session).await.contains("alpha"));
     command(&mut session, "bingo.mod.models:ui", press(&id, "down")).await;
-    // A key queued while alpha was drawn names that drawing's row; the kept row wins.
-    command(
-        &mut session,
-        "bingo.mod.models:ui",
-        row_press(&id, "enter", "model:openai/alpha"),
-    )
-    .await;
+    // A queued key carries no row identity; the owner keeps the moved selection.
+    command(&mut session, "bingo.mod.models:ui", press(&id, "enter")).await;
     session = reopen(&kernel, &session).await;
     assert_eq!(session.snapshot.summary.model.as_deref(), Some("beta"));
 }
@@ -615,7 +561,7 @@ apiKey = "dummy-local-only"
     }
     let req = request(&kernel, &mut session).await;
     let view = kernel.render(&session.session, req).await.unwrap().fold();
-    assert!(view.contains("openai  ◌ not checked"), "{view}");
+    assert!(view.contains("Model") && view.contains("fake-1"), "{view}");
 }
 #[tokio::test(flavor = "multi_thread")]
 async fn a_switch_from_any_client_is_a_line_in_the_transcript() {
@@ -692,4 +638,58 @@ async fn typed_surface_opens_the_picker_independently_of_attribution() {
         });
         assert_eq!(picker, surface == Some(render::SurfaceName::Terminal));
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_sheet_choice_records_no_notice_and_publishes_one_toast() {
+    let mut server = Server::spawn(SCRIPT);
+    let kernel = ready(&mut server).await;
+    let mut session = kernel
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    command(&mut session, "model", json!("")).await;
+    let id = request(&kernel, &mut session).await.request_id;
+    let intent = IntentId::mint();
+    session.handle.submit(
+        intent.clone(),
+        Input::action(
+            Action {
+                name: "bingo.mod.models:ui".into(),
+                args: press(&id, "enter"),
+            },
+            Origin::surface("rpc").on(render::SurfaceName::Terminal),
+        ),
+    );
+    let (mut toasts, mut notices) = (0, 0);
+    tokio::time::timeout(LIMIT, async {
+        while let Some(frame) = session.events.next().await {
+            match frame.event {
+                Event::Signal { payload, .. } => {
+                    toasts += payload["slots"].as_array().map_or(0, |slots| {
+                        slots
+                            .iter()
+                            .filter(|slot| slot["kind"] == "toast" || slot["kind"] == "Toast")
+                            .count()
+                    });
+                }
+                Event::ItemCompleted { item } if matches!(item.body, ItemBody::Notice { .. }) => {
+                    notices += 1
+                }
+                Event::IntentAck {
+                    intent: ack,
+                    outcome,
+                } if ack == intent => {
+                    assert!(matches!(outcome, IntentOutcome::Applied { .. }));
+                    return;
+                }
+                _ => {}
+            }
+        }
+        panic!("sheet choice did not acknowledge");
+    })
+    .await
+    .unwrap();
+    assert_eq!(notices, 0);
+    assert_eq!(toasts, 1);
 }

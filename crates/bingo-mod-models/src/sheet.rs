@@ -3,18 +3,14 @@ use bingo_sdk::*;
 pub enum Sheet {
     Manage {
         provider: String,
-        selected: usize,
+        selected: Option<String>,
         pending: Option<String>,
         confirm: bool,
     },
     SignIn {
         provider: String,
-        selected: usize,
+        selected: Option<String>,
         pending: Option<String>,
-    },
-    Add {
-        guess: crate::guess::Guess,
-        selected: usize,
     },
 }
 impl Sheet {
@@ -22,7 +18,6 @@ impl Sheet {
         match self {
             Self::Manage { provider, .. } => provider.clone(),
             Self::SignIn { provider, .. } => format!("sign in to {provider}"),
-            Self::Add { .. } => "add a provider".into(),
         }
     }
 }
@@ -57,109 +52,115 @@ pub fn actions(provider: &CatalogEntry, pending: bool) -> Vec<(Operation, &'stat
     }
     actions
 }
-pub fn lines(sheet: &Sheet, providers: &[CatalogEntry]) -> Vec<String> {
-    let mut lines = vec![format!("model › {}", sheet.title()), String::new()];
-    match sheet {
-        Sheet::Manage {
-            provider,
-            selected,
-            pending,
-            confirm,
-        } => append_manage(
-            &mut lines,
-            providers,
-            provider,
-            *selected,
-            pending.is_some(),
-            *confirm,
-        ),
-        Sheet::SignIn {
-            selected, pending, ..
-        } => append_sign_in(&mut lines, *selected, pending.as_deref()),
-        Sheet::Add { guess, selected } => append_add(&mut lines, guess, *selected),
+impl Operation {
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Anyway => "anyway",
+            Self::Test => "test",
+            Self::Address => "address",
+            Self::Key => "key",
+            Self::Refresh => "refresh",
+            Self::Logout => "logout",
+            Self::Remove => "remove",
+        }
     }
-    lines
 }
-fn append_sign_in(lines: &mut Vec<String>, selected: usize, pending: Option<&str>) {
-    if let Some(id) = pending {
-        lines.push(format!("   then switch to {id}"));
-    }
-    for (i, label) in [
-        "open the browser",
-        "use a code on another device",
-        "paste a key or token",
+pub fn signin_rows() -> Vec<pick::Row> {
+    [
+        ("browser", "open the browser"),
+        ("device", "use a code on another device"),
+        ("paste", "paste a key or token"),
     ]
-    .iter()
-    .enumerate()
-    {
-        lines.push(format!("{}{label}", mark(i == selected)));
+    .into_iter()
+    .map(|(id, label)| pick::Row::new(id, pick::text(label, "muted")))
+    .collect()
+}
+impl Sheet {
+    pub fn selected_mut(&mut self) -> &mut Option<String> {
+        match self {
+            Self::Manage { selected, .. } | Self::SignIn { selected, .. } => selected,
+        }
+    }
+    pub fn build(&self, providers: &[CatalogEntry]) -> bingo_sdk::sheet::Sheet {
+        let mut sheet = bingo_sdk::sheet::Sheet {
+            head: self.title(),
+            fact: None,
+            top: vec![],
+            rows: vec![],
+            selected: None,
+            foot: vec![],
+            pick: true,
+        };
+        match self {
+            Self::SignIn {
+                selected, pending, ..
+            } => {
+                sheet.selected = selected.clone();
+                sheet.rows = signin_rows();
+                if let Some(id) = pending {
+                    sheet
+                        .top
+                        .push(pick::text(format!("then switch to {id}"), "dim"));
+                }
+            }
+            Self::Manage {
+                provider,
+                selected,
+                pending,
+                confirm,
+            } => {
+                sheet.selected = selected.clone();
+                if let Some(provider) = providers.iter().find(|p| &p.id == provider) {
+                    sheet.top = details(provider);
+                    sheet.rows = actions(provider, pending.is_some())
+                        .into_iter()
+                        .map(|(op, label, enabled)| {
+                            let label = if enabled {
+                                label.into()
+                            } else {
+                                format!("{label} · from env; unset it in your shell")
+                            };
+                            pick::Row::new(op.id(), pick::text(label, "muted"))
+                        })
+                        .collect();
+                    if *confirm {
+                        sheet.foot.push(pick::text(
+                            format!("Remove {} and its key?", provider.id),
+                            "amber",
+                        ));
+                    }
+                }
+            }
+        }
+        sheet
     }
 }
-fn append_add(lines: &mut Vec<String>, guess: &crate::guess::Guess, selected: usize) {
-    let address = if guess.address.is_empty() {
-        "none · paste whose key this is"
-    } else {
-        guess.address.as_str()
-    };
-    let key = if guess.key.is_some() {
-        "••••••••"
-    } else {
-        "none"
-    };
-    for (i, (label, value)) in [
-        ("name", guess.name.as_str()),
-        ("shape", guess.shape.as_str()),
-        ("address", address),
-        ("key", key),
-        ("add provider", "then pick one of its models"),
-    ]
-    .iter()
-    .enumerate()
-    {
-        lines.push(format!("{}{label:10} {value}", mark(i == selected)));
-    }
-}
-fn mark(selected: bool) -> &'static str {
-    if selected { " ❯ " } else { "   " }
-}
-
-fn append_manage(
-    lines: &mut Vec<String>,
-    providers: &[CatalogEntry],
-    provider: &str,
-    selected: usize,
-    pending: bool,
-    confirm: bool,
-) {
-    if let Some(p) = providers.iter().find(|p| p.id == provider) {
-        lines.push(format!(
-            "   address   {}",
-            p.meta["address"]
+fn details(provider: &CatalogEntry) -> Vec<View> {
+    [
+        (
+            "address",
+            provider.meta["address"]
                 .as_str()
                 .unwrap_or("managed by the provider")
-        ));
-        lines.push(format!(
-            "   key       {}",
-            p.meta["auth"]["from"].as_str().unwrap_or("none")
-        ));
-        lines.push(format!("   status    {}", crate::label::status(p)));
-        lines.push(String::new());
-        for (i, (_, label, enabled)) in actions(p, pending).iter().enumerate() {
-            lines.push(format!(
-                "{}{}{}",
-                mark(i == selected),
-                label,
-                if *enabled {
-                    ""
-                } else {
-                    " · from env; unset it in your shell"
-                }
-            ));
-        }
-        if confirm {
-            lines.push(format!("Remove {provider} and its key?"));
-        }
-    }
+                .to_owned(),
+        ),
+        (
+            "key",
+            provider.meta["auth"]["from"]
+                .as_str()
+                .unwrap_or("none")
+                .to_owned(),
+        ),
+        ("status", crate::label::status(provider)),
+    ]
+    .into_iter()
+    .map(|(label, value)| {
+        pick::line([
+            pick::pad(pick::text(label, "dim"), 10),
+            pick::text(value, "muted"),
+        ])
+    })
+    .collect()
 }
 
 #[cfg(test)]
