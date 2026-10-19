@@ -26,6 +26,7 @@ pub(super) fn register(kernel: &Kernel, switched: &Switched) {
     kernel.add(Arc::new(Rewind));
     kernel.add(Arc::new(Status));
     kernel.add(Arc::new(Plugins(kernel.clone(), switched.clone())));
+    kernel.add(Arc::new(Mcp(kernel.clone())));
     let kept: Arc<dyn checkpoints::Checkpoints> = Arc::new(Kept);
     serve(kernel, checkpoints::KEY.name(), kept);
     let crew: Arc<dyn agents_control::AgentsControl> = Arc::new(Crew(kernel.clone()));
@@ -235,5 +236,42 @@ struct Servers;
 impl mcp::Servers for Servers {
     async fn rows(&self) -> Vec<mcp::ServerRow> {
         super::world::servers()
+    }
+}
+
+/// `/mcp login server` asks for the prototype's device code, as a server
+/// whose token expired would ask; the world has no other `/mcp` verb.
+struct Mcp(Kernel);
+
+#[async_trait::async_trait]
+impl Command for Mcp {
+    fn spec(&self) -> CommandSpec {
+        spec("mcp", "MCP servers")
+    }
+    async fn run(&self, args: &str, _: &CommandContext) -> Result<CommandOutcome, KernelError> {
+        let Some(server) = args.strip_prefix("login ") else {
+            return Ok(CommandOutcome::Applied { message: None });
+        };
+        let opened_at =
+            jiff::Timestamp::from_millisecond(crate::test_support::ember::CLOCK_ORIGIN_MS).unwrap();
+        let interaction = Interaction {
+            id: InteractionId::from_raw("login"),
+            session: self.0.root().summary.id,
+            turn: None,
+            item: None,
+            opened_at,
+            guard_until: None,
+            expires_at: None,
+            kind: InteractionKind::Login {
+                provider: server.into(),
+                flow: LoginFlow::Device {
+                    url: "github.com/login/device".into(),
+                    code: "K7QF-2MXP".into(),
+                },
+            },
+            answers: vec![AnswerSpec::Cancel],
+        };
+        self.0.broadcast(Event::InteractionOpened { interaction });
+        Ok(CommandOutcome::Applied { message: None })
     }
 }
