@@ -263,6 +263,9 @@ const WRAPPED_TRANSMIT: &[u8] = b"\x1bPtmux;\x1b\x1b_Ga=T,f=100";
 /// A `bingo` on a pty, with everything it reads and writes in one place.
 struct Terminal {
     child: Box<dyn portable_pty::Child + Send + Sync>,
+    /// Held for the child's life: on Windows the last handle on the master
+    /// closes the ConPTY, and closing it ends every process attached to it.
+    _master: Box<dyn portable_pty::MasterPty + Send>,
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     parser: Arc<Mutex<vt100::Parser>>,
     /// Every byte the child wrote, for an assertion about a sequence that
@@ -402,6 +405,7 @@ impl Terminal {
         });
         Terminal {
             child,
+            _master: pty.master,
             writer,
             parser,
             written,

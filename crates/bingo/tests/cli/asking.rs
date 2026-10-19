@@ -70,6 +70,9 @@ fn a_permission_no_rule_could_silence_offers_no_session_rung() {
 /// everything it has written so far.
 struct AtTheTerminal {
     child: Box<dyn portable_pty::Child + Send + Sync>,
+    /// Held for the run's life: on Windows the last handle on the master
+    /// closes the ConPTY, and closing it ends every process attached to it.
+    _master: Box<dyn portable_pty::MasterPty + Send>,
     writer: Box<dyn Write + Send>,
     seen: Arc<Mutex<Vec<u8>>>,
     home: tempfile::TempDir,
@@ -107,6 +110,7 @@ impl AtTheTerminal {
         Self {
             child,
             writer: pty.master.take_writer().unwrap(),
+            _master: pty.master,
             seen,
             home,
         }
