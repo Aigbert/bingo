@@ -174,8 +174,8 @@ fn chosen(question: &AskQuestion, ids: &[String]) -> Vec<String> {
 fn answered(question: &AskQuestion, answer: Answer) -> Result<String, ToolError> {
     match answer {
         Answer::Choice { ids, other } => said(question, &ids, other.as_deref()),
-        Answer::Text { text } => Ok(format!("{}: {text}", question.header)),
-        Answer::Cancel | Answer::Deny { .. } => Ok(format!("{}: skipped", question.header)),
+        Answer::Text { text } => Ok(text),
+        Answer::Cancel | Answer::Deny { .. } => Ok("skipped".into()),
         other => Err(ToolError::Failed(format!(
             "unexpected answer to {:?}: {other:?}",
             question.question
@@ -200,7 +200,7 @@ fn said(question: &AskQuestion, ids: &[String], other: Option<&str>) -> Result<S
             question.question
         )));
     }
-    Ok(format!("{}: {}", question.header, said.join(", ")))
+    Ok(said.join(", "))
 }
 
 /// The form's answers against the questions they belong to. The kernel gives
@@ -262,11 +262,37 @@ impl Tool for AskUserQuestionTool {
         let Answer::Form { answers } = answer else {
             return Ok(ToolOutput::error(declined(&args)));
         };
-        Ok(ToolOutput::text(format!(
-            "The user answered:\n{}",
-            lines(&args, answers)?.join("\n")
-        )))
+        result(&args, answers)
     }
+}
+
+fn result(args: &AskArgs, answers: Vec<Answer>) -> Result<ToolOutput, ToolError> {
+    let lines = lines(args, answers)?;
+    let model: Vec<_> = args
+        .questions
+        .iter()
+        .zip(&lines)
+        .map(|(q, answer)| format!("{}: {answer}", q.header))
+        .collect();
+    let mut output = ToolOutput::text(format!("The user answered:\n{}", model.join("\n")));
+    let mut children = Vec::new();
+    for (question, line) in args.questions.iter().zip(&lines) {
+        if !children.is_empty() {
+            children.push(bingo_sdk::View::text(""));
+        }
+        children.push(bingo_sdk::View::Text {
+            children: vec![bingo_sdk::view::TextChild::String(
+                question.question.clone(),
+            )],
+            style: bingo_sdk::view::TextStyle {
+                color: Some("muted".into()),
+                ..Default::default()
+            },
+        });
+        children.push(bingo_sdk::View::text(line));
+    }
+    output.display = Some(bingo_sdk::View::column(children));
+    Ok(output)
 }
 
 /// Leaving the whole card is declining all of it, in the words of the first
@@ -304,6 +330,28 @@ mod tests {
         let cx = context_with(dir.path(), host.clone());
         let out = AskUserQuestionTool.call(input, &cx).await.expect("ask");
         (out, host)
+    }
+
+    #[tokio::test]
+    async fn the_owner_draws_the_question_and_answer_without_changing_parts() {
+        let (out, _) = ask(
+            one_question(),
+            form(vec![Answer::Text {
+                text: "a session cookie".into(),
+            }]),
+        )
+        .await;
+        assert_eq!(
+            out.parts[0].as_text(),
+            Some("The user answered:\nAuth method: a session cookie")
+        );
+        let display = serde_json::to_value(out.display.as_ref().unwrap()).unwrap();
+        assert_eq!(display["children"][0]["color"], "muted");
+        assert_eq!(
+            display["children"][0]["children"][0],
+            "Which authentication method?"
+        );
+        assert_eq!(display["children"][1]["children"][0], "a session cookie");
     }
 
     #[test]
