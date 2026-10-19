@@ -9,8 +9,6 @@
 //! These are functions over the run rather than more of its methods: `Run`'s
 //! own `impl` is spread as far as it may be (`scripts/check_discipline.sh` §5).
 
-use std::time::Instant;
-
 use bingo_sdk::{ErrorCode, Input, IntentId, KernelError, Level};
 
 use super::{Reply, Run, identity};
@@ -59,7 +57,7 @@ fn refused(run: &mut Run, error: KernelError) {
         ErrorCode::NotFound => (Level::Info, ALREADY_SENT.to_string()),
         _ => (Level::Warn, error.message),
     };
-    run.ui.notify(level, message, Instant::now());
+    run.ui.notify(level, message, run.now().instant);
 }
 
 pub(super) fn stop(run: &mut Run, intents: Vec<IntentId>) {
@@ -123,7 +121,7 @@ pub(super) fn stopped(
     run.ui.notify(
         Level::Info,
         "stopped · what you queued is back in the input",
-        run.detection.now().instant,
+        run.now().instant,
     );
 }
 

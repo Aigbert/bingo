@@ -75,9 +75,9 @@ impl Typeahead {
     }
 
     #[cfg(test)]
-    pub(super) fn expire(&mut self) {
+    pub(super) fn expire(&mut self, now: Instant) {
         if let Some(opening) = &mut self.opening {
-            opening.until = Instant::now();
+            opening.until = now;
         }
     }
 
@@ -92,7 +92,7 @@ impl Typeahead {
 pub(super) fn command_sent(run: &mut Run, intent: IntentId) {
     run.typeahead.opening = Some(Opening {
         intent,
-        until: run.detection.now().instant + OPENING_WAIT,
+        until: run.now().instant + OPENING_WAIT,
     });
 }
 
@@ -127,15 +127,15 @@ fn drawing(run: &Run, editing: bool) -> bool {
         && crate::pane::readiness::waiting(&run.ui, run.session.tree.viewed()))
         || crate::browse::waiting(&run.ui, &run.session.tree)
         || crate::plugins::waiting(&run.ui)
-        || (!editing && crate::palette::waiting(&run.ui, &run.session.tree, run.detection.now()))
-        || crate::sessions::waiting(&run.ui, &run.session.tree, run.detection.now())
+        || (!editing && crate::palette::waiting(&run.ui, &run.session.tree, run.now()))
+        || crate::sessions::waiting(&run.ui, &run.session.tree, run.now())
 }
 
 /// Whether a key typed now must wait behind something: a site still drawn,
 /// a key still judged, a command line still out, or keys typed before it.
 pub(super) fn blocked(run: &Run, key: Option<KeyEvent>) -> bool {
     let editing = key.is_some_and(|key| crate::palette::edits_query(&run.ui, key));
-    if drawing(run, editing) || run.typeahead.opening(run.detection.now().instant) {
+    if drawing(run, editing) || run.typeahead.opening(run.now().instant) {
         return true;
     }
     if focus(run).is_some_and(|focus| judging(run, &focus)) {
@@ -159,9 +159,8 @@ fn judging(run: &Run, site: &str) -> bool {
 pub(super) fn queue(run: &mut Run, key: KeyEvent) {
     // A closing palette can restore an ask before the command is acknowledged.
     // Keys still waiting for that command were not addressed to the ask.
-    let site = focus(run).filter(|site| {
-        !run.typeahead.opening(run.detection.now().instant) || !dialog(run, Some(site))
-    });
+    let site = focus(run)
+        .filter(|site| !run.typeahead.opening(run.now().instant) || !dialog(run, Some(site)));
     run.typeahead.inputs.push_back(Queued {
         site,
         input: Held::Key(key),
@@ -194,7 +193,8 @@ fn apply(run: &mut Run, held: Held) {
     run.behind = true;
     match held {
         Held::Key(key) => {
-            let effects = input::on_key(&mut run.ui, &run.session.tree, key, run.detection.now());
+            let now = run.now();
+            let effects = input::on_key(&mut run.ui, &run.session.tree, key, now);
             run.apply(effects);
         }
         Held::Paste(text) => input::on_paste(&mut run.ui, &text),
@@ -205,7 +205,7 @@ fn apply(run: &mut Run, held: Held) {
 pub(super) fn drain(run: &mut Run) {
     // A command line that outran its wait no longer holds the keyboard, nor
     // a wake-up for the loop.
-    if !run.typeahead.opening(run.detection.now().instant) {
+    if !run.typeahead.opening(run.now().instant) {
         run.typeahead.opening = None;
     }
     let mut kept_out = 0;
@@ -239,7 +239,7 @@ pub(super) fn drain(run: &mut Run) {
     if kept_out > 0 {
         run.behind = true;
         run.ui
-            .notify(Level::Warn, kept_out_notice(kept_out), Instant::now());
+            .notify(Level::Warn, kept_out_notice(kept_out), run.now().instant);
     }
 }
 
@@ -258,7 +258,7 @@ fn dialog(run: &Run, focus: Option<&str>) -> bool {
 
 fn waiting(run: &Run, site: Option<&str>, input: &Held) -> bool {
     let editing = matches!(input, Held::Key(key) if crate::palette::edits_query(&run.ui, *key));
-    if drawing(run, editing) || run.typeahead.opening(run.detection.now().instant) {
+    if drawing(run, editing) || run.typeahead.opening(run.now().instant) {
         return true;
     }
     if site.is_some_and(|site| judging(run, site)) {

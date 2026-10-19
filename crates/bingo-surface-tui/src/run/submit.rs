@@ -89,7 +89,7 @@ impl Run {
 
     /// Queued gestures leave by the run's own clock, the one its wake obeys.
     pub(super) fn release_actions(&mut self) {
-        self.release_actions_at(self.detection.now().instant);
+        self.release_actions_at(self.now().instant);
     }
 
     pub(super) fn release_actions_at(&mut self, now: std::time::Instant) {
@@ -156,7 +156,7 @@ impl Run {
         match images {
             Ok(images) => self.send_text(handle, text, images, origin, delivery),
             Err(why) => {
-                self.ui.notify(Level::Warn, why, std::time::Instant::now());
+                self.ui.notify(Level::Warn, why, self.now().instant);
                 self.ui.composer.set(&text);
             }
         }

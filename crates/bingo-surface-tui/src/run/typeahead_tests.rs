@@ -245,7 +245,7 @@ async fn keys_wait_no_longer_than_the_command_wait() {
         run.next_draw().is_some(),
         "the loop wakes when the wait ends"
     );
-    run.typeahead.expire();
+    run.typeahead.expire(run.now().instant);
     typeahead::drain(&mut run);
     assert_eq!(run.ui.composer.text(), "hi");
     assert!(run.behind, "released keys owe a drawing");
@@ -286,7 +286,7 @@ async fn deadline_release_owes_a_frame_showing_the_keys() {
     let mut screen = crate::doubles::Recorder::default();
     typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
     type_burst(&mut run, "zq");
-    run.typeahead.expire();
+    run.typeahead.expire(run.now().instant);
     run.paint(&mut screen, Wake::Frame, now).unwrap();
     assert_eq!(run.ui.composer.text(), "zq");
     assert!(!screen.last().contains("zq"));
@@ -304,7 +304,7 @@ async fn pastes_wait_between_the_keys_they_were_typed_between() {
     type_burst(&mut run, "ab");
     run.terminal_event(Term::Paste("X".into()));
     type_burst(&mut run, "cd");
-    run.typeahead.expire();
+    run.typeahead.expire(run.now().instant);
     typeahead::drain(&mut run);
     assert_eq!(run.ui.composer.text(), "abXcd");
     assert!(run.typeahead.is_empty());
@@ -331,7 +331,7 @@ async fn queued_pastes_are_kept_out_of_asks() {
             if !already_open {
                 run.session.tree.fold.apply(&frame(1, opened(ask.clone())));
             }
-            run.typeahead.expire();
+            run.typeahead.expire(run.now().instant);
             typeahead::drain(&mut run);
             assert!(
                 run.ui.composer.is_empty(),
@@ -367,7 +367,7 @@ async fn a_set_aside_ask_never_receives_keys_held_in_the_composer() {
     typeahead::command_sent(&mut run, IntentId::from_raw("slow"));
     type_burst(&mut run, "y");
     run.ui.dialog.aside = false;
-    run.typeahead.expire();
+    run.typeahead.expire(run.now().instant);
     typeahead::drain(&mut run);
     assert!(session.answers().is_empty());
     assert!(run.typeahead.is_empty());
@@ -395,7 +395,7 @@ async fn an_unknown_command_never_answers_the_ask_it_set_aside() {
         if rendered {
             play_palette(&mut run, &session, now);
         }
-        run.typeahead.expire();
+        run.typeahead.expire(run.now().instant);
         typeahead::drain(&mut run);
         assert!(session.answers().is_empty(), "y was typed outside the ask");
         assert!(run.session.tree.open_interaction().is_some());

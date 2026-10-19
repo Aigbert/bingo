@@ -39,7 +39,7 @@ pub(super) fn surface_action(run: &mut Run, action: bingo_sdk::Action) {
     if action.name != "Palette" {
         return;
     }
-    let now = run.detection.now();
+    let now = run.now();
     if let Some(id) = action.args["resume"].as_str() {
         run.apply(vec![Effect::Open(SessionSelector::ById {
             id: SessionId::from_raw(id),

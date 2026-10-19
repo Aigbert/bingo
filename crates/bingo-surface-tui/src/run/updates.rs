@@ -24,6 +24,7 @@ pub(super) fn spawn(replies: mpsc::Sender<Reply>, data_dir: PathBuf) {
         if let Ok(running) = bingo_update::install::running() {
             bingo_update::install::sweep(&running);
         }
+        // Release-check cache expiry is real wall time, independent of UI motion.
         let found = bingo_update::check(CURRENT, &data_dir, Timestamp::now(), fetch).await;
         if let Some(version) = found {
             let _ = replies.send(Reply::Update(version)).await;

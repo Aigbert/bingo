@@ -33,7 +33,7 @@ pub(super) fn ctrl_c(run: &mut Run, key: crossterm::event::KeyEvent) -> bool {
                 .and_then(close_action)
                 .map(|action| (key.session.clone(), action))
         });
-    let now = run.detection.now();
+    let now = run.now();
     if crate::sessions::active(&run.ui) {
         crate::sessions::close(&mut run.ui, now);
     } else if crate::browse::active(&run.ui) {

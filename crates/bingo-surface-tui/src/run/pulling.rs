@@ -96,6 +96,7 @@ pub(super) fn paint(
     look::pay(run, screen).map_err(stdio)?;
     let title = run.detection.render().scope(|| title(&run.session.tree));
     screen.title(&title).map_err(stdio)?;
+    // Measure host-call latency on real time, independently of the frame clock.
     let began = Instant::now();
     let (width, height) = screen.size();
     pulling::sync(run, screen, now)?;

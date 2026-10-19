@@ -37,6 +37,7 @@ mod site_lifecycle;
 /// A line on its way out of the composer, and the pictures it named.
 mod submit;
 mod surface;
+mod time;
 mod typeahead;
 /// Whether a newer release is out, asked once at start (M63).
 mod updates;
@@ -170,6 +171,8 @@ enum Submission {
 }
 
 struct Run {
+    clock: time::Clock,
+    clipboard_image: clipboard::Reader,
     detection: crate::render::Detection,
     host: HostHandle,
     data_dir: std::path::PathBuf,
@@ -277,7 +280,7 @@ pub(crate) async fn drive(
                 Wake::Event
             },
         };
-        let now = run.detection.now();
+        let now = run.now();
         run.ui.expire(now);
         run.ui.drag_step(now);
         if let Some(exit) = run.exit.take() {
@@ -300,7 +303,8 @@ async fn standing(
 ) -> Result<(Run, Option<FrameStream>, Option<GatewayStream>), KernelError> {
     let (mut run, events) = attach(host, opts, surface, replies).await?;
     run.detection = detection;
-    notices::raise(&mut run.ui, run.detection.notice(), Instant::now());
+    let now = run.now();
+    notices::raise(&mut run.ui, run.detection.notice(), now.instant);
     opening::find_resume(&mut run);
     Ok((run, events, Some(host.gateway_events())))
 }
@@ -318,15 +322,16 @@ async fn attach(
     let attachment = host
         .open(opts.selector, identity(), OpenOptions::with_children())
         .await?;
+    let clock = time::system();
+    let (at, _) = clock();
     let mut run = Run {
+        clock,
+        clipboard_image: clipboard::system(),
         detection: crate::render::Detection::default(),
         host: host.clone(),
         data_dir: opts.env.data_dir.clone(),
         session: Attached::new(attachment.snapshot, attachment.handle),
-        ui: Ui::new(
-            history::load(&opts.env.data_dir),
-            crate::clock::Now::real().instant,
-        ),
+        ui: Ui::new(history::load(&opts.env.data_dir), at),
         mine: HashMap::new(),
         rewind_prompts: Default::default(),
         received_asks: HashMap::new(),
@@ -338,7 +343,7 @@ async fn attach(
         opener: viewer::system(),
         // Older than a frame, on the loop's own clock, so the first thing
         // that happens is drawn.
-        painted: older_than_a_frame(),
+        painted: older_than_a_frame(at),
         stored: Stored::default(),
         cache: Cache::under(&opts.env.data_dir, surface.options.cache_days()),
         ear: late::Late::default(),
@@ -365,8 +370,7 @@ async fn attach(
 
 /// An instant one frame in the past, or this one on a machine that has not
 /// been running for a whole frame yet.
-fn older_than_a_frame() -> Instant {
-    let now = Now::real().instant;
+fn older_than_a_frame(now: Instant) -> Instant {
     now.checked_sub(TICK).unwrap_or(now)
 }
 
@@ -414,6 +418,15 @@ fn slow_draw(took: Duration, already: bool) -> Option<String> {
 }
 
 impl Run {
+    fn now(&self) -> Now {
+        let (instant, wall) = (self.clock)();
+        Now {
+            instant,
+            wall,
+            motion: self.detection.motion,
+        }
+    }
+
     /// Events held at the draw gate still owe the next frame boundary.
     fn next_draw(&self) -> Option<Instant> {
         self.ui
@@ -468,7 +481,7 @@ impl Run {
         if let Some(text) = slow_draw(took, self.sluggish) {
             self.sluggish = true;
             self.behind = true;
-            self.ui.notify(Level::Info, text, Instant::now());
+            self.ui.notify(Level::Info, text, self.now().instant);
         }
     }
 
@@ -483,7 +496,7 @@ impl Run {
             Some(bytes) => screen.copy(&bytes).map_err(stdio),
             None => {
                 let refused = crate::select::refused(text.len());
-                self.ui.notify(Level::Warn, refused, Instant::now());
+                self.ui.notify(Level::Warn, refused, self.now().instant);
                 Ok(())
             }
         }
@@ -511,7 +524,7 @@ impl Run {
                 self.announce(Notification::Done, screen)?;
             }
             Event::Notice { level, text, .. } => {
-                self.ui.notify(*level, text.clone(), Instant::now())
+                self.ui.notify(*level, text.clone(), self.now().instant)
             }
             Event::IntentAck { intent, outcome } => self.ack(intent, outcome),
             Event::Invalidated { requests } => pulling::refetch(self, requests),
@@ -527,9 +540,10 @@ impl Run {
             && let Some(state) = self.session.tree.state(&frame.session)
             && frame.seq > state.seq
         {
+            let now = self.now();
             self.ui
                 .queue_arrivals
-                .observe(&state.queue, entries, self.detection.now().instant);
+                .observe(&state.queue, entries, now.instant);
         }
         let tokens = self
             .session
@@ -554,7 +568,7 @@ impl Run {
             return false;
         }
         if let Some(state) = self.session.tree.state(&frame.session) {
-            self.ui.embers.observe(tokens, state, Instant::now());
+            self.ui.embers.observe(tokens, state, self.now().instant);
         }
         let removed: Vec<_> = before
             .into_iter()
@@ -639,7 +653,7 @@ impl Run {
             IntentOutcome::Applied { result } => {
                 surface::receipt(self, result);
                 if matches!(submission, Submission::Mode(_)) {
-                    self.ui.notify_mode(self.detection.now().instant);
+                    self.ui.notify_mode(self.now().instant);
                 }
             }
             _ => {}
@@ -649,7 +663,7 @@ impl Run {
     }
 
     fn rejected(&mut self, message: &str, about: Option<String>) {
-        let now = Instant::now();
+        let now = self.now().instant;
         match about {
             Some(text) => self
                 .ui
@@ -710,7 +724,7 @@ impl Run {
         if matches!(event, Term::Paste(_))
             || matches!(&event, Term::Key(key) if key.kind != crossterm::event::KeyEventKind::Release)
         {
-            self.ui.keyed_at = self.detection.now().instant;
+            self.ui.keyed_at = self.now().instant;
         }
         match event {
             Term::Key(key) => {
@@ -731,17 +745,13 @@ impl Run {
                     return;
                 }
                 self.session.tree.mark_read();
-                let effects =
-                    input::on_key(&mut self.ui, &self.session.tree, key, self.detection.now());
+                let now = self.now();
+                let effects = input::on_key(&mut self.ui, &self.session.tree, key, now);
                 self.apply(effects);
             }
             Term::Mouse(mouse) => {
-                let effects = pointer::on_mouse(
-                    &mut self.ui,
-                    &self.session.tree,
-                    mouse,
-                    self.detection.now(),
-                );
+                let now = self.now();
+                let effects = pointer::on_mouse(&mut self.ui, &self.session.tree, mouse, now);
                 self.apply(effects);
             }
             Term::Paste(text) => {
@@ -802,14 +812,11 @@ impl Run {
     /// (ADR-0052 §1), becomes `[image N]` in the line, and that file is held
     /// under the token; a clipboard with none leaves the line alone.
     fn paste_image(&mut self) {
-        if pictures::refuse(
-            &mut self.ui,
-            self.session.tree.viewed(),
-            self.detection.now(),
-        ) {
+        let now = self.now();
+        if pictures::refuse(&mut self.ui, self.session.tree.viewed(), now) {
             return;
         }
-        let Some(bytes) = clipboard::image() else {
+        let Some(bytes) = (self.clipboard_image)() else {
             return;
         };
         match pasted(&self.data_dir, &bytes) {
@@ -817,9 +824,10 @@ impl Run {
                 self.ui.paste_picture(path);
                 self.ui.edited();
             }
-            Err(why) => self
-                .ui
-                .notify(Level::Warn, format!("clipboard: {why}"), Instant::now()),
+            Err(why) => {
+                self.ui
+                    .notify(Level::Warn, format!("clipboard: {why}"), self.now().instant)
+            }
         }
     }
 
@@ -833,7 +841,7 @@ impl Run {
     }
 
     fn not_yet(&mut self) {
-        self.ui.notify(Level::Warn, NOT_YET, Instant::now());
+        self.ui.notify(Level::Warn, NOT_YET, self.now().instant);
     }
 
     /// Paint another session of the tree, and fetch its mailbox the first
@@ -843,7 +851,7 @@ impl Run {
         catalogues::view_changed(self);
         // Somewhere else is somewhere else: the transcript comes back up out
         // of dim so the change of place is seen and not just noticed (§6).
-        self.ui.switched = Some(Instant::now());
+        self.ui.switched = Some(self.now().instant);
         self.ui.scroll = Default::default();
         interactions::refocus(self);
         if self.session.handles.contains_key(&session) {
@@ -899,7 +907,7 @@ impl Run {
     fn told_of(&mut self, version: String) {
         if self.ui.shown.top > 0 {
             let said = format!("↑ v{version} is out · bingo update");
-            self.ui.notify(Level::Info, said, Instant::now());
+            self.ui.notify(Level::Info, said, self.now().instant);
         }
         self.ui.welcome.update = Some(version);
     }
@@ -943,7 +951,8 @@ impl Run {
             Reply::Stopped(session, taken) => withdraw::stopped(self, session, taken),
             Reply::Failed(error) => {
                 self.ui.opening = false;
-                self.ui.notify(Level::Error, error.message, Instant::now());
+                self.ui
+                    .notify(Level::Error, error.message, self.now().instant);
             }
         }
     }
@@ -959,7 +968,8 @@ impl Run {
         *events = Some(attachment.events);
         self.ui.opening = false;
         self.ui.scroll = Default::default();
-        self.ui.focus.close(Instant::now());
+        let now = self.now();
+        self.ui.focus.close(now.instant);
         interactions::refocus(self);
     }
 }
@@ -1760,6 +1770,8 @@ mod tests {
         at: Instant,
     ) -> Run {
         Run {
+            clock: time::system(),
+            clipboard_image: clipboard::system(),
             detection: crate::render::current().into(),
             stored: Stored::default(),
             cache: None,

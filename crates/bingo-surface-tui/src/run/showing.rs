@@ -16,8 +16,6 @@
 //! own `impl` is spread as far as it may be (`scripts/check_discipline.sh` §5),
 //! and where its pictures go is a chapter of its own either way.
 
-use std::time::Instant;
-
 use bingo_sdk::{ErrorCode, KernelError, Level, SessionState};
 
 use super::{Reply, Run, stdio};
@@ -133,7 +131,7 @@ pub(super) fn forget(run: &mut Run, screen: &mut dyn Screen) -> Result<(), Kerne
 /// notice says what was opened, or, when nothing would, what it was handed.
 pub(super) fn open(run: &mut Run, source: &Source) {
     let opened = handed_over(run, source);
-    let now = Instant::now();
+    let now = run.now().instant;
     match opened {
         Ok(word) => run.ui.notify(Level::Info, format!("opened {word}"), now),
         Err(why) => run.ui.notify(Level::Warn, why, now),

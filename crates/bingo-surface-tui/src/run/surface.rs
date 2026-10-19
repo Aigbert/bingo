@@ -21,7 +21,7 @@ pub(super) fn receipt(run: &mut Run, result: &Value) {
         && let Some(message) = result.get("message").and_then(Value::as_str)
     {
         run.ui
-            .notify(Level::Info, message.to_string(), Instant::now());
+            .notify(Level::Info, message.to_string(), run.now().instant);
     }
     if let Some(view) = result
         .get("view")
@@ -32,7 +32,7 @@ pub(super) fn receipt(run: &mut Run, result: &Value) {
 }
 
 pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
-    let now = run.detection.now();
+    let now = run.now();
     match action.name.as_str() {
         "Browse" => crate::browse::open(
             &mut run.ui,
@@ -82,7 +82,7 @@ fn focus(run: &mut Run, args: &Value) {
 
 pub(super) fn restore_prompt(run: &mut Run, text: Option<String>) {
     if let Some(text) = text {
-        let now = run.detection.now();
+        let now = run.now();
         crate::composer::fill::fill(&mut run.ui, crate::composer::fill::Fill { text }, now);
     }
 }

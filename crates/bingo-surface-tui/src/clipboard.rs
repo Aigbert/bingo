@@ -18,8 +18,14 @@ use std::time::{Duration, Instant};
 /// display server that never answers must not hold the composer.
 const PATIENCE: Duration = Duration::from_secs(5);
 
+pub type Reader = std::sync::Arc<dyn Fn() -> Option<Vec<u8>> + Send + Sync>;
+
+pub fn system() -> Reader {
+    std::sync::Arc::new(image)
+}
+
 /// The PNG bytes on the clipboard, when there is a picture on it.
-pub fn image() -> Option<Vec<u8>> {
+fn image() -> Option<Vec<u8>> {
     let file = scratch();
     let bytes = fetch(&file).then(|| fs::read(&file).ok()).flatten();
     let _ = fs::remove_file(&file);

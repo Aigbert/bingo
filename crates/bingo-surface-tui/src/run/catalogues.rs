@@ -86,7 +86,7 @@ pub(super) fn received(
         Err(error) => run.ui.notify(
             Level::Warn,
             format!("Command catalogue unavailable: {}", error.message),
-            Instant::now(),
+            run.now().instant,
         ),
     }
     typeahead::drain(run);

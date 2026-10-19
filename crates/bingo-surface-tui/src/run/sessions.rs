@@ -26,7 +26,7 @@ pub(super) fn fill(run: &mut Run, request: &str, rows: Vec<SessionSummary>) {
     }
 }
 pub(super) fn surface_action(run: &mut Run, action: &bingo_sdk::Action) {
-    let now = run.detection.now();
+    let now = run.now();
     if action.name == "Sessions" {
         let effects = crate::sessions::open(&mut run.ui, now);
         run.apply(effects);

@@ -1,7 +1,7 @@
 use super::*;
 
 pub(super) fn refocus(run: &mut Run) {
-    refocus_at(run, run.detection.now().wall);
+    refocus_at(run, run.now().wall);
 }
 
 pub(super) fn refocus_at(run: &mut Run, now: jiff::Timestamp) {

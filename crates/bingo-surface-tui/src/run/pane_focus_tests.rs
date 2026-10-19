@@ -217,7 +217,7 @@ async fn opener_receipt_addresses_held_keys_before_releasing_them() {
         run.terminal_event(Term::Key(typed('x')));
         assert_eq!(run.typeahead.len(), 1);
         if expired {
-            run.typeahead.expire();
+            run.typeahead.expire(run.now().instant);
         }
         run.ack(
             &intent,

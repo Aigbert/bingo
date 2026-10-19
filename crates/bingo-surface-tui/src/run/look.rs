@@ -69,6 +69,7 @@ impl Default for Owed {
     fn default() -> Self {
         Self {
             question: false,
+            // Terminal probes follow physical I/O time, not the scene clock.
             asked: Instant::now(),
         }
     }
@@ -112,6 +113,7 @@ pub(super) fn pay(run: &mut Run, screen: &mut dyn Screen) -> io::Result<()> {
     if !std::mem::take(&mut run.look.question) {
         return Ok(());
     }
+    // Probe spacing follows the real terminal even when frame time is controlled.
     run.look.asked = Instant::now();
     screen.ask(theme::QUESTION)
 }

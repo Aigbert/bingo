@@ -220,7 +220,7 @@ fn palette_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
     let IntentOutcome::Applied { result } = outcome else {
         return;
     };
-    let now = run.detection.now();
+    let now = run.now();
     let effects = if let Ok(action) =
         serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
     {
@@ -278,12 +278,8 @@ fn interaction_unhandled(run: &mut Run, pending: &Pending, outcome: &IntentOutco
     if !focused || run.ui.dialog.aside || !unhandled(outcome) {
         return false;
     }
-    let effects = input::interaction_unhandled(
-        &mut run.ui,
-        &run.session.tree,
-        pending.key,
-        run.detection.now(),
-    );
+    let now = run.now();
+    let effects = input::interaction_unhandled(&mut run.ui, &run.session.tree, pending.key, now);
     run.apply(effects);
     true
 }
@@ -301,6 +297,7 @@ fn pane_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
     let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone()) else {
         return;
     };
+    let now = run.now();
     let effects = crate::pane::reply::result(
         &mut run.ui,
         &run.session.tree,
@@ -308,7 +305,7 @@ fn pane_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
         plugin,
         id,
         vouched(result, plugin),
-        run.detection.now(),
+        now,
     );
     run.apply(effects);
 }
@@ -320,12 +317,8 @@ fn pane_unhandled(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
         && pending.session == run.session.tree.viewed().summary.id
         && matches!(&run.ui.focus, crate::focus::Focus::Pane(key) if key == &pending.focus)
     {
-        let effects = input::pane_keys(
-            &mut run.ui,
-            &run.session.tree,
-            pending.key,
-            run.detection.now(),
-        );
+        let now = run.now();
+        let effects = input::pane_keys(&mut run.ui, &run.session.tree, pending.key, now);
         run.apply(effects);
     }
 }
@@ -340,7 +333,7 @@ fn browse_answer(run: &mut Run, outcome: &IntentOutcome) {
         && let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
     {
         let vouched = vouched(result, BROWSE);
-        let now = run.detection.now();
+        let now = run.now();
         let effects = crate::browse::result(&mut run.ui, &run.session.tree, &action, vouched, now);
         run.apply(effects);
     }
@@ -352,7 +345,7 @@ fn plugins_answer(run: &mut Run, outcome: &IntentOutcome) {
         && let Ok(action) = serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
     {
         let vouched = vouched(result, PLUGINS);
-        let now = run.detection.now();
+        let now = run.now();
         let effects = crate::plugins::result(&mut run.ui, &run.session.tree, &action, vouched, now);
         run.apply(effects);
     }
@@ -377,13 +370,13 @@ pub(super) fn notices(run: &mut Run) {
     let notices = crate::keys::commands::bindings(&run.ui, run.session.tree.viewed()).notices;
     if !notices.is_empty() {
         run.ui
-            .notify(Level::Warn, notices.join("; "), Instant::now());
+            .notify(Level::Warn, notices.join("; "), run.now().instant);
     }
 }
 
 fn directory_answer(run: &mut Run, pending: &Pending, outcome: &IntentOutcome) {
     if let IntentOutcome::Applied { result } = outcome {
-        let now = run.detection.now();
+        let now = run.now();
         let effects = if let Ok(action) =
             serde_json::from_value::<bingo_sdk::Action>(result["surface"].clone())
         {
