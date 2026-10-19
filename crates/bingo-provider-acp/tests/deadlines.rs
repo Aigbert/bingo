@@ -51,12 +51,16 @@ async fn scenario(ignore: bool) {
     tokio::task::yield_now().await;
     tokio::time::resume();
     if ignore {
-        assert_eq!(
-            tokio::time::timeout(LIMIT, lifetime.read(&mut byte))
-                .await
-                .expect("the ignored cancel must kill the child")
-                .unwrap(),
-            0
+        let ended = tokio::time::timeout(LIMIT, lifetime.read(&mut byte))
+            .await
+            .expect("the ignored cancel must kill the child");
+        // A killed process's socket closes on unix and is reset on Windows.
+        assert!(
+            matches!(&ended, Ok(0))
+                || ended
+                    .as_ref()
+                    .is_err_and(|e| e.kind() == std::io::ErrorKind::ConnectionReset),
+            "{ended:?}"
         );
         fake.rewrite(json!({"turns":[{}]}));
     }

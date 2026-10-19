@@ -190,7 +190,7 @@ mod tests {
 
     fn bridge() -> (Arc<Bridge>, tempfile::TempDir) {
         let home = tempfile::tempdir().expect("a temporary home");
-        let address = Address::from_raw(home.path().join("b.sock").display().to_string());
+        let address = Address::fresh(&bingo_sdk::Env::rooted(home.path()));
         (Arc::new(Bridge::at(address).expect("it listens")), home)
     }
 
