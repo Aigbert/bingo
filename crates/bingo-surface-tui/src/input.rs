@@ -27,7 +27,7 @@ use crate::views;
 #[cfg(test)]
 mod acting_tests;
 mod interaction;
-mod mode;
+pub(crate) mod mode;
 
 pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
 
@@ -202,6 +202,7 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
         match ui.focus.open() {
             Open::Pager(_) => return Some(pager::keys(ui, tree, key, now)),
             Open::Rewind(_) => return Some(rewind_keys(ui, tree, key, now)),
+            Open::Mode(_) => return Some(crate::mode::sheet::keys(ui, tree, key, now)),
             Open::Result { .. } => return Some(crate::dock::result::keys(ui, key, now)),
             Open::Keys(_) => return Some(crate::keys::sheet::key(ui, key, now)),
             _ => {}

@@ -68,6 +68,11 @@ fn sheet_hints(ui: &Ui) -> Option<SiteHints> {
     }
     if ui.focus.showing() {
         let pairs = match ui.focus.open() {
+            crate::ui::Open::Mode(_) => Some(vec![
+                KeyPair::new("↑↓", "mode"),
+                KeyPair::new("⏎", "use"),
+                KeyPair::new("esc", "close"),
+            ]),
             crate::ui::Open::Rewind(_) => Some(vec![
                 KeyPair::new("↑↓", "prompt"),
                 KeyPair::new("⏎", "rewind"),

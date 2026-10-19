@@ -66,6 +66,33 @@ fn m198_keys_closed_full_frame() {
     });
 }
 
+#[test]
+fn m198_permission_mode_band_uses_policy_meanings_and_session_rules() {
+    let capture = Capture::load("model");
+    capture.render(|| {
+        let (mut state, mut ui) = fixture(&capture);
+        let modes = [
+            ("default", "default", "trusted read-only tools run; everything else asks"),
+            ("acceptEdits", "accept edits", "edits inside the working directories run without a prompt"),
+            ("plan", "plan", "nothing that is not read-only runs at all"),
+            ("bypassPermissions", "bypass", "everything runs except what only a person may decide"),
+        ].into_iter().map(|(id,label,meaning)| ActionItem { label:label.into(), meaning:Some(meaning.into()), key:None, action:Action { name:"permission".into(), args:json!(id) } }).collect();
+        let mut config = state.config.clone();
+        config.plugins.insert("bingo.permissions".into(), slot::with(json!({"mode":"default","rules":["Bash(cargo test:*)"]}), [Slot::Mode { current:"default".into(), modes }]));
+        config.kernel[ConfigView::POLICY] = json!("bingo.permissions");
+        state.apply(&frame(state.seq.0+1, Event::ConfigChanged { config }));
+        ui.focus.show(crate::ui::Open::Mode(Some("plan".into())), capture.now().instant);
+        let screen = drawn(100,32,&solo(&state),&mut ui,capture.now());
+        let band = ui.shown.regions.composer;
+        let lines = band_lines(screen.buffer(), band);
+        assert!(lines.iter().any(|line| line.starts_with("   Permission mode") && line.ends_with("⇧tab cycles")), "{lines:?}");
+        assert!(lines.iter().any(|line| line.trim() == "▎ plan           nothing that is not read-only runs at all"), "{lines:?}");
+        assert!(lines.iter().any(|line| line.trim() == "Bash(cargo test:*)"));
+        let y = band.y + lines.iter().position(|line| line.contains("▎ plan")).unwrap() as u16;
+        assert_eq!(screen.buffer()[(3,y)].fg, crate::theme::palette().named("plan").unwrap());
+        assert_eq!(screen.buffer()[(1,y)].bg, crate::theme::palette().named("pick").unwrap());
+    });
+}
 fn band_lines(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::Rect) -> Vec<String> {
     (area.y..area.bottom())
         .map(|y| {

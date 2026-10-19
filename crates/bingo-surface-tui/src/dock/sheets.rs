@@ -33,6 +33,9 @@ fn native(
             area.width,
             cap,
         ),
+        Open::Mode(selected) => {
+            crate::mode::sheet::sheet(tree.viewed(), selected.as_deref(), area.width, cap)
+        }
         Open::Keys(selected) => crate::keys::sheet::sheet(selected.clone(), area.width, cap),
         Open::Sessions(_) => {
             return Some(crate::sessions::draw(ui, tree, frame, area.width, cap, now));
@@ -168,10 +171,12 @@ pub fn clicked(
         return vec![];
     };
     match ui.focus.open_mut() {
+        Some(Open::Mode(selected)) => *selected = Some(id),
         Some(Open::Rewind(card)) => card.selected = Some(bingo_sdk::TurnId::from_raw(id)),
         _ => return vec![],
     }
     match ui.focus.open() {
+        Open::Mode(_) => crate::mode::sheet::select(ui, tree, now),
         Open::Rewind(_) => crate::input::select_rewind(ui, tree, now),
         _ => vec![],
     }

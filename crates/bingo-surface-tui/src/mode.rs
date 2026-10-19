@@ -1,4 +1,5 @@
 //! Mode words and inks read from the policy's placement.
+pub mod sheet;
 use crate::{clock::Now, ui::Ui};
 use bingo_sdk::{SessionState, slot::Slot};
 

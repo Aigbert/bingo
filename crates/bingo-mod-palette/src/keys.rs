@@ -144,7 +144,7 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
                         .as_ref()
                         .is_some_and(|spec| spec.aliases.iter().any(|alias| alias == query))
             });
-            if matches!(name.as_str(), "permission" | "rename")
+            if name == "rename"
                 || (!exact
                     && spec.is_some_and(|spec| !spec.opens && !matches!(spec.args, ArgSpec::None)))
             {
@@ -647,6 +647,16 @@ pub(crate) mod review_tests {
             activate(Target::Command("permission".into()), &props),
             json!({"edit":"/permission "})
         );
+        props
+            .commands
+            .iter_mut()
+            .find(|entry| entry.id == "permission")
+            .unwrap()
+            .meta["opens"] = json!(true);
+        assert_eq!(
+            activate(Target::Command("permission".into()), &props),
+            json!({"run":"/permission"})
+        );
     }
 }
 
@@ -709,13 +719,9 @@ mod fold_tests {
     }
 
     #[test]
-    fn bare_permission_and_rename_open_their_inline_levels() {
-        for name in ["permission", "rename"] {
-            assert_eq!(
-                enter(&format!("/{name}")),
-                json!({"edit":format!("/{name} ")})
-            );
-        }
+    fn bare_permission_runs_and_rename_opens_its_inline_level() {
+        assert_eq!(enter("/permission"), json!({"run":"/permission"}));
+        assert_eq!(enter("/rename"), json!({"edit":"/rename "}));
         assert_eq!(
             enter("/rename release notes"),
             json!({"run":"/rename release notes"})

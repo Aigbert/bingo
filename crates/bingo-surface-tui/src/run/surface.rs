@@ -52,6 +52,9 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
             action.args["confirm"].as_bool().unwrap_or(false),
             now,
         ),
+        bingo_sdk::sheet::PERMISSION_MODE => {
+            crate::mode::sheet::open(&mut run.ui, run.session.tree.viewed(), now)
+        }
         "Composer" => {
             if let Ok(fill) = serde_json::from_value(action.args) {
                 crate::composer::fill::fill(&mut run.ui, fill, now);

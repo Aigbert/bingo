@@ -48,7 +48,7 @@ fn next_mode(slot: bingo_sdk::slot::Slot) -> Option<bingo_sdk::Action> {
 /// The cycle is this surface's own key, and the one thing it types is a
 /// `/permission` line naming a mode: that line is the person's. A mode the
 /// policy made name anything else is the policy's word, not the person's.
-fn mode_step(placer: &str, action: bingo_sdk::Action) -> bingo_sdk::Input {
+pub(crate) fn mode_step(placer: &str, action: bingo_sdk::Action) -> bingo_sdk::Input {
     match action.args.as_str() {
         Some(mode) if action.name == PERMISSION && is_mode_word(mode) => {
             bingo_sdk::Input::text(format!("/{PERMISSION} {mode}"), crate::origin())
