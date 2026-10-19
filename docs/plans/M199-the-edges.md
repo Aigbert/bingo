@@ -140,45 +140,8 @@ what is owed: `docs/verification/m199/checks.txt`.
   `423 (max 423)`, deny: all pass. Each commit builds (`rebase -x … dev`).
 - [x] Drive — `drive.py` `PASS`/`CLEAN` at 100x32 and 80x24; `tui-smoke ok`.
 - [ ] Windows — surface-tui and bin owed to CI (aws-lc-sys, tree-sitter C builds); brick 8 below.
-
-### Brick 8 — 2026-10-20, branch m199-sweep from dev a2d60da1c
-- [x] Sweep — `cargo test -p bingo-surface-tui --locked ember::sweep`: `106 passed` (105
-  captures, each named for its owner, and `every_capture_in_the_index_is_swept_once`).
-- [x] Deadline kind — `Part` says `Changes::Size` or `Changes::Ink`; a clipped part keeps only a
-  size deadline (ADR-0097 §10 edited to say so). Tests: the crew lamp in a narrow footer
-  schedules nothing; a clipped countdown still wakes.
-- [x] Deleted, each in its own commit:
-  - 89 snapshots no test names (85 keybar, 4 sessions), with the keybar prototype-states test;
-  - the dialog's permission path (title, body, preview, question, its copy of the changed
-    field); the dock ask reads the change off the interaction;
-  - `layout/grid.rs`'s `SIDE`, `short_path`, `fmt_k`, `plural`;
-  - the "Waiting for N background agents" row, its running count and speaking mark
-    (`activity.rs`, `tree.rs`, `identity.rs`), `motion.rs`'s notice fade and context warming
-    ramps with the theme/glyph accessors only they read;
-  - `bingo-rooms/src/here.rs:93`'s driver check, which `Room::of` makes.
-  - Kept: `fold.rs` had nothing only turns used; `motion.rs`'s other tests pin live cues.
-- [x] Behaviour owed: the resume toast keeps its slot over the key hint; the form fallback
-  drops option digits (and their keys, ADR-0097 §8); a click on a question's choice picks it
-  behind the 400 ms guard; a bare `/login` in the terminal opens only the sign-in sheet;
-  skills-sent streams as its capture does.
-- [x] Regressions the sweep found, fixed here: schedule's minutes and memory dates/lines
-  (M198), rewind's welcome (M198/M199), status rows (M198/M200), the end caret and skills-sent
-  (M196), `/mcp login` on the sheet stage (M198).
-- [x] Records — ADR-0095 amendment (esc on a question ends the turn, answered as cancelled);
-  `docs/design/ember/README.md` names the sweep; Files lists `jiff`.
-- [x] Each commit builds — fixups folded with `rebase -i --autosquash dev`, then fmt and
-  `cargo check --workspace --all-targets --locked` on each of the 20 commits: all `ok`.
-- [x] Gates at HEAD — fmt; check; clippy `-D warnings` clean; test `6747 passed; 0 failed`;
-  `discipline ok` with no "no source reference"; budget `422 (max 423)`, `budget ok`;
-  deny `advisories ok, bans ok, licenses ok, sources ok`.
-- [x] Windows — sdk, services, context, mod-ask, mod-memory, mod-models, mod-schedule,
-  mod-status, rooms: `--target x86_64-pc-windows-msvc` ok.
-- [x] Drive — `drive.py` PASS/CLEAN at 100x32 and 80x24; only `signedout-login` dumps
-  committed (the sheet's title row), the rest differed in animation timing.
-  `TUI_SMOKE_SOCKET=m199-drive scripts/tui-smoke.sh` -> `tui-smoke ok`.
-- Departures: the smoke's `/login` step is gone (it asserted the picker the brief removed); the
-  `@` step awaits `@Cargo.toml▍`, the caret over the blank the pick leaves; the rpc secret
-  test opens the picker with `/model`; schema/plugin.json, rpc.json and wire.ts regenerated
-  for status's `branch` and `changed`; mod-ask choices are plain rows so clicks reach them.
-- Owed: surface-tui and bingo on Windows (aws-lc-sys's C build needs a Windows sysroot; CI);
-  plugins-github's sign-in shows the device code where its capture shows a browser flow (M198).
+- [x] Brick 8 (2026-10-20, from dev a2d60da1c) — sweep `ember::sweep`: `106 passed` (105
+  captures by owner plus the index guard); `views::Part` tells size from ink deadlines; dead
+  code and 89 orphan snapshots deleted; owed behaviour fixed; ADR-0095 amended; test
+  `6747 passed; 0 failed`; drive PASS/CLEAN at both sizes; `tui-smoke ok`. Deletions,
+  regressions found, departures and owed: `docs/verification/m199/checks.txt`, Brick 8.
