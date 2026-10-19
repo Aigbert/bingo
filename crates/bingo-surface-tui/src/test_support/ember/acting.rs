@@ -157,3 +157,52 @@ fn m198_memory_band_has_no_owner_for_lines_and_dates() {
         );
     }
 }
+
+#[test]
+fn m196_palette_frames_are_pressed_into_the_owner() {
+    for name in ["palette", "palette-st", "small-palette", "ascii-palette"] {
+        sheet_frame(name, &[]);
+    }
+}
+
+#[test]
+fn m196_skill_frames_are_pressed_into_the_owner() {
+    for name in ["skills", "skills-review"] {
+        sheet_frame(name, &[]);
+    }
+}
+
+/// The harness answers the skill whole where the prototype is mid-reveal, so
+/// the answer's rows and the rows above them sit one row higher than the
+/// capture; the steer rule, the input and the footer are cell for cell.
+#[test]
+fn m196_skill_sent_is_pressed_into_the_owner() {
+    sheet_rows("skills-sent", &[(1..25, 0), (28..32, 28)]);
+}
+
+#[test]
+fn m196_mention_frame_is_pressed_into_the_surface() {
+    sheet_frame("mention", &[]);
+}
+
+/// The prototype inserts `@path ` with its space, then draws its caret over
+/// that space, since its wrap drops a row's trailing blank; the composer
+/// draws the space and the cursor after it. Every other cell is the capture's.
+#[test]
+fn m196_mention_inserted_keeps_its_space_before_the_cursor() {
+    sheet_cells(
+        "mention-inserted",
+        &[
+            (0..29, 0..100, 0),
+            (29..30, 0..49, 29),
+            (30..32, 0..100, 30),
+        ],
+    );
+}
+
+/// `/st` then ⏎ runs `/status`: its sheet waits on M199 for the branch and
+/// `3 changed` and on M200 for the `agents` row, as the status capture does.
+#[test]
+fn m196_palette_ran_waits_for_m199_branch_and_m200_agents() {
+    sheet_rows("palette-ran", &[(0..26, 1), (27..28, 28), (29..32, 29)]);
+}

@@ -57,11 +57,67 @@ pub(super) fn script(kernel: &Kernel, switched: &Switched) {
 fn catalog(kernel: &Kernel, switched: &Switched, kind: CatalogKind) -> Vec<CatalogEntry> {
     match kind {
         CatalogKind::Plugins => plugins(switched),
-        CatalogKind::Commands => kernel.catalogue(),
+        CatalogKind::Commands => commands(kernel),
         CatalogKind::Tools => crate::test_support::ember::story::catalogue(),
         CatalogKind::Models => models(),
         CatalogKind::Providers => providers(),
         _ => vec![],
+    }
+}
+
+/// The prototype's commands and skills, in its order and in its words over
+/// whatever an owner registered under the name; a room's commands are not
+/// offered outside one, the surface lists its own, and an owner's command
+/// the prototype does not list stays runnable but unlisted.
+fn commands(kernel: &Kernel) -> Vec<CatalogEntry> {
+    let registered = kernel.catalogue();
+    let spec_of = |name: &str| {
+        registered
+            .iter()
+            .find(|entry| entry.id == name)
+            .map(|entry| serde_json::from_value::<CommandSpec>(entry.meta.clone()).unwrap())
+    };
+    let listed: Vec<CatalogEntry> = rows("commands")
+        .into_iter()
+        .filter(|row| row["room"] != true)
+        .filter(|row| crate::commands::local(&format!("/{}", row["n"].as_str().unwrap())).is_none())
+        .map(|row| {
+            let name = row["n"].as_str().unwrap();
+            let mut spec = spec_of(name).unwrap_or_else(|| bare(name));
+            spec.hint = row["d"].as_str().unwrap().into();
+            if let Some(shelf) = row["fam"].as_str() {
+                spec.family = format!("skill/{shelf}");
+            }
+            CatalogEntry {
+                id: name.into(),
+                label: spec.hint.clone(),
+                meta: serde_json::to_value(spec).unwrap(),
+            }
+        })
+        .collect();
+    let unlisted = registered
+        .into_iter()
+        .filter(|entry| listed.iter().all(|listed| listed.id != entry.id))
+        .map(|mut entry| {
+            entry.meta["hidden"] = json!(true);
+            entry
+        })
+        .collect::<Vec<_>>();
+    [listed, unlisted].concat()
+}
+
+/// A command no owner of the scene registers, as the prototype lists it.
+fn bare(name: &str) -> CommandSpec {
+    CommandSpec {
+        keys: vec![],
+        hidden: false,
+        opens: true,
+        name: name.into(),
+        aliases: vec![],
+        hint: String::new(),
+        args: ArgSpec::None,
+        instant: true,
+        family: "session".into(),
     }
 }
 

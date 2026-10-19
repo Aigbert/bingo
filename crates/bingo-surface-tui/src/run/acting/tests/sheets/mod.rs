@@ -44,7 +44,10 @@ pub(crate) async fn draw(capture: &Capture) -> ratatui::buffer::Buffer {
 async fn open(capture: &Capture) -> Stage {
     let mut scene = setup::new(capture);
     scene.screen.size = Some((capture.size().width, capture.size().height));
-    let state = world_state();
+    let mut state = world_state();
+    if capture.entry.scene == "mention" {
+        state.summary.cwd = repository(scene._home.path());
+    }
     scene.run.session = Attached::new(state.clone(), SessionHandle(scene.session.clone()));
     let kernel = kernel::Kernel::new(scene.host.clone(), state);
     let switched = world::Switched::default();
@@ -72,6 +75,19 @@ async fn open(capture: &Capture) -> Stage {
     stage.kernel.broadcast(config());
     stage.settle().await;
     let name = capture.entry.file.clone();
+    let typed = match capture.entry.scene.as_str() {
+        "palette" => Some("/"),
+        "skills" => Some("/re"),
+        "mention" => Some("看一下 @queue"),
+        _ => None,
+    };
+    if let Some(typed) = typed {
+        for ch in typed.chars() {
+            stage.hit(fixture::typed(ch)).await;
+        }
+        stage.at(0).await;
+        return stage;
+    }
     match name.split('-').next().unwrap() {
         "keys" => stage.hit(fixture::typed('?')).await,
         "tasks" => stage.hit(fixture::ctrl('t')).await,
@@ -86,6 +102,56 @@ async fn open(capture: &Capture) -> Stage {
     }
     stage.at(0).await;
     stage
+}
+
+/// The prototype's files under a fresh repository, with what git says of
+/// them: `queue.rs` changed since the commit, the test and the ADR new.
+fn repository(home: &std::path::Path) -> String {
+    let root = home.join("bingo-improve");
+    for row in crate::test_support::ember::world::rows("files") {
+        let path = root.join(row["p"].as_str().unwrap());
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        if row["st"] != "new" {
+            std::fs::write(&path, "//! it\n").unwrap();
+        }
+    }
+    let git = |args: &[&str]| {
+        let status = std::process::Command::new("git")
+            .args([
+                "-c",
+                "user.name=bingo",
+                "-c",
+                "user.email=bingo@example.test",
+            ])
+            .args(args)
+            .current_dir(&root)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "git {args:?}");
+    };
+    git(&["init", "-q"]);
+    git(&["add", "."]);
+    git(&["commit", "-q", "-m", "world"]);
+    for row in crate::test_support::ember::world::rows("files") {
+        if row["st"].is_string() {
+            let path = root.join(row["p"].as_str().unwrap());
+            std::fs::write(path, "//! changed\n").unwrap();
+        }
+    }
+    root.to_string_lossy().into_owned()
+}
+
+/// A line that names one of the world's skills: bingo-skills turns it into
+/// a prompt, so the provider answers it.
+fn skill(input: &Input) -> bool {
+    let Input::Text { text, .. } = input else {
+        return false;
+    };
+    let name = text.strip_prefix('/').unwrap_or_default();
+    crate::test_support::ember::world::rows("commands")
+        .iter()
+        .any(|row| row["kind"] == "skill" && row["n"] == name)
 }
 
 /// The opening key or line lands this long before the capture's clock starts,
@@ -189,7 +255,11 @@ impl Stage {
         self.scene.sent += fresh.len();
         let moved = !fresh.is_empty();
         for (intent, input) in fresh {
-            self.kernel.submit(intent, input);
+            if skill(&input) {
+                self.prompt(intent, &input);
+            } else {
+                self.kernel.submit(intent, input);
+            }
         }
         for (intent, input) in self.kernel.prompted() {
             self.prompt(intent, &input);
@@ -197,17 +267,23 @@ impl Stage {
         moved
     }
 
-    /// The prototype answers every prompt it has no script for with its
-    /// echo: the turn starts now and its items stream from here.
+    /// The prototype answers a skill's line with the skill's script and
+    /// every other prompt it has no script for with its echo: the turn
+    /// starts now and its items stream from here.
     fn prompt(&mut self, intent: IntentId, input: &Input) {
         let Input::Text { text, .. } = input else {
             return;
         };
         let now = self.scene.run.now().wall;
-        for event in answers::sent("script-echoScript", intent, input, now) {
+        let script = if skill(input) {
+            "skillScript"
+        } else {
+            "echoScript"
+        };
+        for event in answers::sent(&format!("script-{script}"), intent, input, now) {
             self.kernel.broadcast(event);
         }
-        let timeline = story::script_timeline("echoScript", text, now);
+        let timeline = story::script_timeline(script, text, now);
         let provider = timeline
             .into_iter()
             .map(|(at, event)| (at - CLOCK_ORIGIN_MS, event));

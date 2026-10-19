@@ -360,5 +360,229 @@
       "at": 600,
       "text": "收到「{text}」。这是原型，回答是预先写好的；试试「{T2P}」，看完整的一轮：读文件、改代码、跑测试、失败、修好。"
     }
+  ],
+  "commands": [
+    {
+      "n": "model",
+      "d": "switch model and effort",
+      "k": "alt+m"
+    },
+    {
+      "n": "think",
+      "d": "how hard the model thinks",
+      "k": "alt+t"
+    },
+    {
+      "n": "compact",
+      "d": "summarize the conversation to free context"
+    },
+    {
+      "n": "status",
+      "d": "model, mode, context, cost, plugins"
+    },
+    {
+      "n": "resume",
+      "d": "open an earlier session",
+      "k": "ctrl+r"
+    },
+    {
+      "n": "rewind",
+      "d": "go back to before a prompt",
+      "k": "esc esc"
+    },
+    {
+      "n": "permission",
+      "d": "mode and rules for what runs without asking",
+      "k": "⇧tab"
+    },
+    {
+      "n": "agents",
+      "d": "the agents working with you"
+    },
+    {
+      "n": "tasks",
+      "d": "what the team is working on",
+      "k": "ctrl+t"
+    },
+    {
+      "n": "room",
+      "d": "talk with agents in a room"
+    },
+    {
+      "n": "team",
+      "d": "roles and who holds them"
+    },
+    {
+      "n": "seat",
+      "d": "bring an agent into this room",
+      "room": true
+    },
+    {
+      "n": "unseat",
+      "d": "ask an agent to leave this room",
+      "room": true
+    },
+    {
+      "n": "close",
+      "d": "close this room and say why",
+      "room": true
+    },
+    {
+      "n": "schedule",
+      "d": "prompts that run every, daily at, or once at"
+    },
+    {
+      "n": "wake",
+      "d": "come back to this session later"
+    },
+    {
+      "n": "plugins",
+      "d": "switch plugins, review trust"
+    },
+    {
+      "n": "mcp",
+      "d": "MCP servers and their tools"
+    },
+    {
+      "n": "memory",
+      "d": "read and forget memories and instructions"
+    },
+    {
+      "n": "experience",
+      "d": "what bingo learned in this repo"
+    },
+    {
+      "n": "rename",
+      "d": "rename this session"
+    },
+    {
+      "n": "provider",
+      "d": "add or switch model providers"
+    },
+    {
+      "n": "login",
+      "d": "sign in to a provider"
+    },
+    {
+      "n": "logout",
+      "d": "sign out of a provider"
+    },
+    {
+      "n": "clear",
+      "d": "start a fresh session"
+    },
+    {
+      "n": "help",
+      "d": "every key and command",
+      "k": "?"
+    },
+    {
+      "n": "review",
+      "d": "review the diff on this branch",
+      "kind": "skill",
+      "fam": "project"
+    },
+    {
+      "n": "release",
+      "d": "gates, tag, notes, publish",
+      "kind": "skill",
+      "fam": "project"
+    },
+    {
+      "n": "imagegen",
+      "d": "generate an image through your endpoint",
+      "kind": "skill",
+      "fam": "yours"
+    },
+    {
+      "n": "tdd",
+      "d": "red, green, refactor on one behaviour",
+      "kind": "skill",
+      "fam": "built in"
+    },
+    {
+      "n": "explain",
+      "d": "explain code at the depth you ask for",
+      "kind": "skill",
+      "fam": "built in"
+    },
+    {
+      "n": "guide",
+      "d": "how bingo works, a page at a time",
+      "kind": "skill",
+      "fam": "guide"
+    }
+  ],
+  "files": [
+    {
+      "p": "crates/bingo-core/src/session/queue.rs",
+      "st": "modified"
+    },
+    {
+      "p": "crates/bingo-core/tests/queue_steer.rs",
+      "st": "new"
+    },
+    {
+      "p": "docs/adr/0097-ember-tui.md",
+      "st": "new"
+    },
+    {
+      "p": "crates/bingo-core/src/session/mod.rs"
+    },
+    {
+      "p": "crates/bingo-core/src/turn/loop.rs"
+    },
+    {
+      "p": "crates/bingo-sdk/src/event/mod.rs"
+    },
+    {
+      "p": "crates/bingo-surface-tui/src/dock/composer.rs"
+    },
+    {
+      "p": "crates/bingo-surface-tui/src/stream/steps.rs"
+    },
+    {
+      "p": "ARCHITECTURE.md"
+    },
+    {
+      "p": "Cargo.toml"
+    }
+  ],
+  "skillScript": [
+    {
+      "k": "step",
+      "at": 0,
+      "end": 200,
+      "tool": "skill",
+      "arg": "review",
+      "st": "ok",
+      "tail": [],
+      "res": "loaded"
+    },
+    {
+      "k": "step",
+      "at": 300,
+      "end": 600,
+      "tool": "bash",
+      "arg": "git diff dev...HEAD --stat",
+      "st": "ok",
+      "tail": [],
+      "res": "3 files"
+    },
+    {
+      "k": "step",
+      "at": 700,
+      "end": 900,
+      "tool": "read",
+      "arg": "crates/bingo-core/src/session/queue.rs",
+      "st": "ok",
+      "tail": [],
+      "res": "214 lines"
+    },
+    {
+      "k": "narr",
+      "at": 1100,
+      "text": "看了这次的改动，两点：\n\n1. `reset()` 的注释写清楚了为什么不清队列，好。\n2. `queue_steer.rs` 两个测试都只断言了第一条，建议把 `drain()` 之后的队列也比一遍。"
+    }
   ]
 }
