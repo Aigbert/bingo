@@ -285,7 +285,9 @@ impl ScheduleFixture {
         self.run.ack(intent, &IntentOutcome::Applied { result });
         if let Some((intent, Input::Text { text, .. })) = self.session.submissions().get(count + 1)
         {
-            self.line(text.strip_prefix("/schedule ").unwrap()).await;
+            if let Some(args) = text.strip_prefix("/schedule ") {
+                self.line(args).await;
+            }
             self.run
                 .ack(intent, &IntentOutcome::Applied { result: json!({}) });
         }
@@ -293,31 +295,49 @@ impl ScheduleFixture {
 }
 
 #[tokio::test]
-async fn panel_keys_change_the_same_table_and_deliver_a_wake() {
+async fn sheet_keys_pause_resume_and_submit_at_home() {
     let mut f = ScheduleFixture::new().await;
     f.line("add every 2h -- check build").await;
     f.open().await;
     assert!(f.paint(108, 30).await.contains("check build"));
     f.press(typed(' ')).await;
-    assert!(f.paint(80, 24).await.contains("off"));
+    assert!(f.paint(80, 24).await.contains("paused"));
     let CommandOutcome::View { view } = f.line("").await else {
         panic!("table")
     };
     assert!(view.fold().contains("no"));
     f.press(typed(' ')).await;
-    f.paint(80, 24).await;
-    f.press(typed('r')).await;
-    assert!(f.host.calls().iter().any(|call| matches!(
-        call,
-        bingo_sdk::testing::HostCall::Deliver {
-            delivery: bingo_sdk::Delivery::Wake,
-            ..
-        }
-    )));
-    f.paint(108, 30).await;
-    f.press(typed('d')).await;
-    assert!(f.paint(108, 30).await.contains("its session stays"));
+    assert!(!f.paint(80, 24).await.contains("paused"));
+    for letter in ['r', 'd'] {
+        f.press(typed(letter)).await;
+        assert!(f.paint(108, 30).await.contains("check build"));
+    }
     f.press(key(KeyCode::Enter)).await;
-    assert!(f.paint(80, 24).await.contains("no schedules yet"));
+    assert!(
+        f.session
+            .submissions()
+            .iter()
+            .any(|(_, input)| matches!(input, Input::Text { text, .. } if text == "check build"))
+    );
+    let CommandOutcome::View { view } = f.line("").await else {
+        panic!("table")
+    };
+    assert!(view.fold().contains("check build"));
+    f.plugin.stop().await.unwrap();
+}
+
+#[tokio::test]
+async fn hidden_schedule_text_never_submits_from_the_sheet() {
+    let mut f = ScheduleFixture::new().await;
+    f.line("add every 2h -- first\u{202e}second").await;
+    f.open().await;
+    f.paint(80, 24).await;
+    f.press(key(KeyCode::Enter)).await;
+    assert!(
+        !f.session
+            .submissions()
+            .iter()
+            .any(|(_, input)| matches!(input, Input::Text { .. }))
+    );
     f.plugin.stop().await.unwrap();
 }

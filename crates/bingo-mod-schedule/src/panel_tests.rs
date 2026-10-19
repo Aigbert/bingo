@@ -60,13 +60,13 @@ async fn run(open: &Open, cx: &HookContext, value: Value) -> Value {
 }
 
 #[tokio::test]
-async fn bare_wake_opens_on_the_wake_and_retains_the_original_text_fallback() {
+async fn bare_schedule_opens_and_retains_the_original_text_fallback() {
     let (_, cx) = context(true);
     let shared = Shared::default();
     let result = run(
-        &Open(shared.clone(), "wake"),
+        &Open(shared.clone()),
         &cx,
-        json!({"command":"wake","args":"","surface":"terminal"}),
+        json!({"command":"schedule","args":"","surface":"terminal"}),
     )
     .await;
     let outcome: CommandOutcome = serde_json::from_value(result).unwrap();
@@ -76,33 +76,33 @@ async fn bare_wake_opens_on_the_wake_and_retains_the_original_text_fallback() {
     assert_eq!(action.name, "Pane");
     assert_eq!(action.args, json!({"plugin":ID,"id":REQUEST}));
     assert_eq!(fallback.as_deref(), Some("original wake view"));
-    assert_eq!(
-        shared.lock().unwrap()[&cx.session].selected,
-        Some(crate::rows::Selection::Wake)
-    );
+    assert_eq!(shared.lock().unwrap()[&cx.session].selected, None);
 }
 
 #[tokio::test]
-async fn wake_arguments_text_surfaces_and_missing_services_keep_the_command() {
+async fn schedule_arguments_text_surfaces_and_missing_services_keep_the_command() {
     for (service, input) in [
         (
             true,
-            json!({"command":"wake","args":"off","surface":"terminal"}),
-        ),
-        (true, json!({"command":"wake","args":"","surface":"text"})),
-        (true, json!({"command":"wake","args":""})),
-        (
-            false,
-            json!({"command":"wake","args":"","surface":"terminal"}),
+            json!({"command":"schedule","args":"off","surface":"terminal"}),
         ),
         (
             true,
+            json!({"command":"schedule","args":"","surface":"text"}),
+        ),
+        (true, json!({"command":"schedule","args":""})),
+        (
+            false,
             json!({"command":"schedule","args":"","surface":"terminal"}),
+        ),
+        (
+            true,
+            json!({"command":"unrelated","args":"","surface":"terminal"}),
         ),
     ] {
         let (_, cx) = context(service);
         let shared = Shared::default();
-        let result = run(&Open(shared.clone(), "wake"), &cx, input).await;
+        let result = run(&Open(shared.clone()), &cx, input).await;
         assert_eq!(
             result,
             json!(CommandOutcome::View {
@@ -115,28 +115,27 @@ async fn wake_arguments_text_surfaces_and_missing_services_keep_the_command() {
 
 #[test]
 fn the_opening_matchers_never_intercept_arguments_or_each_other() {
-    for name in ["schedule", "wake"] {
-        let matcher = Open(Shared::default(), name).matcher();
-        assert!(matcher.matches(catalogue::COMMAND_RUN, &json!({"command":name,"args":""})));
-        assert!(!matcher.matches(
-            catalogue::COMMAND_RUN,
-            &json!({"command":name,"args":"off"})
-        ));
-        assert!(!matcher.matches(
-            catalogue::COMMAND_RUN,
-            &json!({"command":"unrelated","args":""})
-        ));
-    }
+    let name = "schedule";
+    let matcher = Open(Shared::default()).matcher();
+    assert!(matcher.matches(catalogue::COMMAND_RUN, &json!({"command":name,"args":""})));
+    assert!(!matcher.matches(
+        catalogue::COMMAND_RUN,
+        &json!({"command":name,"args":"off"})
+    ));
+    assert!(!matcher.matches(
+        catalogue::COMMAND_RUN,
+        &json!({"command":"unrelated","args":""})
+    ));
 }
 
 #[tokio::test]
-async fn the_panel_reads_the_sessions_pending_wake_from_the_service() {
+async fn the_schedule_panel_does_not_draw_the_separate_wake() {
     let (_, cx) = context(true);
     let shared = Shared::default();
     shared.lock().unwrap().insert(
         cx.session.clone(),
         crate::Cursor {
-            selected: Some(crate::rows::Selection::Wake),
+            selected: None,
             ..Default::default()
         },
     );
@@ -151,13 +150,6 @@ async fn the_panel_reads_the_sessions_pending_wake_from_the_service() {
         .await
         .unwrap();
     let view: View = serde_json::from_value(result).unwrap();
-    assert!(view.fold().contains("❯ wake"));
-    assert!(view.fold().contains("check the build"));
-    let View::Box { layout, .. } = view else {
-        panic!("panel")
-    };
-    assert_eq!(
-        layout.on_key.unwrap().args["row"]["wake"]["note"],
-        "check the build"
-    );
+    assert!(view.fold().contains("Schedule"));
+    assert!(!view.fold().contains("check the build"));
 }

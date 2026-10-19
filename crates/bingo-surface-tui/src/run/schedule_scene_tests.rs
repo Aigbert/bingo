@@ -50,24 +50,16 @@ fn listing(scene: &str) -> Listing {
 #[test]
 fn schedules_at_both_sizes() {
     for (width, height) in [(108, 30), (80, 24)] {
-        for scene in ["held", "dormant", "empty", "confirming", "ownership"] {
+        for scene in ["held", "dormant", "empty"] {
             let listing = listing(scene);
-            let confirming = match scene {
-                "confirming" => Some(bingo_mod_schedule::Confirmation::Forget(
-                    listing.entries[1].clone(),
-                )),
-                "ownership" => Some(bingo_mod_schedule::Confirmation::Confirm(
-                    listing.entries[1].clone(),
-                )),
-                _ => None,
-            };
             let view = bingo_mod_schedule::draw::tree(
                 &listing,
-                1,
-                confirming.as_ref(),
+                listing.entries.get(1).map(|row| row.id.as_str()),
+                &jiff::tz::TimeZone::UTC,
                 width,
                 height,
                 "2026-10-15T11:00:00Z".parse().unwrap(),
+                Default::default(),
             );
             let lines = crate::views::render(&view, usize::from(width));
             let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
@@ -88,21 +80,9 @@ fn schedules_at_both_sizes() {
                 .collect::<Vec<_>>()
                 .join("\n");
             insta::assert_snapshot!(format!("schedules_{scene}_{width}x{height}"), text);
-            if !matches!(scene, "empty" | "ownership") {
-                let modifier = |id: &str| {
-                    buffer
-                        .content
-                        .chunks(usize::from(width))
-                        .find(|row| {
-                            row.iter()
-                                .map(|c| c.symbol())
-                                .collect::<String>()
-                                .contains(id)
-                        })
-                        .unwrap()[2]
-                        .modifier
-                };
-                assert_ne!(modifier("01JA4"), modifier("01J9X"));
+            if scene != "empty" {
+                assert!(text.contains("triage new issues"));
+                assert!(text.contains("paused"));
             }
         }
     }
@@ -113,14 +93,14 @@ fn hidden_schedule_text_survives_terminal_rendering_and_disarms_enter() {
     for (width, height) in [(80, 24), (108, 30)] {
         let mut listing = listing("ownership");
         listing.entries[1].text = "first\u{202e}\r\nsecond\u{1b}".into();
-        let confirmation = bingo_mod_schedule::Confirmation::Confirm(listing.entries[1].clone());
         let view = bingo_mod_schedule::draw::tree(
             &listing,
-            1,
-            Some(&confirmation),
+            listing.entries.get(1).map(|row| row.id.as_str()),
+            &jiff::tz::TimeZone::UTC,
             width,
             height,
             jiff::Timestamp::UNIX_EPOCH,
+            Default::default(),
         );
         let bingo_sdk::View::Box { layout, .. } = &view else {
             panic!("pane");
@@ -139,8 +119,8 @@ fn hidden_schedule_text_survives_terminal_rendering_and_disarms_enter() {
             .map(|c| c.symbol())
             .collect();
         assert!(text.contains("first\\u{202e}\\u{d}"));
-        assert!(text.contains("second\\u{1b}"));
-        assert!(text.contains("/schedule confirm 01JA7"));
+        assert!(!text.contains('\u{202e}'));
+        assert!(!text.contains('\u{1b}'));
         assert!(!text.contains("⏎ yes"));
     }
 }

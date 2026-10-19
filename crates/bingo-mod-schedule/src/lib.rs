@@ -1,14 +1,12 @@
 //! Schedules through the shared pane and the owner's service.
-mod confirmation;
 mod disable;
-pub use confirmation::Confirmation;
 pub mod draw;
 mod guide;
 mod keys;
 mod live;
 mod panel;
+mod receipts;
 mod rows;
-mod whole;
 use bingo_sdk::{
     CancellationToken, CommandFold, Contribution, ErrorCode, HostHandle, Interceptor, KernelError,
     Plugin, PluginError, PluginManifest, Registrar, SessionId, plugin,
@@ -27,8 +25,7 @@ pub struct SchedulePanel {
 }
 #[derive(Default)]
 pub(crate) struct Cursor {
-    selected: Option<rows::Selection>,
-    confirming: Option<Confirmation>,
+    selected: Option<String>,
     seen: Option<std::time::Instant>,
 }
 type Shared = Arc<Mutex<BTreeMap<SessionId, Cursor>>>;
@@ -57,9 +54,9 @@ impl Plugin for SchedulePanel {
             shared.clone(),
         ))));
         for link in [
-            Arc::new(panel::Open(shared.clone(), "schedule")) as Arc<dyn Interceptor>,
-            Arc::new(panel::Open(shared.clone(), "wake")),
+            Arc::new(panel::Open(shared.clone())) as Arc<dyn Interceptor>,
             Arc::new(draw::Drawing(shared.clone())),
+            Arc::new(receipts::Receipts),
         ] {
             registrar.add(Contribution::Interceptor {
                 placement: plugin::Placement::Builtin,
@@ -87,13 +84,7 @@ impl Plugin for SchedulePanel {
 fn error(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())
 }
-async fn listing(
-    host: &HostHandle,
-    session: &SessionId,
-) -> Result<(schedule::Listing, Option<schedule::Pending>), KernelError> {
+async fn listing(host: &HostHandle) -> Result<schedule::Listing, KernelError> {
     let service = schedule::find(host).ok_or_else(|| error("schedule service unavailable"))?;
-    Ok((
-        service.list().await?,
-        service.pending(session.clone()).await?,
-    ))
+    service.list().await
 }

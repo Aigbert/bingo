@@ -40,3 +40,28 @@ fn m198_sessions_switched_full_frame() {
         assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
     });
 }
+
+#[test]
+fn m198_schedule_ran_full_frame() {
+    let capture = Capture::load("schedule-ran").spinners(&[(26, 3)]);
+    capture.render(|| {
+        let (mut state, mut ui) = fixture(&capture);
+        // The capture advances 60 ms after Enter, then waits 400 ms.
+        let start = capture.now().wall - jiff::SignedDuration::from_millis(460);
+        let rows = crate::test_support::ember::world::rows("scheds");
+        crate::test_support::ember::story::script(
+            &mut state,
+            "echoScript",
+            rows[1]["what"].as_str().unwrap(),
+            start,
+            460,
+        );
+        ui.notify(
+            Level::Info,
+            format!("paused · {}", rows[0]["what"].as_str().unwrap()),
+            capture.now().instant - std::time::Duration::from_millis(880),
+        );
+        let screen = drawn(100, 32, &solo(&state), &mut ui, capture.now());
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
+}

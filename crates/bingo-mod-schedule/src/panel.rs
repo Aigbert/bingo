@@ -1,18 +1,15 @@
 use crate::{ID, REQUEST, Shared};
 use bingo_sdk::*;
 use serde_json::{Value, json};
-pub struct Open(pub Shared, pub &'static str);
+pub struct Open(pub Shared);
 #[async_trait::async_trait]
 impl Interceptor for Open {
     fn id(&self) -> &str {
-        match self.1 {
-            "wake" => "wake.open",
-            _ => "schedules.open",
-        }
+        "schedules.open"
     }
     fn matcher(&self) -> LinkMatcher {
         LinkMatcher {
-            prefilter: json!({"command":self.1,"args":""}),
+            prefilter: json!({"command":"schedule","args":""}),
             ..LinkMatcher::at(catalogue::COMMAND_RUN)
         }
     }
@@ -25,12 +22,9 @@ impl Interceptor for Open {
     ) -> Result<Value, KernelError> {
         let input: catalogue::CommandRun =
             serde_json::from_value(value.clone()).map_err(crate::error)?;
-        if input.name != self.1
+        if input.name != "schedule"
             || !input.args.trim().is_empty()
-            || !matches!(
-                input.surface,
-                Some(render::SurfaceName::Terminal | render::SurfaceName::Desktop)
-            )
+            || !input.surface.is_some_and(render::SurfaceName::shows_sheets)
             || bingo_services::schedule::find(&cx.host).is_none()
         {
             return next.run(value).await;
@@ -42,10 +36,7 @@ impl Interceptor for Open {
                 CommandOutcome::View { view } => Some(view.fold_markdown()),
                 _ => None,
             });
-        let cursor = crate::Cursor {
-            selected: (self.1 == "wake").then_some(crate::rows::Selection::Wake),
-            ..Default::default()
-        };
+        let cursor = crate::Cursor::default();
         self.0
             .lock()
             .map_err(crate::error)?
@@ -77,7 +68,7 @@ fn slot() -> Value {
             close_on_escape: false,
             hold_toasts: false,
             asked: true,
-            place: vec![slot::Place::Overlay],
+            place: vec![slot::Place::Dock],
             size,
             view: slot::Shown::Pull {
                 request: render::PullRequest {

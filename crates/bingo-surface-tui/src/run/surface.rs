@@ -55,6 +55,12 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
         bingo_sdk::sheet::PERMISSION_MODE => {
             crate::mode::sheet::open(&mut run.ui, run.session.tree.viewed(), now)
         }
+        "SubmitAtHome" => {
+            if let Some(text) = action.args["text"].as_str() {
+                run.show(run.session.tree.root().summary.id.clone());
+                run.submit(Input::text(text, crate::origin()));
+            }
+        }
         "Composer" => {
             if let Ok(fill) = serde_json::from_value(action.args) {
                 crate::composer::fill::fill(&mut run.ui, fill, now);

@@ -94,8 +94,17 @@ mod tests {
 mod ember_tests;
 
 #[cfg(test)]
-#[path = "dock/tests/action_ember.rs"]
-mod action_ember;
-#[cfg(test)]
 #[path = "dock/tests/sessions_ember.rs"]
 mod sessions_ember;
+
+#[cfg(test)]
+#[path = "dock/tests/schedule_ember.rs"]
+mod schedule_ember;
+
+#[cfg(test)]
+#[path = "dock/tests/action_ember.rs"]
+mod action_ember;
+
+#[cfg(test)]
+#[path = "dock/tests/plugins_ember.rs"]
+mod plugins_ember;

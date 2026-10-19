@@ -33,7 +33,15 @@ fn request() -> RenderRequest {
     }
 }
 async fn press(host: &impl HostApi, a: &mut Attachment, key: &str) -> Value {
-    let tree = host.render(&a.session, request()).await.unwrap();
+    press_request(host, a, key, request()).await
+}
+async fn press_request(
+    host: &impl HostApi,
+    a: &mut Attachment,
+    key: &str,
+    request: RenderRequest,
+) -> Value {
+    let tree = host.render(&a.session, request).await.unwrap();
     let View::Box { layout, .. } = tree else {
         panic!("pane")
     };
@@ -43,8 +51,8 @@ async fn press(host: &impl HostApi, a: &mut Attachment, key: &str) -> Value {
     a.handle
         .submit(id.clone(), Input::action(action, Origin::surface("tui")));
     let ack = serde_json::to_value(ack_for(a, &id).await).unwrap();
-    assert_eq!(ack["result"]["drawnBy"], "bingo.mod.schedule", "{ack}");
-    ack["result"]["surface"]["args"]["value"].clone()
+    assert!(matches!(ack["kind"].as_str(), Some("applied")), "{ack}");
+    ack["result"].clone()
 }
 async fn stop(host: &bingo_surface_rpc::RemoteKernel, server: &mut Server) {
     host.shutdown().await.unwrap();
@@ -57,14 +65,14 @@ async fn stop(host: &bingo_surface_rpc::RemoteKernel, server: &mut Server) {
     );
 }
 #[tokio::test(flavor = "multi_thread")]
-async fn person_lines_and_panel_keys_share_one_store() {
+async fn person_lines_and_sheet_keys_share_one_store() {
     let mut server = Server::spawn(r#"{"responses":[{"steps":[{"text":"ran once"}]}]}"#);
     let host = ready(&mut server).await;
     let mut a = host
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    command(&mut a, "/schedule add every 2h -- check the build").await;
+    command(&mut a, "/schedule every 2h check the build").await;
     confirm_model_entry(&host, &mut a, &server.cwd()).await;
     command(&mut a, "/schedule").await;
     assert!(
@@ -75,56 +83,49 @@ async fn person_lines_and_panel_keys_share_one_store() {
             .contains("check the build")
     );
     let pause = press(&host, &mut a, "space").await;
-    command(&mut a, pause["run"].as_str().unwrap()).await;
+    command(
+        &mut a,
+        pause["surface"]["args"]["value"]["run"].as_str().unwrap(),
+    )
+    .await;
     assert!(
         host.render(&a.session, request())
             .await
             .unwrap()
             .fold()
-            .contains("off")
+            .contains("paused")
     );
     let resume = press(&host, &mut a, "space").await;
-    command(&mut a, resume["run"].as_str().unwrap()).await;
-    let run = press(&host, &mut a, "r").await;
-    command(&mut a, run["run"].as_str().unwrap()).await;
-    let sessions = host.sessions(SessionFilter::default()).await.unwrap();
-    let target = sessions
-        .iter()
-        .find(|s| s.key.as_deref().is_some_and(|k| k.starts_with("schedule/")))
-        .unwrap();
+    command(
+        &mut a,
+        resume["surface"]["args"]["value"]["run"].as_str().unwrap(),
+    )
+    .await;
+    for key in ["r", "d", "c"] {
+        assert!(press(&host, &mut a, key).await["surface"].is_null());
+    }
+    let run = press(&host, &mut a, "enter").await;
     assert_eq!(
-        press(&host, &mut a, "right").await["view"],
-        json!(target.id)
+        run["surface"],
+        json!({"name":"SubmitAtHome","args":{"text":"check the build"}})
     );
-    command(&mut a, "/schedule").await;
-    press(&host, &mut a, "d").await;
-    assert!(
-        host.render(&a.session, request())
-            .await
-            .unwrap()
-            .fold()
-            .contains("its session stays")
+    a.handle.submit(
+        IntentId::mint(),
+        Input::text("check the build", Origin::surface("tui")),
     );
-    let forget = press(&host, &mut a, "enter").await;
-    command(&mut a, forget["run"].as_str().unwrap()).await;
-    assert!(
-        host.render(&a.session, request())
-            .await
-            .unwrap()
-            .fold()
-            .contains("no schedules yet")
-    );
+    support::until_completed(&mut a).await;
     assert!(
         host.sessions(SessionFilter::default())
             .await
             .unwrap()
             .iter()
-            .any(|s| s.id == target.id)
+            .all(|s| s.key.as_deref().is_none_or(|k| !k.starts_with("schedule/")))
     );
     stop(&host, &mut server).await;
 }
+
 #[tokio::test(flavor = "multi_thread")]
-async fn disabled_panel_keeps_lines_and_the_wake_on_status() {
+async fn disabled_schedule_sheet_keeps_command_results_and_the_wake_sheet() {
     let home = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
     std::fs::write(
@@ -132,146 +133,27 @@ async fn disabled_panel_keeps_lines_and_the_wake_on_status() {
         r#"{"enabledPlugins":{"bingo.mod.schedule":false},"update":{"check":false}}"#,
     )
     .unwrap();
-    let mut server = Server::spawn_at(
-        home,
-        r#"{"responses":[{"steps":[{"toolCall":{"name":"Wake","input":{"after":"4m","note":"check CI"}}}]},{"steps":[{"text":"waiting"}]}]}"#,
-        &[],
-    );
+    let mut server = Server::spawn_at(home, r#"{"responses":[]}"#, &[]);
     let host = ready(&mut server).await;
     let mut a = host
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    command(&mut a, "/schedule add every 2h -- check").await;
+    command(&mut a, "/schedule every 2h check").await;
     assert!(command(&mut a, "/schedule").await["view"].is_object());
-    a.handle.submit(
-        IntentId::mint(),
-        Input::text("set a wake", Origin::surface("tui")),
-    );
-    support::until_completed(&mut a).await;
-    command(&mut a, "/status").await;
-    let status = RenderRequest {
-        component: Component::Status,
-        request_id: "status".into(),
-        props: json!({}),
-        ..request()
-    };
-    let tree = host.render(&a.session, status.clone()).await.unwrap();
-    assert!(tree.fold().contains("check CI"), "{tree:?}");
-    for _ in 0..10 {
-        let tree = host.render(&a.session, status.clone()).await.unwrap();
-        let selected = tree.fold().contains("❯ wake");
-        let View::Box { layout, .. } = tree else {
-            panic!("status")
-        };
-        let mut action = layout.on_key.unwrap();
-        action.args["value"] = json!({"key":if selected {"enter"} else {"down"}});
-        let intent = IntentId::mint();
-        a.handle.submit(
-            intent.clone(),
-            Input::action(action, Origin::surface("tui")),
-        );
-        let ack = serde_json::to_value(ack_for(&mut a, &intent).await).unwrap();
-        if selected {
-            assert_eq!(
-                ack["result"]["surface"],
-                json!({"name":"Composer","args":{"text":"/wake off"}})
-            );
-            break;
-        }
-    }
-    command(&mut a, "/wake off").await;
+    let opened = command(&mut a, "/wake").await;
+    assert_eq!(opened["surface"]["args"]["plugin"], "bingo.schedule");
     assert!(
-        !host
-            .render(&a.session, status)
+        host.render(&a.session, wake_request(None))
             .await
             .unwrap()
             .fold()
-            .contains("check CI")
+            .contains("in 10s")
     );
     stop(&host, &mut server).await;
 }
 
-#[tokio::test(flavor = "multi_thread")]
-async fn a_second_panel_is_dormant_but_runs_once() {
-    let mut owner = Server::spawn(r#"{"responses":[{"steps":[{"text":"manual completed"}]}]}"#);
-    let first = ready(&mut owner).await;
-    let mut process = tokio::process::Command::from(support::command::bingo());
-    process
-        .args(["serve", "--stdio", "--cwd"])
-        .arg(owner.cwd())
-        .envs(support::home::home_env(owner.cwd()))
-        .env("BINGO_FAKE_SCRIPT", owner.cwd().join("script.json"))
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    let mut second = bingo_process::tree(process).unwrap();
-    let host = bingo_surface_rpc::RemoteKernel::connect(
-        second.take_stdout().unwrap(),
-        second.take_stdin().unwrap(),
-    );
-    host.initialize(who()).await.unwrap();
-    let mut a = host
-        .open(create(owner.cwd()), who(), OpenOptions::default())
-        .await
-        .unwrap();
-    command(&mut a, "/schedule add every 2h -- manual check").await;
-    command(&mut a, "/schedule").await;
-    assert!(
-        host.render(&a.session, request())
-            .await
-            .unwrap()
-            .fold()
-            .contains("dormant — held by another bingo")
-    );
-    let run = press(&host, &mut a, "r").await;
-    command(&mut a, run["run"].as_str().unwrap()).await;
-    let sessions = host.sessions(SessionFilter::default()).await.unwrap();
-    let scheduled = sessions
-        .iter()
-        .find(|s| s.key.as_deref().is_some_and(|k| k.starts_with("schedule/")))
-        .unwrap();
-    let mut turn = host
-        .open(
-            SessionSelector::ById {
-                id: scheduled.id.clone(),
-            },
-            who(),
-            OpenOptions::default(),
-        )
-        .await
-        .unwrap();
-    if turn.snapshot.summary.busy {
-        support::until_completed(&mut turn).await;
-    }
-    let journal = std::fs::read_to_string(
-        owner
-            .sessions_dir()
-            .join(scheduled.id.as_str())
-            .join("journal.jsonl"),
-    )
-    .unwrap();
-    assert_eq!(
-        journal
-            .lines()
-            .filter_map(|line| serde_json::from_str::<serde_json::Value>(line).ok())
-            .filter(|frame| frame["event"]["type"] == "turnStarted")
-            .count(),
-        1,
-        "{journal}"
-    );
-    host.shutdown().await.unwrap();
-    assert!(
-        tokio::time::timeout(LIMIT, second.wait())
-            .await
-            .unwrap()
-            .unwrap()
-            .success()
-    );
-    stop(&first, &mut owner).await;
-}
-
-async fn confirm_model_entry(host: &impl HostApi, a: &mut Attachment, home: &std::path::Path) {
+async fn confirm_model_entry(_host: &impl HostApi, a: &mut Attachment, home: &std::path::Path) {
     let directory = home.join(".bingo/data/schedules");
     let path = std::fs::read_dir(directory)
         .unwrap()
@@ -284,34 +166,14 @@ async fn confirm_model_entry(host: &impl HostApi, a: &mut Attachment, home: &std
     assert!(entry.get("permissionMode").is_none());
     entry["by"] = json!("tool");
     std::fs::write(&path, serde_json::to_vec(&entry).unwrap()).unwrap();
-    command(a, "/schedule").await;
-    assert!(
-        host.render(&a.session, request())
-            .await
-            .unwrap()
-            .fold()
-            .contains("model")
+    let digest =
+        bingo_services::schedule::confirmation_digest(entry["text"].as_str().unwrap(), None);
+    let line = format!(
+        "/schedule confirm {} {digest}",
+        path.file_stem().unwrap().to_str().unwrap()
     );
-    assert!(press(host, a, "c").await["run"].is_null());
-    assert!(
-        host.render(&a.session, request())
-            .await
-            .unwrap()
-            .fold()
-            .contains("as yours")
-    );
-    let confirm = press(host, a, "enter").await;
-    let line = confirm["run"].as_str().unwrap();
-    assert!(line.starts_with("/schedule confirm "));
-    reject_changed_confirmation(a, line, &path, &mut entry).await;
-    command(a, line).await;
-    assert!(
-        host.render(&a.session, request())
-            .await
-            .unwrap()
-            .fold()
-            .contains("you")
-    );
+    reject_changed_confirmation(a, &line, &path, &mut entry).await;
+    command(a, &line).await;
     let entry: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
     assert_eq!(entry["by"], "person");
 }
@@ -338,8 +200,16 @@ async fn reject_changed_confirmation(
     std::fs::write(path, serde_json::to_vec(entry).unwrap()).unwrap();
 }
 
+fn wake_request(selected: Option<&str>) -> RenderRequest {
+    RenderRequest {
+        request_id: "wake.sheet".into(),
+        props: json!({"owner":"bingo.schedule","selected":selected}),
+        ..request()
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
-async fn bare_wake_selects_its_panel_row_and_d_ends_only_the_wake() {
+async fn the_wake_sheet_cancels_only_the_wake_and_ignores_letters() {
     let mut server = Server::spawn(
         r#"{"responses":[{"steps":[{"toolCall":{"name":"Wake","input":{"after":"4m","note":"check CI"}}}]},{"steps":[{"text":"waiting"}]}]}"#,
     );
@@ -348,24 +218,42 @@ async fn bare_wake_selects_its_panel_row_and_d_ends_only_the_wake() {
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    command(&mut a, "/schedule add every 2h -- keep this schedule").await;
+    command(&mut a, "/schedule every 2h keep this schedule").await;
     a.handle.submit(
         IntentId::mint(),
         Input::text("set a wake", Origin::surface("tui")),
     );
     support::until_completed(&mut a).await;
     let opened = command(&mut a, "/wake").await;
-    assert_eq!(opened["surface"]["name"], "Pane", "{opened}");
-    let tree = host.render(&a.session, request()).await.unwrap();
-    assert!(tree.fold().contains("❯ wake"), "{tree:?}");
-    assert!(tree.fold().contains("check CI"), "{tree:?}");
-    assert!(tree.fold().contains("keep this schedule"), "{tree:?}");
-    let cancel = press(&host, &mut a, "d").await;
-    assert_eq!(cancel, json!({"run":"/wake off"}));
-    let ended = command(&mut a, cancel["run"].as_str().unwrap()).await;
-    assert!(ended["surface"].is_null(), "{ended}");
-    let tree = host.render(&a.session, request()).await.unwrap();
-    assert!(!tree.fold().contains("check CI"), "{tree:?}");
-    assert!(tree.fold().contains("keep this schedule"), "{tree:?}");
+    assert_eq!(opened["surface"]["args"]["plugin"], "bingo.schedule");
+    let tree = host.render(&a.session, wake_request(None)).await.unwrap();
+    assert!(tree.fold().contains("cancel the wake-up"));
+    assert!(tree.fold().contains("in 1h"));
+    press_request(&host, &mut a, "d", wake_request(Some("cancel"))).await;
+    assert!(
+        host.render(&a.session, wake_request(None))
+            .await
+            .unwrap()
+            .fold()
+            .contains("cancel the wake-up")
+    );
+    let ended = press_request(&host, &mut a, "enter", wake_request(Some("cancel"))).await;
+    assert_eq!(ended["message"], "wake-up cancelled");
+    assert!(
+        !host
+            .render(&a.session, wake_request(None))
+            .await
+            .unwrap()
+            .fold()
+            .contains("cancel the wake-up")
+    );
+    command(&mut a, "/schedule").await;
+    assert!(
+        host.render(&a.session, request())
+            .await
+            .unwrap()
+            .fold()
+            .contains("keep this schedule")
+    );
     stop(&host, &mut server).await;
 }

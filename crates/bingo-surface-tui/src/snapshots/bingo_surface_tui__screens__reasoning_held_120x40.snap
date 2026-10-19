@@ -1,5 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 71
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 "                                                                                                                        "
@@ -34,8 +35,8 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
-"▍  what is in this workspace?                                                                                       1s  "
 "                                                                                                                        "
+"▍  what is in this workspace?                                                                                       1s  "
 "   ⠋ working                                                                                                            "
 "                                                                                                                        "
 "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔"

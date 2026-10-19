@@ -1,5 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/frame.rs
+assertion_line: 310
 expression: "draw_sized(width, height, &state, &mut ui, later(now, 3_000))"
 ---
 "                                                                                                            "
@@ -24,8 +25,8 @@ expression: "draw_sized(width, height, &state, &mut ui, later(now, 3_000))"
 "                                                                                                            "
 "                                                                                                            "
 "                                                                                                            "
-"▍  label the total in main                                                                                  "
 "                                                                                                            "
+"▍  label the total in main                                                                                  "
 "   ⠧ working                                                                                                "
 "                                                                                                            "
 "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔"

@@ -1,25 +1,16 @@
-# Schedules panel
+# Schedule sheet
 
-`/schedule` opens the panel. The top line names the runner holding the store.
-The `by` column says `you`, `model`, or `unconfirmed` (ADR-0094).
-A pending wake on this session appears after the schedules; `d` ends it.
-`/wake` opens the panel on that row; `/wake off` still ends it directly.
-The wake also appears in `/status`.
-Schedules fire only while bingo runs. Another process may hold the store;
-this panel can still run an enabled schedule now.
+`/schedule` opens the schedules in the dock. ↑/↓ selects a row; space pauses
+or resumes it. Enter closes the sheet and sends its prompt in the home
+conversation. Escape closes it and restores the draft. Letter keys do nothing.
+`/schedule every 30m <prompt>` adds a repeating prompt.
 
-- ↑/↓ selects a row; space pauses or enables it.
-- r runs it now; a disabled schedule must be resumed first.
-- c confirms a `model` or `unconfirmed` entry as yours after showing its
-  whole text and explicit mode; Enter accepts, Escape cancels. A changed text
-  or mode is refused. Hidden control and bidi characters appear as escapes;
-  those entries require a typed `/schedule confirm <id>` instead.
-- d opens a confirmation; Enter forgets it, Escape cancels.
-- → visits its session, or says it has not fired yet.
-- Escape closes the panel.
+Automatic fires still use the schedule's own session and stored permission
+mode. `/schedule run <id>` fires there now; `/schedule confirm <id> [digest]`
+confirms an entry as yours, and `/schedule forget <id>` removes it while keeping
+its transcript. These commands require the person's own input.
 
-Forgetting leaves the session and its transcript intact. A fire in another
-process can add one extra turn when you run now.
-
-With `bingo.mod.schedule` disabled, `/schedule` shows the plain table and
-`/wake` shows its text view. All command lines still work.
+`/wake` opens a separate sheet: six delays from 10 seconds to one hour, then
+cancel when a wake is pending. Enter sets or cancels it. `/wake off` cancels it
+directly. With `bingo.mod.schedule` disabled, the schedule command shows its
+plain table; the wake sheet and all command lines remain available.
