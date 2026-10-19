@@ -1,0 +1,24 @@
+                                            ⠈⠄
+                                            ⠐
+              █      ▀                     ⠈
+              █▀▀▀▀█ █ █▀▀▀▀█ █▀▀▀▀█ █▀▀▀▀█ ▍
+              █▄▄▄▄█ █ █    █ █▄▄▄▄█ █▄▄▄▄█ ▍
+                              ▄▄▄▄▄█        ▍
+
+              fake-1 · default
+              /var/…/T/m199-drive-tuxn2q78/cwd
+
+              recent
+              signed out edge                                   3s
+              run a background shell                            7s
+              keep context 0                                   11s
+
+
+
+
+
+
+
+   ▍Ask anything, or / for commands
+
+   fake-1 · wakes in 6s                         ↑ recent   / commands   ? keys

@@ -56,11 +56,11 @@ def drive(width, height):
         def capture(name):
             (OUT / f'{name}-{width}x{height}.txt').write_text(pane().replace(temporary, '<drive>'))
 
-        def open_session(name, responses, extra=()):
+        def open_session(name, responses, extra=(), login=None):
             nonlocal session, started
             session = name
             script = work / f'{name}.json'
-            script.write_text(json.dumps({'responses': responses}))
+            script.write_text(json.dumps({'responses': responses, **({'login': login} if login else {})}))
             child = dict(env, BINGO_FAKE_SCRIPT=str(script))
             names = {'HOME', 'XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'BINGO_FAKE_SCRIPT', 'BINGO_THEME', 'BINGO_MOTION', 'BINGO_GRAPHICS', 'TERM', 'COLORTERM'}
             command = shlex.join(['env', *[f'{k}={v}' for k, v in child.items() if k in names], str(BIN), '--provider', 'fake', '--cwd', str(work / 'cwd'), '--allowed-tools', 'Bash,Read', *extra])
@@ -136,7 +136,39 @@ def drive(width, height):
             capture('background-notified')
             wait('/ commands')
             leave()
-            print(f'PASS {width}x{height}: fresh, recent/resume, retry/recovery, compact, background, receipt')
+            open_session('signedout', [
+                {'steps': [{'error': {'kind': 'auth', 'message': 'the token expired'}}]},
+                {'steps': [{'text': 'Answered after signing in.'}]},
+            ], login={'flow': {'kind': 'device', 'url': 'console.anthropic.com/device', 'code': 'WDJB-MJHT'}, 'approve_after_ms': 4000})
+            wait('/ commands')
+            text('signed out edge')
+            keys('Enter')
+            wait('your message is kept')
+            capture('signedout')
+            text('/login')
+            wait('sign in to a provider')
+            keys('Enter')
+            wait('WDJB-MJHT')
+            capture('signedout-login')
+            wait('Answered after signing in.')
+            capture('signedin')
+            leave()
+            open_session('wake', [{'steps': [{'text': 'Woke up and looked again.'}]}])
+            wait('/ commands')
+            text('/wake')
+            wait('/schedule')
+            keys('Enter')
+            wait('Wake up later')
+            keys('Enter')
+            wait('wakes in 10s')
+            # The toast holds 2.4 s; past it the footer's countdown is alone.
+            wait('wakes in 6s')
+            capture('wake-pending')
+            wait('wake-up')
+            wait('Woke up and looked again.')
+            capture('woken')
+            leave()
+            print(f'PASS {width}x{height}: fresh, recent/resume, retry/recovery, compact, background, signed out/login, wake, receipt')
         finally:
             if started:
                 tmux('kill-server')
