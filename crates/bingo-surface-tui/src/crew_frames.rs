@@ -46,6 +46,25 @@ fn crew_beats(world: &World) -> Vec<script::Beat> {
     )
 }
 
+/// `S.log.push(simulate(CREW_P, crewScript())); ago('scout', 600);
+/// ago('reviewer', 2600)`: home's turn is long over, each teammate opened at
+/// its call and runs from moments before the scene.
+fn agent_beats(world: &World) -> Vec<script::Beat> {
+    const LONG_AGO: i64 = -10_000_000;
+    crew::crew(
+        world.tree.root_id(),
+        LONG_AGO,
+        crew::Hire {
+            opened: LONG_AGO + 700,
+            t0: -600,
+        },
+        crew::Hire {
+            opened: LONG_AGO + 1000,
+            t0: -2600,
+        },
+    )
+}
+
 /// What the kernel does later on its own: an event on a session, at a
 /// moment of the scene.
 struct Due {
@@ -64,6 +83,8 @@ struct Drive {
     t: i64,
     due: Vec<Due>,
     posts: usize,
+    /// What a teammate does once its ask is answered, from that moment.
+    resumes: Option<Box<dyn FnOnce(i64) -> Vec<script::Beat>>>,
 }
 
 impl Drive {
@@ -79,6 +100,7 @@ impl Drive {
             t: 0,
             due: Vec::new(),
             posts: 0,
+            resumes: None,
         };
         drive.draw();
         drive
@@ -128,7 +150,8 @@ impl Drive {
     }
 
     /// A script's beats: what is already past folds now, the rest when due.
-    fn script(&mut self, beats: Vec<script::Beat>) {
+    fn script(&mut self, mut beats: Vec<script::Beat>) {
+        beats.sort_by_key(|beat| beat.t);
         for beat in beats {
             if beat.t <= self.t {
                 self.world
@@ -205,7 +228,27 @@ impl Drive {
         match effect {
             Effect::View(session) => self.show(&session),
             Effect::Submit(Input::Text { text, .. }) => self.posted(&text),
+            Effect::Answer {
+                interaction,
+                answer,
+                ..
+            } => self.answered(interaction, answer),
             other => panic!("the scene has no answer for {other:?}"),
+        }
+    }
+
+    /// The kernel resolves the ask in the viewed session, and the teammate
+    /// goes on.
+    fn answered(&mut self, id: bingo_sdk::InteractionId, answer: bingo_sdk::Answer) {
+        let session = self.world.tree.viewed().summary.id.clone();
+        let by = bingo_sdk::ResolvedBy::Client {
+            name: "tui".into(),
+            surface: "tui".into(),
+        };
+        let event = Event::InteractionResolved { id, answer, by };
+        self.world.emit(&session, world::SETUP + self.t, event);
+        if let Some(resumes) = self.resumes.take() {
+            self.script(resumes(self.t));
         }
     }
 
@@ -306,5 +349,61 @@ fn m200_crew_frames_follow_the_prototype() {
             drive.wait(capture.entry.moment_ms);
             drive.shot(&capture);
         });
+    }
+}
+
+#[test]
+fn m200_agent_frame_follows_the_prototype() {
+    let capture = Capture::load("agent").spinners(&[(26, 3)]);
+    capture.render(|| {
+        let mut world = World::accepting_edits();
+        world.design_room();
+        let beats = agent_beats(&world);
+        let mut drive = Drive::new(world, &capture);
+        drive.script(beats);
+        drive.show(&world::id("scout"));
+        drive.wait(capture.entry.moment_ms);
+        drive.shot(&capture);
+    });
+}
+
+/// The capture's keys after `wait`, once the teammates are at work: ctrl+g to
+/// the reviewer, allow its run, esc home.
+fn crew_frame(name: &str, agent: bool) {
+    let capture = Capture::load(name);
+    capture.render(|| {
+        let mut world = World::accepting_edits();
+        world.design_room();
+        let home = world.tree.root_id().clone();
+        let (beats, reviewer_t0) = if agent {
+            (agent_beats(&world), -2600)
+        } else {
+            (crew_beats(&world), 1050)
+        };
+        let mut drive = Drive::new(world, &capture);
+        drive.script(beats);
+        drive.resumes = Some(Box::new(move |at| {
+            crew::reviewer_resumes(&home, reviewer_t0, at)
+        }));
+        if agent {
+            drive.show(&world::id("scout"));
+        }
+        drive.play(&capture);
+        assert_eq!(drive.t, capture.entry.moment_ms, "{name}");
+        drive.shot(&capture);
+    });
+}
+
+#[test]
+fn m200_crew_frames_follow_the_prototype_keys() {
+    for name in ["crew-allowed", "crew-home"] {
+        crew_frame(name, false);
+    }
+}
+
+#[test]
+fn m200_agent_frames_follow_the_prototype_keys() {
+    for name in ["agent-allowed", "agent-home"] {
+        crew_frame(name, true);
     }
 }

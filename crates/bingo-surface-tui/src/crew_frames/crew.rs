@@ -16,6 +16,12 @@ const CREW_SAYS: &str = "派出去了：**scout** 找所有调用 `drain()` 的�
 
 const SCOUT_SAYS: &str = "找到 4 处调用 `drain()`：`turn/loop.rs` 两处、`session/mod.rs` 一处、`rpc/steer.rs` 一处。都只在一轮开始时调用，和 `reset()` 的顺序一致，改动不影响它们。";
 
+/// `REVIEWER_SAYS` in p4b-data.js: the review, once the tests ran.
+const REVIEWER_REPORTS: &str = "`reset()` 的改法没问题。建议在 `a_second_steer_replaces_the_first` 里再断言一次队列是空的，不然以后有人把 steer 改成追加，这个测试还是会过。";
+
+/// When the reviewer asks, in its turn's time.
+const ASKS_AT: i64 = 1400;
+
 const QF: &str = "crates/bingo-core/src/session/queue.rs";
 const TF: &str = "crates/bingo-core/tests/queue_steer.rs";
 const TEST: &str = "cargo test -p bingo-core queue";
@@ -107,6 +113,21 @@ fn reviewer_turn(home: &SessionId, call: &str, hire: Hire) -> Vec<Beat> {
         &id("reviewer"),
         Event::InteractionOpened { interaction: ask },
     );
+    turn.beats
+}
+
+/// The rest of `reviewerScript()` once its ask is answered at `answered`,
+/// for a turn that started at `t0`: the run lands, the review is written and
+/// reported home.
+pub fn reviewer_resumes(home: &SessionId, t0: i64, answered: i64) -> Vec<Beat> {
+    let pause = (ASKS_AT, answered - t0 - ASKS_AT);
+    let mut turn = Turn::resumed(&id("reviewer"), "trn_reviewer", t0, 3, pause);
+    turn.reopen(1300, "bash", TEST);
+    turn.waited();
+    turn.ok(3000, "12 passed");
+    let end = turn.reply(3200, REVIEWER_REPORTS);
+    let at = world::SETUP + t0 + pause.1 + end;
+    turn.call(end, home, report("reviewer", REVIEWER_REPORTS, at));
     turn.beats
 }
 

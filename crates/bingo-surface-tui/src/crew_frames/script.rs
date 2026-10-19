@@ -22,6 +22,9 @@ pub struct Turn {
     t0: i64,
     open: Option<Item>,
     n: usize,
+    /// Turn time from which every beat lands later, and by how much: a turn
+    /// waits while it asks.
+    pause: (i64, i64),
     pub beats: Vec<Beat>,
 }
 
@@ -34,6 +37,7 @@ impl Turn {
             t0,
             open: None,
             n: 0,
+            pause: (i64::MAX, 0),
             beats: Vec::new(),
         };
         turn.at(0, started(id));
@@ -42,9 +46,35 @@ impl Turn {
         turn
     }
 
+    /// The same turn, picked up where it asked at `asked` and was answered
+    /// `ms` later; its first `steps` items are already journaled.
+    pub fn resumed(
+        session: &SessionId,
+        id: &str,
+        t0: i64,
+        steps: usize,
+        pause: (i64, i64),
+    ) -> Self {
+        Self {
+            session: session.clone(),
+            id: id.into(),
+            t0,
+            open: None,
+            n: steps,
+            pause,
+            beats: Vec::new(),
+        }
+    }
+
+    /// When `at` happens, from the scene's setup.
+    fn moment(&self, at: i64) -> i64 {
+        let (from, ms) = self.pause;
+        self.t0 + at + if at > from { ms } else { 0 }
+    }
+
     fn at(&mut self, at: i64, event: Event) {
         self.beats.push(Beat {
-            t: self.t0 + at,
+            t: self.moment(at),
             session: self.session.clone(),
             event,
         });
@@ -57,7 +87,7 @@ impl Turn {
 
     fn stamped(&self, mut item: Item, at: i64, end: Option<i64>) -> Item {
         item.turn = Some(TurnId::from_raw(&self.id));
-        let moment = |at: i64| Timestamp::from_millisecond(SETUP + self.t0 + at).unwrap();
+        let moment = |at: i64| Timestamp::from_millisecond(SETUP + self.moment(at)).unwrap();
         item.started_at = moment(at);
         if let ItemBody::ToolCall { began_at, .. } = &mut item.body {
             *began_at = Some(item.started_at);
@@ -81,6 +111,14 @@ impl Turn {
 
     /// `B.step(at, tool, arg)`: the call starts and stays open. Returns its id.
     pub fn step(&mut self, at: i64, name: &str, arg: &str) -> String {
+        let call = self.reopen(at, name, arg);
+        self.at(at, Event::ItemStarted { item: call.clone() });
+        call.id.to_string()
+    }
+
+    /// The call `B.step(at, tool, arg)` opened, still open, without
+    /// journaling it again.
+    pub fn reopen(&mut self, at: i64, name: &str, arg: &str) -> Item {
         let id = self.next_id();
         let input = serde_json::json!({ "target": arg });
         let mut call = tool(&id, name, input, None, ItemStatus::Running);
@@ -88,9 +126,26 @@ impl Turn {
             *call_id = format!("call_{id}").into();
         }
         let call = self.stamped(call, at, None);
-        self.at(at, Event::ItemStarted { item: call.clone() });
-        self.open = Some(call);
-        id
+        self.open = Some(call.clone());
+        call
+    }
+
+    /// The open call asked at the pause and began once answered, as the
+    /// kernel records a run that waited on you.
+    pub fn waited(&mut self) {
+        let (from, ms) = self.pause;
+        let at = |t: i64| Timestamp::from_millisecond(SETUP + self.t0 + t).unwrap();
+        let (asked, began) = (at(from), at(from + ms));
+        if let Some(Item {
+            body: ItemBody::ToolCall {
+                asked_at, began_at, ..
+            },
+            ..
+        }) = &mut self.open
+        {
+            *asked_at = Some(asked);
+            *began_at = Some(began);
+        }
     }
 
     /// `B.ok(at, res)`: the open call lands with `res` as its upshot.
@@ -105,7 +160,19 @@ impl Turn {
         *output = Some(Box::new(landed));
         call.status = ItemStatus::Completed;
         let started = call.started_at.as_millisecond() - SETUP - self.t0;
-        let call = self.stamped(call, started, Some(at));
+        let started = if started > self.pause.0 {
+            started - self.pause.1
+        } else {
+            started
+        };
+        let began = match &call.body {
+            ItemBody::ToolCall { began_at, .. } => *began_at,
+            _ => None,
+        };
+        let mut call = self.stamped(call, started, Some(at));
+        if let ItemBody::ToolCall { began_at, .. } = &mut call.body {
+            *began_at = began.or(*began_at);
+        }
         self.at(at, Event::ItemCompleted { item: call });
     }
 
@@ -125,7 +192,7 @@ impl Turn {
     /// Something the turn does that is not one of its items, at `at`.
     pub fn call(&mut self, at: i64, session: &SessionId, event: Event) {
         self.beats.push(Beat {
-            t: self.t0 + at,
+            t: self.moment(at),
             session: session.clone(),
             event,
         });
