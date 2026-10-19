@@ -497,7 +497,7 @@ impl Blocks {
         let entry = Entry {
             id: item.id.clone(),
             revision,
-            joins: transcript::joins_the_row_above(item),
+            joins: transcript::joins_the_row_above(item, place.previous, rows.state),
             turn: item.turn.clone(),
             lines: drawn.lines,
             pictures: drawn.pictures,

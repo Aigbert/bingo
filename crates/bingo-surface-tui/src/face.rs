@@ -11,6 +11,8 @@ pub struct Faces {
     home: String,
     rows: Vec<SessionSummary>,
     names: Vec<crate::markdown::mentions::Name>,
+    /// The sessions running a turn this frame.
+    working: Vec<SessionId>,
 }
 
 impl Faces {
@@ -19,6 +21,11 @@ impl Faces {
             home: tree.root_id().as_str().to_owned(),
             rows: tree.sessions().map(|state| state.summary.clone()).collect(),
             names: Vec::new(),
+            working: tree
+                .sessions()
+                .filter(|state| state.busy())
+                .map(|state| state.summary.id.clone())
+                .collect(),
         };
         faces.names = crate::markdown::mentions::known(tree, &faces);
         faces
@@ -45,6 +52,25 @@ impl Faces {
         bingo_collab::face::who(name, &self.home, &self.rows)
     }
 
+    /// What a person calls a session: `bingo` for home, a teammate or a room
+    /// by its name.
+    pub fn called(&self, id: &SessionId) -> String {
+        if id.as_str() == self.home {
+            return "bingo".into();
+        }
+        self.rows
+            .iter()
+            .find(|row| &row.id == id)
+            .and_then(|row| row.title.clone())
+            .unwrap_or_else(|| id.to_string())
+    }
+
+    /// Whether the teammate that signs with `name` is running a turn.
+    pub fn works(&self, name: &str) -> bool {
+        self.teammate(name)
+            .is_some_and(|row| self.working.contains(&row.id))
+    }
+
     /// The home's teammate that signs with `name`.
     pub fn teammate(&self, name: &str) -> Option<&SessionSummary> {
         bingo_collab::face::teammate(name, &self.home, &self.rows)
@@ -53,6 +79,26 @@ impl Faces {
 
 pub fn style(ink: &str) -> Style {
     theme::foreground(ink).unwrap_or_default()
+}
+
+/// How long one breath of an edge light takes (`breatheInk`).
+const BREATH: std::time::Duration = std::time::Duration::from_millis(1800);
+
+/// An edge light breathing between `ink` and the coal under it, and when it
+/// next changes: ember's own coal under glow, the ink a shade darker under
+/// any other.
+pub fn breathing(ink: &str, now: crate::clock::Now) -> (Style, Option<std::time::Instant>) {
+    let palette = theme::palette();
+    let Some(color) = palette.named(ink) else {
+        return (style(ink), None);
+    };
+    let coal = match ink {
+        "glow" => palette.coal(),
+        _ => theme::ink::shaded(color),
+    };
+    let weight = crate::clock::breathe(now, BREATH);
+    let next = now.motion.then(|| now.instant + crate::clock::FRAME);
+    (theme::literal(theme::ink::mix(color, coal, weight)), next)
 }
 
 /// The mark a teammate's row and post wear, in that teammate's ink.

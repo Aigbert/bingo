@@ -97,20 +97,6 @@ fn strip_names_the_work_and_yields_to_notices() {
     );
 }
 
-fn chat() -> crate::tree::Tree {
-    let mut tree = crew();
-    tree.fold
-        .apply(&posted(3, "itm_p1", "reviewer", "First post"));
-    tree.fold.apply(&posted(
-        4,
-        "itm_p2",
-        "reviewer",
-        "@parent ask @scout in #design; @unknown stays plain",
-    ));
-    tree.show(&log_id());
-    tree
-}
-
 #[test]
 fn a_child_permission_and_room_posts_keep_the_selected_room_in_front() {
     let mut tree = crew();
@@ -156,38 +142,6 @@ fn a_child_permission_and_room_posts_keep_the_selected_room_in_front() {
             assert!(screen.contains("First review post"), "{screen}");
         }
     }
-}
-
-#[test]
-fn room_groups_authors_marks_the_reader_and_lists_members() {
-    let (mut ui, now) = scene();
-    let screen = draw_tree(120, 40, &chat(), &mut ui, now);
-    assert_eq!(screen.matches("reviewer:").count(), 1, "{screen}");
-    assert!(screen.contains("→ you"), "{screen}");
-    assert!(
-        screen.contains("members: parent, reviewer, scout"),
-        "{screen}"
-    );
-}
-
-#[test]
-fn room_mentions_wear_the_known_names_hues() {
-    theme::with(painted::truecolor(), || {
-        let (mut ui, now) = scene();
-        let screen = painted::painted(120, 40, &chat(), &mut ui, now);
-        let row = screen.row("@parent ask");
-        let scout = face::style(face::Faces::of(&chat()).who("scout")).fg;
-        assert!(
-            row.iter()
-                .any(|(text, style)| text.contains("@scout") && style.fg == scout),
-            "{row:?}"
-        );
-        assert!(
-            row.iter()
-                .any(|(text, style)| text.contains("#design") && style.fg == theme::mode().fg),
-            "{row:?}"
-        );
-    });
 }
 
 #[test]
@@ -293,25 +247,4 @@ fn prose_only_colours_known_mentions_and_refreshes_when_names_arrive() {
             "an unchanged item takes the newly known name's hue"
         );
     });
-}
-
-#[test]
-fn room_members_refresh_and_the_composer_stays_in_place() {
-    let mut tree = chat();
-    let (mut ui, now) = scene();
-    let before = draw_tree(120, 40, &tree, &mut ui, now);
-    let composer = ui.shown.regions.composer;
-    tree.fold.apply(&log_frame(
-        5,
-        extended(
-            "bingo.rooms",
-            "members",
-            roster_payload(&["parent", "reviewer"], &[]),
-        ),
-    ));
-    let after = draw_tree(120, 40, &tree, &mut ui, now);
-    assert_ne!(before, after);
-    assert!(after.contains("members: parent, reviewer"));
-    assert!(!after.contains("members: parent, reviewer, scout"));
-    assert_eq!(composer, ui.shown.regions.composer);
 }

@@ -323,7 +323,7 @@ fn answered_and_skipped_questions_keep_their_receipts_on_the_step() {
 }
 
 #[test]
-fn a_principal_keeps_their_own_band_in_a_turn() {
+fn a_post_in_a_turn_is_drawn_under_its_name() {
     let state = folded(vec![
         frame(1, started("trn_1")),
         frame(
@@ -343,14 +343,14 @@ fn a_principal_keeps_their_own_band_in_a_turn() {
         let mut blocks = Blocks::default();
         let height = blocks.sync(&state, &Default::default(), rows);
         let text = blocks.tail(height).join("\n");
-        assert!(text.contains("mei  look at the deploy?"), "{text}");
+        assert!(text.contains("▎  mei        look at the deploy?"), "{text}");
         assert!(!text.contains("steered"), "{text}");
         assert_eq!(text.matches("2s").count(), 1, "{text}");
     });
 }
 
 #[test]
-fn a_principal_starting_the_turn_owns_its_light_and_clock() {
+fn a_post_starting_the_turn_leads_it_where_your_words_would() {
     let state = folded(vec![
         frame(1, started("trn_1")),
         frame(
@@ -361,16 +361,16 @@ fn a_principal_starting_the_turn_owns_its_light_and_clock() {
         ),
     ]);
     with_rows(&state, later(scene().1, 2000), |rows| {
-        let item = state.transcript.items().first().unwrap();
-        let drawn = band::draw(item, rows);
-        assert!(
-            drawn.lines[0]
-                .to_string()
-                .contains("mei  look at the deploy?")
+        let mut blocks = Blocks::default();
+        let height = blocks.sync(&state, &Default::default(), rows);
+        let tail = blocks.tail(height);
+        let text: Vec<_> = tail.iter().map(|line| line.trim_end()).collect();
+        assert_eq!(
+            text.iter().find(|line| !line.is_empty()),
+            Some(&"▎  mei        look at the deploy?"),
+            "{text:?}"
         );
-        assert!(drawn.lines[0].to_string().ends_with("2s  "));
-        assert_eq!(drawn.lines[0].to_string().chars().next(), Some('▍'));
-        assert!(drawn.next.is_some());
+        assert!(text.iter().any(|line| line.contains("working")), "{text:?}");
     });
 }
 

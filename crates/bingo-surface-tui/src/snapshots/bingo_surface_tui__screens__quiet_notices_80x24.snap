@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-expression: "draw_tree(80, 24, tree, ui, now)"
+expression: "draw_tree(80, small, tree, ui, now)"
 ---
 "                                                                                "
 "                                                                                "
@@ -19,8 +19,8 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "                                                                                "
 "   Started. I will say.                                                         "
 "   ── ✓ cargo test --workspace finished in the background · 412 passed ───────  "
-"   reviewer  Two nits, else fine.                                               "
-"   mei  look at the deploy?                                                     "
+"▎  reviewer   Two nits, else fine.                                              "
+"▎  mei        look at the deploy?                                               "
 "                                                                                "
 "                                                                                "
 "   ▍Reply, or / for commands                                                    "

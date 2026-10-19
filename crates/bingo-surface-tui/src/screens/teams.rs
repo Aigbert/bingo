@@ -36,7 +36,10 @@ fn a_room_transcript() {
         !screen.contains("⎿"),
         "no post is a folded result: {screen}"
     );
-    assert!(screen.contains("● parent: then let us ship it"), "{screen}");
+    assert!(
+        screen.contains("you        then let us ship it"),
+        "{screen}"
+    );
     both("room_transcript", &tree, &mut ui, now);
 }
 
@@ -90,7 +93,7 @@ fn a_room_post_in_a_member_s_own_transcript() {
         "not the nudge, not the reading, not the post: {screen}"
     );
     assert!(
-        screen.contains("scout  Two nits"),
+        screen.contains("scout      Two nits"),
         "a message from a peer is not a room's: {screen}"
     );
     both("room_post", &tree, &mut ui, now);

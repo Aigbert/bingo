@@ -19,6 +19,8 @@ mod answer;
 mod history;
 pub use history::History;
 mod components;
+/// Someone's words under their name.
+mod post;
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
 mod said;
@@ -310,9 +312,10 @@ impl Rows<'_> {
 }
 
 /// A receipt is the answer to the row above it, so it opens no block of its
-/// own (design §4: the receipt joins the result).
-pub fn joins_the_row_above(item: &Item) -> bool {
-    matches!(item.body, ItemBody::PermissionReceipt { .. })
+/// own (design §4: the receipt joins the result); a post joins the one before
+/// it by the same voice.
+pub fn joins_the_row_above(item: &Item, previous: Option<&Item>, state: &SessionState) -> bool {
+    matches!(item.body, ItemBody::PermissionReceipt { .. }) || said::joins(item, previous, state)
 }
 
 /// One item's block: the lines it draws, and the pictures those lines stand
@@ -849,6 +852,9 @@ fn calls(item: &Item, tool: &str) -> bool {
 /// next turn takes it away.
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
     let mut out = live::draw(state, rows);
+    if state.summary.driver == bingo_sdk::Driver::Log {
+        out.append(said::writers(rows));
+    }
     for props in crate::component::closing::props(state) {
         out.append(crate::component::closing::draw(
             state,
@@ -1239,7 +1245,7 @@ mod tests {
                 Some("scout"),
                 "Two nits, else fine."
             )]),
-            vec!["▍  scout  Two nits, else fine.".to_string()],
+            vec!["▎  scout      Two nits, else fine.".to_string()],
         );
         assert_eq!(
             drawn(vec![delivered(
@@ -1319,9 +1325,9 @@ mod tests {
                 "found it\n\nit was the cursor all along",
             )]),
             vec![
-                " ● scout: found it".to_string(),
-                String::new(),
-                "   it was the cursor all along".to_string(),
+                "▎  scout      found it".to_string(),
+                "▎".to_string(),
+                "▎             it was the cursor all along".to_string(),
             ],
             "no `⎿`, nothing dim, nothing folded: a message is read whole"
         );
@@ -1334,7 +1340,7 @@ mod tests {
     fn an_unsigned_post_is_the_holders_and_says_so() {
         assert_eq!(
             drawn_in_room(vec![person("itm_1", "then let us ship it")]),
-            vec![" ● parent: then let us ship it"],
+            vec!["   you        then let us ship it"],
         );
     }
 
@@ -1540,7 +1546,7 @@ mod tests {
                 Some("reviewer"),
                 "done, two nits"
             )]),
-            vec!["▍  reviewer  done, two nits".to_string()],
+            vec!["▎  reviewer   done, two nits".to_string()],
         );
     }
 

@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-expression: "draw_tree(80, 24, tree, ui, now)"
+expression: "draw_tree(80, small, tree, ui, now)"
 ---
 "                                                                                "
 "                                                                                "
@@ -20,7 +20,7 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "                                                                                "
 "                                                                                "
 "                                                                                "
-"▍  scout  Two nits, else fine.                                                  "
+"▎  scout      Two nits, else fine.                                              "
 "                                                                                "
 "                                                                                "
 "   ▍Reply, or / for commands                                                    "

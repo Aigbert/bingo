@@ -20,7 +20,7 @@ pub(crate) use bingo_sdk::effective_voice as voice;
 /// places one is read.
 ///
 /// In a room — a session nothing answers — every user item is a post, and the
-/// room is the conversation: they are drawn as one ([`post`]).
+/// room is the conversation: they are drawn as one ([`super::post`]).
 ///
 /// Everywhere else, a room's activity is the room's: a member's transcript, the
 /// holder's included, shows none of it, and a wake just opens a turn
@@ -47,7 +47,10 @@ pub fn lines(
     }
 
     if rows.state.summary.driver == Driver::Log {
-        return post(item, place, rows).into();
+        return room_post(item, place, rows);
+    }
+    if is_post(origin) {
+        return their_post(item, parts, origin, place, rows);
     }
     match voice(origin) {
         bingo_sdk::Voice::Aside => Default::default(),
@@ -56,106 +59,113 @@ pub fn lines(
     }
 }
 
-/// One post in the room's own transcript: who said it, then the whole of what
-/// they said.
-///
-/// A room is read the way a chat is read, so the name leads and the message
-/// follows it in the text everything said is drawn in — every line of it,
-/// wrapped as prose. Nothing here hangs dim under a `⎿` and nothing folds
-/// away: that is the shape of a subsystem reporting in ([`notice`]), and under
-/// it the body of a message reads as collapsed metadata rather than as what
-/// somebody wrote.
-///
-/// A post nobody signed came from the session the room hangs under — a person
-/// at this composer, or the model that holds it — and every seat reads that one
-/// under the roster's own word for it.
-fn post(item: &Item, place: &super::Place<'_>, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    let Some(post) = bingo_collab::mentions::Post::of(item) else {
-        return Vec::new();
+/// Whether an input is somebody's post rather than your words: its origin
+/// names a principal — a teammate, a person on a channel — other than the
+/// session that holds this one, whose words are what it was handed
+/// ([`super::band`]).
+pub fn is_post(origin: &Origin) -> bool {
+    voice(origin) != bingo_sdk::Voice::Aside
+        && origin
+            .principal
+            .as_deref()
+            .is_some_and(|name| !bingo_collab::name::same(name, seats::HOLDER))
+}
+
+/// Who signed an input, where it is a post.
+fn signed(item: &Item) -> Option<&str> {
+    match &item.body {
+        bingo_sdk::ItemBody::User { origin, .. } if is_post(origin) => origin.principal.as_deref(),
+        _ => None,
+    }
+}
+
+/// Whether an item's post follows one by the same voice, which it joins
+/// without a blank row or a second name.
+pub fn joins(item: &Item, previous: Option<&Item>, state: &bingo_sdk::SessionState) -> bool {
+    let Some(previous) = previous else {
+        return false;
     };
-    if post.text.trim().is_empty() {
-        return Vec::new();
+    if state.summary.driver == Driver::Log {
+        let author = |item| bingo_collab::mentions::Post::of(item).map(|post| post.author);
+        return author(item)
+            .zip(author(previous))
+            .is_some_and(|(a, b)| bingo_collab::name::same(&a, &b));
     }
-    let previous = place.previous.and_then(bingo_collab::mentions::Post::of);
-    let grouped = previous
-        .as_ref()
-        .is_some_and(|before| bingo_collab::name::same(&before.author, &post.author));
-    let mut body: Vec<Line<'static>> = post
-        .text
-        .trim()
-        .lines()
-        .map(|line| {
-            Line::from(crate::markdown::mentions::spans(
-                line,
-                theme::text(),
-                rows.faces.names(),
-            ))
-        })
-        .collect();
-    if !grouped && let Some(first) = body.first_mut() {
-        first.spans.insert(
-            0,
-            Span::styled(
-                format!("{}: ", post.author),
-                crate::face::style(rows.faces.who(&post.author)).patch(theme::bold()),
-            ),
-        );
-    }
-    let members = seats::members(rows.state);
-    if addressed(&post, &members)
-        && let Some(last) = body.last_mut()
-    {
-        let arrow = if theme::glyphs() == &theme::ASCII {
-            " -> you"
-        } else {
-            " → you"
+    signed(item)
+        .zip(signed(previous))
+        .is_some_and(|(a, b)| bingo_collab::name::same(a, b))
+}
+
+/// Who is writing an answer the room is owed, a blank row above: a member
+/// called on, still owing, whose own session runs a turn.
+pub fn writers(rows: &Rows<'_>) -> crate::views::Drawing {
+    let mut out = crate::views::Drawing::default();
+    let mut named: Vec<String> = Vec::new();
+    for mention in bingo_collab::owed::of_state(rows.state) {
+        let Some(name) = mention.owed_by.chased() else {
+            continue;
         };
-        last.spans.push(Span::styled(arrow, theme::dim()));
-    }
-    let glyph = if grouped { " " } else { crate::face::mark() };
-    let ink = crate::face::style(rows.faces.who(&post.author));
-    let mut out = super::marked(glyph, ink, body, rows);
-    if rows.first_post == Some(&item.id) {
-        out.extend(member_row(&members, rows));
+        if named
+            .iter()
+            .any(|held| bingo_collab::name::same(held, name))
+            || !rows.faces.works(name)
+        {
+            continue;
+        }
+        named.push(name.to_owned());
+        let voice = super::post::Voice {
+            name,
+            ink: rows.faces.who(name),
+        };
+        if out.lines.is_empty() {
+            out.lines.push(Line::default());
+        }
+        out.append(super::post::writing(&voice, rows.now));
     }
     out
 }
 
-fn member_row(members: &[String], rows: &Rows<'_>) -> Vec<Line<'static>> {
-    if members.is_empty() {
-        return Vec::new();
-    }
-    super::under(
-        Span::raw("  "),
-        vec![crate::layout::grid::fit(
-            Line::from(vec![Span::styled(
-                format!("members: {}", members.join(", ")),
-                theme::dim(),
-            )]),
-            rows.measured().saturating_sub(2),
-        )],
-        2,
-        rows.measured(),
-    )
+/// A teammate's words outside a room: a report, a message.
+fn their_post(
+    item: &Item,
+    parts: &[ContentPart],
+    origin: &Origin,
+    place: &super::Place<'_>,
+    rows: &Rows<'_>,
+) -> crate::views::Drawing {
+    let Some(name) = origin.principal.as_deref() else {
+        return Default::default();
+    };
+    let joined = joins(item, place.previous, rows.state);
+    let voice = super::post::Voice {
+        name,
+        ink: rows.faces.who(name),
+    };
+    let at = item.started_at.as_millisecond();
+    super::post::theirs(&voice, said(parts).trim(), at, joined, rows)
 }
 
-/// The room's composer speaks as the holder; the shared matcher owns @all.
-fn addressed(post: &bingo_collab::mentions::Post, members: &[String]) -> bool {
-    if bingo_collab::name::same(&post.author, seats::HOLDER)
-        || !members
-            .iter()
-            .any(|name| bingo_collab::name::same(name, seats::HOLDER))
-    {
-        return false;
+/// One post in a room's own stream: yours, from the room's holder, or a
+/// member's. A run of posts by one voice shares its name.
+fn room_post(item: &Item, place: &super::Place<'_>, rows: &Rows<'_>) -> crate::views::Drawing {
+    let Some(post) = bingo_collab::mentions::Post::of(item) else {
+        return Default::default();
+    };
+    if post.text.trim().is_empty() {
+        return Default::default();
     }
-    bingo_collab::mentions::named(&post.text, members)
-        .iter()
-        .any(|owed| match owed {
-            bingo_collab::mentions::Owed::Member(name) => {
-                bingo_collab::name::same(name, seats::HOLDER)
-            }
-            bingo_collab::mentions::Owed::Room => true,
-        })
+    let joined = joins(item, place.previous, rows.state);
+    if bingo_collab::name::same(&post.author, seats::HOLDER) {
+        let open = bingo_collab::owed::of_state(rows.state);
+        let owed = bingo_collab::owed::on(&open, &item.id);
+        return super::post::yours(post.text.trim(), &owed, joined, rows);
+    }
+    let voice = super::post::Voice {
+        name: &post.author,
+        ink: rows.faces.who(&post.author),
+    };
+    let at = item.started_at.as_millisecond();
+    super::post::theirs(&voice, post.text.trim(), at, joined, rows)
 }
 
 /// What a `User` item says, as its parts spell it.

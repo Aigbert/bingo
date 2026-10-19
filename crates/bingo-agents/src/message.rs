@@ -20,8 +20,7 @@ use serde_json::Value;
 use crate::names;
 use bingo_services::room_post::{self, Posted, Request, Said};
 
-/// The surface an agent's messages come from; a person's say `tui` or `print`.
-pub const SURFACE: &str = "agent";
+pub use bingo_collab::name::SURFACE;
 
 /// The tool a message is written through, as a journal records the name of the
 /// call that wrote one.

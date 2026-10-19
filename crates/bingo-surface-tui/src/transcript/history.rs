@@ -1,5 +1,5 @@
 //! One frame's indexes into the transcript, shared by sync, refresh and requests.
-use bingo_sdk::{Item, ItemBody, ItemId, SessionState, TurnId};
+use bingo_sdk::{Item, ItemId, SessionState, TurnId};
 use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
@@ -10,7 +10,6 @@ pub struct History<'a> {
     pub followed: BTreeSet<&'a ItemId>,
     pub newest: Option<&'a TurnId>,
     pub positions: BTreeMap<&'a ItemId, usize>,
-    pub first_post: Option<&'a ItemId>,
     pub answers: crate::ask::receipts::Answers<'a>,
 }
 
@@ -21,7 +20,6 @@ impl<'a> History<'a> {
             newest: None,
             followed: BTreeSet::new(),
             positions: BTreeMap::new(),
-            first_post: None,
             answers: crate::ask::receipts::Answers::of(state),
         };
         for (at, item) in state.transcript.items().iter().enumerate() {
@@ -33,9 +31,6 @@ impl<'a> History<'a> {
             history.positions.insert(&item.id, at);
             if item.turn.is_some() {
                 history.newest = item.turn.as_ref();
-            }
-            if history.first_post.is_none() && matches!(item.body, ItemBody::User { .. }) {
-                history.first_post = Some(&item.id);
             }
         }
         history.followed = history
@@ -87,6 +82,5 @@ mod tests {
         );
         assert_eq!(history.positions[&items[2].id], 2);
         assert_eq!(history.newest, items[2].turn.as_ref());
-        assert_eq!(history.first_post, Some(&items[0].id));
     }
 }

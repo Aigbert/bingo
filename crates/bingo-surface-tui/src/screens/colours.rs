@@ -105,10 +105,10 @@ fn a_card_spends_its_colour_on_the_row_the_keyboard_is_on() {
 }
 
 /// The quiet rule where the eye reads it: a notice wears the tool row's own
-/// mark and spends no other colour, and a surface the closed set does not name
-/// keeps the band a person's words are on.
+/// mark and spends no other colour, and somebody on a channel is a post under
+/// their name, not the band your words are on.
 #[test]
-fn a_notice_is_marked_and_everybody_else_keeps_the_bar() {
+fn a_notice_is_marked_and_somebody_else_posts() {
     let (mut ui, now) = scene();
     crate::theme::with(truecolor(), || {
         let painted = painted(120, 40, &solo(&folded(reported())), &mut ui, still(now));
@@ -120,13 +120,12 @@ fn a_notice_is_marked_and_everybody_else_keeps_the_bar() {
                 .any(|(text, style)| text == "cargo test --workspace"
                     && style.fg == crate::theme::foreground("code").unwrap().fg)
         );
-        let bar = painted.row("look at the deploy");
-        let width: usize = bar.iter().map(|(text, _)| text.width()).sum();
-        assert_eq!(width, 120, "a channel is somebody: {bar:#?}");
+        let post = painted.row("look at the deploy");
+        assert_eq!(post.first().map(|(text, _)| text.as_str()), Some("▎"));
         let ground = crate::theme::as_drawn(crate::theme::raised()).bg;
         assert!(
-            bar.iter().all(|(_, style)| style.bg == ground),
-            "and somebody's line is a band: {bar:#?}"
+            post.iter().all(|(_, style)| style.bg != ground),
+            "somebody's line is a post, not your band: {post:#?}"
         );
     });
 }

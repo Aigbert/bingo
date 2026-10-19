@@ -7,16 +7,33 @@ use bingo_sdk::{
 };
 
 pub fn owns(item: &Item, state: &SessionState) -> bool {
-    state.summary.driver != bingo_sdk::Driver::Log && item.headline().is_none() && prompt(item)
+    state.summary.driver != bingo_sdk::Driver::Log
+        && item.headline().is_none()
+        && prompt(item, state)
 }
 
-fn prompt(item: &Item) -> bool {
+fn prompt(item: &Item, state: &SessionState) -> bool {
     let ItemBody::User { origin, .. } = &item.body else {
         return false;
     };
+    if said::is_post(origin) {
+        return false;
+    }
     let voice = said::voice(origin);
     let correspondent = origin.principal.is_some() && voice != bingo_sdk::Voice::Aside;
-    correspondent || matches!(voice, bingo_sdk::Voice::Said | bingo_sdk::Voice::Note)
+    correspondent
+        || (state.summary.parent.is_some() && handed(origin))
+        || matches!(voice, bingo_sdk::Voice::Said | bingo_sdk::Voice::Note)
+}
+
+/// What the session that started this one tells it — the task it handed over,
+/// and anything it says after — which this session answers as you are answered.
+fn handed(origin: &bingo_sdk::Origin) -> bool {
+    origin.surface == bingo_collab::name::SURFACE
+        && origin
+            .principal
+            .as_deref()
+            .is_none_or(|name| bingo_collab::name::same(name, crate::seats::HOLDER))
 }
 
 pub fn first(item: &Item, rows: &Rows<'_>) -> bool {
@@ -40,7 +57,7 @@ pub fn draw(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
     let right = clock.lines.first().cloned().unwrap_or_default();
     let width = rows.width.saturating_sub(grid::TX + grid::RM).max(1);
     let prompt = text(item);
-    let mut body = prompt_lines(item, &prompt);
+    let mut body = prompt_lines(item, &prompt, rows);
     if let Some(line) = body.first_mut() {
         super::chips::prepend(item, line);
     }
@@ -101,26 +118,34 @@ fn note(item: &Item) -> bool {
         if origin.principal.is_none() && said::voice(origin) == bingo_sdk::Voice::Note)
 }
 
-fn prompt_lines(item: &Item, text: &str) -> Vec<Line<'static>> {
+fn prompt_lines(item: &Item, text: &str, rows: &Rows<'_>) -> Vec<Line<'static>> {
     let note = note(item);
     let ink = if note { theme::ash() } else { theme::text() };
     let mut lines: Vec<_> = text
         .split('\n')
         .map(|line| markdown::inline(line, ink))
         .collect();
-    if let ItemBody::User { origin, .. } = &item.body {
-        let label = if note {
-            Some("wake-up")
-        } else {
-            origin.principal.as_deref()
-        };
-        if let Some(label) = label {
-            lines[0]
-                .spans
-                .insert(0, Span::styled(format!("{label}  "), theme::glow()));
-        }
+    if let Some(label) = from(item, note, rows) {
+        lines[0]
+            .spans
+            .insert(0, Span::styled(format!("{label}  "), theme::glow()));
     }
     lines
+}
+
+/// Whose words these are, where they are not yours: a wake-up, the session
+/// that handed this one its task, or whoever signed them.
+fn from(item: &Item, note: bool, rows: &Rows<'_>) -> Option<String> {
+    let ItemBody::User { origin, .. } = &item.body else {
+        return None;
+    };
+    if note {
+        return Some("wake-up".into());
+    }
+    match &rows.state.summary.parent {
+        Some(parent) if handed(origin) => Some(rows.faces.called(&parent.session)),
+        _ => origin.principal.clone(),
+    }
 }
 
 pub struct Band {

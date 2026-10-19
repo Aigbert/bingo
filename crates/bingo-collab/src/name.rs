@@ -10,6 +10,10 @@ use bingo_sdk::{ErrorCode, KernelError};
 /// (ADR-0028 §1): no agent may take the name, so nothing else can mean it.
 pub const PARENT: &str = "parent";
 
+/// The surface one session's words to another come from; a person's say
+/// `tui` or `print`.
+pub const SURFACE: &str = "agent";
+
 /// Two names, as a room compares them: the same word in any case. Every reader
 /// of a name — the mention fold, the roster, the fan-out — comes through here.
 pub fn same(a: &str, b: &str) -> bool {

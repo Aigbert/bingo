@@ -317,6 +317,12 @@ pub const fn mix(from: Color, to: Color, t: f64) -> Color {
     };
     Color::Rgb(channel(r, x, t), channel(g, y, t), channel(b, z, t))
 }
+/// The coal under an ink that is not ember's: the ink a shade darker
+/// (`coalOf`).
+pub const fn shaded(color: Color) -> Color {
+    mix(color, Color::Rgb(0, 0, 0), 0.28)
+}
+
 const fn channel(a: u8, b: u8, t: f64) -> u8 {
     (a as f64 + (b as f64 - a as f64) * t + 0.5) as u8
 }
