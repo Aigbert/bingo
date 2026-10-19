@@ -390,15 +390,16 @@ mod tests {
             ticks.display()
         );
 
-        let out = tokio::time::timeout(
-            Duration::from_secs(5),
-            run(&command, Duration::from_millis(200), &watched(&cx)),
-        )
-        .await
-        .expect("the shell timeout did not finish")
-        .expect("the command ran");
+        // Long enough for the shell to start its grandchild on a loaded
+        // Windows runner, where Git Bash takes hundreds of milliseconds to fork.
+        let limit = Duration::from_secs(2);
+        let out =
+            tokio::time::timeout(Duration::from_secs(20), run(&command, limit, &watched(&cx)))
+                .await
+                .expect("the shell timeout did not finish")
+                .expect("the command ran");
 
-        assert_eq!(out.ended, Ended::Timeout { after_ms: 200 });
+        assert_eq!(out.ended, Ended::Timeout { after_ms: 2000 });
 
         // The grandchild was in the group, so it stopped writing with the shell.
         let after_kill = std::fs::metadata(&ticks).map(|m| m.len()).unwrap_or(0);
