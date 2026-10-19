@@ -37,6 +37,15 @@ pub fn lines(
     fold: Fold,
     rows: &Rows<'_>,
 ) -> crate::views::Drawing {
+    if let Some(headline) = item.headline() {
+        return super::notice::draw(
+            &headline,
+            item.started_at.as_millisecond(),
+            rows.width,
+            rows.now,
+        );
+    }
+
     if rows.state.summary.driver == Driver::Log {
         return post(item, place, rows).into();
     }
@@ -181,9 +190,6 @@ fn notice(
     // A blank line between the headline and the rest is a separator in the
     // text — a command's prompt puts one there — and under a `⎿` it would be
     // a row spent on nothing.
-    if head.starts_with(['✓', '×']) {
-        return super::notice::draw(head, item.started_at.as_millisecond(), rows.width, rows.now);
-    }
     let rest = rest.trim_start_matches('\n');
     let mut out = speaks(
         bullet_style(item.status, false),

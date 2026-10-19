@@ -22,6 +22,7 @@ pub mod session;
 pub mod settings;
 mod spec;
 pub mod turn;
+mod user;
 
 #[cfg(test)]
 pub(crate) mod test_support;

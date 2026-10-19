@@ -935,6 +935,7 @@ fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect>
 /// (`run::submit`). The loop also writes the line to the history file.
 fn own_line(text: String, delivery: Delivery) -> Effect {
     Effect::Submit(Input::Text {
+        headline: None,
         images: Vec::new(),
         text,
         origin: crate::origin(),
@@ -1105,6 +1106,7 @@ mod tests {
         assert_eq!(
             effects,
             vec![Effect::Submit(Input::Text {
+                headline: None,
                 text: "look at @shot.png".into(),
                 images: Vec::new(),
                 origin: crate::origin(),
@@ -1138,6 +1140,7 @@ mod tests {
         assert_eq!(
             effects,
             vec![Effect::Submit(Input::Text {
+                headline: None,
                 text: "see [image 1]".into(),
                 images: Vec::new(),
                 origin: crate::origin(),

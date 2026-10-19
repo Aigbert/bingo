@@ -68,17 +68,13 @@ async fn supervise(watch: Watch) {
     let pending = scan.last_look(&job.log).await;
     job.finished(state);
     jobs.publish(&host, &job.session).await;
+    let outcome = notify::outcome(&job, state).await;
     announce(
         &host,
         &job,
         &running.sink,
-        notify::finished(
-            &job,
-            state,
-            pending.as_ref(),
-            &notify::clock(),
-            &notify::outcome(&job, state).await,
-        ),
+        notify::finished(&job, state, pending.as_ref(), &notify::clock()),
+        Some(notify::headline(&job, state, &outcome)),
     )
     .await;
 }
@@ -102,7 +98,7 @@ async fn wait_out(
             () = tokio::time::sleep(SCAN) => {
                 if let Some(wake) = scan.look(&job.log).await {
                     let text = notify::matched(job, &wake, &notify::clock());
-                    announce(host, job, sink, text).await;
+                    announce(host, job, sink, text, None).await;
                 }
             }
         }
@@ -128,8 +124,14 @@ fn state_of(status: std::process::ExitStatus) -> State {
 }
 
 /// Wake the session that started the job, or leave the reason in its log.
-async fn announce(host: &HostHandle, job: &Job, sink: &Mutex<Sink>, text: String) {
-    let Err(error) = notify::wake(host, &job.session, text).await else {
+async fn announce(
+    host: &HostHandle,
+    job: &Job,
+    sink: &Mutex<Sink>,
+    text: String,
+    headline: Option<bingo_sdk::Headline>,
+) {
+    let Err(error) = notify::wake(host, &job.session, text, headline).await else {
         return;
     };
     let note = format!(

@@ -3258,6 +3258,16 @@
               "$ref": "#/$defs/Delivery",
               "description": "Whether a running turn may be steered with it (ADR-0008 §2,\namended M68). `Wake` is the line every client has always sent, so\nit is the default and nothing is written for it."
             },
+            "headline": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Headline"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "kind": {
               "type": "string",
               "const": "text"
@@ -3313,6 +3323,25 @@
         }
       ],
       "description": "How a line reaches a session's queue: a peer's message (ADR-0010 §1) and\na person's own line are the same question, so they are the same word."
+    },
+    "Headline": {
+      "type": "object",
+      "properties": {
+        "tone": {
+          "$ref": "#/$defs/Tone"
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Each part is one line of inline Markdown."
+        }
+      },
+      "required": [
+        "tone",
+        "parts"
+      ]
     },
     "Extend": {
       "type": "object",

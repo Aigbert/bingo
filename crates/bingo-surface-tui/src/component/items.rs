@@ -5,6 +5,7 @@ use serde_json::Value;
 pub fn props(item: &Item, expanded: bool) -> Option<Props> {
     match &item.body {
         ItemBody::User { parts, origin } => Some(Props::UserMessage(UserMessageProps {
+            headline: item.headline(),
             text: parts
                 .iter()
                 .filter_map(|part| part.as_text())

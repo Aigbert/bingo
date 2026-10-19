@@ -330,6 +330,7 @@ async fn a_submitted_image_reaches_the_kernel_beside_the_text() {
     let mut wire = Wire::opened(host).await;
     let image = Image::from_bytes("image/png", b"a tiny picture").expect("a small image");
     let input = Input::Text {
+        headline: None,
         text: "look".into(),
         images: vec![image.clone()],
         origin: Origin::surface("test"),
@@ -351,6 +352,7 @@ async fn a_submitted_image_reaches_the_kernel_beside_the_text() {
     assert_eq!(
         submits[0].1,
         Input::Text {
+            headline: None,
             text: "look".into(),
             images: vec![image],
             origin: Origin::surface("test"),

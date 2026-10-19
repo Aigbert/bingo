@@ -180,6 +180,7 @@ async fn a_picture_warning_keeps_the_picture_and_the_small_switch_is_instant() {
     client.handle.submit(
         IntentId::mint(),
         Input::Text {
+            headline: None,
             text: "look".into(),
             delivery: Delivery::Wake,
             images: vec![Image {

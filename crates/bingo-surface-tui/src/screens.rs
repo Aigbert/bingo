@@ -472,9 +472,20 @@ fn an_interrupted_turn() {
 }
 
 /// What a background job says when it ends, first line first.
-const JOB: &str = "✓ `cargo test --workspace` finished in the background · 412 passed\n\
-                   Background job ab12cd34 exited with code 0 after 2m 4s.\n\
+const JOB: &str = "Background job ab12cd34 exited with code 0 after 2m 4s.\n\
                    `BashOutput` with id \"ab12cd34\" reads what it wrote.";
+
+fn job_notice(id: &str, command: &str, text: &str) -> bingo_sdk::Item {
+    let mut item = delivered(id, "bash", None, text);
+    item.set_headline(bingo_sdk::Headline {
+        tone: bingo_sdk::Tone::Good,
+        parts: vec![
+            format!("`{command}` finished in the background"),
+            "412 passed".into(),
+        ],
+    });
+    item
+}
 
 /// The three sides of one rule in one transcript: a job reporting in and an
 /// agent answering are the machinery, and a person writing from a channel is
@@ -486,7 +497,7 @@ fn reported() -> Vec<bingo_sdk::Frame> {
             2,
             assistant("itm_2", "Started. I will say.", ItemStatus::Completed),
         ),
-        item(3, delivered("itm_3", "bash", None, JOB)),
+        item(3, job_notice("itm_3", "cargo test --workspace", JOB)),
         item(
             4,
             delivered("itm_4", "agent", Some("reviewer"), "Two nits, else fine."),

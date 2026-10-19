@@ -543,6 +543,7 @@ mod tests {
     fn only_the_persons_own_line_may_run_a_shell_command() {
         let from = |origin: Origin| {
             may_run_shell(&Input::Text {
+                headline: None,
                 text: "!ls".into(),
                 images: Vec::new(),
                 origin,

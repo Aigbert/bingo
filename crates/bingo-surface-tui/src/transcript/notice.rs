@@ -8,24 +8,21 @@ use crate::{
 use bingo_sdk::view::TextMotion;
 use ratatui::text::{Line, Span};
 
-pub(super) fn draw(head: &str, at: i64, width: usize, now: Now) -> Drawing {
+pub(super) fn draw(head: &bingo_sdk::Headline, at: i64, width: usize, now: Now) -> Drawing {
     let motion = TextMotion::Fade {
         from: "glow".into(),
         at_ms: at,
         ms: 400,
         curve: None,
     };
-    let mut label = label(head);
+    let mut label = Line::from(crate::tone::parts(
+        &head.parts,
+        head.tone,
+        true,
+        Some((motion.clone(), now)),
+    ));
     label.spans.insert(0, Span::styled(" ", theme::ash()));
     label.spans.push(Span::styled(" ", theme::ash()));
-    for span in &mut label.spans {
-        let ink = ["good", "bad", "code", "faint", "muted"]
-            .into_iter()
-            .find(|name| theme::foreground(name).is_some_and(|style| style.fg == span.style.fg))
-            .and_then(|name| theme::palette().named(name))
-            .unwrap_or(theme::palette().fg());
-        span.style = views::motion::style(span.style, ink, Some(&motion), Some(now));
-    }
     let faint = theme::foreground("faint").unwrap_or_default();
     let thin = theme::glyphs::get("thin");
     let mut line = Line::from(vec![
@@ -41,32 +38,6 @@ pub(super) fn draw(head: &str, at: i64, width: usize, now: Now) -> Drawing {
     }
 }
 
-fn label(head: &str) -> Line<'static> {
-    let mark = head
-        .strip_prefix("✓ ")
-        .map(|text| (text, theme::glyphs::get("ok"), theme::good()))
-        .or_else(|| {
-            head.strip_prefix("× ")
-                .map(|text| (text, theme::glyphs::get("times"), theme::bad()))
-        });
-    let (text, mark, ink) = mark.unwrap_or((head, "", theme::ash()));
-    let mut line = Line::default();
-    for (index, part) in text.split(" · ").enumerate() {
-        if index > 0 {
-            line.spans.push(Span::styled(
-                theme::glyphs::get("sep"),
-                theme::foreground("faint").unwrap_or_default(),
-            ));
-        }
-        line.spans
-            .extend(crate::markdown::inline(part, theme::ash()).spans);
-    }
-    if !mark.is_empty() {
-        line.spans.insert(0, Span::styled(format!("{mark} "), ink));
-    }
-    line
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -76,7 +47,13 @@ mod tests {
     fn a_notice_has_a_divider_and_its_arrival_keeps_a_deadline_without_room() {
         theme::with(crate::painted::truecolor(), || {
             let now = scene().1;
-            let text = "✓ `cargo test` finished in the background · 2 passed";
+            let text = &bingo_sdk::Headline {
+                tone: bingo_sdk::Tone::Good,
+                parts: vec![
+                    "`cargo test` finished in the background".into(),
+                    "2 passed".into(),
+                ],
+            };
             let settled = draw(text, now.wall.as_millisecond(), 80, later(now, 400));
             assert!(
                 settled.lines[0]

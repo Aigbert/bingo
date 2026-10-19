@@ -56,12 +56,16 @@ impl Run {
         };
         match input {
             Input::Text {
+                headline: None,
                 text,
                 images,
                 origin,
                 delivery,
             } => self.submit_text(handle, text, images, origin, delivery),
-            input @ Input::Action { .. } => {
+            input @ (Input::Action { .. }
+            | Input::Text {
+                headline: Some(_), ..
+            }) => {
                 self.send_line(handle, input, Submission::Ordinary);
             }
         }
@@ -172,6 +176,7 @@ impl Run {
         self.send_line(
             handle,
             Input::Text {
+                headline: None,
                 text,
                 images,
                 origin,

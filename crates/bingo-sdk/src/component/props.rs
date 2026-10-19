@@ -18,6 +18,8 @@ props!(QuestionProps {
     metadata_source: Option<String>,
 });
 props!(UserMessageProps {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    headline: Option<crate::Headline>,
     text: String,
     origin: crate::Origin,
     is_expanded: bool

@@ -13,6 +13,7 @@ use crate::{theme, views};
 
 mod inlines;
 mod wrapping;
+pub(crate) use inlines::code as inline_code;
 pub use inlines::line as inline;
 pub(crate) mod mentions;
 mod spaced;

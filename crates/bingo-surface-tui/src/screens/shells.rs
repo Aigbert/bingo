@@ -74,12 +74,11 @@ fn ran() -> bingo_sdk::SessionState {
         ),
         item(
             6,
-            delivered(
+            super::job_notice(
                 "itm_4",
-                "bash",
-                None,
+                COMMAND,
                 &format!(
-                    "✓ `{COMMAND}` finished in the background · 412 passed\n\
+                    "Background job exited with code 0.\n\
                      `BashOutput` with id \"{ID}\" reads what it wrote."
                 ),
             ),

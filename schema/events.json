@@ -1907,6 +1907,16 @@
                 "description": "Whether a running turn may be steered with it (ADR-0008 §2,\namended M68). `Wake` is the line every client has always sent, so\nit is the default and nothing is written for it.",
                 "$ref": "#/$defs/Delivery"
               },
+              "headline": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Headline"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "kind": {
                 "type": "string",
                 "const": "text"
@@ -2066,6 +2076,43 @@
               }
             ]
           },
+          "Headline": {
+            "type": "object",
+            "properties": {
+              "tone": {
+                "$ref": "#/$defs/Tone"
+              },
+              "parts": {
+                "description": "Each part is one line of inline Markdown.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "tone",
+              "parts"
+            ]
+          },
+          "Tone": {
+            "description": "The one styling hook a plugin has; the surface owns the colour.",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "neutral",
+                  "good",
+                  "bad"
+                ]
+              },
+              {
+                "description": "Wants a person: a surface makes it move.",
+                "type": "string",
+                "const": "attention"
+              }
+            ]
+          },
           "Action": {
             "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
             "type": "object",
@@ -2162,6 +2209,16 @@
                   "delivery": {
                     "description": "Whether a running turn may be steered with it (ADR-0008 §2,\namended M68). `Wake` is the line every client has always sent, so\nit is the default and nothing is written for it.",
                     "$ref": "#/$defs/Delivery"
+                  },
+                  "headline": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Headline"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "kind": {
                     "type": "string",
@@ -2319,6 +2376,43 @@
                 "description": "It waits in the queue for whatever opens the next turn.",
                 "type": "string",
                 "const": "hold"
+              }
+            ]
+          },
+          "Headline": {
+            "type": "object",
+            "properties": {
+              "tone": {
+                "$ref": "#/$defs/Tone"
+              },
+              "parts": {
+                "description": "Each part is one line of inline Markdown.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "tone",
+              "parts"
+            ]
+          },
+          "Tone": {
+            "description": "The one styling hook a plugin has; the surface owns the colour.",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "neutral",
+                  "good",
+                  "bad"
+                ]
+              },
+              {
+                "description": "Wants a person: a surface makes it move.",
+                "type": "string",
+                "const": "attention"
               }
             ]
           },
@@ -10232,6 +10326,16 @@
                     "description": "Whether a running turn may be steered with it (ADR-0008 §2,\namended M68). `Wake` is the line every client has always sent, so\nit is the default and nothing is written for it.",
                     "$ref": "#/$defs/Delivery"
                   },
+                  "headline": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/$defs/Headline"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "kind": {
                     "type": "string",
                     "const": "text"
@@ -10391,6 +10495,43 @@
               }
             ]
           },
+          "Headline": {
+            "type": "object",
+            "properties": {
+              "tone": {
+                "$ref": "#/$defs/Tone"
+              },
+              "parts": {
+                "description": "Each part is one line of inline Markdown.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "tone",
+              "parts"
+            ]
+          },
+          "Tone": {
+            "description": "The one styling hook a plugin has; the surface owns the colour.",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "neutral",
+                  "good",
+                  "bad"
+                ]
+              },
+              {
+                "description": "Wants a person: a surface makes it move.",
+                "type": "string",
+                "const": "attention"
+              }
+            ]
+          },
           "Action": {
             "description": "A typed action a client asks for (GUI buttons, hosts); the kernel dispatches it to a command.",
             "type": "object",
@@ -10452,6 +10593,16 @@
                 "description": "Whether a running turn may be steered with it (ADR-0008 §2,\namended M68). `Wake` is the line every client has always sent, so\nit is the default and nothing is written for it.",
                 "$ref": "#/$defs/Delivery"
               },
+              "headline": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Headline"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "kind": {
                 "type": "string",
                 "const": "text"
@@ -10608,6 +10759,43 @@
                 "description": "It waits in the queue for whatever opens the next turn.",
                 "type": "string",
                 "const": "hold"
+              }
+            ]
+          },
+          "Headline": {
+            "type": "object",
+            "properties": {
+              "tone": {
+                "$ref": "#/$defs/Tone"
+              },
+              "parts": {
+                "description": "Each part is one line of inline Markdown.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "tone",
+              "parts"
+            ]
+          },
+          "Tone": {
+            "description": "The one styling hook a plugin has; the surface owns the colour.",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "neutral",
+                  "good",
+                  "bad"
+                ]
+              },
+              {
+                "description": "Wants a person: a surface makes it move.",
+                "type": "string",
+                "const": "attention"
               }
             ]
           },
@@ -10653,6 +10841,16 @@
                 "description": "Whether a running turn may be steered with it (ADR-0008 §2,\namended M68). `Wake` is the line every client has always sent, so\nit is the default and nothing is written for it.",
                 "$ref": "#/$defs/Delivery"
               },
+              "headline": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/Headline"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
               "kind": {
                 "type": "string",
                 "const": "text"
@@ -10809,6 +11007,43 @@
                 "description": "It waits in the queue for whatever opens the next turn.",
                 "type": "string",
                 "const": "hold"
+              }
+            ]
+          },
+          "Headline": {
+            "type": "object",
+            "properties": {
+              "tone": {
+                "$ref": "#/$defs/Tone"
+              },
+              "parts": {
+                "description": "Each part is one line of inline Markdown.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "tone",
+              "parts"
+            ]
+          },
+          "Tone": {
+            "description": "The one styling hook a plugin has; the surface owns the colour.",
+            "oneOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "neutral",
+                  "good",
+                  "bad"
+                ]
+              },
+              {
+                "description": "Wants a person: a surface makes it move.",
+                "type": "string",
+                "const": "attention"
               }
             ]
           },

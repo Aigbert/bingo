@@ -192,6 +192,7 @@ mod tests {
         for spelling in ["!touch marker", "/plugins trust probe full"] {
             for delivery in [Delivery::Wake, Delivery::Hold] {
                 let input = Input::Text {
+                    headline: None,
                     text: spelling.into(),
                     images: Vec::new(),
                     origin: Origin::surface("rpc"),
@@ -229,6 +230,7 @@ mod tests {
         (
             IntentId::mint(),
             Pending::Prose(Input::Text {
+                headline: None,
                 text: t.into(),
                 images: Vec::new(),
                 origin: Origin::surface("rpc"),
@@ -284,6 +286,7 @@ mod tests {
     fn an_image_only_ask_previews_as_an_image() {
         let image = Image::from_bytes("image/png", b"abc").expect("a small image");
         let input = Input::Text {
+            headline: None,
             text: String::new(),
             images: vec![image],
             origin: Origin::surface("rpc"),

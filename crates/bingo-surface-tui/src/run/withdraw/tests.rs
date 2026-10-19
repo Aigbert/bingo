@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 fn input(text: &str, images: Vec<bingo_sdk::Image>) -> Input {
     Input::Text {
+        headline: None,
         text: text.into(),
         images,
         origin: crate::origin(),

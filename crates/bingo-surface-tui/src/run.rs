@@ -1824,6 +1824,7 @@ mod tests {
             Reply::Withdrawn(
                 IntentId::from_raw("req_1"),
                 Box::new(Ok(Input::Text {
+                    headline: None,
                     text: "look at [image 1]".into(),
                     images: vec![image],
                     origin: bingo_sdk::Origin::surface(SURFACE_ID),
@@ -2944,3 +2945,6 @@ mod schedule_scene_tests;
 #[cfg(test)]
 #[path = "run/tests/schedule.rs"]
 mod schedule_tests;
+
+#[cfg(test)]
+mod headline_tests;

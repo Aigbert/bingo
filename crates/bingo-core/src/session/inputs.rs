@@ -175,20 +175,12 @@ impl Actor {
     /// A `Log` session's input (ADR-0011 §1): a user item in the journal at
     /// once, acknowledged as applied, and nothing answers it.
     async fn log_input(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
-        let Input::Text {
-            text,
-            images,
-            origin,
-            ..
-        } = input
-        else {
+        if !matches!(input, Input::Text { .. }) {
             return self
                 .reject(intent, ErrorCode::InvalidInput, "a log records text")
                 .await;
-        };
-        let id = self
-            .journal_prose(None, intent.clone(), text, images, origin)
-            .await?;
+        }
+        let id = self.journal_prose(None, intent.clone(), input).await?;
         self.applied(intent, json!({ "item": id })).await?;
         Ok(())
     }
@@ -613,18 +605,12 @@ impl Actor {
         let mut ids = Vec::new();
         let mut acks = Vec::new();
         for (intent, input) in inputs {
-            let Input::Text {
-                text,
-                images,
-                origin,
-                ..
-            } = input
-            else {
+            if !matches!(input, Input::Text { .. }) {
                 continue;
-            };
+            }
             acks.push(intent.clone());
             ids.push(
-                self.journal_prose(Some(turn.clone()), intent, text, images, origin)
+                self.journal_prose(Some(turn.clone()), intent, input)
                     .await?,
             );
         }
@@ -638,15 +624,12 @@ impl Actor {
         &mut self,
         turn: Option<TurnId>,
         intent: IntentId,
-        text: String,
-        images: Vec<Image>,
-        origin: Origin,
+        input: Input,
     ) -> Result<ItemId, KernelError> {
-        let body = ItemBody::User {
-            parts: user_parts(text, images),
-            origin,
-        };
-        let item = self.fresh(turn, Some(intent.clone()), body);
+        let item = crate::user::item(input, |body| self.fresh(turn, Some(intent.clone()), body))
+            .ok_or_else(|| {
+                KernelError::new(ErrorCode::InvalidInput, "a user item requires text")
+            })?;
         let id = item.id.clone();
         self.publish(Event::ItemCompleted { item }, Some(intent))
             .await?;
@@ -674,21 +657,14 @@ impl Actor {
 
 /// The delivery the caller asked for, written into the line itself: from here
 /// on one place says whether a barrier may steer with it (M68).
-fn stamped(input: Input, delivery: Delivery) -> Input {
-    match input {
-        Input::Text {
-            text,
-            images,
-            origin,
-            ..
-        } => Input::Text {
-            text,
-            images,
-            origin,
-            delivery,
-        },
-        other => other,
+fn stamped(mut input: Input, delivery: Delivery) -> Input {
+    if let Input::Text {
+        delivery: stamped, ..
+    } = &mut input
+    {
+        *stamped = delivery;
     }
+    input
 }
 
 /// The line is not in the queue: a turn took it, or it was never there.
@@ -697,19 +673,6 @@ fn gone(intent: &IntentId) -> KernelError {
         ErrorCode::NotFound,
         format!("no line of {intent} is waiting in this queue"),
     )
-}
-
-/// The parts a person's ask becomes (ADR-0040 §3): the words, when there are
-/// any, then the pictures in the order they were sent — an image-only ask
-/// carries no empty text part. The turn's barrier records a steer through
-/// the same function, so a picture steered in mid-turn is not dropped.
-pub(crate) fn user_parts(text: String, images: Vec<Image>) -> Vec<ContentPart> {
-    let mut parts = Vec::with_capacity(images.len() + 1);
-    if !text.is_empty() {
-        parts.push(ContentPart::text(text));
-    }
-    parts.extend(images.into_iter().map(ContentPart::Image));
-    parts
 }
 
 /// What the kernel accepts as prose: words, a picture, or both — an ask with

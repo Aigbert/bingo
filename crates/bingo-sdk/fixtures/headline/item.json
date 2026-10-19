@@ -1,0 +1,1 @@
+{"id":"i","round":0,"status":"completed","startedAt":"2026-10-19T00:00:00Z","body":{"kind":"user","parts":[{"type":"text","text":"model words"}],"origin":{"surface":"bash"}},"meta":{"headline":{"tone":"good","parts":["`echo ok` finished in the background","exit 0"]}}}

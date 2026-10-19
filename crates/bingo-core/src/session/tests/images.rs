@@ -54,6 +54,7 @@ async fn an_image_with_no_words_journals_as_one_image_part() {
     mailbox.submit(
         IntentId::mint(),
         Input::Text {
+            headline: None,
             text: String::new(),
             images: vec![image("image/png", b"abc")],
             origin: Origin::surface("tui"),
@@ -73,6 +74,7 @@ async fn text_and_two_images_journal_in_order() {
     mailbox.submit(
         IntentId::mint(),
         Input::Text {
+            headline: None,
             text: "look at these".into(),
             images: vec![image("image/png", b"one"), image("image/gif", b"two")],
             origin: Origin::surface("tui"),
@@ -101,6 +103,7 @@ async fn an_unknown_media_type_is_invalid_input() {
     mailbox.submit(
         IntentId::mint(),
         Input::Text {
+            headline: None,
             text: String::new(),
             images: vec![bogus],
             origin: Origin::surface("tui"),
@@ -123,6 +126,7 @@ async fn an_oversize_image_is_invalid_input() {
     mailbox.submit(
         IntentId::mint(),
         Input::Text {
+            headline: None,
             text: String::new(),
             images: vec![oversized_image()],
             origin: Origin::surface("tui"),
@@ -136,4 +140,20 @@ async fn an_oversize_image_is_invalid_input() {
             if error.code == ErrorCode::InvalidInput && error.message.contains("too large")
     ));
     assert!(state.transcript.items().is_empty());
+}
+
+#[tokio::test]
+async fn a_logged_input_keeps_its_headline() {
+    let mailbox = log_session();
+    let (mut state, mut events) = mailbox.attach().await.unwrap();
+    let headline = Headline {
+        tone: Tone::Good,
+        parts: vec!["person's words".into()],
+    };
+    mailbox.submit(
+        IntentId::mint(),
+        Input::text("model words", Origin::surface("test")).with_headline(headline.clone()),
+    );
+    frames_until(&mut events, &mut state, acked).await;
+    assert_eq!(state.transcript.items()[0].headline(), Some(headline));
 }

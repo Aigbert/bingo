@@ -260,6 +260,7 @@ impl<'a> Attached<'a> {
         self.handle.submit(
             intent,
             Input::Text {
+                headline: None,
                 text,
                 images,
                 origin: Origin::surface(SURFACE_ID),

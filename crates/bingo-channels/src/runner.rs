@@ -496,6 +496,7 @@ impl Runner {
             None => {
                 let intent = IntentId::mint();
                 let input = Input::Text {
+                    headline: None,
                     text,
                     images,
                     origin: incoming_origin(principal, &self.key),

@@ -213,6 +213,8 @@ pub enum Input {
         /// it is the default and nothing is written for it.
         #[serde(default, skip_serializing_if = "Delivery::is_wake")]
         delivery: Delivery,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        headline: Option<crate::Headline>,
     },
     Action {
         action: Action,
@@ -238,7 +240,15 @@ impl Input {
             images: Vec::new(),
             origin,
             delivery: Delivery::Wake,
+            headline: None,
         }
+    }
+
+    pub fn with_headline(mut self, value: crate::Headline) -> Self {
+        if let Self::Text { headline, .. } = &mut self {
+            *headline = Some(value);
+        }
+        self
     }
 
     /// Whether the line asked to wait for the running turn to end rather than
@@ -916,6 +926,7 @@ mod tests {
     #[test]
     fn a_held_line_carries_the_word_and_answers_to_it() {
         let held = Input::Text {
+            headline: None,
             text: "and then the docs".into(),
             images: Vec::new(),
             origin: Origin::surface("tui"),

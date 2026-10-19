@@ -60,6 +60,7 @@ async fn attached(host: &Host) -> Attachment {
 /// A line as a surface sends it, with the word it asked to be delivered by.
 fn line(text: &str, surface: &str, delivery: Delivery) -> Input {
     Input::Text {
+        headline: None,
         text: text.into(),
         images: Vec::new(),
         origin: Origin::surface(surface),
@@ -219,4 +220,50 @@ async fn a_queued_line_comes_back_out_to_the_surface_that_sent_it() {
         Some(ErrorCode::NotFound),
         "once out, the person has it and the queue does not"
     );
+}
+
+#[tokio::test]
+async fn opening_and_queued_inputs_keep_their_headlines() {
+    let (host, _) = gated_host(vec![
+        Script::Events(tool_call("Echo", json!({"v":1}))),
+        Script::Events(text("first")),
+        Script::Events(text("second")),
+    ])
+    .await;
+    let mut a = attached(&host).await;
+    let headline = Headline {
+        tone: Tone::Good,
+        parts: vec!["person's words".into()],
+    };
+    a.handle.submit(
+        IntentId::mint(),
+        Input::text("go", Origin::surface("test")).with_headline(headline.clone()),
+    );
+    let gate = opened(&mut a).await;
+    a.handle.submit(
+        IntentId::mint(),
+        line("later", "test", Delivery::Hold).with_headline(headline.clone()),
+    );
+    queued(&mut a, 1).await;
+    a.handle.answer(
+        IntentId::mint(),
+        gate,
+        Answer::AllowOnce,
+        Activation::Pointer,
+    );
+    turns_completed(&mut a, 2).await;
+    let state = host.read(&a.session).await.unwrap();
+    let items: Vec<_> = state
+        .transcript
+        .items()
+        .iter()
+        .filter(|item| matches!(item.body, ItemBody::User { .. }))
+        .collect();
+    assert_eq!(items.len(), 2);
+    assert!(
+        items
+            .iter()
+            .all(|item| item.headline() == Some(headline.clone()))
+    );
+    host.shutdown().await;
 }

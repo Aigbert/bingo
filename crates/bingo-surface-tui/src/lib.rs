@@ -121,6 +121,7 @@ mod theme;
 /// transcript draws as one thought.
 mod thoughts;
 mod toast;
+mod tone;
 mod tool_rows;
 mod transcript;
 mod tree;

@@ -421,8 +421,19 @@ pub struct Item {
 /// true of a handful of items and false of every other, and `meta` is where an
 /// item's occasional facts already live.
 const EXTERNAL: &str = "external";
+// Like external, this is an occasional item fact, not a field on every item.
+const HEADLINE: &str = "headline";
 
 impl Item {
+    pub fn headline(&self) -> Option<crate::Headline> {
+        serde_json::from_value(self.meta.get(HEADLINE)?.clone()).ok()
+    }
+
+    pub fn set_headline(&mut self, headline: crate::Headline) {
+        self.meta
+            .insert(HEADLINE.into(), serde_json::json!(headline));
+    }
+
     pub fn is_terminal(&self) -> bool {
         self.status.is_terminal()
     }

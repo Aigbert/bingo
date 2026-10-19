@@ -242,13 +242,7 @@ pub fn clock() -> String {
 /// that only matched in its last breath is carried here rather than sent on
 /// its own, and so is a tally a quiet window was still holding: one ending,
 /// one message.
-pub fn finished(
-    job: &Job,
-    state: State,
-    pending: Option<&Notice>,
-    at: &str,
-    outcome: &str,
-) -> String {
+pub fn finished(job: &Job, state: State, pending: Option<&Notice>, at: &str) -> String {
     let matched = pending
         .map(|notice| {
             format!(
@@ -258,15 +252,8 @@ pub fn finished(
             )
         })
         .unwrap_or_default();
-    let mark = if state == (State::Exited { code: 0 }) {
-        "✓"
-    } else {
-        "×"
-    };
-    let command = head_for_notice(&job.command);
     format!(
-        "{mark} `{command}` finished in the background · {}\nBackground job {} {} at {at}, after {}.{matched}\n`BashOutput` with id \"{}\" reads what it wrote; its log is {}.",
-        outcome,
+        "Background job {} {} at {at}, after {}.{matched}\n`BashOutput` with id \"{}\" reads what it wrote; its log is {}.",
         job.named(),
         state.said(),
         job.age(),
@@ -291,10 +278,6 @@ pub async fn outcome(job: &Job, state: State) -> String {
         bingo_sdk::Upshot::Words { text, .. } => text,
         _ => state.said(),
     }
-}
-
-fn head_for_notice(command: &str) -> String {
-    crate::jobs::head(command).replace('`', "")
 }
 
 /// What a job says when its output answers a condition. It says the job is
@@ -326,17 +309,21 @@ pub fn matched(job: &Job, wake: &Wake, at: &str) -> String {
 /// Open a turn on the session that started the job. A session that has gone
 /// takes the message nowhere, and the error is the caller's to record — a
 /// reader task must never fail loudly over one.
-pub async fn wake(host: &HostHandle, to: &SessionId, text: String) -> Result<(), KernelError> {
-    host.deliver(
-        to,
-        IntentId::mint(),
-        Input::text(
-            text,
-            Origin::surface(SURFACE).voiced(bingo_sdk::Voice::Quiet),
-        ),
-        Delivery::Wake,
-    )
-    .await
+pub async fn wake(
+    host: &HostHandle,
+    to: &SessionId,
+    text: String,
+    headline: Option<bingo_sdk::Headline>,
+) -> Result<(), KernelError> {
+    let mut input = Input::text(
+        text,
+        Origin::surface(SURFACE).voiced(bingo_sdk::Voice::Quiet),
+    );
+    if let Some(headline) = headline {
+        input = input.with_headline(headline);
+    }
+    host.deliver(to, IntentId::mint(), input, Delivery::Wake)
+        .await
 }
 
 #[cfg(test)]
@@ -349,7 +336,7 @@ mod tests {
         let host = bingo_sdk::testing::TestHost::default();
         let session = SessionId::from_raw("ses_test");
         host.on_deliver(|_, _, _, _| async { Ok(()) });
-        wake(&host.handle(), &session, "finished".into())
+        wake(&host.handle(), &session, "finished".into(), None)
             .await
             .unwrap();
         assert!(host.calls().iter().any(|call| matches!(call,
@@ -533,10 +520,7 @@ mod tests {
     #[test]
     fn a_completion_names_the_job_its_state_and_where_to_read_it() {
         let job = job();
-        let text = finished(&job, State::Exited { code: 1 }, None, "16:33:51", "exit 1");
-        assert!(
-            text.starts_with("× `cargo test --workspace` finished in the background · exit 1\n")
-        );
+        let text = finished(&job, State::Exited { code: 1 }, None, "16:33:51");
         assert!(text.contains(&job.id), "{text}");
         assert!(text.contains("at 16:33:51"), "{text}");
         assert!(text.contains("cargo test --workspace"), "{text}");
@@ -554,7 +538,6 @@ mod tests {
             State::Killed,
             Some(&Notice::of("error[E0308]\n")),
             "now",
-            "stopped",
         );
         assert!(text.contains("It matched: error[E0308]\n"), "{text}");
         assert!(text.contains("killed"), "{text}");
@@ -569,13 +552,7 @@ mod tests {
             line: "error[E0433]: no `Foo`\n".into(),
             more: 12,
         };
-        let text = finished(
-            &job(),
-            State::Exited { code: 101 },
-            Some(&pending),
-            "now",
-            "stopped",
-        );
+        let text = finished(&job(), State::Exited { code: 101 }, Some(&pending), "now");
         assert!(
             text.contains("It matched: error[E0433]: no `Foo`"),
             "{text}"
@@ -646,5 +623,63 @@ mod tests {
         assert_eq!(said(Duration::from_secs(1)), "1 s");
         assert_eq!(said(Duration::from_millis(16_400)), "16 s");
         assert_eq!(said(Duration::from_secs(125)), "2m 5s");
+    }
+}
+
+pub fn tone(state: State) -> bingo_sdk::Tone {
+    match state {
+        State::Exited { code: 0 } => bingo_sdk::Tone::Good,
+        State::Exited { .. } => bingo_sdk::Tone::Bad,
+        State::Killed | State::Running => bingo_sdk::Tone::Neutral,
+    }
+}
+
+pub fn headline(job: &Job, state: State, outcome: &str) -> bingo_sdk::Headline {
+    bingo_sdk::Headline {
+        tone: tone(state),
+        parts: vec![
+            format!(
+                "{} finished in the background",
+                code(&crate::jobs::head(&job.command))
+            ),
+            plain(outcome),
+        ],
+    }
+}
+
+fn code(text: &str) -> String {
+    let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
+    let fence = "`".repeat(longest + 1);
+    let pad = if text.starts_with('`')
+        || text.ends_with('`')
+        || (text.starts_with(' ') && text.ends_with(' '))
+    {
+        " "
+    } else {
+        ""
+    };
+    format!("{fence}{pad}{text}{pad}{fence}")
+}
+
+fn plain(text: &str) -> String {
+    let mut out = String::new();
+    for ch in text.chars() {
+        if ch.is_ascii_punctuation() {
+            out.push('\\');
+        }
+        out.push(ch);
+    }
+    out
+}
+
+#[cfg(test)]
+mod headline_tests {
+    use super::*;
+    #[test]
+    fn markdown_parts_keep_backticks_and_outcome_punctuation() {
+        assert_eq!(code("echo `date`"), "`` echo `date` ``");
+        assert_eq!(code("`date` now"), "`` `date` now ``");
+        assert_eq!(code(" padded "), "`  padded  `");
+        assert_eq!(plain("2 *ok*_ [done]"), r"2 \*ok\*\_ \[done\]");
     }
 }

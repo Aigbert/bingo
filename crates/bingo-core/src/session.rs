@@ -39,7 +39,6 @@ pub use commands::Services;
 pub(crate) use commands::is_shell;
 pub use drawn::Drawings;
 pub(crate) use drawn::Drawn;
-pub(crate) use inputs::user_parts;
 pub use interactions::INTERACTION_GUARD_MS;
 use interactions::Pending;
 pub use mailbox::Mailbox;

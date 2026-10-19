@@ -462,6 +462,12 @@ export type Fork = {
   [key: string]: unknown;
 };
 export type ForkLink = { "session": SessionId; "turn"?: (TurnId | null); [key: string]: unknown; };
+export type Headline = {
+  /** Each part is one line of inline Markdown. */
+  "parts": Array<string>;
+  "tone": Tone;
+  [key: string]: unknown;
+};
 export type HistoryChunk = {
   "generation": number;
   "items": Array<Item>;
@@ -518,6 +524,7 @@ export type Input = ({
    * it is the default and nothing is written for it.
    */
   "delivery"?: Delivery;
+  "headline"?: (Headline | null);
   /**
    * The pictures the ask carries, in the order they reach the journal
    * (ADR-0040): exactly as they will be journaled, because a surface

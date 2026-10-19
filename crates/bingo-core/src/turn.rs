@@ -712,17 +712,14 @@ impl Turn<'_> {
     async fn barrier(&mut self) -> Option<()> {
         let steering = self.racing(self.host.absorb()).await?;
         for (_intent, input) in steering {
-            if let Input::Text {
-                text,
-                images,
-                origin,
-                ..
-            } = input
+            if let Some(item) =
+                crate::user::item(input, |body| mint(&self.id, self.round, body, ItemStatus::Completed))
             {
-                self.record(ItemBody::User {
-                    parts: crate::session::user_parts(text, images),
-                    origin,
-                });
+                emit_and_fold(
+                    &mut self.transcript,
+                    self.host,
+                    Event::ItemCompleted { item },
+                );
             }
         }
         let usage = self.measure(&self.cfg.system, &ContextView::model_view(&self.transcript));

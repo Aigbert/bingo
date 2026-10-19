@@ -255,7 +255,6 @@ fn every_token_is_spent_where_the_design_says() {
             &[
                 "activity.rs",
                 "transcript.rs",
-                "transcript/notice.rs",
                 "views/badge.rs",
             ],
         ),
@@ -264,7 +263,6 @@ fn every_token_is_spent_where_the_design_says() {
             &[
                 "activity.rs",
                 "transcript.rs",
-                "transcript/notice.rs",
                 "transcript/ran.rs",
                 "transcript/steps.rs",
                 "views/badge.rs",

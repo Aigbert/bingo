@@ -418,6 +418,12 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
  * a person's own line are the same question, so they are the same word.
  */
 export type Delivery = ("wake" | "hold");
+export type Headline = {
+  /** Each part is one line of inline Markdown. */
+  "parts": Array<string>;
+  "tone": Tone;
+  [key: string]: unknown;
+};
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -451,6 +457,8 @@ export type Origin = {
   [key: string]: unknown;
 };
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** The one styling hook a plugin has; the surface owns the colour. */
+export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 /**
@@ -464,6 +472,7 @@ export type Payload = ({
    * it is the default and nothing is written for it.
    */
   "delivery"?: Delivery;
+  "headline"?: (Headline | null);
   /**
    * The pictures the ask carries, in the order they reach the journal
    * (ADR-0040): exactly as they will be journaled, because a surface
@@ -495,6 +504,12 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
  */
 export type Delivery = ("wake" | "hold");
 export type ErrorCode = (("SESSION_NOT_FOUND" | "SESSION_LOCKED" | "SESSION_CLOSED" | "INTERACTION_CLOSED" | "NOT_READY" | "STALE_GENERATION" | "NOT_INITIALIZED" | "INVALID_INPUT" | "PERMISSION_DENIED" | "TOOL_NOT_FOUND" | "TOOL_FAILED" | "PROVIDER_UNAVAILABLE" | "AUTH_REQUIRED" | "RATE_LIMITED" | "CONTEXT_OVERFLOW" | "TIMEOUT" | "OFFLINE" | "SERVER_ERROR" | "TURN_LOST" | "TURN_BUDGET_EXHAUSTED" | "UNSUPPORTED" | "INTERNAL") | "INTERRUPTED" | "PROTOCOL_LIMIT" | "NOT_FOUND" | "STORAGE");
+export type Headline = {
+  /** Each part is one line of inline Markdown. */
+  "parts": Array<string>;
+  "tone": Tone;
+  [key: string]: unknown;
+};
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -528,6 +543,7 @@ export type Input = ({
    * it is the default and nothing is written for it.
    */
   "delivery"?: Delivery;
+  "headline"?: (Headline | null);
   /**
    * The pictures the ask carries, in the order they reach the journal
    * (ADR-0040): exactly as they will be journaled, because a surface
@@ -563,6 +579,8 @@ export type Origin = {
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** The one styling hook a plugin has; the surface owns the colour. */
+export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = ({ "accepted": Input; } | { "rejected": KernelError; } | { "redirect": { "input": Input; "session": SessionId; [key: string]: unknown; }; });
@@ -1878,6 +1896,12 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
  * a person's own line are the same question, so they are the same word.
  */
 export type Delivery = ("wake" | "hold");
+export type Headline = {
+  /** Each part is one line of inline Markdown. */
+  "parts": Array<string>;
+  "tone": Tone;
+  [key: string]: unknown;
+};
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -1911,6 +1935,7 @@ export type Input = ({
    * it is the default and nothing is written for it.
    */
   "delivery"?: Delivery;
+  "headline"?: (Headline | null);
   /**
    * The pictures the ask carries, in the order they reach the journal
    * (ADR-0040): exactly as they will be journaled, because a surface
@@ -1944,6 +1969,8 @@ export type Origin = {
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** The one styling hook a plugin has; the surface owns the colour. */
+export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 export type Payload = {
@@ -1970,6 +1997,12 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
  * a person's own line are the same question, so they are the same word.
  */
 export type Delivery = ("wake" | "hold");
+export type Headline = {
+  /** Each part is one line of inline Markdown. */
+  "parts": Array<string>;
+  "tone": Tone;
+  [key: string]: unknown;
+};
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -2003,6 +2036,8 @@ export type Origin = {
   [key: string]: unknown;
 };
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** The one styling hook a plugin has; the surface owns the colour. */
+export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 /**
@@ -2016,6 +2051,7 @@ export type Payload = ({
    * it is the default and nothing is written for it.
    */
   "delivery"?: Delivery;
+  "headline"?: (Headline | null);
   /**
    * The pictures the ask carries, in the order they reach the journal
    * (ADR-0040): exactly as they will be journaled, because a surface
@@ -2046,6 +2082,12 @@ export type Action = { "args"?: unknown; "name": string; [key: string]: unknown;
  * a person's own line are the same question, so they are the same word.
  */
 export type Delivery = ("wake" | "hold");
+export type Headline = {
+  /** Each part is one line of inline Markdown. */
+  "parts": Array<string>;
+  "tone": Tone;
+  [key: string]: unknown;
+};
 /**
  * A picture handed to the model, already the shape the journal keeps and a
  * provider's request encodes: one struct, so a surface that reads a picture
@@ -2079,6 +2121,8 @@ export type Origin = {
   [key: string]: unknown;
 };
 export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
+/** The one styling hook a plugin has; the surface owns the colour. */
+export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
 /**
@@ -2092,6 +2136,7 @@ export type Payload = ({
    * it is the default and nothing is written for it.
    */
   "delivery"?: Delivery;
+  "headline"?: (Headline | null);
   /**
    * The pictures the ask carries, in the order they reach the journal
    * (ADR-0040): exactly as they will be journaled, because a surface
