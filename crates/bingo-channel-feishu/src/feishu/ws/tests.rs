@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::Duration;
 
 use serde_json::json;
-use tokio::io::AsyncWriteExt;
-use tokio::net::TcpListener;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
@@ -106,6 +106,7 @@ async fn refusing_peer(status: &'static str, autherr: &'static str) -> SocketAdd
     let address = listener.local_addr().expect("an address");
     tokio::spawn(async move {
         while let Ok((mut socket, _)) = listener.accept().await {
+            heard(&mut socket).await;
             let response = format!(
                 "HTTP/1.1 {status} Refused\r\nHandshake-Status: {status}\r\n\
                  Handshake-Msg: no\r\nHandshake-Autherrcode: {autherr}\r\n\
@@ -116,6 +117,20 @@ async fn refusing_peer(status: &'static str, autherr: &'static str) -> SocketAdd
         }
     });
     address
+}
+
+/// Read the upgrade request through its blank line. A socket closed with
+/// bytes unread is reset rather than finished, and on Windows the reset
+/// discards the answer before the dialler has read it.
+async fn heard(socket: &mut TcpStream) {
+    let mut request = Vec::new();
+    let mut chunk = [0u8; 1024];
+    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+        match socket.read(&mut chunk).await {
+            Ok(0) | Err(_) => return,
+            Ok(n) => request.extend_from_slice(&chunk[..n]),
+        }
+    }
 }
 
 /// The bootstrap endpoint, pointing at a socket of our own.
