@@ -20,7 +20,7 @@ mod history;
 pub use history::History;
 mod components;
 /// Someone's words under their name.
-mod post;
+pub(crate) mod post;
 mod room;
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.

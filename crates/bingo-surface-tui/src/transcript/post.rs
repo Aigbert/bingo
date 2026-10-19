@@ -8,7 +8,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
 /// The name column's width: the words start at `TX + GUT`.
-const GUT: usize = 11;
+pub(crate) const GUT: usize = 11;
 /// How long someone's words take to rise out of the ground.
 const RISE_MS: u64 = 260;
 

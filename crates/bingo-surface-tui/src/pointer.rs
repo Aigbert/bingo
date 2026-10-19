@@ -113,10 +113,8 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
         return Vec::new();
     };
     let block = ui.shown.blocks.at(cell.line);
-    // A row that spawned a session is that session's row: `⏎` steps in, and
-    // so does a click.
-    if let Some(session) = block.as_ref().and_then(|item| tree.spawned_by(item)) {
-        return vec![Effect::View(session.clone())];
+    if let Some(session) = block.as_ref().and_then(|id| walked(ui, tree, id, cell)) {
+        return vec![Effect::View(session)];
     }
     if let Some(id) = &block
         && tree.viewed().transcript.get(id).is_some_and(|item| {
@@ -146,6 +144,25 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
         ui.start_selection(cell);
     }
     Vec::new()
+}
+
+/// A teammate's row, or a post's name, is that teammate's: a click walks in.
+fn walked(
+    ui: &Ui,
+    tree: &Tree,
+    id: &bingo_sdk::ItemId,
+    cell: Cell,
+) -> Option<bingo_sdk::SessionId> {
+    let item = item_of(tree.viewed(), id)?;
+    let spot = crate::whose::Spot {
+        first_line: ui
+            .shown
+            .blocks
+            .span(id)
+            .is_some_and(|(start, _)| start == cell.line),
+        column: cell.column,
+    };
+    crate::whose::walked(tree, &crate::tool_rows::Looks::in_ui(ui), item, &spot)
 }
 
 /// A click on a block walks its fold one step and comes back round to the peek
