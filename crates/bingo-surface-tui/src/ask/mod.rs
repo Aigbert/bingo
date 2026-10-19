@@ -1,5 +1,6 @@
 pub mod aside;
 pub mod drawing;
+pub mod guard;
 pub mod options;
 pub mod receipts;
 pub mod scope;
