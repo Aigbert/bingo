@@ -121,7 +121,7 @@ mod tests {
     #[test]
     fn ranking_puts_prefix_then_contains_then_subsequence_and_keeps_ties_in_order() {
         let items = [
-            "experience",
+            "preference",
             "rename",
             "resume",
             "rewind",
@@ -139,7 +139,7 @@ mod tests {
                 "resume",
                 "rewind",
                 "review",
-                "experience",
+                "preference",
                 "provider"
             ]
         );

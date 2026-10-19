@@ -80,7 +80,7 @@ impl Sheet {
         self.window_with_limit(rows, 8, Shape::Sheet)
     }
     fn window_with_limit(&self, rows: u16, max: usize, shape: Shape) -> std::ops::Range<usize> {
-        let max = room(rows, shape.reserved() + self.top.len(), max);
+        let max = fit(rows, shape.reserved() + self.top.len(), max);
         let at = pick::selected(&self.rows, self.selected.as_deref());
         if self.pick {
             pick::list_window(self.rows.len(), at, max)
@@ -165,9 +165,9 @@ impl Sheet {
 }
 /// Visible list capacity, also used when an owner fetches facts for visible rows.
 pub fn capacity(rows: u16, top: usize, max: usize) -> usize {
-    room(rows, Shape::Sheet.reserved() + top, max)
+    fit(rows, Shape::Sheet.reserved() + top, max)
 }
-fn room(rows: u16, reserved: usize, max: usize) -> usize {
+fn fit(rows: u16, reserved: usize, max: usize) -> usize {
     max.min(usize::from(rows).saturating_sub(reserved).max(3))
 }
 
