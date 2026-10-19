@@ -207,14 +207,8 @@ pub const BINDINGS: &[Binding] = &[
         working: None,
     },
     Binding {
-        keys: "1-9 · y/a/n",
-        description: "answer the open dialog",
-        group: None,
-        working: None,
-    },
-    Binding {
-        keys: "ctrl+e",
-        description: "expand preview",
+        keys: "up/down · enter",
+        description: "answer the open ask; a letter starts the no",
         group: None,
         working: None,
     },

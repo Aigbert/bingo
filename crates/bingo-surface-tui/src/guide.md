@@ -51,7 +51,7 @@ context from 70%, active agents and shells, with the available keys on the right
 - Plugins draw where they place a view: a transcript row, the activity band,
   or the status line. Legacy panel and live payloads remain data until placed.
 - `shift+tab` — cycle the permission mode.
-- `1-9 · y/a/n` — answer the open dialog. `ctrl+e` — expand its preview.
+- `up/down · enter` — answer the open ask; a letter starts the no and its reason.
 - `ctrl+o` — open the newest fold one rung further, and again until it is
   whole. In the pager, `esc`, `q` or `ctrl+o` closes it without answering an ask.
 - `ctrl+b` — background the running command.
