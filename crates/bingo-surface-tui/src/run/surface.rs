@@ -80,7 +80,7 @@ pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
 
 fn page(run: &mut Run, args: &Value, now: crate::clock::Now) {
     if let Ok(page) = serde_json::from_value(args.clone()) {
-        crate::pager::page::open(&mut run.ui, &run.session.tree, page, now);
+        crate::browse::reader::page::open(&mut run.ui, &run.session.tree, page, now);
     }
 }
 /// `/plugins` answers with the panel to open and the group it opens on.

@@ -12,7 +12,7 @@ mod button;
 /// [`crate::markdown`] hands its language and text straight to this renderer
 /// (M11e).
 pub mod code;
-mod diff;
+pub(crate) mod diff;
 mod drawing;
 pub use drawing::Drawing;
 mod flex;
@@ -53,6 +53,8 @@ pub const MISSING: &str = "–";
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Marks {
     pub pending: Option<Action>,
+    /// How the enclosing frame draws a diff: a well's numbered gutter or the card's own.
+    pub diff: diff::DiffStyle,
     pub sealed: Option<std::rc::Rc<std::cell::RefCell<Vec<usize>>>>,
     pub targets: Option<std::rc::Rc<std::cell::RefCell<Vec<bingo_sdk::ActionItem>>>>,
     /// The frame clock; a record drawn outside a frame uses the still form.
@@ -64,6 +66,7 @@ impl Marks {
     pub fn at(now: Now) -> Self {
         Self {
             pending: None,
+            diff: diff::DiffStyle::Permission,
             targets: None,
             sealed: None,
             now: Some(now),
@@ -131,7 +134,7 @@ fn still_lines(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
             start,
             ..
         } => code::numbered(language.as_deref(), source, *start, width),
-        View::Diff { unified } => diff::lines(unified),
+        View::Diff { unified } => diff::lines(unified, marks.diff),
         View::List { items } => list::lines(items),
         View::Table { headers, rows } => table::lines(headers, rows, width),
         View::KeyValue { rows } => keyvalue::lines(rows, width),

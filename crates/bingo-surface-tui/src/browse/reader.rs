@@ -1,13 +1,6 @@
-//! One block, whole, over the frame.
-//!
-//! A transcript row is a glance: a result folds to five lines, a thought decays
-//! to how long it took. The pager is where the rest of it is — `⏎` on a focused
-//! block, or `ctrl+o` on a result already open (design §5: code, a diff, a long
-//! output and reasoning each open in a sheet).
-//!
-//! It keeps where a person is looking and nothing else: the content is read
-//! from the item every frame, so a block that is still arriving grows under the
-//! sheet rather than being copied into it.
+//! Browse’s complete-output reader and the text reader used by memory panes.
+//! The item and query hits are resolved from the transcript each frame.
+//! Up/down walk matches while the query is edited.
 
 pub mod page;
 
@@ -17,10 +10,11 @@ use ratatui::text::{Line, Span};
 
 use crate::clock::Now;
 use crate::effect::Effect;
-use crate::search::Search;
+use crate::search::{self, Search};
 use crate::tree::Tree;
 use crate::ui::{Open, Ui};
-use crate::{markdown, search, theme, thoughts, transcript, wrap};
+use crate::{keys, layers, layout::Layout, markdown, theme, thoughts, transcript, wrap};
+use ratatui::layout::Rect;
 
 /// The rows the sheet spends on itself: what it is, and the air under it.
 pub const HEAD: usize = 2;
@@ -33,8 +27,6 @@ pub struct Pager {
     pub top: usize,
     /// `/` within the sheet, while one is open.
     pub search: Option<Search>,
-    /// The site the sheet was opened over, given back by `esc`.
-    pub return_to: Option<Return>,
 }
 
 /// What the sheet reads: a transcript block, or text a command handed over.
@@ -45,26 +37,29 @@ pub enum Source {
     Text { title: String, text: String },
 }
 
-/// Where closing the sheet goes back to.
+/// A standalone reader remembers the pane it gives back on close.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Reader {
+    pub pager: Pager,
+    pub return_to: Option<Return>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Return {
-    /// A layer, as it was left: Browse keeps its query and its place.
-    Layer(Box<Open>),
-    /// A placed pane, by its key.
     Pane(String),
 }
 
 impl Pager {
+    #[cfg(test)]
     pub fn open(item: ItemId) -> Self {
-        Self::new(Source::Item(item), None)
+        Self::new(Source::Item(item))
     }
 
-    pub fn new(source: Source, return_to: Option<Return>) -> Self {
+    pub fn new(source: Source) -> Self {
         Self {
             source,
             top: 0,
             search: None,
-            return_to,
         }
     }
 
@@ -73,18 +68,19 @@ impl Pager {
         tree: &Tree,
         width: usize,
         tools: &crate::tool_rows::Looks,
+        over_browse: bool,
     ) -> (String, Vec<Line<'static>>) {
         match &self.source {
             Source::Item(id) => source(tree, id)
-                .map(|(state, item)| (title(item, state, tools), content(state, item, width, self)))
+                .map(|(state, item)| {
+                    (
+                        title(item, state, tools),
+                        content(state, item, width, over_browse),
+                    )
+                })
                 .unwrap_or_default(),
             Source::Text { title, text } => (title.clone(), markdown::render(text, width)),
         }
-    }
-
-    /// Opened from Browse, where a block is read whole even when it fits.
-    pub fn over_browse(&self) -> bool {
-        matches!(&self.return_to, Some(Return::Layer(open)) if matches!(**open, Open::Browse(_)))
     }
 
     /// Move by lines, never past either end of the content.
@@ -120,9 +116,9 @@ pub fn content(
     state: &SessionState,
     item: &Item,
     width: usize,
-    pager: &Pager,
+    over_browse: bool,
 ) -> Vec<Line<'static>> {
-    if pager.over_browse() {
+    if over_browse {
         whole(state, item, width)
     } else {
         lines(state, item, width)
@@ -283,7 +279,7 @@ fn head(title: &str, searching: Option<&Search>) -> Line<'static> {
         Span::raw("  "),
     ];
     if let Some(open) = searching {
-        spans.extend(search::row(open).spans);
+        spans.push(Span::styled(format!("/{}", open.query), theme::text()));
     }
     Line::from(spans)
 }
@@ -292,20 +288,6 @@ fn head(title: &str, searching: Option<&Search>) -> Line<'static> {
 //
 // The pager owns the noun, so it owns the keys that move in it:
 // [`crate::input`] routes and this decides, exactly as a dialog does.
-
-/// Open a block whole, and say whether one was there to open. Nothing opens
-/// for a row that already shows everything it has.
-pub fn open_block(ui: &mut Ui, tree: &Tree, now: Now, focused: Option<&ItemId>) -> bool {
-    let width = width_of(ui);
-    let state = tree.viewed();
-    let Some(id) =
-        crate::input::latest(state, focused, |item| !lines(state, item, width).is_empty())
-    else {
-        return false;
-    };
-    ui.focus.show(Open::Pager(Pager::open(id)), now.instant);
-    true
-}
 
 /// The cells the sheet has, which is what its content is laid out for.
 fn width_of(ui: &Ui) -> usize {
@@ -328,12 +310,17 @@ pub fn source<'a>(tree: &'a Tree, id: &ItemId) -> Option<(&'a SessionState, &'a 
 
 /// What the open pager is showing, as the sheet lays it out.
 fn content_of(ui: &Ui, tree: &Tree) -> Vec<Line<'static>> {
-    let Open::Pager(open) = ui.focus.open() else {
+    let Some(open) = current(ui) else {
         return Vec::new();
     };
     let width = width_of(ui);
-    open.content(tree, width, &crate::tool_rows::Looks::in_ui(ui))
-        .1
+    open.content(
+        tree,
+        width,
+        &crate::tool_rows::Looks::in_ui(ui),
+        matches!(ui.focus.open(), Open::Browse(_)),
+    )
+    .1
 }
 
 /// The pager owns the keyboard while it is up: `j/k` and the page keys move
@@ -351,14 +338,14 @@ pub fn keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         return Vec::new();
     }
     let window = window_of(ui, tree);
-    if let Some(Open::Pager(open)) = ui.focus.open_mut() {
+    if let Some(open) = current_mut(ui) {
         moved(open, key, window);
     }
     Vec::new()
 }
 
 fn searching(ui: &Ui) -> bool {
-    matches!(ui.focus.open(), Open::Pager(open) if open.search.is_some())
+    current(ui).is_some_and(|open| open.search.is_some())
 }
 
 fn moved(open: &mut Pager, key: KeyEvent, window: Window) {
@@ -381,16 +368,14 @@ fn moved(open: &mut Pager, key: KeyEvent, window: Window) {
 /// in. Forgetting the entry *is* the fold: the start is written in one place
 /// ([`crate::fold`]) and never copied here.
 fn closed(ui: &mut Ui, tree: &Tree, now: Now) {
-    let Open::Pager(open) = ui.focus.open() else {
-        return ui.focus.close(now.instant);
+    if let Some(Open::Browse(browse)) = ui.focus.open_mut() {
+        browse.reader = None;
+        return;
+    }
+    let return_to = match ui.focus.open() {
+        Open::Reader(reader) => reader.return_to.clone(),
+        _ => None,
     };
-    let (source, return_to) = (open.source.clone(), open.return_to.clone());
-    if let Some(Return::Layer(previous)) = return_to {
-        return ui.focus.show(*previous, now.instant);
-    }
-    if let Source::Item(item) = source {
-        ui.folds.remove(&item);
-    }
     match return_to {
         Some(Return::Pane(key)) if placed(tree, &key) => ui.focus = crate::focus::Focus::Pane(key),
         _ => ui.focus.close(now.instant),
@@ -411,10 +396,10 @@ fn searched(ui: &mut Ui, tree: &Tree, key: KeyEvent) -> Vec<Effect> {
         .iter()
         .map(ToString::to_string)
         .collect();
-    let Some(Open::Pager(open)) = ui.focus.open_mut() else {
+    let Some(open) = current_mut(ui) else {
         return Vec::new();
     };
-    if key.code == KeyCode::Esc {
+    if matches!(keys::find(key), Some(keys::Find::Back | keys::Find::Keep)) {
         open.search = None;
         return Vec::new();
     }
@@ -430,25 +415,79 @@ fn searched(ui: &mut Ui, tree: &Tree, key: KeyEvent) -> Vec<Effect> {
 
 /// One key of a query row: what it does, and the line it wants on the screen.
 fn walk(search: &mut Search, key: KeyEvent, text: &[String]) -> Option<usize> {
-    let by = match (search.typing, key.code) {
-        (true, KeyCode::Char(c)) => {
-            search.typed(c);
-            return None;
-        }
-        (true, KeyCode::Backspace) => {
-            search.backspace();
-            return None;
-        }
-        (true, KeyCode::Enter) => {
-            search.find(text);
-            0
-        }
-        (false, KeyCode::Char('n') | KeyCode::Enter) => 1,
-        (false, KeyCode::Char('N')) => -1,
+    match keys::find(key) {
+        Some(keys::Find::Type(c)) => search.type_char(c),
+        Some(keys::Find::Delete) => search.delete(),
+        Some(keys::Find::Move(by)) => search.step(&search::hits(text, &search.query), by),
         _ => return None,
+    }
+    let hits = search::hits(text, &search.query);
+    hits.get(search.at(&hits)?).map(|hit| hit.line)
+}
+
+pub fn current(ui: &Ui) -> Option<&Pager> {
+    match ui.focus.open() {
+        Open::Browse(open) => open.reader.as_deref(),
+        Open::Reader(reader) => Some(&reader.pager),
+        _ => None,
+    }
+}
+fn current_mut(ui: &mut Ui) -> Option<&mut Pager> {
+    match ui.focus.open_mut()? {
+        Open::Browse(open) => open.reader.as_deref_mut(),
+        Open::Reader(reader) => Some(&mut reader.pager),
+        _ => None,
+    }
+}
+
+pub fn draw(
+    tree: &Tree,
+    frame: &mut Layout,
+    above: Rect,
+    open: &crate::browse::reader::Pager,
+    reveal: layers::Reveal,
+    tools: &crate::tool_rows::Looks,
+    over_browse: bool,
+) {
+    let (title, content) = open.content(tree, above.width as usize, tools, over_browse);
+    let window = Window {
+        height: content.len(),
+        rows: usize::from(above.height).saturating_sub(HEAD),
     };
-    search.step(by);
-    search.current().map(|hit| hit.line)
+    let lines = sheet(&title, &content, open, window);
+    crate::view::sheet(frame, above, lines, reveal);
+    marked(frame, above, open, window, reveal, &content);
+}
+
+/// The hits of the pager's own query, once the sheet has finished arriving:
+/// one still sliding up would carry the marks to the wrong rows.
+fn marked(
+    frame: &mut Layout,
+    above: Rect,
+    open: &crate::browse::reader::Pager,
+    window: Window,
+    reveal: layers::Reveal,
+    content: &[Line<'static>],
+) {
+    let Some(search) = open.search.as_ref().filter(|_| !reveal.moving()) else {
+        return;
+    };
+    let head = u16::try_from(HEAD).unwrap_or(u16::MAX);
+    let area = Rect {
+        y: above.y + head,
+        height: above.height.saturating_sub(head),
+        ..above
+    };
+    let text = content.iter().map(ToString::to_string).collect::<Vec<_>>();
+    crate::search::mark(frame, area, open.at(window), search, &text);
+}
+
+#[cfg(test)]
+pub fn layer(reader: Pager) -> Open {
+    Open::Reader(Reader {
+        pager: reader,
+        return_to: None,
+    })
 }
 
 #[cfg(test)]

@@ -198,45 +198,6 @@ fn caution_starts_on_no_and_escape_denies_and_stops() {
 }
 
 #[test]
-fn the_whole_preview_comes_from_the_child_that_asked() {
-    let mut open = permission(
-        None,
-        Some(Preview::Diff {
-            unified: (0..40).map(|n| format!("+child line {n}\n")).collect(),
-        }),
-    );
-    open.session = child_id();
-    let tree = folded_tree(vec![
-        child_frame(1, announced("moss")),
-        child_frame(
-            2,
-            started_tool(
-                2,
-                tool(
-                    "itm_2",
-                    "Edit",
-                    json!({"new_string":"changed"}),
-                    None,
-                    ItemStatus::Pending,
-                ),
-            )
-            .event,
-        ),
-        child_frame(3, opened(open)),
-    ]);
-    let (mut ui, now) = scene();
-    let now = still(now);
-    ui.dialog
-        .focus_on(tree.open_interaction().map(|(_, open)| open));
-    draw_tree(80, 24, &tree, &mut ui, now);
-    crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
-    draw_tree(80, 24, &tree, &mut ui, now);
-    crate::input::on_key(&mut ui, &tree, key(KeyCode::End), now);
-    let screen = draw_tree(80, 24, &tree, &mut ui, now);
-    assert!(screen.contains("child line 39"), "{screen}");
-}
-
-#[test]
 fn change_and_sealed_props_use_the_gates_rewritten_input() {
     let open = permission(None, None);
     let mut wire = serde_json::to_value(open).unwrap();
@@ -296,29 +257,6 @@ fn escaping_aside_returns_to_the_ask_but_the_change_editor_stops() {
                 ..
             }]
         ));
-    }
-}
-
-#[test]
-fn pager_close_keys_leave_the_underlying_ask_unanswered() {
-    for pressed in [key(KeyCode::Esc), typed('q'), ctrl('o')] {
-        let (tree, mut ui, now) = scene_for(
-            permission(
-                None,
-                Some(Preview::Diff {
-                    unified: "-old\n+new".into(),
-                }),
-            ),
-            false,
-        );
-        assert!(crate::input::on_key(&mut ui, &tree, ctrl('o'), now).is_empty());
-        assert!(matches!(ui.focus.open(), crate::ui::Open::Pager(_)));
-        let effects = crate::input::on_key(&mut ui, &tree, pressed, now);
-        assert!(effects.is_empty(), "pager key escaped: {effects:?}");
-        assert!(!ui.focus.showing(), "pager stayed open after {pressed:?}");
-        assert!(!ui.dialog.answered);
-        assert!(ui.stop_asked.is_none());
-        assert!(tree.open_interaction().is_some());
     }
 }
 

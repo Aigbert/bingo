@@ -14,12 +14,9 @@ use crate::SURFACE_ID;
 use crate::clock::Now;
 use crate::commands::{self, Local};
 use crate::effect::Effect;
-use crate::fold;
 use crate::keys;
 use crate::mentions;
-use crate::pager;
 use crate::rewind::{self, Rewind};
-use crate::search::Search;
 use crate::tree::Tree;
 use crate::ui::{Menu, Open, Ui};
 use crate::views;
@@ -74,8 +71,12 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if crate::palette::active(ui) {
         return crate::palette::key(ui, tree, key, now);
     }
-    if ui.focus.showing() && matches!(ui.focus.open(), Open::Pager(_)) {
-        return pager::keys(ui, tree, key, now);
+    if matches!(
+        ui.focus,
+        crate::focus::Focus::Detail(_) | crate::focus::Focus::Search(_)
+    ) {
+        let owner = crate::focus::owner(ui, tree);
+        return owned_keys(ui, tree, key, now, owner);
     }
     if key.code == KeyCode::Esc && tree.open_interaction().is_some() {
         return escape(ui, tree, now);
@@ -110,7 +111,14 @@ fn owned_keys(
     match owner {
         crate::focus::Owner::Pane => pane_keys(ui, tree, key, now),
         crate::focus::Owner::Select => selecting(ui, tree, key, now),
-        crate::focus::Owner::Search => searching(ui, key, now),
+        crate::focus::Owner::Search => crate::search::key(ui, key, now),
+        crate::focus::Owner::Detail => {
+            if crate::detail::key(ui, tree, key, now) {
+                return Vec::new();
+            }
+            crate::detail::close(ui, tree, now);
+            on_key(ui, tree, key, now)
+        }
         crate::focus::Owner::Layer => {
             layered(ui, tree, key, now).unwrap_or_else(|| composer_keys(ui, tree, key, now))
         }
@@ -131,10 +139,8 @@ fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effec
     if matches!(key.code, KeyCode::Char(_)) && (key.modifiers - KeyModifiers::SHIFT).is_empty() {
         ui.last_typed = Some(now.wall);
     }
-    if key == KeyEvent::new(KeyCode::Char('f'), KeyModifiers::CONTROL)
-        && !crate::browse::offered(ui, tree)
-    {
-        ui.focus = crate::focus::Focus::Search(Search::open());
+    if keys::look(key) == Some(keys::Look::Find) {
+        crate::search::open(ui, now);
         return Vec::new();
     }
     if let Some(line) = keys::commands::line(ui, tree.viewed(), key) {
@@ -200,7 +206,7 @@ fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effect>> {
     if ui.focus.captures() {
         match ui.focus.open() {
-            Open::Pager(_) => return Some(pager::keys(ui, tree, key, now)),
+            Open::Reader(_) => return Some(crate::browse::reader::keys(ui, tree, key, now)),
             Open::Rewind(_) => return Some(rewind_keys(ui, tree, key, now)),
             Open::Mode(_) => return Some(crate::mode::sheet::keys(ui, tree, key, now)),
             Open::Result { .. } => return Some(crate::dock::result::keys(ui, key, now)),
@@ -208,16 +214,18 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
             _ => {}
         }
     }
-    if let Some(chord) = chorded(key) {
-        match chord {
-            'f' => ui.focus = crate::focus::Focus::Search(Search::open()),
-
-            'o' => deepen(ui, tree, now),
-            'b' => return Some(background(ui, tree, now)),
-            // No other chord reaches here: `LAYERS` is what `chorded` answers.
-            _ => return None,
+    if let Some(look) = keys::look(key) {
+        match look {
+            keys::Look::Find => crate::search::open(ui, now),
+            keys::Look::Detail => open_detail(ui, tree.viewed(), now),
         }
         return Some(Vec::new());
+    }
+    if let Some(chord) = chorded(key) {
+        return match chord {
+            'b' => Some(background(ui, tree, now)),
+            _ => None,
+        };
     }
     None
 }
@@ -226,40 +234,13 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
 /// of them. Every other control chord is the line's ([`control`]): `ctrl+w`
 /// deletes a word wherever a person is typing, the list's own query included,
 /// so it must not be mistaken for a layer's key.
-const LAYERS: [char; 3] = ['f', 'o', 'b'];
+const LAYERS: [char; 1] = ['b'];
 
 /// The letter of a layer's control chord, if that is what this key is.
 fn chorded(key: KeyEvent) -> Option<char> {
     match (key.code, key.modifiers.contains(KeyModifiers::CONTROL)) {
         (KeyCode::Char(c), true) if LAYERS.contains(&c) => Some(c),
         _ => None,
-    }
-}
-
-/// `ctrl+o` only ever opens further: the first press lifts the fold on the
-/// focused result — else the latest — and the second takes the whole of it into
-/// the pager, where `esc` folds it again. One key, one direction (§4's
-/// `ctrl+o to expand`).
-fn deepen(ui: &mut Ui, tree: &Tree, now: Now) {
-    let focused = ui.select.block.clone();
-    let state = tree.viewed();
-    // A thought a newer one joined has no block of its own (M79), so there is
-    // nothing on the screen for the key to open: the run's rows are the last
-    // thought's, and so is the fold under them.
-    let opens = |item: &bingo_sdk::Item| folds(item) && crate::thoughts::ends_its_run(state, item);
-    let Some(id) = latest(state, focused.as_ref(), opens) else {
-        return;
-    };
-    let Some(item) = item_of(state, &id) else {
-        return;
-    };
-    match fold::deeper(fold::fold_of(&ui.folds, item)) {
-        Some(next) => {
-            ui.folds.insert(id, next);
-        }
-        None => {
-            pager::open_block(ui, tree, now, Some(&id));
-        }
     }
 }
 
@@ -298,23 +279,6 @@ pub(crate) fn placed_action(state: &SessionState, key: char) -> Option<bingo_sdk
         })
 }
 
-/// The newest item a key acts on: the focused block when the transcript is
-/// holding one, else the last that answers `what`.
-pub fn latest(
-    state: &SessionState,
-    focused: Option<&bingo_sdk::ItemId>,
-    what: impl Fn(&bingo_sdk::Item) -> bool,
-) -> Option<bingo_sdk::ItemId> {
-    state
-        .transcript
-        .items()
-        .iter()
-        .rev()
-        .filter(|item| focused.is_none_or(|id| id == &item.id))
-        .find(|item| what(item))
-        .map(|item| item.id.clone())
-}
-
 /// The item a fold belongs to. A fold is a fact about a kind of block, so the
 /// id alone cannot answer what the block starts at or cycles through.
 pub(crate) fn item_of<'a>(
@@ -322,27 +286,6 @@ pub(crate) fn item_of<'a>(
     id: &bingo_sdk::ItemId,
 ) -> Option<&'a bingo_sdk::Item> {
     state.transcript.get(id)
-}
-
-/// What `ctrl+o` opens further: a block that is keeping something back — a
-/// call that came back, a thought that was not redacted, an action's own
-/// result. Most of them say so on the row, with `… +N lines (ctrl+o to
-/// expand)`; a thought that is over holds the rows it ended on and says
-/// nothing, because the mark would cost it the row it is holding
-/// (2026-09-06). A quiet notice is deliberately not one either: its cut
-/// promises no key (M11's rule, 2026-09-01), and a click is what opens it.
-fn folds(item: &bingo_sdk::Item) -> bool {
-    match &item.body {
-        bingo_sdk::ItemBody::ToolCall { output, .. } => output.is_some(),
-        // Only once the thinking is over, as a call folds only once it has
-        // come back: while it is being had the rows under the row are the tail
-        // a running tool wears, which cuts nothing and promises no key.
-        bingo_sdk::ItemBody::Reasoning { .. } => {
-            item.completed_at.is_some() && crate::transcript::thought(item).is_some()
-        }
-        bingo_sdk::ItemBody::Action { result, .. } => result.is_some(),
-        _ => false,
-    }
 }
 
 /// Rows with actions, in transcript order, using the last placement as drawing does.
@@ -478,8 +421,8 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     let owner = crate::focus::owner(ui, tree);
     let pressed = keys::Pressed {
         open: open(ui, tree, now),
-        detail: matches!(owner, Owner::Select | Owner::Row)
-            || matches!(ui.focus.open(), Open::Pager(_)),
+        detail: matches!(owner, Owner::Select | Owner::Row | Owner::Detail)
+            || matches!(ui.focus.open(), Open::Reader(_)),
         armed: ui.exit_armed(now.instant),
     };
     let rung = keys::interrupt(pressed);
@@ -489,6 +432,7 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     match rung {
         keys::Interrupt::Turn => return ask_to_stop(ui, tree.viewed()),
         keys::Interrupt::Close(place) => return close(ui, tree, place, now),
+        keys::Interrupt::Fold if owner == Owner::Detail => crate::detail::close(ui, tree, now),
         keys::Interrupt::Fold => {
             ui.focus = crate::focus::Focus::Composer;
             ui.folds.clear();
@@ -513,7 +457,7 @@ fn close(ui: &mut Ui, tree: &Tree, place: keys::Close, now: Now) -> Vec<Effect> 
         keys::Close::Sheet => ui.focus.close(now.instant),
         keys::Close::Card => return cancel(ui, tree),
         keys::Close::Dropdown => ui.menu.dismissed = true,
-        keys::Close::Search => ui.focus = crate::focus::Focus::Composer,
+        keys::Close::Search => crate::search::back(ui),
         keys::Close::Pane => {
             // A plugin pane owns its close action and exposes it through Esc.
             return crate::pane::key(
@@ -536,7 +480,7 @@ fn open(ui: &Ui, tree: &Tree, now: Now) -> keys::Open {
     let owner = crate::focus::owner(ui, tree);
     keys::Open {
         // One layer is open at a time, whichever form it takes.
-        sheet: owner == crate::focus::Owner::Layer && !matches!(ui.focus.open(), Open::Pager(_)),
+        sheet: owner == crate::focus::Owner::Layer && !matches!(ui.focus.open(), Open::Reader(_)),
         card: tree.open_interaction().is_some(),
         dropdown: !suggestions(ui, tree).is_empty(),
         pane: owner == crate::focus::Owner::Pane && tree.open_interaction().is_none(),
@@ -759,47 +703,6 @@ fn focused_line(ui: &Ui) -> usize {
         .unwrap_or(painted.top)
 }
 
-/// The search row owns the keyboard while it is up: typing edits the query,
-/// `enter` commits it and then steps, `n`/`N` walk the hits and `esc` gives
-/// the status line back.
-fn searching(ui: &mut Ui, key: KeyEvent, now: Now) -> Vec<Effect> {
-    let Some(search) = ui.focus.search_mut() else {
-        return Vec::new();
-    };
-    match (search.typing, key.code) {
-        (_, KeyCode::Esc) => ui.focus = crate::focus::Focus::Composer,
-        (true, KeyCode::Char(c)) => search.typed(c),
-        (true, KeyCode::Backspace) => search.backspace(),
-        (true, KeyCode::Enter) => commit(ui, now),
-        (false, KeyCode::Char('n') | KeyCode::Enter) => step(ui, 1, now),
-        (false, KeyCode::Char('N')) => step(ui, -1, now),
-        _ => {}
-    }
-    Vec::new()
-}
-
-/// Look through what the last frame rendered — the blocks are the transcript
-/// a person is reading — and go to the first hit.
-fn commit(ui: &mut Ui, now: Now) {
-    let lines = ui.transcript_text();
-    if let Some(search) = ui.focus.search_mut() {
-        search.find(&lines);
-    }
-    step(ui, 0, now);
-}
-
-fn step(ui: &mut Ui, by: isize, now: Now) {
-    let Some(search) = ui.focus.search_mut() else {
-        return;
-    };
-    search.step(by);
-    let Some(hit) = search.current() else {
-        return;
-    };
-    let (total, rows) = ui.transcript();
-    ui.scroll.show(hit.line, total, rows, now.instant);
-}
-
 /// The dropdown owns the arrows and the enter key while it is open; `tab` is
 /// answered before this, by the one table of it ([`tabbed`]).
 fn menu(ui: &mut Ui, tree: &Tree, key: KeyEvent) -> Option<Vec<Effect>> {
@@ -922,8 +825,13 @@ fn enter(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     // being typed: it opens whole (design §5). A message outranks it.
     if ui.composer.is_empty()
         && let Some(block) = ui.select.block.clone()
-        && pager::open_block(ui, tree, now, Some(&block))
+        && tree
+            .viewed()
+            .transcript
+            .get(&block)
+            .is_some_and(crate::detail::row)
     {
+        crate::detail::toggle(ui, tree.viewed(), &block);
         return Vec::new();
     }
     if ui.composer.text().ends_with('\\') {
@@ -2393,36 +2301,6 @@ mod tests {
         (1..=9).map(|i| format!("step {i}\n")).collect()
     }
 
-    /// `ctrl+o` only ever opens further (§7): a thought that is over holds the
-    /// two rows it ended on, and from there the whole of it and then the
-    /// sheet. `esc` out of the sheet puts it back where its kind starts.
-    #[test]
-    fn ctrl_o_climbs_a_thought_from_its_hold_through_the_whole_to_the_sheet() {
-        let state = thought(&steps());
-        let (mut ui, now) = scene();
-        let held = render(&state, &mut ui, now);
-        assert!(held.contains("Thought for 2s"), "{held}");
-        assert!(held.contains("step 9"), "it holds where it ended: {held}");
-        assert!(!held.contains("step 7"), "two rows of it: {held}");
-        assert!(
-            !held.contains("ctrl+o to expand"),
-            "and no cut mark: {held}"
-        );
-
-        press(&mut ui, &state, ctrl('o'), now);
-        let opened = render(&state, &mut ui, now);
-        assert!(opened.contains("step 1"), "{opened}");
-
-        press(&mut ui, &state, ctrl('o'), now);
-        assert!(
-            render(&state, &mut ui, later(now, 200)).contains("Thinking"),
-            "the sheet says what it is"
-        );
-
-        press(&mut ui, &state, key(KeyCode::Esc), now);
-        assert!(ui.folds.is_empty(), "and esc folds it back to the hold");
-    }
-
     /// A click walks the same rungs and comes back round (§7): a thought that
     /// is over is the one block with three states, because it is the one whose
     /// working a person may want put away — and putting it away is on the far
@@ -2457,74 +2335,6 @@ mod tests {
         );
     }
 
-    /// A run of thoughts is one block (M79), so it is one fold: a click on any
-    /// of its rows opens the whole run where it happened, and `ctrl+o` from
-    /// there takes a sheet with every thought of it.
-    #[test]
-    fn a_click_opens_the_whole_run_and_ctrl_o_takes_it_to_the_sheet() {
-        let state = a_run_of_thoughts();
-        let tree = solo(&state);
-        let (mut ui, now) = scene();
-        let held = render(&state, &mut ui, now);
-        assert!(
-            held.contains("Thought for 6s"),
-            "the run's own time: {held}"
-        );
-        assert!(
-            !held.contains("The manifest first"),
-            "the tail of the run alone: {held}"
-        );
-
-        let row = last_row(&ui);
-        on_mouse(&mut ui, &tree, click(6, row), now);
-        let opened = render(&state, &mut ui, now);
-        assert!(opened.contains("The manifest first"), "{opened}");
-        assert_eq!(ui.folds.len(), 1, "one fold for the whole run");
-
-        press(&mut ui, &state, ctrl('o'), now);
-        let sheet = render(&state, &mut ui, later(now, 200));
-        for thought in ["The manifest first", "Then the crate map", "The plan after"] {
-            assert!(sheet.contains(thought), "{thought} is missing: {sheet}");
-        }
-    }
-
-    /// Three thoughts in a row, as a provider that closes a reasoning item per
-    /// output item hands them over.
-    fn a_run_of_thoughts() -> SessionState {
-        let thought = |id: &str, text: &str, seconds: i64| {
-            let mut item = crate::test_support::item(
-                id,
-                bingo_sdk::ItemStatus::Completed,
-                bingo_sdk::ItemBody::Reasoning {
-                    text: text.into(),
-                    provider_metadata: Default::default(),
-                },
-            );
-            item.completed_at = Some(ts() + jiff::SignedDuration::from_secs(seconds));
-            crate::test_support::loose(item)
-        };
-        folded(vec![
-            frame(
-                1,
-                bingo_sdk::Event::ItemCompleted {
-                    item: thought("itm_1", "The manifest first.", 1),
-                },
-            ),
-            frame(
-                2,
-                bingo_sdk::Event::ItemCompleted {
-                    item: thought("itm_2", "Then the crate map.", 2),
-                },
-            ),
-            frame(
-                3,
-                bingo_sdk::Event::ItemCompleted {
-                    item: thought("itm_3", "The plan after that.", 3),
-                },
-            ),
-        ])
-    }
-
     /// A redacted thought promises nothing: no fold, no key, no sheet.
     #[test]
     fn an_empty_thought_opens_nothing() {
@@ -2536,62 +2346,6 @@ mod tests {
         ui.select.block = Some(bingo_sdk::ItemId::from_raw("itm_1"));
         press(&mut ui, &state, key(KeyCode::Enter), now);
         assert!(!ui.focus.showing(), "and nothing to open");
-    }
-
-    /// A thought being had is not a fold: its two tail rows scroll rather than
-    /// cut, and promise no key, so `ctrl+o` walks past it — and past the whole
-    /// run it ends, because a run of thoughts is one thought (M79). The fold
-    /// it lifts once the run is over is the run's last item, which is the one
-    /// with the block.
-    #[test]
-    fn ctrl_o_walks_past_a_run_whose_last_thought_is_still_being_had() {
-        let mut state = thought(&steps());
-        let mut being_had = crate::test_support::loose(crate::test_support::item(
-            "itm_2",
-            bingo_sdk::ItemStatus::Running,
-            bingo_sdk::ItemBody::Reasoning {
-                text: "and now the lockfile".into(),
-                provider_metadata: Default::default(),
-            },
-        ));
-        state.apply(&frame(
-            2,
-            bingo_sdk::Event::ItemStarted {
-                item: being_had.clone(),
-            },
-        ));
-        let (mut ui, now) = scene();
-        render(&state, &mut ui, now);
-        press(&mut ui, &state, ctrl('o'), now);
-        assert!(
-            ui.folds.is_empty(),
-            "the run is still being thought: nothing on the screen cuts"
-        );
-
-        being_had.status = bingo_sdk::ItemStatus::Completed;
-        being_had.completed_at = Some(ts() + jiff::SignedDuration::from_secs(3));
-        state.apply(&frame(
-            3,
-            bingo_sdk::Event::ItemCompleted { item: being_had },
-        ));
-        render(&state, &mut ui, now);
-        press(&mut ui, &state, ctrl('o'), now);
-        assert_eq!(
-            ui.folds.keys().map(ToString::to_string).collect::<Vec<_>>(),
-            vec!["itm_2".to_string()],
-            "one fold for the run, on the item its block hangs from"
-        );
-    }
-
-    /// `⏎` on a focused block still opens the pager, thought or result alike.
-    #[test]
-    fn enter_on_a_focused_thought_opens_the_sheet() {
-        let state = thought("the manifest first");
-        let (mut ui, now) = scene();
-        render(&state, &mut ui, now);
-        ui.select.block = Some(bingo_sdk::ItemId::from_raw("itm_1"));
-        press(&mut ui, &state, key(KeyCode::Enter), now);
-        assert!(matches!(*ui.focus.open(), Open::Pager(_)));
     }
 
     #[test]
@@ -2912,8 +2666,10 @@ mod tests {
 
     /// The read's turn opened: a step's picture is drawn under it there.
     fn open_the_read(ui: &mut Ui) {
-        ui.folds
-            .insert(bingo_sdk::ItemId::from_raw("itm_1"), fold::Fold::Open);
+        ui.set_well(
+            bingo_sdk::TurnId::from_raw("trn_1"),
+            Some(bingo_sdk::ItemId::from_raw("itm_1")),
+        );
     }
 
     /// The row of the screen a picture's cells are on.
@@ -2944,9 +2700,10 @@ mod tests {
                 ui.focus.selection().is_none(),
                 "opening a picture is not selecting"
             );
-            assert_eq!(
-                ui.folds.get(&bingo_sdk::ItemId::from_raw("itm_1")),
-                Some(&fold::Fold::Open),
+            assert!(
+                ui.wells
+                    .values()
+                    .any(|id| id == &bingo_sdk::ItemId::from_raw("itm_1")),
                 "and it is not the turn's fold"
             );
         });
@@ -2966,9 +2723,10 @@ mod tests {
                 on_mouse(&mut ui, &solo(&state), click(4, row), now).is_empty(),
                 "the step's row above the cells is the block's"
             );
-            assert_eq!(
-                ui.folds.get(&bingo_sdk::ItemId::from_raw("itm_1")),
-                Some(&fold::Fold::Peek),
+            assert!(
+                !ui.wells
+                    .values()
+                    .any(|id| id == &bingo_sdk::ItemId::from_raw("itm_1")),
                 "the step row cycles only its own output"
             );
             let cells = cells_row(&screen);
@@ -3497,4 +3255,10 @@ mod return_tests {
             [Effect::View(tree.root_id().clone())]
         );
     }
+}
+
+pub(crate) fn open_detail(ui: &mut Ui, state: &bingo_sdk::SessionState, now: Now) {
+    let frame = std::mem::take(&mut ui.shown);
+    crate::detail::open(ui, state, &frame, now);
+    ui.shown = frame;
 }

@@ -427,7 +427,10 @@ mod tests {
     fn the_frame_draws_the_cells_and_names_the_picture() {
         let state = folded(vec![said(read(&png(100, 200)))]);
         let (mut ui, now) = scene();
-        ui.folds = opened();
+        ui.set_well(
+            bingo_sdk::TurnId::from_raw("trn_1"),
+            Some(bingo_sdk::ItemId::from_raw("itm_1")),
+        );
         let screen = graphics::with(graphics::drawing(), || {
             let drawn = crate::test_support::draw_tree(80, 24, &solo(&state), &mut ui, now);
             let pictures = ui.shown.blocks.pictures();
@@ -457,7 +460,14 @@ mod tests {
         let pictures = Decoded::default();
         let folds = opened();
         let linked = Linked::default();
-        let rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
+        let wells = [(
+            bingo_sdk::TurnId::from_raw("trn_1"),
+            bingo_sdk::ItemId::from_raw("itm_1"),
+        )]
+        .into_iter()
+        .collect();
+        let mut rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
+        rows.opened.wells = Some(&wells);
         let tail = graphics::with(graphics::drawing(), || {
             let mut blocks = Blocks::default();
             let height = blocks.sync(&state, &Agents::new(), &rows);
@@ -483,7 +493,14 @@ mod tests {
         let pictures = Decoded::default();
         let folds = opened();
         let linked = Linked::default();
-        let rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
+        let wells = [(
+            bingo_sdk::TurnId::from_raw("trn_1"),
+            bingo_sdk::ItemId::from_raw("itm_1"),
+        )]
+        .into_iter()
+        .collect();
+        let mut rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
+        rows.opened.wells = Some(&wells);
         graphics::with(graphics::drawing(), || {
             let mut blocks = Blocks::default();
             blocks.sync(&state, &Agents::new(), &rows);
@@ -504,7 +521,14 @@ mod tests {
         let pictures = Decoded::default();
         let folds = opened();
         let linked = Linked::default();
-        let rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
+        let wells = [(
+            bingo_sdk::TurnId::from_raw("trn_1"),
+            bingo_sdk::ItemId::from_raw("itm_1"),
+        )]
+        .into_iter()
+        .collect();
+        let mut rows = Rows::of(&state, 60, &folds, &pictures, &linked, scene().1);
+        rows.opened.wells = Some(&wells);
         let mut blocks = Blocks::default();
         graphics::with(Graphics::Off, || blocks.sync(&state, &Agents::new(), &rows));
         assert!(blocks.pictures().is_empty(), "drawn as the chip first");

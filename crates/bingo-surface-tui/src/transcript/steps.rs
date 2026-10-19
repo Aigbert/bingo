@@ -9,6 +9,8 @@ pub(super) fn part(item: &Item, role: &Role, rows: &Rows<'_>) -> Option<Block> {
         Role::Own => None,
         Role::Hidden => Some(Block::default()),
         Role::Step { step, opened } => Some(step_block(item, step, *opened, rows)),
+        Role::Thought { opened } => Some(super::thinking::detail(item, *opened, rows.width).into()),
+        Role::Addition => Some(super::band::addition(item, rows).into()),
         Role::Narration => Some(narration(item, rows).into()),
     }
 }
@@ -39,7 +41,7 @@ pub(super) fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>
         out.append(progress(item, step.target_column(), rows));
     }
     if opened {
-        out.append(result(item, rows, Fold::Open));
+        out.append(result(item, step, rows));
     } else if fails_turn(item, step, rows) {
         out.lines.extend(fail_tail(item, rows));
     }
@@ -154,58 +156,6 @@ fn fail_tail(item: &Item, rows: &Rows<'_>) -> Vec<Line<'static>> {
         .collect()
 }
 
-/// What came back from a step, through the site that owns it.
-fn result(item: &Item, rows: &Rows<'_>, fold: Fold) -> crate::views::Drawing {
-    let Some((id, props)) = crate::turns::result(item) else {
-        return crate::views::Drawing::default();
-    };
-    crate::component::resolve(
-        rows.state,
-        rows.pulled,
-        &id,
-        &props,
-        rows.width,
-        &crate::views::Marks::at(rows.now),
-        |changed, width| {
-            let Props::ToolResult(result) = changed else {
-                return crate::views::Drawing::default();
-            };
-            let output = crate::component::items::output_of(&result.output);
-            hung(
-                &output,
-                &Rows {
-                    width,
-                    ..rows.clone()
-                },
-                fold,
-            )
-        },
-    )
-}
-
-/// What came back from a step, under its words, nothing of it folded: the
-/// turn was opened to be read.
-fn hung(output: &ToolOutput, rows: &Rows<'_>, fold: Fold) -> crate::views::Drawing {
-    let inner = rows.width.saturating_sub(HANG).max(1);
-    folded(output, fold, inner, Some(rows.now)).map_lines(|lines| {
-        let body = lines
-            .into_iter()
-            .map(|line| shortened(line, rows))
-            .collect();
-        step_body(body, rows)
-    })
-}
-
-/// A line of output with the paths in it read from this session's directory.
-fn shortened(line: Line<'static>, rows: &Rows<'_>) -> Line<'static> {
-    let spans = line
-        .spans
-        .into_iter()
-        .map(|span| Span::styled(rows.shorten(&span.content), span.style))
-        .collect::<Vec<_>>();
-    Line::from(spans).style(line.style)
-}
-
 fn progress(item: &Item, ax: usize, rows: &Rows<'_>) -> crate::views::Drawing {
     let Some(props @ Props::ToolProgress(_)) = crate::component::items::tail(item) else {
         return Default::default();
@@ -229,6 +179,41 @@ fn progress(item: &Item, ax: usize, rows: &Rows<'_>) -> crate::views::Drawing {
             under(Span::raw(" ".repeat(ax)), vec![line], ax, width)
         },
     )
+}
+
+fn result(item: &Item, step: &Step, rows: &Rows<'_>) -> crate::views::Drawing {
+    let width = crate::well::inner(rows.width);
+    let skipped = step.state == StepState::Skipped;
+    let drawing = if let Some((id, props)) = crate::turns::result(item) {
+        crate::component::resolve(
+            rows.state,
+            rows.pulled,
+            &id,
+            &props,
+            width,
+            &crate::views::Marks::at(rows.now),
+            |props, width| {
+                let Props::ToolResult(result) = props else {
+                    return Default::default();
+                };
+                let output = crate::component::items::output_of(&result.output);
+                if rows.opened.browse_hit == Some(&item.id) {
+                    super::output::whole(&output, width).into()
+                } else {
+                    crate::well::content(Some(&output), step.tier, skipped, width, rows.now)
+                }
+            },
+        )
+    } else {
+        crate::well::content(None, step.tier, skipped, width, rows.now)
+    };
+    drawing.map_lines(|lines| {
+        if rows.opened.browse_hit == Some(&item.id) {
+            super::step_body(lines, rows)
+        } else {
+            crate::well::frame(lines, rows.width)
+        }
+    })
 }
 
 #[cfg(test)]

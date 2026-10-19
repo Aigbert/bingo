@@ -452,7 +452,13 @@ impl Blocks {
     ) -> usize {
         let now = rows.now.instant;
         let agent = agents.get(&item.id).copied();
-        let revision = revision(item, place, agent, fold::fold_of(rows.folds, item), rows);
+        let revision = revision(
+            item,
+            place,
+            agent,
+            fold::fold_of(rows.opened.folds, item),
+            rows,
+        );
         let held = self.blocks.get(at).filter(|entry| entry.id == item.id);
         let same = held.is_some_and(|entry| entry.revision == revision);
         let occupied = held.is_some();

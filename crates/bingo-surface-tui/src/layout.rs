@@ -54,6 +54,11 @@ pub struct Layout {
 }
 
 impl Layout {
+    pub fn below(&self) -> usize {
+        self.height
+            .saturating_sub(self.top + self.regions.transcript.height as usize)
+    }
+
     pub fn wake(&mut self, next: Option<Instant>) {
         self.next_frame = self.next_frame.into_iter().chain(next).min();
     }

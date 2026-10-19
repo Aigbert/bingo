@@ -223,28 +223,3 @@ fn an_empty_thought_draws_the_row_alone() {
     let (mut ui, now) = scene();
     both("reasoning_redacted", &solo(&state), &mut ui, now);
 }
-
-/// `⏎` on a `▏ Thought for 2s` row: what was thought, whole.
-#[test]
-fn a_thought_opens_in_a_sheet() {
-    let state = folded(vec![item(
-        1,
-        thought(
-            "itm_1",
-            "The manifest first, because the lockfile only says what the\n\
-             manifest already asked for.\n\n\
-             Then the crate map, which is the one place the layering is\n\
-             written down.",
-            2,
-        ),
-    )]);
-    let (mut ui, now) = scene();
-    shown(
-        &mut ui,
-        Open::Pager(crate::pager::Pager::open(bingo_sdk::ItemId::from_raw(
-            "itm_1",
-        ))),
-        now,
-    );
-    both("reasoning_sheet", &solo(&state), &mut ui, now);
-}

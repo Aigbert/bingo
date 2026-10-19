@@ -51,6 +51,7 @@ pub fn next_is_thought<T: std::borrow::Borrow<Item>>(items: &[T], at: usize) -> 
 /// Whether this item's own block is the one on the screen. Every item's is,
 /// except a thought a newer one joined: the run draws on its last, so the
 /// fold, the click and the sheet are all that one's.
+#[cfg(test)]
 pub fn ends_its_run(state: &SessionState, item: &Item) -> bool {
     if !is_thought(item) {
         return true;

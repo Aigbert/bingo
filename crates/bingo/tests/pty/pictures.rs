@@ -4,8 +4,7 @@
 
 use super::*;
 
-/// Ask for the picture and open the turn that read it: a finished turn folds
-/// to one line, and what a step brought back shows under it opened (M185).
+/// Ask for the picture, select its step in detail, and open its well.
 fn look(terminal: &mut Terminal) {
     terminal.send(b"look at it\r");
     open_the_turn(terminal);
@@ -17,6 +16,8 @@ fn look(terminal: &mut Terminal) {
 fn open_the_turn(terminal: &mut Terminal) {
     terminal.wait_for("That is the picture.");
     terminal.send(&[0x0f]);
+    terminal.wait_for("esc close");
+    terminal.send(b"\r");
 }
 
 /// A picture in the transcript on a terminal that says it draws pictures:

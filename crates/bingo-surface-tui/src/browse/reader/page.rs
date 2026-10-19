@@ -3,7 +3,7 @@
 use bingo_sdk::ItemId;
 use serde::Deserialize;
 
-use super::{Pager, Return, Source};
+use super::{Pager, Reader, Return, Source};
 use crate::clock::Now;
 use crate::focus::Focus;
 use crate::tree::Tree;
@@ -62,12 +62,26 @@ pub fn open(ui: &mut Ui, tree: &Tree, page: Page, now: Now) {
     {
         return;
     }
+    if let Source::Item(id) = &page.source
+        && !crate::browse::active(ui)
+    {
+        crate::detail::toggle(ui, tree.viewed(), id);
+        return;
+    }
+    let pager = Pager::new(page.source);
+    if let Some(Open::Browse(browse)) = ui.focus.open_mut() {
+        browse.reader = Some(Box::new(pager));
+        return;
+    }
     let return_to = match &page.return_to {
         Some(pane) => placed(tree, pane).map(Return::Pane),
-        None => behind(ui),
+        None => match &ui.focus {
+            Focus::Pane(key) => Some(Return::Pane(key.clone())),
+            _ => None,
+        },
     };
-    let pager = Pager::new(page.source, return_to);
-    ui.focus.show(Open::Pager(pager), now.instant);
+    ui.focus
+        .show(Open::Reader(Reader { pager, return_to }), now.instant);
 }
 
 fn placed(tree: &Tree, pane: &PaneRef) -> Option<String> {
@@ -75,14 +89,6 @@ fn placed(tree: &Tree, pane: &PaneRef) -> Option<String> {
         .into_iter()
         .find(|placed| placed.plugin == pane.plugin && placed.id == pane.id)
         .map(|placed| placed.key)
-}
-
-fn behind(ui: &Ui) -> Option<Return> {
-    match (&ui.focus, ui.focus.open()) {
-        (_, open @ Open::Browse(_)) => Some(Return::Layer(Box::new(open.clone()))),
-        (Focus::Pane(key), _) => Some(Return::Pane(key.clone())),
-        _ => None,
-    }
 }
 
 #[cfg(test)]
@@ -97,7 +103,15 @@ mod tests {
 
     fn with_pane() -> bingo_sdk::SessionState {
         let mut state = state();
-        state.transcript = vec![user("i1", "first")].into_iter().collect();
+        state.transcript = vec![tool(
+            "i1",
+            "Read",
+            json!({}),
+            Some(bingo_sdk::ToolOutput::text("first")),
+            bingo_sdk::ItemStatus::Completed,
+        )]
+        .into_iter()
+        .collect();
         let slot = serde_json::from_value(json!({
             "kind":"pane", "id":"memory", "title":"memory", "focus":true,
             "asked":true, "closeOnEscape":false, "holdToasts":false, "rows":8,
@@ -144,9 +158,7 @@ mod tests {
         open(&mut ui, &tree, Page::item(ItemId::from_raw("gone")), now);
         assert!(!ui.focus.showing());
         open(&mut ui, &tree, parsed(json!({"item":"i1"})), now);
-        assert!(
-            matches!(ui.focus.open(), Open::Pager(p) if p.source == Source::Item(ItemId::from_raw("i1")) && p.return_to.is_none())
-        );
+        assert!(ui.wells.values().any(|id| id == &ItemId::from_raw("i1")));
     }
 
     #[test]
@@ -158,9 +170,9 @@ mod tests {
         let page = json!({"title":"t","text":"body","return_to":{"plugin":"owner","id":"memory"}});
         open(&mut ui, &tree, parsed(page), now);
         assert!(
-            matches!(ui.focus.open(), Open::Pager(p) if p.return_to == Some(Return::Pane(key.clone())))
+            matches!(ui.focus.open(), Open::Reader(p) if p.return_to == Some(Return::Pane(key.clone())))
         );
-        crate::pager::keys(
+        crate::browse::reader::keys(
             &mut ui,
             &tree,
             key_press(crossterm::event::KeyCode::Esc),
@@ -183,8 +195,43 @@ mod tests {
             now,
         );
         assert!(
-            matches!(ui.focus.open(), Open::Pager(p) if p.return_to == Some(Return::Pane(key)))
+            matches!(ui.focus.open(), Open::Reader(p) if p.return_to == Some(Return::Pane(key)))
         );
+    }
+
+    #[test]
+    fn a_memory_reader_owns_its_keys_and_uses_conversation_search() {
+        use crossterm::event::KeyCode;
+        let tree = solo(&state());
+        let (mut ui, now) = scene();
+        open(
+            &mut ui,
+            &tree,
+            parsed(json!({"title":"memory","text":"warm cache\n你好 warm"})),
+            now,
+        );
+        assert!(matches!(ui.focus.open(), Open::Reader(_)));
+        crate::input::on_key(&mut ui, &tree, key_press(KeyCode::Char('/')), now);
+        for c in "warm".chars() {
+            crate::input::on_key(&mut ui, &tree, key_press(KeyCode::Char(c)), now);
+        }
+        let reader = crate::browse::reader::current(&ui).unwrap();
+        let query = reader.search.as_ref().unwrap();
+        assert_eq!(query.query, "warm");
+        assert_eq!(
+            crate::search::hits(&["warm cache".into(), "你好 warm".into()], &query.query).len(),
+            2
+        );
+        assert!(ui.composer.is_empty());
+        crate::input::on_key(&mut ui, &tree, key_press(KeyCode::Esc), now);
+        assert!(
+            crate::browse::reader::current(&ui)
+                .unwrap()
+                .search
+                .is_none()
+        );
+        crate::input::on_key(&mut ui, &tree, key_press(KeyCode::Esc), now);
+        assert!(!ui.focus.showing());
     }
 
     fn key_press(code: crossterm::event::KeyCode) -> crossterm::event::KeyEvent {

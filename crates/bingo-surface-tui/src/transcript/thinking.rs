@@ -13,7 +13,7 @@ use ratatui::text::{Line, Span};
 
 use super::{Place, Rows, THOUGHT_ROWS, plain, returns, tail};
 use crate::fold::Fold;
-use crate::{theme, thoughts};
+use crate::{layout::grid, theme, thoughts};
 
 /// A thought is readable where it happened, and while it is being had: `▏
 /// Thinking…` over the newest [`THOUGHT_ROWS`] rows of what has arrived so
@@ -123,6 +123,54 @@ pub fn thought(item: &Item) -> Option<&str> {
         ItemBody::Reasoning { text, .. } if !text.trim().is_empty() => Some(text),
         _ => None,
     }
+}
+
+pub(super) fn detail(item: &Item, opened: bool, width: usize) -> crate::views::Drawing {
+    let ItemBody::Reasoning { text, .. } = &item.body else {
+        return Default::default();
+    };
+    let elapsed = item
+        .completed_at
+        .unwrap_or(item.started_at)
+        .duration_since(item.started_at);
+    let right = if elapsed.as_secs() >= 1 {
+        bingo_sdk::component::row::fmt_dur(elapsed.as_millis() as u64)
+    } else {
+        String::new()
+    };
+    let room = width
+        .saturating_sub(grid::AX + grid::RM + if right.is_empty() { 0 } else { right.len() + 2 });
+    let preview = grid::fit(
+        Line::from(Span::styled(
+            text.replace('\n', " "),
+            theme::dim().patch(theme::italic()),
+        )),
+        room,
+    );
+    let mut line = Line::from(vec![
+        Span::raw(" ".repeat(grid::TX)),
+        Span::styled(theme::glyphs::get("think"), theme::dim()),
+        Span::raw(" "),
+        Span::styled("think", theme::dim()),
+    ]);
+    line = grid::pad_to(line, grid::AX);
+    line.spans.extend(preview.spans);
+    if !right.is_empty() {
+        line = grid::pad_to(line, width.saturating_sub(grid::RM + right.len()));
+        line.spans.push(Span::styled(right, theme::dim()));
+    }
+    let mut lines = vec![line];
+    if opened {
+        let body = crate::wrap::wrap_all(
+            &[Line::from(Span::styled(
+                text.clone(),
+                theme::ash().patch(theme::italic()),
+            ))],
+            crate::well::inner(width).max(1),
+        );
+        lines.extend(crate::well::frame(body, width));
+    }
+    lines.into()
 }
 
 #[cfg(test)]

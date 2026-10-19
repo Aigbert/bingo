@@ -16,7 +16,6 @@ use crate::fold::Folds;
 use crate::graphics::{Decoded, Linked};
 use crate::layers::{self, Reveal};
 use crate::layout::Layout;
-use crate::pager::Pager;
 use crate::rewind::Rewind;
 use crate::scroll::Scroll;
 use crate::select::{self, Cell, Dragging, Edge};
@@ -182,9 +181,8 @@ pub enum Open {
     Palette(crate::palette::Opened),
     Sessions(crate::sessions::Opened),
     Browse(crate::browse::Opened),
+    Reader(crate::browse::reader::Reader),
     Plugins(crate::plugins::Opened),
-    /// One block, whole, as a sheet.
-    Pager(Pager),
     /// The turns of this transcript, as a card above the input box.
     Rewind(Rewind),
 }
@@ -201,8 +199,8 @@ impl Open {
                 | Open::Sessions(_)
                 | Open::Plugins(_)
                 | Open::Browse(_)
+                | Open::Reader(_)
                 | Open::Palette(_)
-                | Open::Pager(_)
                 | Open::Rewind(_)
         )
     }
@@ -293,6 +291,7 @@ pub struct Placed {
 
 #[derive(Debug)]
 pub struct Ui {
+    pub wells: std::collections::BTreeMap<bingo_sdk::TurnId, bingo_sdk::ItemId>,
     pub placed: Placed,
     pub(crate) controls: controls::Controls,
     pub scroll: Scroll,
@@ -346,6 +345,7 @@ impl Ui {
 
     pub fn new(history: Vec<String>, now: Instant) -> Self {
         Self {
+            wells: Default::default(),
             controls: controls::Controls::new(history),
             placed: Placed::default(),
             scroll: Scroll::default(),
@@ -642,6 +642,19 @@ impl Ui {
     /// the column the pointer left the region at.
     fn head_column(&self) -> usize {
         self.focus.selection().map_or(0, |run| run.head.column)
+    }
+}
+
+impl Ui {
+    pub fn set_well(&mut self, turn: bingo_sdk::TurnId, item: Option<bingo_sdk::ItemId>) {
+        match item {
+            Some(item) => {
+                self.wells.insert(turn, item);
+            }
+            None => {
+                self.wells.remove(&turn);
+            }
+        }
     }
 }
 

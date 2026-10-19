@@ -1,19 +1,19 @@
-//! Looking through the transcript.
-//!
-//! `ctrl+f` takes the composer's row for a query; committing it finds every
-//! place the words occur in the rendered transcript and `n`/`N` walk them,
-//! scrolling the transcript to each. The hits are cells — a line and a run of
-//! columns — because that is what a highlight is drawn over, and because a
-//! block's rendering is what a person is actually reading.
-
-use crate::layout::Canvas;
-use ratatui::layout::Rect;
-use ratatui::text::{Line, Span};
+//! Find owns only its query, current match and where the stream was parked when it opened.
+use crate::{
+    clock::Now,
+    focus::Focus,
+    keys,
+    layout::{Canvas, Layout},
+    theme,
+    ui::Ui,
+};
+use ratatui::{
+    layout::Rect,
+    text::{Line, Span},
+    widgets::Paragraph,
+};
 use unicode_width::UnicodeWidthStr;
 
-use crate::theme;
-
-/// One occurrence: a transcript line and the cells it covers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Hit {
     pub line: usize,
@@ -21,86 +21,152 @@ pub struct Hit {
     pub width: usize,
 }
 
-/// What is being looked for, and what was found.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Search {
     pub query: String,
-    /// The query is still being typed; `enter` commits it.
-    pub typing: bool,
-    hits: Vec<Hit>,
-    at: usize,
+    pub current: Option<usize>,
+    /// Where the stream was parked when find opened, which esc gives back.
+    pub from: crate::scroll::Scroll,
 }
 
-/// What the row says when a committed query found nothing.
-pub const NONE: &str = "no matches";
-/// What the row opens with.
-pub const PROMPT: &str = "/";
-
 impl Search {
-    /// A fresh, empty query with the caret in it.
     pub fn open() -> Self {
-        Self {
-            typing: true,
-            ..Self::default()
-        }
+        Self::default()
     }
-
-    pub fn typed(&mut self, c: char) {
+    pub fn type_char(&mut self, c: char) {
         self.query.push(c);
+        self.current = None;
     }
-
-    pub fn backspace(&mut self) {
+    pub fn delete(&mut self) {
         self.query.pop();
+        self.current = None;
     }
-
-    /// Look through the rendered transcript and stop typing. Matching ignores
-    /// case: a person searching a transcript is looking for words, not for
-    /// the shape they happened to be written in.
-    pub fn find(&mut self, lines: &[String]) {
-        self.typing = false;
-        self.at = 0;
-        self.hits = match self.query.is_empty() {
-            true => Vec::new(),
-            false => hits(lines, &self.query),
-        };
+    pub fn step(&mut self, hits: &[Hit], by: isize) {
+        self.current = self
+            .at(hits)
+            .map(|at| at.saturating_add_signed(by).min(hits.len() - 1));
     }
+    pub fn at(&self, hits: &[Hit]) -> Option<usize> {
+        (!hits.is_empty()).then(|| self.current.unwrap_or(hits.len() - 1).min(hits.len() - 1))
+    }
+}
 
-    /// Step `by` hits, wrapping at either end.
-    pub fn step(&mut self, by: isize) {
-        if self.hits.is_empty() {
-            return;
+pub fn open(ui: &mut Ui, now: Now) {
+    if ui.shown.blocks.height() == 0 {
+        ui.notify(bingo_sdk::Level::Info, "nothing to find yet", now.instant);
+        return;
+    }
+    ui.focus = Focus::Search(Search {
+        from: ui.scroll,
+        ..Search::open()
+    });
+}
+
+pub fn key(ui: &mut Ui, key: crossterm::event::KeyEvent, now: Now) -> Vec<crate::effect::Effect> {
+    let lines = drawn(&ui.shown);
+    let Some(search) = ui.focus.search_mut() else {
+        return Vec::new();
+    };
+    match keys::find(key) {
+        Some(keys::Find::Back) => back(ui),
+        Some(keys::Find::Keep) => {
+            ui.focus = Focus::Composer;
+            ui.scroll = crate::scroll::Scroll::park(ui.shown.top, now.instant);
         }
-        let count = self.hits.len() as isize;
-        self.at = (self.at as isize + by).rem_euclid(count) as usize;
-    }
-
-    pub fn current(&self) -> Option<Hit> {
-        self.hits.get(self.at).copied()
-    }
-
-    /// The hits on one transcript line, and whether each is the current one.
-    pub fn on(&self, line: usize) -> impl Iterator<Item = (Hit, bool)> {
-        self.hits
-            .iter()
-            .enumerate()
-            .filter(move |(_, hit)| hit.line == line)
-            .map(|(index, hit)| (*hit, index == self.at))
-    }
-
-    /// What the row says to the right of the query.
-    pub fn tally(&self) -> String {
-        if self.typing {
-            return String::new();
+        Some(keys::Find::Move(by)) => {
+            let hits = hits(&lines, &search.query);
+            search.step(&hits, by);
         }
-        match self.hits.len() {
-            0 => NONE.to_string(),
-            found => format!("{}/{found}", self.at + 1),
-        }
+        Some(keys::Find::Type(c)) => search.type_char(c),
+        Some(keys::Find::Delete) => search.delete(),
+        None => {}
     }
+    Vec::new()
+}
+
+/// Closes find and gives back where the stream was when it opened.
+pub fn back(ui: &mut Ui) {
+    if let Some(search) = ui.focus.search() {
+        ui.scroll = search.from;
+    }
+    ui.focus = Focus::Composer;
+}
+
+pub fn drawn(frame: &Layout) -> Vec<String> {
+    frame
+        .blocks
+        .window(0, frame.blocks.height())
+        .into_iter()
+        .map(|line| {
+            crate::layout::grid::fit(line, frame.regions.transcript.width as usize).to_string()
+        })
+        .collect()
+}
+
+pub fn top(search: &Search, frame: &Layout, height: usize) -> Option<usize> {
+    let hits = hits(&drawn(frame), &search.query);
+    let hit = hits.get(search.at(&hits)?)?;
+    Some(
+        hit.line
+            .saturating_sub(height / 2)
+            .min(frame.height.saturating_sub(height)),
+    )
+}
+
+pub fn demand(ui: &Ui) -> Option<u16> {
+    ui.focus.search().map(|_| 1)
+}
+
+pub fn draw(search: &Search, ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
+    let hits = hits(&drawn(frame), &search.query);
+    let tally = if search.query.is_empty() {
+        String::new()
+    } else {
+        search
+            .at(&hits)
+            .map(|at| format!("{} of {}", at + 1, hits.len()))
+            .unwrap_or_else(|| "no match".into())
+    };
+    let mut line = Line::from(vec![
+        Span::raw(" ".repeat(crate::layout::grid::TX)),
+        Span::styled("find  ", theme::dim()),
+        Span::styled(search.query.clone(), theme::text()),
+    ]);
+    let rest = ui.keyed_at + std::time::Duration::from_secs(10);
+    let now = Now {
+        motion: now.motion && now.instant < rest,
+        ..now
+    };
+    let caret = crate::views::Drawing {
+        lines: vec![Line::from(Span::styled(
+            theme::glyphs::get("caret"),
+            theme::caret_ink(now, "glow", "you").unwrap_or_default(),
+        ))],
+        next: now
+            .motion
+            .then_some((now.instant + crate::clock::FRAME).min(rest)),
+    };
+    let caret_width = line.width();
+    line.spans
+        .extend(caret.lines.into_iter().flat_map(|line| line.spans));
+    if search.query.is_empty() {
+        line.spans
+            .push(Span::styled("in this conversation", theme::dim()));
+    }
+    let room = (area.width as usize).saturating_sub(2 + tally.width());
+    line = crate::layout::grid::pad_to(line, room);
+    line.spans.push(Span::styled(tally, theme::ash()));
+    if area.height > 0 && caret_width < area.width as usize {
+        frame.wake(caret.next);
+    }
+    frame.render_widget(Paragraph::new(line), area);
 }
 
 /// Every occurrence of `query` in these lines, in reading order.
-fn hits(lines: &[String], query: &str) -> Vec<Hit> {
+pub fn hits(lines: &[String], query: &str) -> Vec<Hit> {
+    if query.is_empty() {
+        return Vec::new();
+    }
     let needle = query.to_lowercase();
     lines
         .iter()
@@ -126,139 +192,75 @@ fn in_line(line: usize, text: &str, needle: &str) -> Vec<Hit> {
     out
 }
 
-/// The query and its count, without action hints.
-pub fn row(search: &Search) -> Line<'static> {
-    let caret = if search.typing { theme::caret() } else { "" };
-    Line::from(vec![
-        Span::styled(format!("{PROMPT}{}{caret}", search.query), theme::text()),
-        Span::styled(format!("  {}", search.tally()), theme::dim()),
-    ])
-}
-
-/// Paint the hits that are on the screen. It is a pass over the cells the
-/// transcript already drew, so no block has to know it was searched.
-///
-/// `area`'s first row is line `top`: it is the rows carrying lines, which is
-/// not the whole region when a short transcript hangs from the composer.
-pub fn mark(frame: &mut Canvas, area: Rect, top: usize, search: &Search) {
-    for row in 0..area.height {
-        let line = top + row as usize;
-        for (hit, current) in search.on(line) {
-            let style = match current {
-                true => theme::presence().patch(theme::bold()),
-                false => theme::raised().patch(theme::bold()),
-            };
-            paint(frame, area, area.y + row, hit, style);
+pub fn mark(frame: &mut Canvas, area: Rect, top: usize, search: &Search, lines: &[String]) {
+    let hits = hits(lines, &search.query);
+    let current = search.at(&hits);
+    for (i, hit) in hits.into_iter().enumerate() {
+        let Some(y) = hit
+            .line
+            .checked_sub(top)
+            .filter(|y| *y < area.height as usize)
+        else {
+            continue;
+        };
+        let style = if Some(i) == current {
+            theme::ground("glow")
+                .unwrap_or_default()
+                .patch(theme::foreground("bg").unwrap_or_default())
+        } else {
+            theme::ground("glowTint").unwrap_or_default()
+        };
+        for x in hit.column..(hit.column + hit.width).min(area.width as usize) {
+            frame.buffer_mut()[(area.x + x as u16, area.y + y as u16)].set_style(style);
         }
-    }
-}
-
-fn paint(frame: &mut Canvas, area: Rect, y: u16, hit: Hit, style: ratatui::style::Style) {
-    let buffer = frame.buffer_mut();
-    let from = area
-        .x
-        .saturating_add(u16::try_from(hit.column).unwrap_or(u16::MAX));
-    let to = from.saturating_add(u16::try_from(hit.width).unwrap_or(0));
-    for x in from..to.min(area.right()) {
-        buffer[(x, y)].set_style(style);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn lines() -> Vec<String> {
-        vec![
-            "the cache is warm".to_string(),
-            "Cache the cache".to_string(),
-            "nothing here".to_string(),
-        ]
-    }
-
-    fn found(query: &str) -> Search {
-        let mut search = Search::open();
-        for c in query.chars() {
-            search.typed(c);
-        }
-        search.find(&lines());
-        search
-    }
-
     #[test]
-    fn a_committed_query_finds_every_occurrence_in_reading_order() {
-        let search = found("cache");
+    fn query_edits_reset_selection_and_steps_clamp_at_both_ends() {
+        let mut search = Search::open();
+        search.type_char('x');
+        let hits = hits(&["x x".into()], &search.query);
+        search.step(&hits, 1);
+        assert_eq!(search.current, Some(1));
+        search.step(&hits, -10);
+        assert_eq!(search.current, Some(0));
+        search.step(&hits, 10);
+        assert_eq!(search.current, Some(1));
+        search.delete();
+        assert_eq!(search.query, "");
+        assert_eq!(search.current, None);
+        search.step(&[], 1);
+        assert_eq!(search.current, None);
+    }
+    #[test]
+    fn matcher_is_case_insensitive_and_counts_a_wide_character_once() {
         assert_eq!(
-            search.hits,
+            hits(&["你好 Reset 你".into()], "你"),
             vec![
                 Hit {
                     line: 0,
-                    column: 4,
-                    width: 5
-                },
-                Hit {
-                    line: 1,
                     column: 0,
-                    width: 5
+                    width: 2
                 },
                 Hit {
-                    line: 1,
-                    column: 10,
-                    width: 5
-                },
+                    line: 0,
+                    column: 11,
+                    width: 2
+                }
             ]
         );
-        assert!(!search.typing, "committing stops the typing");
-        assert_eq!(search.tally(), "1/3");
-    }
-
-    #[test]
-    fn stepping_walks_the_hits_and_wraps_both_ways() {
-        let mut search = found("cache");
-        search.step(1);
-        assert_eq!(search.current().map(|h| h.line), Some(1));
-        assert_eq!(search.tally(), "2/3");
-        search.step(1);
-        search.step(1);
-        assert_eq!(search.current().map(|h| h.line), Some(0), "it wrapped");
-        search.step(-1);
-        assert_eq!(search.current().map(|h| h.column), Some(10));
-    }
-
-    #[test]
-    fn a_query_nothing_matches_says_so_and_steps_nowhere() {
-        let mut search = found("banana");
-        assert_eq!(search.tally(), NONE);
-        search.step(1);
-        assert!(search.current().is_none());
-    }
-
-    #[test]
-    fn an_empty_query_finds_nothing_rather_than_everything() {
-        let mut search = Search::open();
-        search.find(&lines());
-        assert!(search.current().is_none());
-    }
-
-    #[test]
-    fn the_hits_on_a_line_know_which_one_the_eye_is_on() {
-        let mut search = found("cache");
-        search.step(1);
-        let on = search.on(1).collect::<Vec<_>>();
-        assert_eq!(on.len(), 2);
-        assert!(on[0].1, "the second hit is the current one");
-        assert!(!on[1].1);
-        assert_eq!(search.on(2).count(), 0);
-    }
-
-    #[test]
-    fn a_hit_is_measured_in_cells_so_a_wide_glyph_does_not_shift_it() {
-        let mut search = Search::open();
-        for c in "warm".chars() {
-            search.typed(c);
-        }
-        // `▍ ` is two cells and each of `你好` is two more.
-        search.find(&["▍ 你好 warm".to_string()]);
-        assert_eq!(search.current().map(|h| h.column), Some(7));
+        assert_eq!(
+            hits(&["你好 Reset".into()], "reset"),
+            vec![Hit {
+                line: 0,
+                column: 5,
+                width: 5
+            }]
+        );
+        assert!(hits(&["text".into()], "").is_empty());
     }
 }

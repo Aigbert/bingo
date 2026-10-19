@@ -2,11 +2,10 @@
 //! folded to the rows the transcript can spare, with a line that says how
 //! much was left out and what opens it (design §5).
 
-use bingo_sdk::{ContentPart, ToolOutput, View};
+use bingo_sdk::{ContentPart, ToolOutput};
 use ratatui::text::{Line, Span};
 use unicode_width::UnicodeWidthChar;
 
-use super::{DIFF_ROWS, EXPAND, OUTPUT_ROWS};
 use crate::fold::Fold;
 use crate::{theme, views, wrap};
 
@@ -41,35 +40,12 @@ pub(super) fn tail(arriving: &str, keep: usize, width: usize) -> Vec<Line<'stati
     rows.split_off(rows.len().saturating_sub(keep))
 }
 
-/// What a person reads under a finished tool row: the display the tool drew
-/// for them when there is one (ADR-0013 §2, the block lane), else the text the
-/// model read, folded to what a row can spare either way.
-pub(super) fn folded(
-    output: &ToolOutput,
-    fold: Fold,
-    width: usize,
-    now: Option<crate::clock::Now>,
-) -> views::Drawing {
-    if fold == Fold::Shut {
-        return views::Drawing::default();
-    }
-    let marks = views::Marks {
-        now,
-        ..Default::default()
-    };
-    let (drawing, limit) = match &output.display {
-        Some(view @ View::Diff { .. }) => (views::marked(view, width, &marks), DIFF_ROWS),
-        Some(view @ View::Text { .. }) => (plain(&view.fold()).into(), OUTPUT_ROWS),
-        Some(view) => (views::marked(view, width, &marks), OUTPUT_ROWS),
-        None => (plain(&text_of(output)).into(), OUTPUT_ROWS),
-    };
-    drawing.map_lines(|lines| kept(lines, fold, limit, Some(EXPAND)))
-}
-
-/// Everything a result says, with nothing folded away: what the pager opens
-/// (design §5 — a long output opens in a sheet).
+/// The full owner's display for Browse's reader.
 pub fn whole(output: &ToolOutput, width: usize) -> Vec<Line<'static>> {
-    folded(output, Fold::Open, width, None).lines
+    match &output.display {
+        Some(view) => views::render(view, width),
+        None => plain(&text_of(output)),
+    }
 }
 
 pub(super) fn plain(text: &str) -> Vec<Line<'static>> {
@@ -140,151 +116,4 @@ pub(super) fn cut(
         )));
     }
     out
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn a_text_display_has_the_same_dim_style_as_plain_output() {
-        let mut output = ToolOutput::text("model text");
-        output.display = Some(View::text("display text"));
-        assert_eq!(whole(&output, 80), plain("display text"));
-    }
-
-    #[test]
-    fn styled_and_nested_text_displays_keep_plain_layout() {
-        for display in [
-            serde_json::json!({"kind":"Text","color":"good","children":["a\tb  \n"]}),
-            serde_json::json!({"kind":"Text","children":[{"kind":"Text","color":"good","children":["a\tb  \n"]}]}),
-        ] {
-            let view: View = serde_json::from_value(display).unwrap();
-            let mut output = ToolOutput::text("model text");
-            output.display = Some(view.clone());
-            let drawn = folded(
-                &output,
-                Fold::Open,
-                80,
-                Some(crate::test_support::scene().1),
-            );
-            assert_eq!(drawn.lines, plain(&view.fold()));
-            assert_eq!(drawn.lines[0].to_string(), "a       b");
-            assert_eq!(drawn.next, None);
-        }
-    }
-
-    #[test]
-    fn a_box_display_keeps_its_clock_and_deadline() {
-        let mut output = ToolOutput::text("model text");
-        output.display = Some(
-            serde_json::from_value(serde_json::json!({
-                "kind": "Box", "children": [{
-                    "kind": "Text", "motion": {"kind": "spin"}, "children": ["waiting"]
-                }]
-            }))
-            .unwrap(),
-        );
-        let now = crate::test_support::scene().1;
-        let moving = folded(&output, Fold::Open, 80, Some(now));
-        assert_eq!(
-            moving.lines[0].to_string().trim(),
-            crate::spinner::glyph(now)
-        );
-        assert_eq!(moving.next, Some(crate::spinner::next(now)));
-        assert_eq!(folded(&output, Fold::Open, 80, None).next, None);
-    }
-
-    use unicode_width::UnicodeWidthStr;
-
-    use super::*;
-
-    /// The paragraph the bug was reported on: one logical line, many rows.
-    const PARAGRAPH: &str = "The manifest first, because the lockfile only says what \
-                             the manifest already asked for, and then the crate map, \
-                             which is the one place the layering is written down.";
-
-    fn rows(lines: &[Line<'static>]) -> Vec<String> {
-        lines.iter().map(Line::to_string).collect()
-    }
-
-    #[test]
-    fn one_long_paragraph_is_cut_to_the_rows_it_ends_on() {
-        let cut = tail(PARAGRAPH, 2, 40);
-        assert_eq!(cut.len(), 2, "{:?}", rows(&cut));
-        let whole = wrap::wrap_all(&plain(PARAGRAPH), 40);
-        assert_eq!(rows(&cut), rows(&whole[whole.len() - 2..]));
-    }
-
-    #[test]
-    fn a_text_shorter_than_the_cut_is_kept_whole() {
-        assert_eq!(rows(&tail("one\ntwo", 3, 40)), vec!["one", "two"]);
-    }
-
-    #[test]
-    fn nothing_arrived_yet_is_no_rows_at_all() {
-        assert!(tail("", 2, 40).is_empty());
-    }
-
-    /// A cell, not a character: a CJK row holds ten glyphs at twenty columns,
-    /// so a cut counting characters would keep twice the block it promised.
-    #[test]
-    fn a_wide_paragraph_is_cut_by_cells() {
-        let paragraph = "先立组件后立系统再立原语".repeat(3);
-        let cut = tail(&paragraph, 2, 20);
-        assert_eq!(cut.len(), 2);
-        let drawn = rows(&cut);
-        assert!(
-            drawn
-                .iter()
-                .all(|row| UnicodeWidthStr::width(&row[..]) <= 20),
-            "{drawn:?}"
-        );
-        assert!(paragraph.ends_with(&drawn.concat()), "{drawn:?}");
-    }
-
-    /// Crossing a paragraph break keeps the count where it was, which is the
-    /// whole point of counting rows.
-    #[test]
-    fn a_paragraph_break_does_not_shrink_the_count() {
-        let across = format!("{PARAGRAPH}\n\nThen the plan.");
-        assert_eq!(tail(&across, 2, 40).len(), 2);
-        assert_eq!(rows(&tail(&across, 2, 40))[1], "Then the plan.");
-    }
-
-    /// The shape the hands-on drive caught (2026-09-06): three paragraphs whose
-    /// last is one short sentence. The break above the sentence was a row of
-    /// the tail, so the `⎿` hung on nothing for the rest of the session; the
-    /// tail is the end of the paragraph over the sentence.
-    #[test]
-    fn a_break_above_the_last_sentence_is_not_a_row_of_the_tail() {
-        let drive = format!("{PARAGRAPH}\n\nSo: manifest, map, plan.");
-        let whole = wrap::wrap_all(&plain(PARAGRAPH), 40);
-        assert_eq!(
-            rows(&tail(&drive, 2, 40)),
-            vec![
-                whole[whole.len() - 1].to_string(),
-                "So: manifest, map, plan.".to_string(),
-            ],
-        );
-    }
-
-    /// A text that ends on a blank line has arrived as far as the line before
-    /// it: the tail is the rows that carry text, not the emptiness after them.
-    #[test]
-    fn a_text_that_ends_blank_tails_to_the_rows_before_the_blank() {
-        assert_eq!(rows(&tail("one\ntwo\n\n", 2, 40)), vec!["one", "two"]);
-    }
-
-    /// `transcript::under` wraps the tail again at the same width when it
-    /// hangs it under the `⎿`, so that second pass has to be the identity —
-    /// otherwise the count the cut promised is not the count on the screen.
-    #[test]
-    fn wrapping_the_tail_again_at_its_own_width_changes_nothing() {
-        for text in [
-            PARAGRAPH,
-            "  an indented line that is long enough to wrap twice",
-        ] {
-            let cut = tail(text, 2, 40);
-            assert_eq!(wrap::wrap_all(&cut, 40), cut, "{:?}", rows(&cut));
-        }
-    }
 }

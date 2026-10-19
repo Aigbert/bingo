@@ -13,7 +13,10 @@ pub fn scene(name: &str) -> (SessionState, crate::tool_rows::Looks) {
 
 pub fn turns(name: &str) -> Vec<Value> {
     let data = match name {
-        "done" | "ascii-done" | "small-done" | "mode" | "mode-later" => include_str!("done.json"),
+        "done" | "done-detail" | "done-well" | "done-folded" | "ledger" | "ledger-up" | "find"
+        | "find-up" | "find-back" | "ascii-done" | "small-done" | "mode" | "mode-later" => {
+            include_str!("done.json")
+        }
         "stop" => include_str!("stop.json"),
         "steer" => include_str!("steer.json"),
         "steer-landed" => include_str!("steer-landed.json"),
@@ -163,6 +166,7 @@ pub fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
         let at = data["at"].as_i64().unwrap();
         let end = data["end"]
             .as_i64()
+            .or_else(|| data["ms"].as_i64().map(|ms| at + ms))
             .or_else(|| item.status.is_terminal().then_some(at));
         stamp(&mut item, at, end);
         emit(
@@ -281,9 +285,21 @@ fn call(id: &str, data: &Value) -> Item {
         .filter_map(Value::as_str)
         .collect::<Vec<_>>()
         .join("\n");
-    let output = status
-        .is_terminal()
-        .then(|| ToolOutput::text(&tail).with_upshot(upshot));
+    let output = status.is_terminal().then(|| {
+        let text = data["out"]
+            .as_array()
+            .map(|lines| {
+                lines
+                    .iter()
+                    .filter_map(Value::as_str)
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
+            .unwrap_or_else(|| tail.clone());
+        let mut output = ToolOutput::text(text).with_upshot(upshot);
+        output.display = display(data);
+        output
+    });
     let mut item = tool(
         id,
         data["tool"].as_str().unwrap(),
@@ -423,4 +439,114 @@ pub fn provider_events(n: usize, turn: &Value) -> Vec<(i64, Event)> {
     }
     events.sort_by_key(|(at, _)| *at);
     events
+}
+
+fn display(data: &Value) -> Option<bingo_sdk::View> {
+    if let Some(diff) = data["diff"].as_array() {
+        return diff_display(diff);
+    }
+    let code = data["code"].as_object()?;
+    let lines = code["lines"].as_array()?;
+    let start = code["start"].as_u64()? as u32;
+    let source = lines
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<Vec<_>>()
+        .join("\n");
+    let of = code["of"].as_u64()? as usize;
+    let mut file: Vec<String> = vec![String::new(); start as usize - 1];
+    file.extend(source.split('\n').map(str::to_string));
+    file.resize(of, "unread source line".into());
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("source.rs"), file.join("\n")).unwrap();
+    tool_output(
+        &bingo_tool_fs::ReadTool,
+        json!({"file_path":"source.rs", "offset":start, "limit":lines.len()}),
+        dir.path(),
+    )
+    .display
+}
+
+fn diff_display(rows: &[Value]) -> Option<bingo_sdk::View> {
+    let first = rows.first()?["n"].as_u64()? as usize;
+    let prefix = "unchanged\n".repeat(first.saturating_sub(1));
+    let side = |excluded: &str| {
+        prefix.clone()
+            + &rows
+                .iter()
+                .filter(|row| row["s"] != excluded)
+                .map(|row| format!("{}\n", row["t"].as_str().unwrap()))
+                .collect::<String>()
+    };
+    let old = side("+");
+    let new = side("-");
+    let dir = tempfile::tempdir().unwrap();
+    let output = if old.is_empty() {
+        tool_output(
+            &bingo_tool_fs::WriteTool,
+            json!({"file_path":"source.rs","content":new}),
+            dir.path(),
+        )
+    } else {
+        std::fs::write(dir.path().join("source.rs"), &old).unwrap();
+        tool_output(
+            &bingo_tool_fs::EditTool,
+            json!({"file_path":"source.rs","old_string":old,"new_string":new}),
+            dir.path(),
+        )
+    };
+    output.display
+}
+
+fn tool_output(tool: &dyn bingo_sdk::Tool, input: Value, cwd: &std::path::Path) -> ToolOutput {
+    use std::sync::Arc;
+    let cx = bingo_sdk::ToolContext {
+        call_id: "fixture".into(),
+        session: SessionId::from_raw("fixture"),
+        turn: TurnId::from_raw("fixture"),
+        item: ItemId::from_raw("fixture"),
+        cwd: cwd.to_path_buf(),
+        cancel: bingo_sdk::CancellationToken::new(),
+        env: Arc::new(bingo_sdk::Env {
+            home: cwd.into(),
+            config_dir: cwd.into(),
+            data_dir: cwd.into(),
+        }),
+        host: bingo_sdk::testing::NoHost::handle(),
+        call: Arc::new(FixtureCall),
+    };
+    // Captures also run inside async tests; the tool owns an independent runtime.
+    std::thread::scope(|scope| {
+        scope
+            .spawn(|| {
+                tokio::runtime::Builder::new_current_thread()
+                    .enable_all()
+                    .build()
+                    .unwrap()
+                    .block_on(tool.call(input, &cx))
+                    .unwrap()
+            })
+            .join()
+            .unwrap()
+    })
+}
+
+#[derive(Debug)]
+struct FixtureCall;
+#[async_trait::async_trait]
+impl bingo_sdk::Prompter for FixtureCall {
+    async fn ask(
+        &self,
+        _: bingo_sdk::InteractionKind,
+        _: Vec<bingo_sdk::AnswerSpec>,
+    ) -> Result<bingo_sdk::Answer, bingo_sdk::KernelError> {
+        panic!("filesystem fixture never asks")
+    }
+}
+#[async_trait::async_trait]
+impl bingo_sdk::ToolHost for FixtureCall {
+    fn progress(&self, _: &ItemId, _: String) {}
+    async fn record(&self, _: ItemBody) -> Result<ItemId, bingo_sdk::KernelError> {
+        panic!("filesystem fixture never records")
+    }
 }

@@ -1,8 +1,7 @@
 //! Where the transcript is parked.
 //!
-//! Two states and no third: it either follows the tail — what arrives is what
-//! you see — or it is held at a line and stays there while the transcript
-//! grows under it. Holding a line from the top rather than an offset from the
+//! A stream follows the tail or holds a line as new rows arrive. Detail
+//! temporarily pins its distance from the tail while wells change height. Holding a line from the top rather than an offset from the
 //! bottom is what makes that true without anyone remembering to adjust it.
 //!
 //! The move to a new line eases out over [`EASE`] as a pure function of the
@@ -19,6 +18,8 @@ pub const FLASH: Duration = Duration::from_millis(900);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scroll {
+    /// Detail keeps its distance from the tail as wells change height.
+    Offset(usize),
     /// At the bottom, following what arrives.
     Tail(Option<Instant>),
     /// Held, easing from one line to another since an instant.
@@ -39,6 +40,7 @@ impl Scroll {
     pub fn touched(&self) -> Option<Instant> {
         match self {
             Self::Tail(at) => *at,
+            Self::Offset(_) => None,
             Self::Held { since, .. } => Some(*since),
         }
     }
@@ -49,6 +51,7 @@ impl Scroll {
         let bottom = bottom(total, rows);
         match self {
             Scroll::Tail(_) => bottom,
+            Scroll::Offset(below) => bottom.saturating_sub(*below),
             Scroll::Held { from, to, since } => eased(*from, *to, *since, now).min(bottom),
         }
     }
@@ -56,13 +59,13 @@ impl Scroll {
     /// Whether what arrives is shown as it arrives — the transcript is at its
     /// foot and the person is writing, not reading back.
     pub fn following(&self) -> bool {
-        matches!(self, Scroll::Tail(_))
+        matches!(self, Scroll::Tail(_) | Scroll::Offset(0))
     }
 
     /// Whether the frame after this one would draw it somewhere else.
     pub fn moving(&self, now: Instant) -> bool {
         match self {
-            Scroll::Tail(_) => false,
+            Scroll::Tail(_) | Scroll::Offset(_) => false,
             Scroll::Held { since, .. } => now.saturating_duration_since(*since) < EASE,
         }
     }
@@ -101,6 +104,7 @@ impl Scroll {
         let bottom = bottom(total, rows);
         match self {
             Scroll::Tail(_) => bottom,
+            Scroll::Offset(below) => bottom.saturating_sub(*below),
             Scroll::Held { to, .. } => (*to).min(bottom),
         }
     }
@@ -115,8 +119,7 @@ impl Scroll {
     /// all while it is on the screen, the line at the top when it is above
     /// and at the bottom when it is below.
     ///
-    /// What follows a hand moves this way and what answers a question moves
-    /// the other ([`Scroll::show`]): a selection's far end walks a line at a
+    /// A selection's far end walks a line at a
     /// time, and a view that jumped a third of a screen under each step would
     /// read as the transcript running away from it.
     pub fn reveal(&mut self, line: usize, total: usize, rows: usize, now: Instant) {
@@ -129,10 +132,12 @@ impl Scroll {
         self.hold(here, want, total, rows, now);
     }
 
-    /// Bring a line into view, a third of the way down, and hold it there.
-    pub fn show(&mut self, line: usize, total: usize, rows: usize, now: Instant) {
-        let here = self.top(total, rows, now);
-        self.hold(here, line.saturating_sub(rows / 3), total, rows, now);
+    pub fn park(top: usize, now: Instant) -> Self {
+        Self::Held {
+            from: top,
+            to: top,
+            since: now - FLASH,
+        }
     }
 
     /// The foot of it, following again.
@@ -293,17 +298,12 @@ mod tests {
     }
 
     #[test]
-    fn showing_a_line_puts_it_a_third_down_the_region() {
+    fn parking_uses_the_given_top_without_easing_or_following() {
         let now = Instant::now();
-        let mut scroll = Scroll::default();
-        scroll.show(50, TOTAL, ROWS, now);
-        assert_eq!(at(&scroll, now + EASE), 50 - ROWS / 3);
-        scroll.show(2, TOTAL, ROWS, now);
-        assert_eq!(
-            at(&scroll, now + EASE),
-            0,
-            "a line near the head is the head"
-        );
+        let scroll = Scroll::park(34, now);
+        assert_eq!(at(&scroll, now), 34);
+        assert_eq!(scroll.top(140, ROWS, now + EASE), 34);
+        assert!(!scroll.following());
     }
 
     /// The tail shows lines 80..=99, so every line of that screenful is

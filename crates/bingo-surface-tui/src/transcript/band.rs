@@ -81,7 +81,9 @@ pub fn draw(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
         ));
     }
     if first {
-        additions(item, rows, &mut out);
+        if !rows.opened.in_detail(item) {
+            additions(item, rows, &mut out);
+        }
         light(&turn, rows, &mut out);
     }
     out
@@ -262,40 +264,44 @@ fn additions(item: &Item, rows: &Rows<'_>, out: &mut crate::views::Drawing) {
         .flatten()
         .filter(|other| other.id != item.id)
     {
-        let (words, note) = match &other.body {
-            ItemBody::User { .. } if owns(other, rows.state) && !named(other) => {
-                (text(other), "steered")
-            }
-            ItemBody::PermissionReceipt {
-                feedback: Some(text),
-                decision: bingo_sdk::DecisionKind::Deny,
-                ..
-            } => (text.clone(), "said no"),
-            _ => continue,
-        };
-        let view = bingo_sdk::View::Text {
-            children: vec![bingo_sdk::view::TextChild::String(note.into())],
-            style: bingo_sdk::view::TextStyle {
-                color: Some("dim".into()),
-                motion: Some(Box::new(bingo_sdk::view::TextMotion::Fade {
-                    from: "glow".into(),
-                    at_ms: other.started_at.as_millisecond(),
-                    ms: 420,
-                    curve: None,
-                })),
-                ..Default::default()
-            },
-        };
-        let note = crate::views::marked(&view, rows.width, &crate::views::Marks::at(rows.now));
-        let right = note.lines.first().cloned().unwrap_or_default();
-        out.next = out.next.into_iter().chain(note.next).min();
-        let room = rows
-            .width
-            .saturating_sub(grid::TX + grid::RM + right.width() + 2);
-        let mut left = markdown::inline(words.lines().next().unwrap_or_default(), theme::text());
-        super::chips::prepend(other, &mut left);
-        out.lines
-            .push(laid(grid::fit(left, room), right, rows.width));
+        out.append(addition(other, rows));
+    }
+}
+
+pub(super) fn addition(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
+    let (words, note) = match &item.body {
+        ItemBody::User { .. } if owns(item, rows.state) && !named(item) => (text(item), "steered"),
+        ItemBody::PermissionReceipt {
+            feedback: Some(text),
+            decision: bingo_sdk::DecisionKind::Deny,
+            ..
+        } => (text.clone(), "said no"),
+        _ => return Default::default(),
+    };
+    let view = bingo_sdk::View::Text {
+        children: vec![bingo_sdk::view::TextChild::String(note.into())],
+        style: bingo_sdk::view::TextStyle {
+            color: Some("dim".into()),
+            motion: Some(Box::new(bingo_sdk::view::TextMotion::Fade {
+                from: "glow".into(),
+                at_ms: item.started_at.as_millisecond(),
+                ms: 420,
+                curve: None,
+            })),
+            ..Default::default()
+        },
+    };
+    let note = crate::views::marked(&view, rows.width, &crate::views::Marks::at(rows.now));
+    let right = note.lines.first().cloned().unwrap_or_default();
+    let next = note.next;
+    let room = rows
+        .width
+        .saturating_sub(grid::TX + grid::RM + right.width() + 2);
+    let mut left = markdown::inline(words.lines().next().unwrap_or_default(), theme::text());
+    super::chips::prepend(item, &mut left);
+    crate::views::Drawing {
+        lines: vec![laid(grid::fit(left, room), right, rows.width)],
+        next,
     }
 }
 
@@ -367,6 +373,7 @@ pub struct Revision {
     seconds: u64,
     newest: bool,
     sparks: bool,
+    detail: bool,
 }
 
 pub fn revision(item: &Item, rows: &Rows<'_>) -> Option<Revision> {
@@ -375,6 +382,7 @@ pub fn revision(item: &Item, rows: &Rows<'_>) -> Option<Revision> {
     }
     let band = Band::of(item, rows);
     Some(Revision {
+        detail: rows.opened.in_detail(item),
         live: band.live,
         asking: band.asking,
         stopped: band.stopped,

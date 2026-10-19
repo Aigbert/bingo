@@ -117,7 +117,7 @@ fn shell_ran() {
         shut.contains("   $ run     cargo test --workspace"),
         "{shut}"
     );
-    open_the_turns(&mut ui, &state);
+    open_chosen_wells(&mut ui, &state);
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
     assert!(
         screen.contains("     Started in the background as job_ab12cd34"),

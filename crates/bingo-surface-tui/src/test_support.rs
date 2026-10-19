@@ -304,25 +304,34 @@ pub fn loose(item: Item) -> Item {
     Item { turn: None, ..item }
 }
 
-/// Every finished turn opened under its line, as a click on each would.
-pub fn open_the_turns(ui: &mut Ui, state: &SessionState) {
-    ui.folds = turns_opened(state, &ui.folds);
+/// Open one chosen well per finished turn: prefer an edit diff, otherwise its first step.
+pub fn open_chosen_wells(ui: &mut Ui, state: &SessionState) {
+    for (turn, id) in chosen_wells(state) {
+        ui.set_well(turn, Some(id));
+    }
 }
 
-/// `folds` with every finished turn's line opened.
-pub fn turns_opened(state: &SessionState, folds: &crate::fold::Folds) -> crate::fold::Folds {
+/// Deliberate fixture selection, independent of loose-block folds.
+pub fn chosen_wells(state: &SessionState) -> std::collections::BTreeMap<TurnId, ItemId> {
     let pictures = Default::default();
     let linked = Default::default();
-    let rows = crate::transcript::Rows::of(state, 80, folds, &pictures, &linked, scene().1);
+    let folds = Default::default();
+    let rows = crate::transcript::Rows::of(state, 80, &folds, &pictures, &linked, scene().1);
     let roles = crate::turns::Roles::of(&Default::default(), &rows);
-    let mut opened = folds.clone();
+    let mut wells = std::collections::BTreeMap::new();
     for item in state.transcript.items() {
-        if item.turn.is_some() && matches!(roles.of_item(&item.id), crate::turns::Role::Step { .. })
+        if let Some(turn) = item.turn.as_ref()
+            && item.status.is_terminal()
+            && matches!(roles.of_item(&item.id), crate::turns::Role::Step { .. })
         {
-            opened.insert(item.id.clone(), crate::fold::Fold::Open);
+            let diff = matches!(&item.body, ItemBody::ToolCall { output: Some(output), .. }
+                if matches!(output.display, Some(bingo_sdk::View::Diff { .. })));
+            if diff || !wells.contains_key(turn) {
+                wells.insert(turn.clone(), item.id.clone());
+            }
         }
     }
-    opened
+    wells
 }
 
 pub fn item(id: &str, status: ItemStatus, body: ItemBody) -> Item {

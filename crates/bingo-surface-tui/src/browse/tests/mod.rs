@@ -297,7 +297,7 @@ async fn copy_page_escape_and_card_use_the_current_drawing() {
     fixture
         .press(&mut ui, &state, key(KeyCode::Enter), now)
         .await;
-    assert!(matches!(ui.focus.open(), Open::Pager(_)));
+    assert!(crate::browse::reader::current(&ui).is_some());
     open(
         &mut ui,
         &solo(&state),
@@ -315,11 +315,14 @@ async fn copy_page_escape_and_card_use_the_current_drawing() {
     assert!(ui.folds.is_empty());
 }
 #[test]
-fn opener_uses_catalogue_and_disabled_falls_back_to_line_search() {
+fn find_uses_the_dock_with_or_without_browse() {
     let fixture = Fixture::new();
     let (mut state, mut ui, now) = setup(&fixture);
+    draw_tree(80, 24, &solo(&state), &mut ui, now);
     let effects = crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now);
-    assert!(matches!(&effects[0], Effect::Run(text) if text == "/browse"));
+    assert!(effects.is_empty());
+    assert!(ui.focus.search().is_some());
+    crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Esc), now);
     disable(&mut state);
     assert!(crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now).is_empty());
     assert!(ui.focus.search().is_some());

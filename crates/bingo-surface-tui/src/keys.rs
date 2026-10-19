@@ -440,6 +440,63 @@ pub fn interrupt(at: Pressed) -> Interrupt {
     .unwrap_or(Interrupt::Arm)
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Look {
+    Detail,
+    Find,
+}
+
+pub fn look(key: crossterm::event::KeyEvent) -> Option<Look> {
+    use crossterm::event::{KeyCode as K, KeyModifiers as M};
+    match (key.code, key.modifiers) {
+        (K::Char('o'), M::CONTROL) => Some(Look::Detail),
+        (K::Char('f'), M::CONTROL) => Some(Look::Find),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Detail {
+    Find,
+    Move(isize),
+    Open,
+    Close,
+}
+
+pub fn detail(key: crossterm::event::KeyEvent) -> Option<Detail> {
+    use crossterm::event::{KeyCode as K, KeyModifiers as M};
+    match (key.code, key.modifiers) {
+        (K::Char('f'), M::CONTROL) => Some(Detail::Find),
+        (K::Up, M::NONE) => Some(Detail::Move(-1)),
+        (K::Down, M::NONE) => Some(Detail::Move(1)),
+        (K::Enter | K::Char(' '), M::NONE) => Some(Detail::Open),
+        (K::Esc, M::NONE) | (K::Char('o'), M::CONTROL) => Some(Detail::Close),
+        _ => None,
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Find {
+    Move(isize),
+    Keep,
+    Back,
+    Type(char),
+    Delete,
+}
+
+pub fn find(key: crossterm::event::KeyEvent) -> Option<Find> {
+    use crossterm::event::{KeyCode as K, KeyModifiers as M};
+    match (key.code, key.modifiers) {
+        (K::Up, M::NONE) => Some(Find::Move(-1)),
+        (K::Down, M::NONE) => Some(Find::Move(1)),
+        (K::Enter, M::NONE) | (K::Char('f'), M::CONTROL) => Some(Find::Keep),
+        (K::Esc, M::NONE) => Some(Find::Back),
+        (K::Backspace, M::NONE) => Some(Find::Delete),
+        (K::Char(c), m) if (m - M::SHIFT).is_empty() => Some(Find::Type(c)),
+        _ => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
 

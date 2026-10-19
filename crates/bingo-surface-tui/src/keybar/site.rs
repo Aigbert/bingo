@@ -8,10 +8,17 @@ pub fn hints(state: &SessionState, ui: &Ui, frame: &Layout) -> Option<SiteHints>
     if let Some(hints) = sheet_hints(ui) {
         return Some(hints);
     }
-    if let Some(search) = ui.focus.search() {
-        return Some(search_hints(search));
+    if matches!(ui.focus, Focus::Detail(_)) {
+        return Some(SiteHints::new([
+            KeyPair::new("↑↓", "step"),
+            KeyPair::new("⏎", "open"),
+            KeyPair::new("esc", "close"),
+        ]));
     }
-    if let crate::ui::Open::Pager(pager) = ui.focus.open()
+    if ui.focus.search().is_some() {
+        return Some(search_hints());
+    }
+    if let Some(pager) = crate::browse::reader::current(ui)
         && ui.focus.showing()
     {
         return Some(pager.search.as_ref().map_or_else(
@@ -24,7 +31,7 @@ pub fn hints(state: &SessionState, ui: &Ui, frame: &Layout) -> Option<SiteHints>
                     KeyPair::new("esc", "back"),
                 ])
             },
-            search_hints,
+            |_| search_hints(),
         ));
     }
     if let Focus::Pane(focused) = &ui.focus {
@@ -97,14 +104,10 @@ fn from_view(view: &View) -> Option<&SiteHints> {
     }
 }
 
-fn search_hints(search: &crate::search::Search) -> SiteHints {
+fn search_hints() -> SiteHints {
     SiteHints::new([
-        if search.typing {
-            KeyPair::new("⏎", "find")
-        } else {
-            KeyPair::new("n/N", "match")
-        },
-        KeyPair::new("esc", "back"),
+        KeyPair::new("↑↓", "matches"),
+        KeyPair::new("⏎", "jump"),
+        KeyPair::new("esc", "close"),
     ])
-    .composer("/", "search transcript")
 }

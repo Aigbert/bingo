@@ -1,5 +1,4 @@
 //! Each step retains its row throughout the turn (ADR-0097).
-use crate::fold::Fold;
 use crate::paths;
 use crate::tree::Agents;
 use bingo_sdk::component::{LedgerProps, Props, Step, StepState, ledger::Marks};
@@ -16,6 +15,10 @@ pub enum Role {
         opened: bool,
     },
     Narration,
+    Thought {
+        opened: bool,
+    },
+    Addition,
 }
 
 #[derive(Debug, Default)]
@@ -25,38 +28,92 @@ impl Roles {
     pub fn of(agents: &Agents<'_>, rows: &crate::transcript::Rows<'_>) -> Self {
         let state = rows.state;
         let replaced = rowed(&rows.slots);
-        let mut roles = BTreeMap::new();
-        for item in state.transcript.items() {
-            if item.turn.is_none() && !matches!(item.body, ItemBody::ToolCall { .. }) {
-                continue;
-            }
-            let role = match &item.body {
-                ItemBody::ToolCall { quiet, output, .. } => match step(item, rows) {
-                    None => Role::Hidden,
-                    Some(step)
-                        if (!*quiet || item.status.failed(output.as_deref()))
-                            && !agents.contains_key(&item.id)
-                            && !replaced.contains(&item.id) =>
-                    {
-                        Role::Step {
-                            step,
-                            opened: rows.folds.get(&item.id) == Some(&Fold::Open),
-                        }
-                    }
-                    _ => continue,
-                },
-                ItemBody::Interruption { .. } | ItemBody::Reasoning { .. } => Role::Hidden,
-                ItemBody::Assistant { .. } if rows.followed.contains(&item.id) => Role::Narration,
-                _ => continue,
-            };
-            roles.insert(item.id.clone(), role);
-        }
+        let roles = state
+            .transcript
+            .items()
+            .iter()
+            .filter_map(|item| {
+                let in_detail = rows.opened.in_detail(item);
+                role(item, agents, rows, &replaced, in_detail).map(|role| (item.id.clone(), role))
+            })
+            .collect();
         Self(roles)
     }
 
     pub fn of_item(&self, id: &ItemId) -> &Role {
         self.0.get(id).unwrap_or(&Role::Own)
     }
+}
+
+fn role(
+    item: &Item,
+    agents: &Agents<'_>,
+    rows: &crate::transcript::Rows<'_>,
+    replaced: &[ItemId],
+    in_detail: bool,
+) -> Option<Role> {
+    if item.turn.is_none() && !matches!(item.body, ItemBody::ToolCall { .. }) {
+        return None;
+    }
+    match &item.body {
+        ItemBody::ToolCall { .. } => call_role(item, agents, rows, replaced),
+        ItemBody::Reasoning { .. } => Some(thought_role(item, rows, in_detail)),
+        ItemBody::User { .. } => user_role(item, rows, in_detail),
+        ItemBody::PermissionReceipt {
+            feedback: Some(_),
+            decision: DecisionKind::Deny,
+            ..
+        } => receipt_role(item, rows, in_detail),
+        ItemBody::Interruption { .. } => Some(Role::Hidden),
+        ItemBody::Assistant { .. } => narration_role(item, rows),
+        _ => None,
+    }
+}
+
+fn call_role(
+    item: &Item,
+    agents: &Agents<'_>,
+    rows: &crate::transcript::Rows<'_>,
+    replaced: &[ItemId],
+) -> Option<Role> {
+    let Some(step) = step(item, rows) else {
+        return Some(Role::Hidden);
+    };
+    let ItemBody::ToolCall { quiet, output, .. } = &item.body else {
+        return None;
+    };
+    ((!*quiet || item.status.failed(output.as_deref()))
+        && !agents.contains_key(&item.id)
+        && !replaced.contains(&item.id))
+    .then(|| Role::Step {
+        step,
+        opened: rows.opened.well(item),
+    })
+}
+
+fn thought_role(item: &Item, rows: &crate::transcript::Rows<'_>, in_detail: bool) -> Role {
+    if rows.opened.browse_hit == Some(&item.id) || in_detail {
+        Role::Thought {
+            opened: rows.opened.well(item),
+        }
+    } else {
+        Role::Hidden
+    }
+}
+
+fn user_role(item: &Item, rows: &crate::transcript::Rows<'_>, in_detail: bool) -> Option<Role> {
+    (in_detail
+        && crate::transcript::band::owns(item, rows.state)
+        && !crate::transcript::band::first(item, rows))
+    .then_some(Role::Addition)
+}
+
+fn receipt_role(item: &Item, rows: &crate::transcript::Rows<'_>, in_detail: bool) -> Option<Role> {
+    (rows.opened.browse_hit == Some(&item.id) || in_detail).then_some(Role::Addition)
+}
+
+fn narration_role(item: &Item, rows: &crate::transcript::Rows<'_>) -> Option<Role> {
+    rows.followed.contains(&item.id).then_some(Role::Narration)
 }
 
 /// Items before the last call are followed by a step, including narration.
@@ -267,4 +324,11 @@ fn question_result(answer: &str, input: &serde_json::Value) -> String {
         }
     }
     answer.to_owned()
+}
+
+pub fn detail<'a>(
+    state: &'a SessionState,
+    selected: Option<&ItemId>,
+) -> Option<&'a bingo_sdk::TurnId> {
+    state.transcript.get(selected?)?.turn.as_ref()
 }

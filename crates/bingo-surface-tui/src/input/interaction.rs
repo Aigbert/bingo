@@ -7,13 +7,8 @@ pub(crate) fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now
     if key.code == KeyCode::Esc {
         return escape(ui, tree, now);
     }
-    if key.code == KeyCode::Char('o') && key.modifiers.contains(KeyModifiers::CONTROL) {
-        if let Some(item) = &interaction.item {
-            ui.focus
-                .show(Open::Pager(pager::Pager::open(item.clone())), now.instant);
-        } else {
-            ui.dialog.expanded = !ui.dialog.expanded;
-        }
+    if keys::look(key) == Some(keys::Look::Detail) {
+        super::open_detail(ui, tree.viewed(), now);
         return Vec::new();
     }
     if ui.dialog.answered

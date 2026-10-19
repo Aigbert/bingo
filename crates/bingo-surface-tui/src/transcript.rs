@@ -41,11 +41,12 @@ pub(crate) mod ran;
 /// A turn's steps and narration at column 3.
 mod steps;
 pub(crate) use steps::asked;
+pub mod opened;
 /// The rows a thought draws, one of them or a run of them (§4, §6).
 mod thinking;
 
 pub use output::whole;
-use output::{folded, kept, plain, tail};
+use output::{kept, plain, tail};
 pub use ran::whole as shell_whole;
 pub use thinking::thought;
 
@@ -77,12 +78,6 @@ const OUTPUT_ROWS: usize = 5;
 /// it went; a third would spend a row of the transcript on working nobody
 /// asked for.
 const THOUGHT_ROWS: usize = 2;
-/// Diff rows kept under a tool row.
-const DIFF_ROWS: usize = 12;
-/// What opens a folded result. The key is the frame's; the words are here
-/// because this is what is folded.
-const EXPAND: &str = "ctrl+o to expand";
-
 /// What every row of one transcript needs to know about where it is.
 #[derive(Clone)]
 pub struct Rows<'a> {
@@ -96,7 +91,7 @@ pub struct Rows<'a> {
     pub width: usize,
     /// How much of each block a person opened or shut; everything else wears
     /// its kind's own start ([`crate::fold`]).
-    pub folds: &'a Folds,
+    pub opened: opened::Opened<'a>,
     /// The frame being drawn: what every cue below is a function of.
     pub now: Now,
     pub stop_asked: Option<&'a bingo_sdk::TurnId>,
@@ -188,7 +183,7 @@ impl<'a> Rows<'a> {
             state,
             faces: Default::default(),
             width,
-            folds,
+            opened: opened::Opened::new(folds),
             now,
             stop_asked: None,
             pictures,
@@ -432,20 +427,30 @@ pub fn item_block(
     if matches!(&item.body, ItemBody::User { origin, .. } if origin.is_context()) {
         return Block::default();
     }
-    if crate::ask::receipts::source(item).is_some_and(|id| rows.state.transcript.get(id).is_some())
+    if !matches!(place.role, crate::turns::Role::Addition)
+        && crate::ask::receipts::source(item)
+            .is_some_and(|id| rows.state.transcript.get(id).is_some())
     {
         return Block::default();
     }
     if let Some(block) = steps::part(item, &place.role, rows) {
         return if matches!(place.role, crate::turns::Role::Step { .. }) {
-            pictured::under_the_words(item, block, fold::fold_of(rows.folds, item), rows)
+            pictured::under_the_words(
+                item,
+                block,
+                if rows.opened.well(item) {
+                    Fold::Open
+                } else {
+                    Fold::Shut
+                },
+                rows,
+            )
         } else {
             block
         };
     }
-    // How much of this block is on the screen — what `ctrl+o` and a click both
-    // write, over the start its kind has. One question, asked once, here.
-    let fold = fold::fold_of(rows.folds, item);
+    // Loose blocks retain the fold chosen by their pointer gesture.
+    let fold = fold::fold_of(rows.opened.folds, item);
     let mut block = item_lines(item, place, agents, rows, cue, fold);
     if item.turn.is_some()
         && place
@@ -484,7 +489,7 @@ fn default_item_lines(
         ItemBody::ToolCall { .. } => called(item, agents, fold, rows).into(),
         ItemBody::Shell { .. } => ran::lines(item, rows).into(),
         ItemBody::Action { name, args, result } => {
-            action(item.status, name, args, result.as_ref(), fold, rows, cue).into()
+            action(item.status, name, args, result.as_ref(), rows, cue).into()
         }
         ItemBody::Compaction { before, after, .. } => compacted(*before, *after, rows).into(),
         ItemBody::Rewind { dropped, .. } => rewound(*dropped, rows).into(),
@@ -805,7 +810,6 @@ fn action(
     name: &str,
     args: &Value,
     result: Option<&Value>,
-    fold: Fold,
     rows: &Rows<'_>,
     cue: Cue,
 ) -> Vec<Line<'static>> {
@@ -821,10 +825,7 @@ fn action(
         rows,
     );
     if let Some(result) = result {
-        out.extend(returns(
-            kept(plain(&as_text(result)), fold, OUTPUT_ROWS, Some(EXPAND)),
-            rows,
-        ));
+        out.extend(returns(plain(&as_text(result)), rows));
     }
     out
 }
@@ -987,11 +988,11 @@ mod tests {
 
     use super::*;
     use crate::test_support::{
-        agent_call, assistant, completed, delivered, extended, folded, frame, item, loose, post,
-        receipt_item, running_tool, scene, started, started_tool, tool, ts, turns_opened,
+        agent_call, assistant, chosen_wells, completed, delivered, extended, folded, frame, item,
+        loose, post, receipt_item, running_tool, scene, started, started_tool, tool, ts,
         user as person, voiced,
     };
-    use bingo_sdk::{Event, ItemId};
+    use bingo_sdk::{Event, ItemId, TurnId};
 
     #[test]
     fn an_upgraded_historical_agent_call_draws_a_tool_row() {
@@ -1022,7 +1023,7 @@ mod tests {
     /// A member's own transcript: a session a model answers.
     fn drawn(items: Vec<Item>) -> Vec<String> {
         let state = stated(items);
-        rendered_with(&state, &turns_opened(&state, &Folds::new()))
+        rendered_wells(&state, &chosen_wells(&state))
     }
 
     /// Turn-less calls use the same step geometry and keep their folded output.
@@ -1221,10 +1222,26 @@ mod tests {
     }
 
     fn rendered_with(state: &SessionState, folds: &Folds) -> Vec<String> {
+        rendered_choices(state, folds, &Default::default())
+    }
+
+    fn rendered_wells(
+        state: &SessionState,
+        wells: &std::collections::BTreeMap<TurnId, ItemId>,
+    ) -> Vec<String> {
+        rendered_choices(state, &Default::default(), wells)
+    }
+
+    fn rendered_choices(
+        state: &SessionState,
+        folds: &Folds,
+        wells: &std::collections::BTreeMap<TurnId, ItemId>,
+    ) -> Vec<String> {
         let mut blocks = crate::blocks::Blocks::default();
         let pictures = Decoded::default();
         let linked = Linked::default();
-        let rows = Rows::of(state, 60, folds, &pictures, &linked, scene().1);
+        let mut rows = Rows::of(state, 60, folds, &pictures, &linked, scene().1);
+        rows.opened.wells = Some(wells);
         let height = blocks.sync(state, &Agents::new(), &rows);
         let mut rows: Vec<String> = blocks
             .window(0, height)
@@ -1533,7 +1550,9 @@ mod tests {
             called,
             vec![
                 "   • skill   guide",
-                "     Base directory for this skill: /skills/guide"
+                "",
+                "       Base directory for this skill: /skills/guide",
+                ""
             ]
         );
         assert!(!called.join("\n").contains('⎿'));
@@ -1564,7 +1583,11 @@ mod tests {
             None,
             ItemStatus::Completed,
         )]);
-        assert_eq!(lines[..], ["   • skill   the wire format"], "{lines:?}");
+        assert_eq!(
+            lines[..],
+            ["   • skill   the wire format", "", "       no output", ""],
+            "{lines:?}"
+        );
     }
 
     /// A message from another session says who sent it, as a room's post does.
@@ -1625,7 +1648,7 @@ mod tests {
         )]);
         assert_eq!(
             lines[..],
-            ["   • read    Cargo.toml", "     Read 3 lines"],
+            ["   • read    Cargo.toml", "", "       Read 3 lines", ""],
             "the path is named from the session's own directory"
         );
     }
@@ -1643,8 +1666,8 @@ mod tests {
             Some(output),
             ItemStatus::Completed,
         )]);
-        assert_eq!(lines.len(), 1 + 9, "{lines:?}");
-        assert_eq!(lines.last().map(String::as_str), Some("     line 9"));
+        assert_eq!(lines.len(), 1 + 2 + 9, "{lines:?}");
+        assert_eq!(lines[10], "       line 9");
     }
 
     #[test]
@@ -1769,7 +1792,7 @@ mod tests {
         ]);
         assert_eq!(
             lines[..],
-            ["   • read    Cargo.toml", "     Read 3 lines",],
+            ["   • read    Cargo.toml", "", "       Read 3 lines", "",],
             "{lines:?}"
         );
     }
@@ -1992,7 +2015,9 @@ mod tests {
             lines[..],
             [
                 "   ¶ read    Read src/lib.rs (1 - 50)",
-                "     pub mod wire;"
+                "",
+                "       pub mod wire;",
+                ""
             ],
             "{lines:?}"
         );
@@ -2046,7 +2071,11 @@ mod tests {
             "tool something",
             serde_json::json!({ "external": true }),
         )]);
-        assert_eq!(lines[..], ["   • other   Tool"], "{lines:?}");
+        assert_eq!(
+            lines[..],
+            ["   • other   Tool", "", "       no output", ""],
+            "{lines:?}"
+        );
     }
 
     /// A call that failed says so where every other row says it: the bullet.
@@ -2067,12 +2096,14 @@ mod tests {
                 ]
             }),
         )]);
-        let lines = rendered_with(&state, &turns_opened(&state, &Folds::new()));
+        let lines = rendered_wells(&state, &chosen_wells(&state));
         assert_eq!(
             lines[..],
             [
                 "   • other   toolu_04Bash                           failed",
-                "     no such file",
+                "",
+                "       no such file",
+                "",
             ],
             "{lines:?}"
         );
@@ -2211,10 +2242,10 @@ mod tests {
             .map(|(i, item)| frame(i as u64 + 1, Event::ItemCompleted { item }))
             .collect();
         let state = folded(frames);
-        let opened: Folds = [(ItemId::from_raw("itm_1"), Fold::Open)]
+        let wells = [(TurnId::from_raw("trn_1"), ItemId::from_raw("itm_1"))]
             .into_iter()
             .collect();
-        let rows = rendered_with(&state, &opened).join("\n");
+        let rows = rendered_wells(&state, &wells).join("\n");
         assert!(rows.contains("line 9"), "{rows}");
         assert!(!rows.contains("+4 lines"), "{rows}");
     }

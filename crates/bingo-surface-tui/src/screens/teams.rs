@@ -188,12 +188,24 @@ fn listed_the_agents() -> Item {
 fn what_the_message_tools_answer() {
     let state = folded(vec![
         item(1, opened_a_room()),
-        item(2, posted_to_a_room()),
-        item(3, listed_the_agents()),
+        item(
+            2,
+            Item {
+                turn: Some(bingo_sdk::TurnId::from_raw("trn_2")),
+                ..posted_to_a_room()
+            },
+        ),
+        item(
+            3,
+            Item {
+                turn: Some(bingo_sdk::TurnId::from_raw("trn_3")),
+                ..listed_the_agents()
+            },
+        ),
     ]);
     let tree = solo(&state);
     let (mut ui, now) = scene();
-    open_the_turns(&mut ui, &state);
+    open_chosen_wells(&mut ui, &state);
     let wide = draw_tree(120, 40, &tree, &mut ui, now);
     assert!(wide.contains("├─ watcher [ 120s ]"), "{wide}");
     assert!(wide.contains("└─ parent [ live ]"), "{wide}");
@@ -202,7 +214,9 @@ fn what_the_message_tools_answer() {
         "{wide}"
     );
     assert!(wide.contains("├─ helper [ working ]"), "{wide}");
-    both("message_tools", &tree, &mut ui, now);
+    let small = draw_tree(80, 32, &tree, &mut ui, now);
+    assert!(small.contains("openroom"), "{small}");
+    super::both_at("message_tools", &tree, &mut ui, now, 32);
 }
 
 // ---- the one list of sessions (M36) -------------------------------------

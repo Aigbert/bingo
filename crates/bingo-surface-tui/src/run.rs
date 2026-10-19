@@ -2267,9 +2267,9 @@ mod tests {
         let (mut run, mut waiting) =
             replying(folded(vec![frame(1, Event::ItemCompleted { item: read })]));
         // A finished turn folds to one line; the picture is under its opened step.
-        run.ui.folds.insert(
-            bingo_sdk::ItemId::from_raw("itm_1"),
-            crate::fold::Fold::Open,
+        run.ui.set_well(
+            bingo_sdk::TurnId::from_raw("trn_1"),
+            Some(bingo_sdk::ItemId::from_raw("itm_1")),
         );
         let mut recorder = Recorder::default();
         let now = crate::test_support::scene().1;
@@ -2815,9 +2815,9 @@ mod tests {
         let (mut run, mut waiting) =
             replying(folded(vec![frame(1, Event::ItemCompleted { item: read })]));
         // A finished turn folds to one line; the picture is under its opened step.
-        run.ui.folds.insert(
-            bingo_sdk::ItemId::from_raw("itm_1"),
-            crate::fold::Fold::Open,
+        run.ui.set_well(
+            bingo_sdk::TurnId::from_raw("trn_1"),
+            Some(bingo_sdk::ItemId::from_raw("itm_1")),
         );
         // A store with rows in it, so the list that comes down is a list.
         let stored: Vec<SessionSummary> = (0..20)

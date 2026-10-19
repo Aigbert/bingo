@@ -503,10 +503,10 @@ fn a_turnless_finished_call_has_no_output_preview() {
 }
 
 #[test]
-fn quiet_and_opened_calls_place_the_same_display_body() {
+fn quiet_calls_keep_their_display_and_opened_calls_frame_it() {
     let display = bingo_sdk::View::text("a displayed body");
     let draw = |quiet| {
-        let mut call = loose(tool(
+        let mut call = tool(
             "step",
             "Inspect",
             serde_json::json!({}),
@@ -515,17 +515,23 @@ fn quiet_and_opened_calls_place_the_same_display_body() {
                 ..ToolOutput::text("")
             }),
             ItemStatus::Completed,
-        ));
+        );
         if let ItemBody::ToolCall { quiet: flag, .. } = &mut call.body {
             *flag = quiet;
         }
         let state = folded(vec![frame(1, Event::ItemCompleted { item: call })]);
         with_rows(&state, scene().1, |rows| {
-            let folds = [(bingo_sdk::ItemId::from_raw("step"), Fold::Open)]
-                .into_iter()
-                .collect();
+            let wells = [(
+                bingo_sdk::TurnId::from_raw("trn_1"),
+                bingo_sdk::ItemId::from_raw("step"),
+            )]
+            .into_iter()
+            .collect();
             let rows = Rows {
-                folds: &folds,
+                opened: crate::transcript::opened::Opened {
+                    wells: Some(&wells),
+                    ..rows.opened
+                },
                 ..rows.clone()
             };
             let mut blocks = Blocks::default();
@@ -537,8 +543,8 @@ fn quiet_and_opened_calls_place_the_same_display_body() {
                 .unwrap()
         })
     };
-    assert_eq!(draw(false), "     a displayed body");
-    assert_eq!(draw(true), draw(false));
+    assert_eq!(draw(false), "       a displayed body");
+    assert_eq!(draw(true), "     a displayed body");
 }
 
 #[test]
@@ -597,7 +603,7 @@ fn an_idle_turn_waiting_for_a_person_does_not_say_working() {
 }
 
 #[test]
-fn a_tools_picture_stays_under_its_step_without_opening_detail() {
+fn a_tools_picture_follows_its_well() {
     let output = ToolOutput {
         parts: vec![bingo_sdk::ContentPart::Image(bingo_pictures::testing::png(
             8, 8,
@@ -629,8 +635,8 @@ fn a_tools_picture_stays_under_its_step_without_opening_detail() {
                 .span(&bingo_sdk::ItemId::from_raw("picture"))
                 .unwrap();
             let lines = blocks.window(from, to - from);
-            assert_eq!(lines.len(), 2);
-            assert_eq!(lines[1].to_string(), "     [image: image/png]");
+            assert_eq!(lines.len(), 1);
+            assert!(!lines[0].to_string().contains("[image"));
         });
     });
 }

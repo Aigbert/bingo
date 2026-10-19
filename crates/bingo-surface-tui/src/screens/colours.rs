@@ -46,7 +46,7 @@ fn a_step_rows_mark_is_the_only_cell_a_colour_is_spent_on() {
         ),
     )]);
     let (mut ui, now) = scene();
-    open_the_turns(&mut ui, &state);
+    open_chosen_wells(&mut ui, &state);
     assert!(!draw_tree(80, 24, &solo(&state), &mut ui, now).contains("Read 3 lines"));
     let painted = painted(80, 24, &solo(&state), &mut ui, now);
     assert_eq!(

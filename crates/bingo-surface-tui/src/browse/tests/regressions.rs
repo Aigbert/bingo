@@ -62,7 +62,7 @@ async fn pager_returns_to_query_and_position_and_tool_copy_is_readable() {
     fixture
         .press(&mut ui, &state, key(KeyCode::Enter), now)
         .await;
-    assert!(matches!(ui.focus.open(), Open::Pager(p) if p.return_to.is_some()));
+    assert!(matches!(ui.focus.open(), Open::Browse(open) if open.reader.is_some()));
     assert_eq!(request(&ui), before.action.args["handler"].as_str());
     crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Esc), now);
     assert!(active(&ui));
@@ -172,18 +172,9 @@ fn projection_cache_sees_a_streamed_or_rewritten_item() {
 fn ordinary_pagers_keep_their_existing_content_projection() {
     let state = state();
     let row = user("user", "already visible");
-    let mut pager = crate::pager::Pager::open(row.id.clone());
-    assert!(crate::pager::content(&state, &row, 80, &pager).is_empty());
-    pager.return_to = Some(crate::pager::Return::Layer(Box::new(Open::Browse(
-        Opened {
-            session: state.summary.id.clone(),
-            id: "test".into(),
-            selected: None,
-            confirm: false,
-        },
-    ))));
+    assert!(crate::browse::reader::content(&state, &row, 80, false).is_empty());
     assert_eq!(
-        crate::pager::content(&state, &row, 80, &pager)[0].to_string(),
+        crate::browse::reader::content(&state, &row, 80, true)[0].to_string(),
         "already visible"
     );
 }

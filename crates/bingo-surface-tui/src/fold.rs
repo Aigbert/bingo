@@ -57,17 +57,6 @@ pub fn cycled(item: &Item, fold: Fold) -> Fold {
     }
 }
 
-/// `ctrl+o` only ever opens further (§7): a shut block lifts to its peek, a
-/// peek to the whole, and the whole takes the sheet — which is what `None`
-/// says, since the sheet is not a fold.
-pub fn deeper(fold: Fold) -> Option<Fold> {
-    match fold {
-        Fold::Shut => Some(Fold::Peek),
-        Fold::Peek => Some(Fold::Open),
-        Fold::Open => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,12 +157,5 @@ mod tests {
         let thought = reasoning(Some(2));
         let folds: Folds = [(thought.id.clone(), Fold::Open)].into_iter().collect();
         assert_eq!(fold_of(&folds, &thought), Fold::Open);
-    }
-
-    #[test]
-    fn ctrl_o_climbs_to_the_sheet_and_never_back() {
-        assert_eq!(deeper(Fold::Shut), Some(Fold::Peek));
-        assert_eq!(deeper(Fold::Peek), Some(Fold::Open));
-        assert_eq!(deeper(Fold::Open), None, "the sheet is not a fold");
     }
 }

@@ -115,11 +115,33 @@ fn pressed(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect>
     if let Some(session) = block.as_ref().and_then(|item| tree.spawned_by(item)) {
         return vec![Effect::View(session.clone())];
     }
-    if let Some(item) = &block {
+    if let Some(id) = &block
+        && tree.viewed().transcript.get(id).is_some_and(|item| {
+            crate::detail::row(item)
+                && (item.turn.is_some()
+                    || matches!(item.body, bingo_sdk::ItemBody::ToolCall { .. }))
+        })
+    {
+        if ui
+            .shown
+            .blocks
+            .span(id)
+            .is_some_and(|(start, _)| start == cell.line)
+        {
+            crate::detail::toggle(ui, tree.viewed(), id);
+            if ui.focus.detail().is_some() {
+                ui.focus = crate::focus::Focus::Detail(id.clone());
+            }
+        }
+    } else if let Some(item) = &block {
         cycle_fold(ui, tree.viewed(), item);
     }
     ui.select.block = block;
-    ui.start_selection(cell);
+    if ui.focus.detail().is_some() {
+        ui.select.anchor = Some(cell);
+    } else {
+        ui.start_selection(cell);
+    }
     Vec::new()
 }
 
@@ -149,6 +171,9 @@ fn cycle_fold(ui: &mut Ui, state: &SessionState, id: &bingo_sdk::ItemId) {
 /// rows it takes the view too: the pointer is still pointing at the
 /// transcript, and what it points at is off the screen (§3).
 fn drag(ui: &mut Ui, mouse: MouseEvent, now: Now) {
+    if let Some(anchor) = ui.select.anchor.take() {
+        ui.start_selection(anchor);
+    }
     match edge_under(ui, mouse) {
         Some(edge) => drag_past(ui, edge, mouse, now),
         None => drag_inside(ui, mouse),
@@ -179,6 +204,7 @@ fn drag_past(ui: &mut Ui, edge: Edge, mouse: MouseEvent, now: Now) {
 /// run that reaches nowhere is a click, and keeps every meaning a click has.
 fn released(ui: &mut Ui, now: Now) -> Vec<Effect> {
     ui.select.dragging = None;
+    ui.select.anchor = None;
     let Some(lines) = ui
         .focus
         .selection()

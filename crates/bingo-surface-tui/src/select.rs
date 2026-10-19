@@ -64,6 +64,7 @@ pub struct Dragging {
 /// What the transcript is holding.
 #[derive(Clone, Debug, Default)]
 pub struct Select {
+    pub anchor: Option<Cell>,
     /// The block a click or a key last landed on.
     pub block: Option<ItemId>,
     /// The hand is past an edge of the transcript and the view is walking

@@ -173,14 +173,14 @@ fn ctrl_c_closes_then_clears_and_an_unbound_alt_enter_splits() {
     let tree = solo(&state());
     let (mut ui, now) = scene();
     ui.composer.set("draft");
-    ui.focus = crate::focus::Focus::Search(Search::open());
+    ui.focus = crate::focus::Focus::Search(crate::search::Search::open());
     let ctrl_c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
     on_key(&mut ui, &tree, ctrl_c, now);
     assert!(matches!(ui.focus, crate::focus::Focus::Composer));
     assert_eq!(ui.composer.text(), "draft");
     on_key(&mut ui, &tree, ctrl_c, now);
     assert!(ui.composer.is_empty());
-    ui.focus = crate::focus::Focus::Search(Search::open());
+    ui.focus = crate::focus::Focus::Search(crate::search::Search::open());
     ui.composer.set("send me");
     let effects = on_key(
         &mut ui,

@@ -30,7 +30,7 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now
         {
             if name == "copy" {
                 return vec![Effect::Copy(
-                    crate::pager::whole(
+                    crate::browse::reader::whole(
                         tree.viewed(),
                         item,
                         usize::from(ui.shown.canvas.area().width),
@@ -41,8 +41,8 @@ pub fn result(ui: &mut Ui, tree: &Tree, action: &Action, vouched: bool, now: Now
                     .join("\n"),
                 )];
             }
-            let page = crate::pager::page::Page::item(item.id.clone());
-            crate::pager::page::open(ui, tree, page, now);
+            let page = crate::browse::reader::page::Page::item(item.id.clone());
+            crate::browse::reader::page::open(ui, tree, page, now);
         }
     }
     Vec::new()

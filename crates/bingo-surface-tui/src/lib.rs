@@ -59,6 +59,7 @@ mod component;
 mod composer;
 mod count;
 mod crew;
+mod detail;
 mod dialog;
 mod dock;
 mod effect;
@@ -87,7 +88,6 @@ mod mentions;
 mod mode;
 /// The opening (M149): the wordmark arriving, out of the motions the
 /// product already has.
-mod pager;
 mod palette;
 mod pane;
 mod paths;
@@ -134,6 +134,7 @@ mod view;
 mod viewer;
 mod views;
 mod welcome;
+mod well;
 mod window;
 mod wrap;
 

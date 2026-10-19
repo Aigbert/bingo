@@ -67,7 +67,14 @@ fn draw_tree(width: u16, height: u16, tree: &Tree, ui: &mut Ui, now: Now) -> Str
 
 /// One scene, at the two sizes every layout rule is written for.
 fn both(name: &str, tree: &Tree, ui: &mut Ui, now: Now) {
-    insta::assert_snapshot!(format!("{name}_80x24"), draw_tree(80, 24, tree, ui, now));
+    both_at(name, tree, ui, now, 24);
+}
+
+fn both_at(name: &str, tree: &Tree, ui: &mut Ui, now: Now, small: u16) {
+    insta::assert_snapshot!(
+        format!("{name}_80x{small}"),
+        draw_tree(80, small, tree, ui, now)
+    );
     insta::assert_snapshot!(format!("{name}_120x40"), draw_tree(120, 40, tree, ui, now));
 }
 
@@ -814,39 +821,6 @@ fn the_at_completion_dropdown_with_agents_to_reach() {
     directory_dropdowns("at_dropdown_agents", &tree, &mut ui, now);
 }
 
-/// A long result, open whole: what `⏎` on a focused block and the second
-/// `ctrl+o` both take (design §5).
-#[test]
-fn the_pager_sheet() {
-    let output = ToolOutput::text(
-        (1..=40)
-            .map(|i| format!("crates/bingo-surface-tui/src/file_{i}.rs\n"))
-            .collect::<String>(),
-    );
-    let state = folded(vec![
-        item(1, user("itm_0", "list the sources")),
-        item(
-            2,
-            tool(
-                "itm_1",
-                "Glob",
-                json!({"pattern": "crates/**/*.rs"}),
-                Some(output),
-                ItemStatus::Completed,
-            ),
-        ),
-    ]);
-    let (mut ui, now) = scene();
-    shown(
-        &mut ui,
-        Open::Pager(crate::pager::Pager::open(bingo_sdk::ItemId::from_raw(
-            "itm_1",
-        ))),
-        now,
-    );
-    both("pager_sheet", &solo(&state), &mut ui, now);
-}
-
 /// The card of §4 with a replacement under its title: the colour comes from
 /// the column, the weight from the words that actually moved.
 #[test]
@@ -865,7 +839,7 @@ fn a_permission_card_previews_a_word_level_diff() {
         .filter(|(_, style)| style.add_modifier.contains(ratatui::style::Modifier::BOLD))
         .map(|(text, _)| text.trim().to_string())
         .collect();
-    assert_eq!(emphasised, vec!["breathing()".to_string()]);
+    assert_eq!(emphasised, vec!["breathing".to_string()]);
 }
 
 /// What a screen cannot show: which token every run of a fence was drawn in.

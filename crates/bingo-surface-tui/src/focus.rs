@@ -11,6 +11,7 @@ pub enum Focus {
     Composer,
     Select(Run),
     Search(Search),
+    Detail(ItemId),
     Layer(Layer),
     Row(ItemId),
     Pane(String),
@@ -21,6 +22,7 @@ pub enum Owner {
     Composer,
     Select,
     Search,
+    Detail,
     Layer,
     Row,
     Interaction,
@@ -41,6 +43,7 @@ fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
     match focus {
         Focus::Select(_) => Owner::Select,
         Focus::Search(_) => Owner::Search,
+        Focus::Detail(_) => Owner::Detail,
         Focus::Layer(layer) if layer.showing() => Owner::Layer,
         Focus::Row(_) => Owner::Row,
         _ if interaction => Owner::Interaction,
@@ -51,6 +54,13 @@ fn resolve(focus: &Focus, interaction: bool, menu: bool) -> Owner {
 }
 
 impl Focus {
+    pub fn detail(&self) -> Option<&ItemId> {
+        if let Self::Detail(id) = self {
+            Some(id)
+        } else {
+            None
+        }
+    }
     pub fn search(&self) -> Option<&Search> {
         if let Self::Search(value) = self {
             Some(value)

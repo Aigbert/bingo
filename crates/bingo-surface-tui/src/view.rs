@@ -15,8 +15,8 @@ use crate::frame::{self, Demand, Regions};
 use crate::tree::{self, Tree};
 use crate::ui::{Card, Open, Ui};
 use crate::{
-    activity, composer as prompt, dialog, graphics, layers, mentions, pager, pill, search, select,
-    theme, transcript, views, window, wrap,
+    activity, composer as prompt, dialog, graphics, layers, mentions, pill, search, select, theme,
+    transcript, views, window, wrap,
 };
 
 /// How tall the composer box may grow before it scrolls internally.
@@ -48,7 +48,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     frame.sheet = crate::dock::sheets::prepare(tree, ui, frame, now);
     let mut regions = frame::regions(
         area,
-        demand(&draft, &activity, &palette, frame.sheet.as_deref()),
+        demand(&draft, &activity, &palette, frame.sheet.as_deref(), ui),
     );
     grow(frame, &mut regions, now);
     activity = frame.collect(views::Drawing {
@@ -106,12 +106,15 @@ fn demand(
     activity: &[Line<'_>],
     palette: &[Line<'_>],
     sheet: Option<&[Line<'_>]>,
+    ui: &Ui,
 ) -> Demand {
     Demand {
-        composer: u16::try_from(
-            sheet.map_or_else(|| draft.rows() + draft.above.len(), |lines| lines.len()),
-        )
-        .unwrap_or(u16::MAX),
+        composer: match sheet {
+            Some(lines) => u16::try_from(lines.len()).unwrap_or(u16::MAX),
+            None => search::demand(ui).unwrap_or_else(|| {
+                u16::try_from(draft.rows() + draft.above.len()).unwrap_or(u16::MAX)
+            }),
+        },
         activity: if sheet.is_some() {
             0
         } else {
@@ -190,7 +193,9 @@ fn grow(frame: &mut Layout, regions: &mut Regions, now: Now) {
     frame.wake(growth.next(now));
 }
 fn render_pill(ui: &Ui, frame: &mut Layout, area: Rect) {
-    if ui.scroll.following() || area.height == 0 {
+    if ui.scroll.following() && ui.focus.detail().is_none() && ui.focus.search().is_none()
+        || area.height == 0
+    {
         return;
     }
     let below = frame
@@ -211,17 +216,24 @@ fn render_pill(ui: &Ui, frame: &mut Layout, area: Rect) {
     }
 }
 fn scrollbar(ui: &Ui, frame: &mut Layout, area: Rect, now: Now) {
-    let Some(since) = ui.scroll.touched() else {
+    let since = ui.scroll.touched();
+    let below = frame
+        .height
+        .saturating_sub(frame.top + area.height as usize);
+    if since.is_none()
+        && (below == 0
+            || ui.scroll.following() && ui.focus.detail().is_none() && ui.focus.search().is_none())
+    {
         return;
-    };
+    }
     let h = usize::from(area.height);
     if area.width == 0 || frame.height <= h {
         return;
     }
     let size = ((h * h) as f64 / frame.height as f64).round().max(1.0) as usize;
     let top = (frame.top as f64 / (frame.height - h) as f64 * (h - size) as f64).round() as u16;
-    let fresh = now.since(since) < crate::scroll::FLASH;
-    if ui.scroll.following() && !fresh {
+    let fresh = since.is_some_and(|since| now.since(since) < crate::scroll::FLASH);
+    if below == 0 && !fresh {
         return;
     }
     let ink = theme::foreground(if fresh { "dim" } else { "faint" }).unwrap_or_default();
@@ -276,13 +288,18 @@ fn layer(
 ) {
     match ui.focus.open() {
         Open::Nothing
+        | Open::Reader(_)
         | Open::Keys(_)
         | Open::Mode(_)
         | Open::Result { .. }
         | Open::Rewind(_)
         | Open::Sessions(_)
         | Open::Plugins(_) => {}
-        Open::Browse(_) => {
+        Open::Browse(open) => {
+            if let Some(reader) = &open.reader {
+                crate::browse::reader::draw(tree, frame, above, reader, reveal, tools, true);
+                return;
+            }
             let lines = crate::browse::draw(
                 ui,
                 tree,
@@ -302,54 +319,16 @@ fn layer(
         }
         // Drawn under the box, in its own rows (ADR-0095 §1).
         Open::Palette(_) => {}
-        Open::Pager(open) => paged(tree, frame, above, open, reveal, tools),
     }
 }
 
-/// One block, whole. What it shows is read from the item every frame, so a
-/// block that is still arriving grows under the sheet rather than being copied
-/// into it.
-fn paged(
-    tree: &Tree,
-    frame: &mut Layout,
-    above: Rect,
-    open: &crate::pager::Pager,
-    reveal: layers::Reveal,
-    tools: &crate::tool_rows::Looks,
-) {
-    let (title, content) = open.content(tree, above.width as usize, tools);
-    let window = pager::Window {
-        height: content.len(),
-        rows: usize::from(above.height).saturating_sub(pager::HEAD),
-    };
-    let lines = pager::sheet(&title, &content, open, window);
-    sheet(frame, above, lines, reveal);
-    marked(frame, above, open, window, reveal);
-}
-
-/// The hits of the pager's own query, once the sheet has finished arriving:
-/// one still sliding up would carry the marks to the wrong rows.
-fn marked(
-    frame: &mut Layout,
-    above: Rect,
-    open: &crate::pager::Pager,
-    window: pager::Window,
-    reveal: layers::Reveal,
-) {
-    let Some(search) = open.search.as_ref().filter(|_| !reveal.moving()) else {
-        return;
-    };
-    let head = u16::try_from(pager::HEAD).unwrap_or(u16::MAX);
-    let area = Rect {
-        y: above.y + head,
-        height: above.height.saturating_sub(head),
-        ..above
-    };
-    search::mark(frame, area, open.at(window), search);
-}
-
 /// A sheet over a dimmed frame.
-fn sheet(frame: &mut Layout, above: Rect, lines: Vec<Line<'static>>, reveal: layers::Reveal) {
+pub(crate) fn sheet(
+    frame: &mut Layout,
+    above: Rect,
+    lines: Vec<Line<'static>>,
+    reveal: layers::Reveal,
+) {
     layers::dim(frame);
     layers::sheet(frame, above, lines, reveal);
 }
@@ -568,6 +547,13 @@ fn render_transcript(
     .measuring(ui.measure);
     rows.tools = tools.clone();
     rows.stop_asked = ui.stop_asked.as_ref();
+    let browse = crate::browse::current(ui).filter(|_| crate::browse::active(ui));
+    rows.opened.browse_hit = browse
+        .as_ref()
+        .and_then(|props| props.hit.as_ref())
+        .map(|hit| &hit.item);
+    rows.opened.detail = crate::turns::detail(tree.viewed(), ui.focus.detail());
+    rows.opened.wells = Some(&ui.wells);
     draw_stream(tree, ui, frame, area, &rows);
     frame.measurements = measurements;
 }
@@ -660,6 +646,14 @@ fn transcript_window(tree: &Tree, ui: &Ui, frame: &mut Layout, rows: usize, now:
         frame.height = frame.height - removed + count;
     }
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
+    if matches!(ui.focus, crate::focus::Focus::Detail(_)) {
+        frame.top = crate::detail::top(ui, frame, rows);
+    }
+    if let Some(search) = ui.focus.search()
+        && let Some(top) = search::top(search, frame, rows)
+    {
+        frame.top = top;
+    }
     if let Some((at, _, count)) = frame.inline {
         frame.top = (at + count).saturating_sub(rows);
     }
@@ -684,7 +678,8 @@ fn mark_transcript(ui: &Ui, frame: &mut Layout, area: Rect, padding: usize, now:
     // the lines start rather than where the region does.
     let lined = lined(area, padding);
     if let Some(search) = ui.focus.search() {
-        search::mark(&mut frame.canvas, lined, frame.top, search);
+        let lines = search::drawn(frame);
+        search::mark(&mut frame.canvas, lined, frame.top, search, &lines);
     }
     if let Some(run) = ui.focus.selection().as_ref() {
         select::mark(&mut frame.canvas, lined, frame.top, run);
@@ -724,7 +719,17 @@ fn component_requests(ui: &Ui, frame: &mut Layout, area: Rect, rows: &transcript
                 crate::turns::requests(item, role, rows)
                     .into_iter()
                     .filter_map(|(id, props)| {
-                        crate::component::key(rows.state, &id, &props, area.width, area.height)
+                        crate::component::key(
+                            rows.state,
+                            &id,
+                            &props,
+                            if matches!(props, bingo_sdk::component::Props::ToolResult(_)) {
+                                crate::well::inner(area.width as usize) as u16
+                            } else {
+                                area.width
+                            },
+                            area.height,
+                        )
                     }),
             );
         }
@@ -778,7 +783,7 @@ fn item_requests(
 
 /// Mark focus in the drawn copy, leaving the cached transcript unchanged.
 fn mark_row(ui: &Ui, frame: &Layout, shown: &mut [Line<'static>]) {
-    let Some(item) = ui.focus.row() else {
+    let Some(item) = ui.focus.detail().or_else(|| ui.focus.row()) else {
         return;
     };
     let Some((start, _)) = frame.blocks.span(item) else {
@@ -791,6 +796,15 @@ fn mark_row(ui: &Ui, frame: &Layout, shown: &mut [Line<'static>]) {
     else {
         return;
     };
+    if ui.focus.detail().is_some() {
+        let ground = theme::ground("pickBg").unwrap_or_default();
+        *row = crate::layout::grid::pad_to(row.clone(), frame.regions.transcript.width as usize);
+        row.style = ground;
+        for span in &mut row.spans {
+            span.style = ground.patch(span.style);
+        }
+        return;
+    }
     if let Some(bullet) = row.spans.first_mut() {
         *bullet = theme::cursor_span(true);
     }
@@ -840,7 +854,7 @@ fn render_composer(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: No
         ..area
     };
     if let Some(search) = ui.focus.search() {
-        frame.render_widget(Paragraph::new(search::row(search)), inner);
+        search::draw(search, ui, frame, inner, now);
     } else {
         let rows = draft.rows();
         let above = inner
@@ -964,7 +978,6 @@ mod tests {
         ContentPart, ContextUsage, Event, InterruptReason, ItemBody, ItemStatus, KernelError,
         Level, Preview, QueueEntry, ToolOutput, TurnId, TurnStatus, View,
     };
-    use crossterm::event::KeyCode;
     use serde_json::json;
 
     fn render(state: &SessionState, ui: &mut Ui, now: Now) -> String {
@@ -1693,22 +1706,19 @@ mod tests {
         };
         let state = folded(vec![item_frame(
             1,
-            loose(tool(
+            tool(
                 "itm_1",
                 "Board",
                 json!({}),
                 Some(output),
                 ItemStatus::Completed,
-            )),
+            ),
         )]);
         let (mut ui, now) = scene();
         let screen = render(&state, &mut ui, now);
         assert!(!screen.contains("write the plan"), "{screen}");
         insta::assert_snapshot!(screen);
-        ui.folds.insert(
-            bingo_sdk::ItemId::from_raw("itm_1"),
-            crate::fold::Fold::Open,
-        );
+        crate::detail::toggle(&mut ui, &state, &bingo_sdk::ItemId::from_raw("itm_1"));
         let screen = render(&state, &mut ui, now);
         assert!(screen.contains("     id   task"), "{screen}");
         assert!(!screen.contains("2 open"), "the model's text is not drawn");
@@ -1751,22 +1761,21 @@ mod tests {
             press(&mut ui, typed(c));
         }
         let typing = render(&state, &mut ui, now);
-        assert!(typing.contains("/line 4▌"), "{typing}");
+        assert!(typing.contains("find  line 4"), "{typing}");
 
-        press(&mut ui, key(crossterm::event::KeyCode::Enter));
         // The transcript eases to the hit; this is where it lands.
         let there = Now {
             instant: now.instant + crate::scroll::EASE,
             ..now
         };
         let found = render(&state, &mut ui, there);
-        assert!(found.contains("1/11"), "{found}");
+        assert!(found.contains("11 of 11"), "{found}");
         assert!(found.contains("line 4"), "it scrolled to the hit: {found}");
         insta::assert_snapshot!(found);
 
-        press(&mut ui, typed('n'));
+        press(&mut ui, key(crossterm::event::KeyCode::Up));
         let stepped = render(&state, &mut ui, there);
-        assert!(stepped.contains("2/11"), "{stepped}");
+        assert!(stepped.contains("10 of 11"), "{stepped}");
 
         press(&mut ui, key(crossterm::event::KeyCode::Esc));
         assert!(
@@ -1777,35 +1786,36 @@ mod tests {
 
     #[test]
     fn a_hit_on_the_screen_is_marked_where_it_sits() {
-        let state = long_transcript(60);
-        let (mut ui, now) = scene();
-        render(&state, &mut ui, now);
-        crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now);
-        for c in "line 59".chars() {
-            crate::input::on_key(&mut ui, &solo(&state), typed(c), now);
+        crate::render::Render {
+            look: crate::painted::truecolor(),
+            ..Default::default()
         }
-        crate::input::on_key(
-            &mut ui,
-            &solo(&state),
-            key(crossterm::event::KeyCode::Enter),
-            now,
-        );
-        let screen = drawn(
-            80,
-            24,
-            &solo(&state),
-            &mut ui,
-            Now {
-                instant: now.instant + crate::scroll::EASE,
-                ..now
-            },
-        );
-        let marked = hit_cells(&screen);
-        assert_eq!(marked.len(), 7, "seven cells of `line 59`: {marked:?}");
-        assert!(
-            marked.iter().all(|(x, _)| (3..10).contains(x)),
-            "after the `❯ `: {marked:?}"
-        );
+        .scope(|| {
+            let state = long_transcript(60);
+            let (mut ui, now) = scene();
+            render(&state, &mut ui, now);
+            crate::input::on_key(&mut ui, &solo(&state), ctrl('f'), now);
+            for c in "line 59".chars() {
+                crate::input::on_key(&mut ui, &solo(&state), typed(c), now);
+            }
+
+            let screen = drawn(
+                80,
+                24,
+                &solo(&state),
+                &mut ui,
+                Now {
+                    instant: now.instant + crate::scroll::EASE,
+                    ..now
+                },
+            );
+            let marked = hit_cells(&screen);
+            assert_eq!(marked.len(), 7, "seven cells of `line 59`: {marked:?}");
+            assert!(
+                marked.iter().all(|(x, _)| (3..10).contains(x)),
+                "after the `❯ `: {marked:?}"
+            );
+        });
     }
 
     /// The cells carrying the mark a hit is drawn in.
@@ -1816,7 +1826,13 @@ mod tests {
             .iter()
             .enumerate()
             .filter(|(i, cell)| {
-                *i >= 160 && cell.style() == theme::as_drawn(theme::presence().patch(theme::bold()))
+                *i >= 160
+                    && cell.style()
+                        == theme::as_drawn(
+                            theme::ground("glow")
+                                .unwrap()
+                                .patch(theme::foreground("bg").unwrap()),
+                        )
             })
             .map(|(i, _)| ((i % 80) as u16, (i / 80) as u16))
             .collect()
@@ -1826,20 +1842,26 @@ mod tests {
     /// its region, both hang with the lines and not with the pane.
     #[test]
     fn a_hit_on_a_short_transcript_is_marked_where_it_sits() {
-        let state = folded(vec![item_frame(1, user("itm_1", "run the tests"))]);
-        let tree = solo(&state);
-        let (mut ui, now) = scene();
-        let row = row_carrying(&render(&state, &mut ui, now), "run the tests");
-        crate::input::on_key(&mut ui, &tree, ctrl('f'), now);
-        for c in "tests".chars() {
-            crate::input::on_key(&mut ui, &tree, typed(c), now);
+        crate::render::Render {
+            look: crate::painted::truecolor(),
+            ..Default::default()
         }
-        crate::input::on_key(&mut ui, &tree, key(crossterm::event::KeyCode::Enter), now);
-        assert_eq!(
-            hit_cells(&drawn(80, 24, &tree, &mut ui, now)),
-            (11..16).map(|x| (x, row)).collect::<Vec<_>>(),
-            "the five cells of `tests` on the row it is drawn on"
-        );
+        .scope(|| {
+            let state = folded(vec![item_frame(1, user("itm_1", "run the tests"))]);
+            let tree = solo(&state);
+            let (mut ui, now) = scene();
+            let row = row_carrying(&render(&state, &mut ui, now), "run the tests");
+            crate::input::on_key(&mut ui, &tree, ctrl('f'), now);
+            for c in "tests".chars() {
+                crate::input::on_key(&mut ui, &tree, typed(c), now);
+            }
+
+            assert_eq!(
+                hit_cells(&drawn(80, 24, &tree, &mut ui, now)),
+                (11..16).map(|x| (x, row)).collect::<Vec<_>>(),
+                "the five cells of `tests` on the row it is drawn on"
+            );
+        });
     }
 
     /// The cells one draw styles differently from another, gathered by row:
@@ -1960,62 +1982,6 @@ mod tests {
         let screen = render(&state, &mut ui, settled);
         assert!(screen.contains("lines below"), "{screen}");
         assert_eq!(ui.shown.regions, following);
-    }
-
-    #[test]
-    fn the_pager_scrolls_searches_and_leaves_the_frame_as_it_found_it() {
-        let output = ToolOutput {
-            parts: vec![ContentPart::text(
-                (1..=40).map(|i| format!("line {i}\n")).collect::<String>(),
-            )],
-            is_error: false,
-            display: None,
-            upshot: None,
-        };
-        let state = folded(vec![item_frame(
-            1,
-            tool(
-                "itm_1",
-                "Read",
-                json!({"file_path": "src/lib.rs"}),
-                Some(output),
-                ItemStatus::Completed,
-            ),
-        )]);
-        let (mut ui, now) = scene();
-        let tree = solo(&state);
-        let before = render(&state, &mut ui, now);
-
-        // A click focuses the block; `⏎` opens it whole.
-        crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
-        crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
-        let settled = later(now, 200);
-        let top = render(&state, &mut ui, settled);
-        assert!(top.contains("line 1"), "{top}");
-
-        crate::input::on_key(&mut ui, &tree, typed('G'), now);
-        let bottom = render(&state, &mut ui, settled);
-        assert!(bottom.contains("line 40"), "{bottom}");
-        assert_ne!(top, bottom, "G takes the end of it");
-
-        crate::input::on_key(&mut ui, &tree, typed('/'), now);
-        for c in "line 7".chars() {
-            crate::input::on_key(&mut ui, &tree, typed(c), now);
-        }
-        let typing = render(&state, &mut ui, settled);
-        assert!(typing.contains("/line 7"), "{typing}");
-        crate::input::on_key(&mut ui, &tree, key(KeyCode::Enter), now);
-        let found = render(&state, &mut ui, settled);
-        assert!(found.contains("1/1"), "{found}");
-        assert!(found.contains("line 7"), "{found}");
-
-        crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert_eq!(
-            render(&state, &mut ui, later(now, 400)),
-            before,
-            "the frame beneath is what it was"
-        );
     }
 
     #[test]

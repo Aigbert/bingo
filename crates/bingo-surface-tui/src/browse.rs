@@ -2,6 +2,7 @@
 mod actions;
 pub mod cache;
 mod paint;
+pub mod reader;
 use crate::{
     clock::Now,
     effect::Effect,
@@ -20,6 +21,7 @@ use serde_json::json;
 pub const BUSY: &str = "Wait for the running turn before rewinding";
 #[derive(Clone, Debug, PartialEq)]
 pub struct Opened {
+    pub reader: Option<Box<reader::Pager>>,
     pub session: SessionId,
     pub id: String,
     pub selected: Option<TurnId>,
@@ -41,6 +43,7 @@ pub fn open(ui: &mut Ui, tree: &Tree, selected: Option<TurnId>, confirm: bool, n
     });
     ui.focus.show(
         Open::Browse(Opened {
+            reader: None,
             session: tree.view().clone(),
             id: IntentId::mint().to_string(),
             selected,
@@ -55,13 +58,6 @@ pub fn active(ui: &Ui) -> bool {
 fn opened(ui: &Ui) -> Option<&Opened> {
     match ui.focus.open() {
         Open::Browse(open) => Some(open),
-        Open::Pager(pager) => match &pager.return_to {
-            Some(crate::pager::Return::Layer(open)) => match &**open {
-                Open::Browse(open) => Some(open),
-                _ => None,
-            },
-            _ => None,
-        },
         _ => None,
     }
 }
@@ -206,6 +202,9 @@ pub fn waiting(ui: &Ui, tree: &Tree) -> bool {
             .is_none_or(|(_, waiting)| waiting)
 }
 pub fn key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+    if reader::current(ui).is_some() {
+        return reader::keys(ui, tree, key, now);
+    }
     if offered(ui, tree)
         && ui
             .shown

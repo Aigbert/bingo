@@ -216,7 +216,11 @@ fn layout_layer_and_drag_report_their_own_deadlines() {
         Some(arrived.instant + crate::select::EDGE_PACE)
     );
     ui.focus = crate::focus::Focus::Search(crate::search::Search::open());
-    assert_eq!(layout(first, &tree, &ui, SIZE, arrived).deadline(), None);
+    assert!(
+        layout(first, &tree, &ui, SIZE, arrived)
+            .deadline()
+            .is_some()
+    );
     ui.drag_step(arrived);
     assert!(ui.select.dragging.is_none());
 }

@@ -16,7 +16,7 @@ fn stopped() -> (Tree, Ui, Now) {
 fn expanded() -> (Tree, Ui, Now) {
     let (mut ui, now) = scene();
     let state = folded(finished_turn());
-    open_the_turns(&mut ui, &state);
+    open_chosen_wells(&mut ui, &state);
     (solo(&state), ui, later(now, 9_000))
 }
 
@@ -64,7 +64,7 @@ fn turn_expanded() {
     let (tree, mut ui, now) = expanded();
     let screen = draw_tree(120, 40, &tree, &mut ui, now);
     assert!(screen.contains("   ± edit    src/main.rs"));
-    assert!(screen.contains("     test result: ok. 3 passed"));
+    assert!(screen.contains("let a = 2;"), "{screen}");
     assert!(!screen.contains("/tmp/project/src"));
     both("turn_expanded", &tree, &mut ui, now);
 }
@@ -97,18 +97,19 @@ fn running_steps_do_not_repeat_the_footer_action() {
 fn an_ended_step_hangs_no_action() {
     let (_, mut ui, now) = expanded();
     let state = crate::transcript::slots::fixtures::with_promotions(folded(finished_turn()));
-    open_the_turns(&mut ui, &state);
+    open_chosen_wells(&mut ui, &state);
     let screen = draw_tree(120, 40, &solo(&state), &mut ui, now);
     assert!(screen.contains("   $ run     cargo test -q"));
     assert!(!screen.contains("background"));
 }
 #[test]
-fn ctrl_o_opens_only_the_latest_steps_output() {
+fn ctrl_o_selects_the_first_detail_row_without_opening_output() {
     let (tree, mut ui, now) = finished();
     draw_tree(80, 24, &tree, &mut ui, now);
     crate::input::on_key(&mut ui, &tree, ctrl('o'), now);
     let screen = draw_tree(80, 24, &tree, &mut ui, now);
-    assert!(screen.contains("test result: ok. 3 passed"));
+    assert!(!screen.contains("test result: ok. 3 passed"));
+    assert!(ui.focus.detail().is_some());
     assert!(screen.contains("edit    src/main.rs"));
     assert!(!screen.contains("4 steps"));
 }

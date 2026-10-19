@@ -101,30 +101,11 @@ fn light(item: &Item, exit: Option<i32>, rows: &Rows<'_>) -> crate::views::Drawi
     crate::views::marked(&view, 1, &crate::views::Marks::at(rows.now))
 }
 
-pub(super) fn well(lines: Vec<Line<'static>>, width: usize) -> Vec<Line<'static>> {
+fn well(lines: Vec<Line<'static>>, width: usize) -> Vec<Line<'static>> {
     if lines.is_empty() {
         return Vec::new();
     }
-    let width = width.saturating_sub(grid::VX + grid::RM);
-    let ground = theme::ground("well").unwrap_or_default();
-    let mut out = vec![Line::default()];
-    out.extend(lines.into_iter().map(|line| {
-        let mut body = Line::from("  ");
-        body.spans
-            .extend(grid::fit(line, width.saturating_sub(4)).spans);
-        body
-    }));
-    out.push(Line::default());
-    out.into_iter()
-        .map(|line| {
-            let mut body = grid::pad_to(line, width);
-            for span in &mut body.spans {
-                span.style = ground.patch(span.style);
-            }
-            body.spans.insert(0, Span::raw(" ".repeat(grid::VX)));
-            body
-        })
-        .collect()
+    crate::well::frame(lines, width)
 }
 
 pub fn whole(output: &str, exit: Option<i32>) -> Vec<Line<'static>> {

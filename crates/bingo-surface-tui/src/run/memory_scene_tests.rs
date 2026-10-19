@@ -126,7 +126,7 @@ fn memory_panel_sketch_at_both_sizes() {
 
 #[test]
 fn memory_and_experience_frontmatter_stays_verbatim_in_the_pager() {
-    use crate::{pager::Pager, test_support::*, ui::Open};
+    use crate::{browse::reader::Pager, test_support::*};
     for (width, height) in [(80, 24), (108, 30)] {
         for (text, fields) in [
             (
@@ -149,13 +149,10 @@ fn memory_and_experience_frontmatter_stays_verbatim_in_the_pager() {
             let (mut ui, now) = scene();
             let now = still(now);
             ui.focus.show(
-                Open::Pager(Pager::new(
-                    crate::pager::Source::Text {
-                        title: "file.md".into(),
-                        text: bingo_mod_memory::fence::document(text),
-                    },
-                    None,
-                )),
+                crate::browse::reader::layer(Pager::new(crate::browse::reader::Source::Text {
+                    title: "file.md".into(),
+                    text: bingo_mod_memory::fence::document(text),
+                })),
                 now.instant,
             );
             let screen = draw_tree(width, height, &tree, &mut ui, now);
@@ -174,18 +171,15 @@ fn memory_and_experience_frontmatter_stays_verbatim_in_the_pager() {
 }
 #[test]
 fn a_pager_renders_other_text_as_given_without_a_fence() {
-    use crate::{pager::Pager, test_support::*, ui::Open};
+    use crate::{browse::reader::Pager, test_support::*};
     let tree = solo(&state());
     let (mut ui, now) = scene();
     let now = still(now);
     ui.focus.show(
-        Open::Pager(Pager::new(
-            crate::pager::Source::Text {
-                title: "notes".into(),
-                text: "---\ntitle: plain notes\n---\n\n**Body**".into(),
-            },
-            None,
-        )),
+        crate::browse::reader::layer(Pager::new(crate::browse::reader::Source::Text {
+            title: "notes".into(),
+            text: "---\ntitle: plain notes\n---\n\n**Body**".into(),
+        })),
         now.instant,
     );
     let screen = draw_tree(80, 24, &tree, &mut ui, now);
@@ -199,20 +193,20 @@ fn a_pager_renders_other_text_as_given_without_a_fence() {
 }
 #[test]
 fn a_pager_does_not_return_focus_to_a_removed_pane() {
-    use crate::{pager::Pager, test_support::*, ui::Open};
+    use crate::{browse::reader::Pager, test_support::*};
     let tree = solo(&state());
     let (mut ui, now) = scene();
     ui.focus.show(
-        Open::Pager(Pager::new(
-            crate::pager::Source::Text {
+        crate::ui::Open::Reader(crate::browse::reader::Reader {
+            pager: Pager::new(crate::browse::reader::Source::Text {
                 title: "file".into(),
                 text: "text".into(),
-            },
-            Some(crate::pager::Return::Pane("removed".into())),
-        )),
+            }),
+            return_to: Some(crate::browse::reader::Return::Pane("removed".into())),
+        }),
         now.instant,
     );
-    crate::pager::keys(&mut ui, &tree, key(crossterm::event::KeyCode::Esc), now);
+    crate::browse::reader::keys(&mut ui, &tree, key(crossterm::event::KeyCode::Esc), now);
     assert!(!matches!(ui.focus, crate::focus::Focus::Pane(_)));
     assert!(!ui.focus.showing());
 }

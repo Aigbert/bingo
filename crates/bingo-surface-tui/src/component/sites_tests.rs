@@ -218,7 +218,7 @@ fn seen(component: Component, state: &bingo_sdk::SessionState) -> crate::tree::T
 /// the turns did has it.
 fn reading(tree: &crate::tree::Tree) -> (crate::ui::Ui, crate::clock::Now) {
     let (mut ui, now) = scene();
-    open_the_turns(&mut ui, tree.viewed());
+    open_chosen_wells(&mut ui, tree.viewed());
     (ui, now)
 }
 
