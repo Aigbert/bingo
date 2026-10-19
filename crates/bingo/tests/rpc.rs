@@ -63,11 +63,9 @@ async fn stdout_carries_json_rpc_lines_only_and_an_unknown_method_is_refused() {
     let parse = next(3).await;
     assert_eq!(parse["error"]["code"], -32700, "{parse}");
     assert!(parse["id"].is_null());
-    let open = format!(
-        r#"{{"jsonrpc":"2.0","id":4,"method":"session/open","params":{{"selector":{{"kind":"create","spec":{{"cwd":"{}"}}}}}}}}"#,
-        server.cwd().display()
-    );
-    send(&mut stdin, &open).await;
+    let open = serde_json::json!({"jsonrpc":"2.0","id":4,"method":"session/open",
+        "params":{"selector":{"kind":"create","spec":{"cwd":server.cwd()}}}});
+    send(&mut stdin, &open.to_string()).await;
     let opened = next(4).await;
     let session = opened["result"]["session"].as_str().unwrap().to_string();
     let submit = format!(
