@@ -91,9 +91,9 @@ unknown. The traits that pick a row's tier (`read_only`, `edit`) already belong 
     - A part keeps its deadline whatever room it gets, because the deadline may be when it
       appears, ends or changes size; a toast's end gives the footer back. Transcript rows
       outside the visible window and the caret wake only while on screen (M193).
-    - Accepted cost: a part clipped to no room still wakes at its animation's pace, as the crew
-      lamp does in a footer too narrow to show it, and a mod's clipped part is still pulled.
-      Telling a deadline that changes a part's size from one that only changes its ink is M199's.
+    - A footer part says whether its deadline changes its size or only its ink (`views::Part`);
+      clipped to no room it keeps only the size kind, so the crew lamp in a footer too narrow
+      for it schedules nothing (M199). A mod's part is the size kind, and is still pulled.
 11. **Colour.** M73 holds for prose: body text is the terminal's foreground, and
     muted/dim/faint are blends of the detected foreground and background. Chrome takes Ember's
     hex pairs (ember, glow, amber, good, bad, plan, auto, code and six crew colours), chosen by

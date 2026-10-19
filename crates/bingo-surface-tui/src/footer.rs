@@ -6,7 +6,7 @@ use crate::{
     theme,
     tree::Tree,
     ui::Ui,
-    views::Drawing,
+    views::{Drawing, Part},
 };
 use bingo_sdk::component::{Props, SessionModeProps};
 use ratatui::text::{Line, Span};
@@ -26,7 +26,7 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, width: usize, now: Now) ->
     // them; the facts after it are cut short with an ellipsis.
     let lead = facts
         .iter()
-        .filter_map(|fact| fact.lines.first())
+        .filter_map(|fact| fact.drawing.lines.first())
         .map(Line::width)
         .find(|width| *width > 0)
         .map_or(0, |width| width + 3);
@@ -58,7 +58,7 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, width: usize, now: Now) ->
     }
 }
 
-fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> Vec<Drawing> {
+fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> Vec<Part> {
     crate::layout::count::band(3);
     let mut site = Site {
         state: tree.viewed(),
@@ -75,10 +75,11 @@ fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> V
     };
     parts.push(mode(tree.viewed(), &mut site));
     parts.push(context(tree.viewed()));
+    let mut parts: Vec<Part> = parts.into_iter().map(Part::size).collect();
     if tree.viewing().is_none() && tree.needers().next().is_none() {
-        parts.push(crew(tree, now));
+        parts.push(Part::ink(crew(tree, now)));
     }
-    parts.extend(slots(tree.viewed(), now));
+    parts.extend(slots(tree.viewed(), now).into_iter().map(Part::size));
     parts
 }
 
@@ -284,22 +285,41 @@ fn slots(state: &bingo_sdk::SessionState, now: Now) -> Vec<Drawing> {
 
 /// The facts in order, a separator between each, cut with an ellipsis
 /// where the row ends (`fitSegs()`).
-fn fit(parts: Vec<Drawing>, width: usize) -> Drawing {
-    let next = parts.iter().filter_map(|part| part.next).min();
+fn fit(parts: Vec<Part>, width: usize) -> Drawing {
     let mut line = Line::default();
-    for part in parts {
-        let Some(part) = part.lines.into_iter().next().filter(|l| l.width() > 0) else {
+    let mut starts = Vec::with_capacity(parts.len());
+    for part in &parts {
+        let Some(drawn) = part.drawing.lines.first().filter(|l| l.width() > 0) else {
+            starts.push(None);
             continue;
         };
         if line.width() > 0 {
             line.spans
                 .push(Span::styled(theme::glyphs::get("sep"), ink("faint")));
         }
-        line.spans.extend(part.spans);
+        starts.push(Some(line.width()));
+        line.spans.extend(drawn.spans.iter().cloned());
     }
+    let shown = visible(line.width(), width);
+    let next = parts
+        .iter()
+        .zip(starts)
+        .filter_map(|(part, start)| part.next(start.is_some_and(|start| start < shown)))
+        .min();
     Drawing {
         lines: vec![grid::fit(line, width)],
         next,
+    }
+}
+
+/// How many columns of a `wide` row `grid::fit` keeps of its own cells in
+/// `width`: all of them when it fits, and the room before the ellipsis when not.
+fn visible(wide: usize, width: usize) -> usize {
+    match wide <= width {
+        true => width,
+        false => width.saturating_sub(unicode_width::UnicodeWidthStr::width(theme::glyphs::get(
+            "ell",
+        ))),
     }
 }
 

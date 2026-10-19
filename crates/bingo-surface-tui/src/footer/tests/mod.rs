@@ -249,19 +249,40 @@ fn a_narrow_footer_keeps_the_lead_then_the_keys_and_cuts_the_facts() {
     assert_eq!(at(12), "   fake-1…");
 }
 
+/// The crew lamp only breathes, so a footer too narrow for it schedules
+/// nothing (ADR-0097 §10).
 #[test]
-fn ambient_deadlines_survive_clipping_but_not_toast_replacement() {
+fn a_clipped_lamp_schedules_nothing_and_a_toast_replaces_it() {
     let tree = folded_tree(busy_child("reviewer"));
     let (mut ui, now) = scene();
     let draw = |ui: &Ui, width, now| super::draw(&tree, ui, &mut Default::default(), width, now);
-    let next = Some(now.instant + crate::clock::FRAME);
-    assert_eq!(draw(&ui, 80, now).next, next);
-    assert_eq!(draw(&ui, 12, now).next, next);
+    assert_eq!(
+        draw(&ui, 80, now).next,
+        Some(now.instant + crate::clock::FRAME)
+    );
+    assert_eq!(draw(&ui, 12, now).next, None);
     ui.notify(Level::Info, "saved", now.instant);
     assert_eq!(
         draw(&ui, 80, later(now, 200)).next,
         Some(now.instant + std::time::Duration::from_millis(2400))
     );
+}
+
+/// `wakes in 10s` becomes `wakes in 9s`, and the room it gives back may
+/// show it again, so a clipped countdown keeps its deadline.
+#[test]
+fn a_clipped_countdown_still_wakes_when_its_words_change() {
+    let (ui, now) = scene();
+    let at = now.wall + jiff::SignedDuration::from_secs(10);
+    let state = folded(vec![frame(1, pending_wake(&at.to_string()))]);
+    let tree = solo(&state);
+    let draw = |width| super::draw(&tree, &ui, &mut Default::default(), width, now);
+    let wide = draw(80);
+    assert!(wide.lines[0].to_string().contains("wakes in 10s"));
+    let narrow = draw(12);
+    assert!(!narrow.lines[0].to_string().contains("wakes"));
+    assert!(narrow.next.is_some());
+    assert_eq!(narrow.next, wide.next);
 }
 
 #[test]

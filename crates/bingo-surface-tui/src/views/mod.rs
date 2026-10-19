@@ -14,7 +14,7 @@ mod button;
 pub mod code;
 pub(crate) mod diff;
 mod drawing;
-pub use drawing::Drawing;
+pub use drawing::{Drawing, Part};
 mod flex;
 mod image;
 mod input;
