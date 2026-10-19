@@ -215,7 +215,8 @@ def send(value):
     print(json.dumps(dict(jsonrpc='2.0', **value)), flush=True)
 def request(id, method, params):
     send(dict(id=id, method=method, params=params))
-for line in sys.stdin:
+# Bytes, because Windows decodes a text pipe with the locale code page.
+for line in sys.stdin.buffer:
     message = json.loads(line)
     method = message.get('method')
     params = message.get('params', {})
