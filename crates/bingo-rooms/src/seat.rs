@@ -122,7 +122,7 @@ pub async fn join(
     let roster = joined(&room::roster_of(&standing), seats);
     let fresh = joining(Some(&standing), seats);
     let head = head_of(&standing);
-    post::say(host, id, by, moved(by, "seated", &named(seats))).await?;
+    post::say(host, id, by, room::Move::Seated(named(seats)).said(by)).await?;
     declare(host, id, &roster).await?;
     start_reading(host, id, &room.title, head.as_ref(), &fresh).await;
     Ok(roster)
@@ -148,7 +148,7 @@ pub async fn leave(
         .collect();
     declare(host, id, &roster).await?;
     clear_ears(host, id, &leaving).await?;
-    post::say(host, id, by, moved(by, "unseated", &leaving)).await?;
+    post::say(host, id, by, room::Move::Unseated(leaving.clone()).said(by)).await?;
     tell_the_unseated(host, room, &leaving, by).await;
     Ok(roster)
 }
@@ -165,7 +165,17 @@ pub async fn close(
 ) -> Result<(), KernelError> {
     let standing = read(host, id, &room.title).await?;
     still_open(Some(&standing), &room.title)?;
-    post::say(host, id, by, closing(by, &room.title, why)).await?;
+    post::say(
+        host,
+        id,
+        by,
+        room::Move::Closed {
+            title: room.title.clone(),
+            why: why.map(str::to_string),
+        }
+        .said(by),
+    )
+    .await?;
     let closed = Closed {
         at: Timestamp::now(),
         by: by.to_string(),
@@ -297,19 +307,6 @@ fn holds(names: &[String], name: &str) -> bool {
 /// The names a roster asks for, in the order it asks for them.
 fn named(seats: &[Seat]) -> Vec<String> {
     seats.iter().map(|seat| seat.name.clone()).collect()
-}
-
-/// What the room is told a verb did, in the caller's own name (ADR-0053 §3).
-fn moved(by: &str, verb: &str, names: &[String]) -> String {
-    format!("{by} {verb} {}", names.join(", "))
-}
-
-/// The last line a room reads, which is the one that ends it.
-fn closing(by: &str, title: &str, why: Option<&str>) -> String {
-    match why {
-        Some(why) => format!("{by} closed {title}: {why}"),
-        None => format!("{by} closed {title}"),
-    }
 }
 
 /// Nothing in a tree is taken away in silence (ADR-0053 §3): a seat that has

@@ -288,8 +288,10 @@ pub struct Retuned {
     pub patience_s: u64,
 }
 
+mod moves;
 mod readers;
 pub use crate::name::PARENT as HOLDER;
+pub use moves::Move;
 pub use readers::{Hearing, Owes, debts, hearing, unread_count};
 
 #[cfg(test)]
