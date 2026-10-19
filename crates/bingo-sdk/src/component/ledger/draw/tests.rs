@@ -13,6 +13,7 @@ fn step(state: StepState) -> Step {
         elapsed_ms: Some(1234),
         why: None,
         landed_at: Some(100),
+        teammate: None,
     }
 }
 fn marks() -> Marks {

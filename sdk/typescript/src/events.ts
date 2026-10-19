@@ -1040,7 +1040,18 @@ export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: un
 /** The top-level input field a tool's row names. */
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
@@ -1116,7 +1127,18 @@ export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: un
 /** The top-level input field a tool's row names. */
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
@@ -1205,7 +1227,18 @@ export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: un
 /** The top-level input field a tool's row names. */
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
@@ -1277,7 +1310,18 @@ export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: un
 /** The top-level input field a tool's row names. */
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;
@@ -1500,7 +1544,18 @@ export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": numb
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /**
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).
@@ -1859,7 +1914,18 @@ export type Reads = ("path" | "command" | "text");
 /** The top-level input field a tool's row names. */
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type Payload = {
   "description": string;
@@ -1881,7 +1947,18 @@ export type Reads = ("path" | "command" | "text");
 /** The top-level input field a tool's row names. */
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /** A tool as the model sees it. */
 export type ToolSpec = {
   "description": string;

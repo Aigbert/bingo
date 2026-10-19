@@ -1,0 +1,1 @@
+{"name":"SendMessage","description":"Send a message","inputSchema":{},"look":{"mark":"@","verb":"send","target":{"field":"message","reads":"text"},"who":"to"}}

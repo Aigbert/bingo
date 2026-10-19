@@ -35,6 +35,7 @@ fn running(item: &Item, command: &str, rows: &Rows<'_>) -> crate::views::Drawing
         answer: None,
         why: None,
         landed_at: None,
+        teammate: None,
         elapsed_ms: Some(
             rows.now
                 .wall

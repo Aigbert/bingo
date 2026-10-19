@@ -6637,6 +6637,17 @@
           ],
           "format": "int64",
           "description": "When the result arrived; the drawing declares its landing motion."
+        },
+        "teammate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Teammate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The session this step started or addressed, when it has a voice of\nits own."
         }
       },
       "required": [
@@ -6784,6 +6795,31 @@
         "text",
         "chat"
       ]
+    },
+    "Teammate": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ink": {
+          "type": "string",
+          "description": "The theme token the session is drawn in."
+        },
+        "reportedAt": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "description": "When a post from that session first followed the step."
+        }
+      },
+      "required": [
+        "name",
+        "ink"
+      ],
+      "description": "The session a step started or addressed, in the words its row needs."
     },
     "TextChild": {
       "anyOf": [

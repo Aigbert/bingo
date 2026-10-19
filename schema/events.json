@@ -4878,6 +4878,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "who": {
+                "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -5653,6 +5660,13 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "who": {
+                "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour.",
+                "type": [
+                  "string",
+                  "null"
                 ]
               }
             },
@@ -6620,6 +6634,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "who": {
+                "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -6993,6 +7014,13 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "who": {
+                "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour.",
+                "type": [
+                  "string",
+                  "null"
                 ]
               }
             },
@@ -9704,6 +9732,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "who": {
+                "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -10142,6 +10177,13 @@
                     "type": "null"
                   }
                 ]
+              },
+              "who": {
+                "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour.",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -10250,6 +10292,13 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "who": {
+                "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour.",
+                "type": [
+                  "string",
+                  "null"
                 ]
               }
             },

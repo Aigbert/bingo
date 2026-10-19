@@ -10536,6 +10536,17 @@
           ],
           "format": "int64",
           "description": "When the result arrived; the drawing declares its landing motion."
+        },
+        "teammate": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Teammate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The session this step started or addressed, when it has a voice of\nits own."
         }
       },
       "required": [
@@ -10720,6 +10731,31 @@
         "reads"
       ],
       "description": "The top-level input field a tool's row names."
+    },
+    "Teammate": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ink": {
+          "type": "string",
+          "description": "The theme token the session is drawn in."
+        },
+        "reportedAt": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64",
+          "description": "When a post from that session first followed the step."
+        }
+      },
+      "required": [
+        "name",
+        "ink"
+      ],
+      "description": "The session a step started or addressed, in the words its row needs."
     },
     "TextChild": {
       "anyOf": [
@@ -11092,6 +11128,13 @@
               "type": "null"
             }
           ]
+        },
+        "who": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The top-level input field naming a principal the call addresses, so a\nsurface can draw the row in that principal's colour."
         }
       },
       "required": [

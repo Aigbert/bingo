@@ -430,6 +430,19 @@
           "elapsedMs": 2000,
           "landedAt": 10000,
           "why": "session rule"
+        },
+        {
+          "verb": "scout",
+          "target": "find every caller of drain()",
+          "state": "done",
+          "mark": "@",
+          "reads": "text",
+          "tier": "change",
+          "teammate": {
+            "name": "scout",
+            "ink": "crew1",
+            "reportedAt": 12000
+          }
         }
       ],
       "marks": {

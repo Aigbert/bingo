@@ -61,6 +61,7 @@ pub fn resolve(name: &str, input: &Value, tools: &Looks, ascii: bool) -> Step {
         elapsed_ms: None,
         why: None,
         landed_at: None,
+        teammate: None,
     }
 }
 

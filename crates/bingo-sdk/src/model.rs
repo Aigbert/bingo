@@ -276,6 +276,10 @@ pub struct ToolLook {
     pub verb: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<Target>,
+    /// The top-level input field naming a principal the call addresses, so a
+    /// surface can draw the row in that principal's colour.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub who: Option<String>,
 }
 
 impl ToolLook {
@@ -285,6 +289,7 @@ impl ToolLook {
             ascii: None,
             verb: verb.into(),
             target: None,
+            who: None,
         }
     }
 
@@ -298,6 +303,11 @@ impl ToolLook {
             field: field.into(),
             reads,
         });
+        self
+    }
+
+    pub fn who(mut self, field: impl Into<String>) -> Self {
+        self.who = Some(field.into());
         self
     }
 }

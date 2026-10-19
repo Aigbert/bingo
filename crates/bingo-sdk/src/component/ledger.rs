@@ -68,6 +68,22 @@ pub struct Step {
     /// When the result arrived; the drawing declares its landing motion.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub landed_at: Option<i64>,
+    /// The session this step started or addressed, when it has a voice of
+    /// its own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub teammate: Option<Teammate>,
+}
+
+/// The session a step started or addressed, in the words its row needs.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Teammate {
+    pub name: String,
+    /// The theme token the session is drawn in.
+    pub ink: String,
+    /// When a post from that session first followed the step.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reported_at: Option<i64>,
 }
 
 /// The only state mark supplied by a surface; tool marks belong to tools.

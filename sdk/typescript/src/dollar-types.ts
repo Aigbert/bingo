@@ -893,7 +893,18 @@ export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** A call the model asked for, before or after the gate. */
 export type ToolCall = { "callId": string; "input": unknown; "name": string; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /**
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).

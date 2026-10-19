@@ -137,6 +137,7 @@ fn step_motion_lands_and_reduced_motion_owes_nothing() {
             elapsed_ms: None,
             why: None,
             landed_at: Some(now.wall.as_millisecond()),
+            teammate: None,
         };
         let view = step.drawing(&crate::turns::marks(), 80);
         let draw = |at| crate::views::marked(&view, 80, &crate::views::Marks::at(at));

@@ -362,6 +362,7 @@ mod tests {
             ascii: Some('<'),
             verb: "read".into(),
             target: None,
+            who: None,
         });
         assert_eq!(encode(&request, &caps(false)), without);
     }

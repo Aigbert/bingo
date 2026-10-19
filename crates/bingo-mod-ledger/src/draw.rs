@@ -29,6 +29,7 @@ mod tests {
             elapsed_ms: None,
             why: None,
             landed_at: None,
+            teammate: None,
         };
         for state in [StepState::Done, StepState::Asked, StepState::Running] {
             step.state = state;

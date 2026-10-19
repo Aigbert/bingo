@@ -40,15 +40,16 @@ pub fn checked_look(spec: &ToolSpec) -> ToolLook {
         spec.name
     );
     assert!(ascii.mark.is_ascii(), "{} ASCII mark", spec.name);
-    if let Some(target) = &look.target {
+    let fields = look.target.iter().map(|target| &target.field);
+    for field in fields.chain(look.who.iter()) {
         assert!(
             spec.input_schema
                 .get("properties")
-                .and_then(|p| p.get(&target.field))
+                .and_then(|p| p.get(field))
                 .is_some(),
-            "{} target {} is not an input property",
+            "{} field {} is not an input property",
             spec.name,
-            target.field
+            field
         );
     }
     look

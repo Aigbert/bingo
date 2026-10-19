@@ -1375,6 +1375,11 @@ export type Step = {
   "state": StepState;
   /** What it does it to, shortened for one row. */
   "target": string;
+  /**
+   * The session this step started or addressed, when it has a voice of
+   * its own.
+   */
+  "teammate"?: (Teammate | null);
   /** The catalogue baseline: only trusted read-only tools are lookups. */
   "tier": Tier2;
   /** What the tool said the call came to. */
@@ -1400,6 +1405,15 @@ export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type SystemBlock = { "cache"?: boolean; "text": string; [key: string]: unknown; };
 /** The top-level input field a tool's row names. */
 export type Target = { "field": string; "reads": Reads; [key: string]: unknown; };
+/** The session a step started or addressed, in the words its row needs. */
+export type Teammate = {
+  /** The theme token the session is drawn in. */
+  "ink": string;
+  "name": string;
+  /** When a post from that session first followed the step. */
+  "reportedAt"?: (number | null);
+  [key: string]: unknown;
+};
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
@@ -1447,7 +1461,18 @@ export type ToolEvent = {
 };
 export type ToolGroupProps = { "calls": Array<ToolUseProps>; "isActive": boolean; "isExpanded": boolean; [key: string]: unknown; };
 /** How a tool reads on a surface; never sent to a model. */
-export type ToolLook = { "ascii"?: (string | null); "mark": string; "target"?: (Target | null); "verb": string; [key: string]: unknown; };
+export type ToolLook = {
+  "ascii"?: (string | null);
+  "mark": string;
+  "target"?: (Target | null);
+  "verb": string;
+  /**
+   * The top-level input field naming a principal the call addresses, so a
+   * surface can draw the row in that principal's colour.
+   */
+  "who"?: (string | null);
+  [key: string]: unknown;
+};
 /**
  * What a tool returned: the parts the model sees, plus what a person sees
  * instead when the tool has something better than the text (ADR-0013 §2).

@@ -12,6 +12,32 @@ fn a_tool_look_round_trips_its_fixture() {
     assert_eq!(serde_json::to_value(spec).unwrap(), fixture);
 }
 
+/// A look may name the input field that holds a principal the call
+/// addresses; a surface draws the row in that principal's colour.
+#[test]
+fn a_look_naming_a_principal_round_trips_its_fixture() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../fixtures/tool-look-who.json")).unwrap();
+    let spec: ToolSpec = serde_json::from_value(fixture.clone()).unwrap();
+    let look = spec.look.as_ref().unwrap();
+    assert_eq!(look.who.as_deref(), Some("to"));
+    assert_eq!(serde_json::to_value(&spec).unwrap(), fixture);
+    let built = ToolLook::new('@', "send")
+        .target("message", Reads::Text)
+        .who("to");
+    assert_eq!(spec.look, Some(built));
+}
+
+#[test]
+fn a_look_without_a_principal_says_nothing_of_one() {
+    let look: ToolLook = serde_json::from_value(json!({"mark":"¶", "verb":"read"})).unwrap();
+    assert!(look.who.is_none());
+    assert_eq!(
+        serde_json::to_value(look).unwrap(),
+        json!({"mark":"¶", "verb":"read"})
+    );
+}
+
 #[test]
 fn an_old_spec_has_no_look_on_the_wire() {
     let fixture = json!({"name":"Old", "description":"Old tool", "inputSchema":{}});

@@ -7,7 +7,7 @@ use serde_json::Value;
 mod keybar;
 pub use keybar::*;
 pub mod ledger;
-pub use ledger::{LedgerProps, Step, StepState, Tier};
+pub use ledger::{LedgerProps, Step, StepState, Teammate, Tier};
 mod model_picker;
 pub mod row;
 pub use model_picker::*;
