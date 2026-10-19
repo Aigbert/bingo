@@ -284,7 +284,7 @@ step 'an @ offers the paths under the session and enter takes one'
 printf '[package]\nname = "smoke"\n' >"$WORK/cwd/Cargo.toml"
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '@Car'
-await '@Cargo.toml'
+await '▎ Cargo.toml'
 keys Enter
 await '@Cargo.toml ▍'
 finish
