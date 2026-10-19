@@ -8,4 +8,5 @@ mod room_posts;
 #[path = "../thinking.rs"]
 mod thinking;
 
+mod crew_rows;
 mod provenance;
