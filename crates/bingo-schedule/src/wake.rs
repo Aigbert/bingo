@@ -83,7 +83,12 @@ pub fn payload(pending: Option<&Wake>) -> Value {
                 at: wake.at.to_string(),
                 note: wake.note.clone()
             }),
-            [],
+            // The footer counts down from this instant at render time.
+            [bingo_sdk::slot::Slot::Status {
+                text: "wakes".into(),
+                tone: bingo_sdk::Tone::Neutral,
+                until: Some(wake.at),
+            }],
         ),
         None => Value::Null,
     }
@@ -126,7 +131,7 @@ mod tests {
     }
 
     #[test]
-    fn journal_payload_bytes_stay_unchanged() {
+    fn the_journal_payload_carries_the_wake_and_its_countdown() {
         let wake = set(
             Timestamp::UNIX_EPOCH,
             SignedDuration::from_mins(5),
@@ -134,7 +139,10 @@ mod tests {
         );
         assert_eq!(
             serde_json::to_string(&payload(Some(&wake))).unwrap(),
-            r#"{"at":"1970-01-01T00:05:00Z","note":"check","slots":[]}"#
+            concat!(
+                r#"{"at":"1970-01-01T00:05:00Z","note":"check","slots":["#,
+                r#"{"kind":"status","text":"wakes","tone":"neutral","until":"1970-01-01T00:05:00Z"}]}"#
+            )
         );
     }
 
