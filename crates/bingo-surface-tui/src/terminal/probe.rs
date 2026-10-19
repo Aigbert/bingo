@@ -48,18 +48,11 @@ pub(super) fn measured(mut heard: Heard) -> Heard {
 }
 
 /// The cell the terminal's window says, from its size in pixels and in cells
-/// ([`probe::window_cell`]).
-#[cfg(unix)]
+/// ([`probe::window_cell`]). A Windows console has no window in pixels to
+/// read: crossterm answers `Unsupported`, and that is no cell.
 fn window_cell() -> Option<Cell> {
     let window = crossterm::terminal::window_size().ok()?;
     probe::window_cell(window.columns, window.rows, window.width, window.height)
-}
-
-/// No Windows console is asked anything ([`exchange`]), and none has a window
-/// in pixels to read (crossterm answers `Unsupported`).
-#[cfg(not(unix))]
-fn window_cell() -> Option<Cell> {
-    None
 }
 
 /// How long the answers are given. Under a tmux that says it carries them
