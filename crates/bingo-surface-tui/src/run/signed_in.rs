@@ -19,7 +19,7 @@ pub(super) fn after(run: &mut Run, submission: &Submission, result: &Value) {
         .then(|| refused(state))
         .flatten();
     let now = run.now().instant;
-    let Some(text) = kept else {
+    let Some(input) = kept else {
         let said = bingo_sdk::toast::Say::ok(format!("signed in to {provider}"));
         return run.ui.tell(said, now);
     };
@@ -27,7 +27,7 @@ pub(super) fn after(run: &mut Run, submission: &Submission, result: &Value) {
         bingo_sdk::toast::Say::ok("signed in · sending your message again"),
         now,
     );
-    run.submit(Input::text(text, crate::origin()));
+    run.submit(input);
 }
 
 /// The provider the recorded receipt names; no receipt, no sign-in.
@@ -48,10 +48,42 @@ fn signed_in_to(state: &SessionState, result: &Value) -> Option<String> {
     }
 }
 
-fn refused(state: &SessionState) -> Option<String> {
+/// The refused turn's own words and pictures, as the person sent them.
+fn refused(state: &SessionState) -> Option<Input> {
     crate::component::signed_out::props(state)?;
     let turns = bingo_sdk::transcript::turns(&state.transcript);
-    turns.last()?.asked(&state.transcript).map(str::to_owned)
+    let turn = turns.last()?;
+    let items = state.transcript.items().get(turn.first..=turn.last)?;
+    items
+        .iter()
+        .filter(|item| item.turn.as_ref() == Some(&turn.id))
+        .find_map(|item| said(item))
+}
+
+/// The inverse of the kernel's journaling: one text part, then the pictures.
+fn said(item: &bingo_sdk::Item) -> Option<Input> {
+    let bingo_sdk::ItemBody::User { parts, origin } = &item.body else {
+        return None;
+    };
+    if bingo_sdk::effective_voice(origin) != bingo_sdk::Voice::Said {
+        return None;
+    }
+    let text = parts.iter().find_map(bingo_sdk::ContentPart::as_text);
+    let images: Vec<_> = parts
+        .iter()
+        .filter_map(|part| match part {
+            bingo_sdk::ContentPart::Image(image) => Some(image.clone()),
+            _ => None,
+        })
+        .collect();
+    if text.is_none() && images.is_empty() {
+        return None;
+    }
+    let mut input = Input::text(text.unwrap_or_default(), crate::origin());
+    if let Input::Text { images: sent, .. } = &mut input {
+        *sent = images;
+    }
+    Some(input)
 }
 
 #[cfg(test)]
@@ -63,7 +95,10 @@ mod tests {
     use serde_json::json;
 
     fn signed_out(provider: &str) -> SessionState {
-        let mut prompt = user("prompt", "fix it and add a test");
+        refused_with(provider, user("prompt", "fix it and add a test"))
+    }
+
+    fn refused_with(provider: &str, mut prompt: bingo_sdk::Item) -> SessionState {
         prompt.turn = Some(TurnId::from_raw("t1"));
         let receipt = loose(item(
             "receipt",
@@ -88,12 +123,15 @@ mod tests {
     }
 
     fn signed_in(provider: &str) -> (Run, std::sync::Arc<TestSession>, tempfile::TempDir) {
+        signed_in_from(signed_out(provider))
+    }
+
+    fn signed_in_from(
+        state: SessionState,
+    ) -> (Run, std::sync::Arc<TestSession>, tempfile::TempDir) {
         let session = std::sync::Arc::new(TestSession::default());
-        let mut run = super::super::tests::idle_in(
-            signed_out(provider),
-            session.clone(),
-            std::time::Instant::now(),
-        );
+        let mut run =
+            super::super::tests::idle_in(state, session.clone(), std::time::Instant::now());
         // A sent line joins the prompt history, which lives in the data dir.
         let data = tempfile::tempdir().unwrap();
         run.data_dir = data.path().to_owned();
@@ -120,6 +158,32 @@ mod tests {
             "{sent:?}"
         );
         assert_eq!(told(&run), "signed in · sending your message again");
+    }
+
+    #[test]
+    fn signing_in_again_sends_the_refused_pictures_with_the_words() {
+        let picture = bingo_pictures::testing::png(4, 3);
+        let prompt = item(
+            "prompt",
+            ItemStatus::Completed,
+            ItemBody::User {
+                parts: vec![
+                    bingo_sdk::ContentPart::text("what is wrong here"),
+                    bingo_sdk::ContentPart::Image(picture.clone()),
+                ],
+                origin: bingo_sdk::Origin::surface("tui"),
+            },
+        );
+        let (_run, session, _data) = signed_in_from(refused_with("anthropic", prompt));
+        let sent = session.submitted();
+        assert!(
+            matches!(
+                sent.as_slice(),
+                [Input::Text { text, images, .. }]
+                    if text == "what is wrong here" && images.as_slice() == [picture]
+            ),
+            "{sent:?}"
+        );
     }
 
     #[test]
