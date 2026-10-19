@@ -17,7 +17,8 @@ fn fold(scene: &mut Scene, turns: &[Value]) {
     scene.run.session = Attached::new(state, SessionHandle(scene.session.clone()));
 }
 
-fn recents(_scene: &Scene) -> Vec<bingo_sdk::SessionSummary> {
+/// The prototype's RECENTS, the sessions the welcome lists for this cwd.
+pub(super) fn recents() -> Vec<bingo_sdk::SessionSummary> {
     [
         ("steer 吞掉排队消息", 720),
         ("给 total 加标签", 7200),
@@ -38,7 +39,7 @@ fn recents(_scene: &Scene) -> Vec<bingo_sdk::SessionSummary> {
 
 async fn welcome(scene: &mut Scene, capture: &Capture) {
     scene.run.ui.welcome.started_at_ms = Some(CLOCK_ORIGIN_MS);
-    let recent = recents(scene);
+    let recent = recents();
     scene.host.on_render(move |_, mut request| {
         let recent = recent.clone();
         async move {

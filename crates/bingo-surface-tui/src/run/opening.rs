@@ -10,6 +10,14 @@ pub(super) fn arrived(run: &mut Run, reopened: bool) {
     }
 }
 
+/// A rewind that leaves the transcript on screen blank starts the welcome's
+/// clock again, as the prototype's `rewindTo` does.
+pub(super) fn rewound(run: &mut Run, session: &bingo_sdk::SessionId) {
+    if session == run.session.tree.view() && crate::welcome::blank(run.session.tree.viewed()) {
+        run.ui.welcome.started_at_ms = Some(run.now().wall.as_millisecond());
+    }
+}
+
 pub(super) async fn receipt(
     run: &mut Run,
     now: crate::clock::Now,

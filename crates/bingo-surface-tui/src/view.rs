@@ -607,8 +607,7 @@ fn draw_sparks(state: &SessionState, frame: &mut Layout, area: Rect, now: Now) {
 }
 
 fn transcript_window(tree: &Tree, ui: &Ui, frame: &mut Layout, rows: usize, now: Now) {
-    frame.height =
-        frame.blocks.height() + usize::from(!tree.viewed().transcript.items().is_empty());
+    frame.height = frame.blocks.height() + usize::from(!crate::welcome::blank(tree.viewed()));
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
     if matches!(ui.focus, crate::focus::Focus::Detail(_)) {
         frame.top = crate::detail::top(ui, frame, rows);
@@ -626,7 +625,7 @@ fn transcript_window(tree: &Tree, ui: &Ui, frame: &mut Layout, rows: usize, now:
 fn prepare_lines(ui: &Ui, tree: &Tree, frame: &Layout, shown: &mut Vec<Line<'static>>) -> usize {
     crate::browse::mark(ui, tree, frame, shown);
     mark_row(ui, frame, shown);
-    if !tree.viewed().transcript.items().is_empty() && frame.top + shown.len() < frame.height {
+    if !crate::welcome::blank(tree.viewed()) && frame.top + shown.len() < frame.height {
         shown.push(Line::default());
     }
     let padding = frame.padding();

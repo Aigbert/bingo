@@ -18,6 +18,11 @@ pub(super) fn script(kernel: &Kernel, switched: &Switched) {
         async move { Ok(attached) }
     });
     host.on_sessions(|filter: SessionFilter| async move {
+        // The prototype's welcome lists RECENTS while its picker lists
+        // SESSIONS; only the welcome asks by cwd without a page limit.
+        if filter.cwd.is_some() && filter.limit.is_none() {
+            return Ok(crate::run::acting::edges::recents());
+        }
         Ok(sessions()
             .into_iter()
             .filter(|s| {

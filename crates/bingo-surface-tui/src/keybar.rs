@@ -117,7 +117,7 @@ fn home(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
     if !ui.composer.is_empty() {
         return vec![KeyPair::new("⏎", "send"), KeyPair::new("⇧⏎", "newline")];
     }
-    if !tree.viewed().transcript.items().is_empty() {
+    if !crate::welcome::blank(tree.viewed()) {
         return vec![
             KeyPair::new("ctrl+o", "details"),
             KeyPair::new("/", "commands"),
@@ -131,7 +131,7 @@ fn home(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
             KeyPair::new("esc", "back"),
         ];
     }
-    if tree.viewed().transcript.items().is_empty() && !crate::welcome::recent(ui).is_empty() {
+    if crate::welcome::blank(tree.viewed()) && !crate::welcome::recent(ui).is_empty() {
         return vec![
             KeyPair::new("↑", "recent"),
             KeyPair::new("/", "commands"),
@@ -215,7 +215,7 @@ fn placeholder(state: &bingo_sdk::SessionState) -> String {
     }
     if state.busy() {
         "Steer, or queue what comes next"
-    } else if state.transcript.items().is_empty() {
+    } else if crate::welcome::blank(state) {
         "Ask anything, or / for commands"
     } else {
         "Reply, or / for commands"

@@ -54,7 +54,7 @@ async fn open(capture: &Capture) -> Stage {
     if capture.entry.scene == "mention" {
         state.summary.cwd = repository(scene._home.path());
     } else {
-        located(&mut state, scene._home.path());
+        located(&mut state);
     }
     scene.run.session = Attached::new(state.clone(), SessionHandle(scene.session.clone()));
     let kernel = kernel::Kernel::new(scene.host.clone(), state);
@@ -152,9 +152,11 @@ fn repository(home: &std::path::Path) -> String {
 }
 
 /// The prototype's `HERE`: the repository under home, on `dev` with three
-/// files changed, as bingo-context's location slot says it.
-fn located(state: &mut SessionState, home: &std::path::Path) {
-    state.summary.cwd = home.join("bingo-improve").to_string_lossy().into_owned();
+/// files changed, as bingo-context's location slot says it. The directory is
+/// written as the welcome would spell it, since the welcome reads the
+/// process's home and not the scene's.
+fn located(state: &mut SessionState) {
+    state.summary.cwd = "~/bingo-improve".into();
     let location = bingo_sdk::slot::Slot::Location {
         cwd: state.summary.cwd.clone(),
         branch: Some("dev".into()),

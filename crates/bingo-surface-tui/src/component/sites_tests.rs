@@ -454,7 +454,6 @@ fn every_known_item_body_has_a_site() {
 
 screen_test!(reasoning_backend, Reasoning);
 screen_test!(compaction_backend, Compaction);
-screen_test!(rewind_backend, Rewind);
 screen_test!(interruption_backend, Interruption);
 screen_test!(questionanswer_backend, QuestionAnswer);
 screen_test!(permissionreceipt_backend, PermissionReceipt);
@@ -472,6 +471,7 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
     for component in Component::ALL {
         // Pulled sites wait for their first answer; they have no surface body.
         // The dock draws a permission itself and pulls no site for it (M197).
+        // A rewind leaves no row, as the prototype cuts its log (M199).
         if matches!(
             component,
             Component::Pane
@@ -480,6 +480,7 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
                 | Component::PromptHint
                 | Component::Composer
                 | Component::Permission
+                | Component::Rewind
         ) {
             continue;
         }

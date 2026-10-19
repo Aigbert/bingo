@@ -8,7 +8,7 @@ pub(super) fn render(rows: &Rows<'_>, frame: &mut Layout, area: Rect) {
         .items()
         .iter()
         .find_map(|item| bingo_sdk::asked(item).map(|_| item.started_at));
-    if (out.is_none() && !rows.state.transcript.items().is_empty())
+    if (out.is_none() && !crate::welcome::blank(rows.state))
         || out.is_some_and(|at| {
             !rows.now.motion || rows.now.wall.duration_since(at).as_millis() >= 520
         })

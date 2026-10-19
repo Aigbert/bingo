@@ -533,6 +533,7 @@ impl Run {
             Event::Invalidated { requests } => pulling::refetch(self, requests),
             Event::ConfigChanged { .. } => site_keys::notices(self),
             Event::SessionClosed { .. } => self.closed(&frame.session),
+            Event::Rewound { .. } => opening::rewound(self, &frame.session),
             _ => {}
         }
         Ok(())

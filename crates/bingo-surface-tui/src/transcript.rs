@@ -500,7 +500,8 @@ fn default_item_lines(
             window,
             ..
         } => notice::compacted(item, (*before, *after), *window, rows).into(),
-        ItemBody::Rewind { dropped, .. } => rewound(*dropped, rows).into(),
+        // The prototype cuts the log and leaves no seam.
+        ItemBody::Rewind { .. } => Vec::new().into(),
         ItemBody::Interruption { marker, .. } => vec![indented(marker, theme::dim())].into(),
         ItemBody::Notice { level, text, .. } => speaks(
             theme::level(*level),
@@ -531,14 +532,6 @@ fn indented(text: &str, style: Style) -> Line<'static> {
         Span::raw(" ".repeat(speaks_indent())),
         Span::styled(text.to_owned(), style),
     ])
-}
-
-/// The seam a rewind left.
-fn rewound(dropped: u32, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    vec![rule(
-        &format!("rewound, {dropped} items dropped"),
-        rows.width,
-    )]
 }
 
 /// Every call is its own row, a call that started or addressed a teammate in
@@ -911,16 +904,6 @@ pub(crate) fn component_closing(
         ]));
     }
     out
-}
-
-/// A divider from column 1 to the edge, with its reason in the left run.
-fn rule(text: &str, width: usize) -> Line<'static> {
-    let head = format!(" {0}{0}{0} {text} ", theme::rule());
-    let tail = width.saturating_sub(head.width());
-    Line::from(Span::styled(
-        format!("{head}{}", theme::rule().repeat(tail)),
-        theme::dim(),
-    ))
 }
 
 #[cfg(test)]

@@ -23,6 +23,17 @@ pub fn wanted(state: &SessionState) -> bool {
     state.summary.parent.is_none() && state.summary.driver == Driver::Model
 }
 
+/// Whether the transcript says nothing yet: no item, or only the records
+/// rewinds left, which the prototype draws as nothing, so a rewind to the
+/// first prompt brings the welcome back.
+pub fn blank(state: &SessionState) -> bool {
+    state
+        .transcript
+        .items()
+        .iter()
+        .all(|item| matches!(item.body, bingo_sdk::ItemBody::Rewind { .. }))
+}
+
 mod drawing;
 mod embers;
 pub use drawing::draw;
@@ -91,7 +102,7 @@ pub fn key(
         && listed
         && key.code == KeyCode::Up
         && ui.composer.is_empty()
-        && tree.viewed().transcript.items().is_empty()
+        && blank(tree.viewed())
         && !rows.is_empty()
     {
         ui.focus = Focus::Welcome(rows.len() - 1);
