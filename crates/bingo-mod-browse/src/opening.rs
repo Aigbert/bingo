@@ -24,7 +24,7 @@ impl Interceptor for Opening {
             serde_json::from_value(value.clone()).map_err(crate::error)?;
         if input.name != "rewind"
             || !input.args.trim().is_empty()
-            || input.surface != Some(render::SurfaceName::Terminal)
+            || !input.surface.is_some_and(render::SurfaceName::shows_sheets)
         {
             return next.run(value).await;
         }
