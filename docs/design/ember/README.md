@@ -36,6 +36,19 @@ each key. The same build always writes the same files.
   captures together with the code that matches them. The person approves any change to what
   a scene shows.
 
+## The shipped terminal follows them
+
+Since M199 the shipped TUI draws every capture, not a sample. The sweep,
+`crates/bingo-surface-tui/src/test_support/ember/sweep.rs`, names each of the 105 captures once
+together with the milestone whose `full_frame` draws it, so a failing test is named for the
+milestone that owns the regression. Each test renders the whole frame at the capture's size and
+moment and compares it as above: characters cell for cell, inks wherever a token is named.
+`every_capture_in_the_index_is_swept_once` reads `scenes/index.json` and fails when a capture is
+missing from the sweep, swept twice, or swept without being in the index. A new capture is
+therefore a failing test until a milestone draws it.
+
+Run the sweep alone with `cargo test -p bingo-surface-tui --locked ember::sweep`.
+
 ## Regenerating
 
 ```sh

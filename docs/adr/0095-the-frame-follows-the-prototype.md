@@ -1,7 +1,8 @@
 # ADR-0095 — The frame follows the approved prototype
 
 Status: proposed · 2026-10-16 · Amends: ADR-0084 §1, §5 · Refines: M73 · Amended by ADR-0097
-(2026-10-18): §1, §2, §6, §7 and `TurnFold` superseded, §3 refined, the prototype is Ember
+(2026-10-18): §1, §2, §6, §7 and `TurnFold` superseded, §3 refined, the prototype is Ember;
+by M199 (2026-10-20): §4 esc on a question ends the turn
 
 ## Context
 
@@ -102,3 +103,11 @@ for prose and takes Ember's chrome tokens. §4, §5 and §9 stand.
   `TurnDuration` draws on the band. `KeyBar` is drawn in the footer. Inside a turn, a step's
   row is asked of `Ledger` once per row, so a mod may answer for its own steps.
 
+
+## Amendment — 2026-10-20 (M199)
+
+§4's esc on a question or form changes to follow the prototype. Esc on an open question ends
+the turn, as it does on an ask: the question is answered as cancelled, and the model gets no
+skip to decide on. Words typed into `Something else` are the first thing esc leaves; the next
+esc ends the turn. The 400 ms guard holds esc as it holds every other key, and `ctrl+c` is not
+held. The rest of §4 stands.

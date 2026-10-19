@@ -94,6 +94,10 @@ Then every one of the 105 captures passes, and what the old look left behind is 
   notice), and `crates/bingo` (`--resume`'s toast).
 - Assigned subset: SDK props/metadata, core compaction recording, context location facts,
   mod-sessions recent lookup, TUI edge modules and PTY/capture/drive tests; no dependency added.
+- Brick 8: `crates/bingo-services` and `crates/bingo-context` take `jiff` (already a workspace
+  dependency) as a normal dependency: a memory carries the civil date it was written
+  (services), dated by the local day of its file (context, where `jiff` was a dev-dependency).
+  The lock gains one edge and no package.
 
 ## Exit criteria
 
@@ -103,7 +107,7 @@ Then every one of the 105 captures passes, and what the old look left behind is 
       `narrow`.
 - [ ] `exit`: its receipt rows match byte for byte in a pty black-box test. The shell's prompt
       rows are the shell's, not bingo's.
-- [ ] The sweep module passes all 105 captures on the merged dev, after M198 and M200.
+- [x] The sweep module passes all 105 captures on the merged dev, after M198 and M200.
 - [ ] A fold test: `TurnRetrying` keeps its delay and reason, and an old journal without them
       still folds.
 - [ ] Gates and checks as in M192. tmux drive: a fresh start, ↑ into recent and ⏎, a retry
