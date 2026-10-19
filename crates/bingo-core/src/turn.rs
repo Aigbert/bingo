@@ -253,7 +253,11 @@ fn record(
     round: u32,
     body: ItemBody,
 ) -> ItemId {
-    record_item(transcript, host, mint(turn, round, body, ItemStatus::Completed))
+    record_item(
+        transcript,
+        host,
+        mint(turn, round, body, ItemStatus::Completed),
+    )
 }
 
 fn record_item(transcript: &mut Transcript, host: &dyn TurnHost, item: Item) -> ItemId {
@@ -715,9 +719,9 @@ impl Turn<'_> {
     async fn barrier(&mut self) -> Option<()> {
         let steering = self.racing(self.host.absorb()).await?;
         for (_intent, input) in steering {
-            if let Some(item) =
-                crate::user::item(input, |body| mint(&self.id, self.round, body, ItemStatus::Completed))
-            {
+            if let Some(item) = crate::user::item(input, |body| {
+                mint(&self.id, self.round, body, ItemStatus::Completed)
+            }) {
                 record_item(&mut self.transcript, self.host, item);
             }
         }
