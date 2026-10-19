@@ -1,31 +1,78 @@
-M196 part 1, round 4 — command evidence
+M196 part 1, round 5 — command evidence
 Cargo jobs ran serially.
 
-$ GIT_SEQUENCE_EDITOR=true git rebase -i --autosquash fec21d36
-exit 0; fixup removes the core test from badf16b6; a separate test(core) commit restores and extends it.
+$ cargo test -p bingo-surface-tui --lib --locked (initial key-policy update)
+1436 passed; 3 failed.
+Failures: two palette snapshot tests and escape_returns_from_aside_and_otherwise_stops_permission_asks.
+Updated only the seven Esc description rows and the obsolete root-only cancellation expectation.
+
+$ INSTA_UPDATE=always cargo test -p bingo-surface-tui --lib palette::tests --locked
+Finished `test` profile [unoptimized + debuginfo] target(s) in 4.23s
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 1425 filtered out; finished in 0.33s
+exit 0
+
+$ cargo test -p bingo-surface-tui --lib --locked (before rebase)
+Finished `test` profile [unoptimized + debuginfo] target(s) in 10.85s
+test result: ok. 1440 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.86s
+exit 0
+
+$ cargo test -p bingo-surface-tui --lib a_queued_chain_call_gets_the_tool_marker_and_zero_duration --locked
+Finished `test` profile [unoptimized + debuginfo] target(s) in 8.67s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1440 filtered out; finished in 0.00s
+exit 0
+
+$ git rebase d00ff6c7
+Conflicts: turn/tests.rs at 426214a5 and e32c081d; turn.rs at 6d54f28c.
+Kept round and headline tests; shared the free record_item emitter.
+Reworded 1b701c13 within this rebase: test(docs): Wait for the background answer in the drive.
+Successfully rebased and updated refs/heads/m196-acting-never-moves.
+
+$ cargo check --workspace --all-targets --locked (headline conflict resolution)
+Initial check: E0599, Turn::fresh no longer exists.
+Use dev's free mint; corrected check passes.
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 24s
+exit 0
+
+$ cargo check --workspace --all-targets --locked (conflict-headline)
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.28s
+exit 0
+
+$ cargo check --workspace --all-targets --locked (conflict-record)
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 02s
+exit 0
 
 $ unset $(git rev-parse --local-env-vars)
 exit 0
 
-$ git rebase -x 'cargo check --workspace --all-targets --locked' fec21d36
-28 checks: Finished `dev` profile; exit 0
+$ git rebase -x 'cargo check --workspace --all-targets --locked' d00ff6c7
+32 successful workspace checks, including corrected reruns.
+27e9fab0 failed E0308: box the stop output; amended to bd1d3103; rerun passed.
+11d35d06 failed E0277: dereference the boxed test output; amended to fdbb3145; rerun passed.
 Successfully rebased and updated refs/heads/m196-acting-never-moves.
-Before/after ordered commit hashes identical during the build proof; no failed commits or amendments.
+
+$ cargo test -p bingo-surface-tui --lib --locked (rebased fixtures)
+Finished `test` profile [unoptimized + debuginfo] target(s) in 42.04s
+test result: ok. 1446 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.88s
+exit 0
+
+$ cargo check -p bingo-core --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.19s
+exit 0
 
 $ cargo fmt --all -- --check
 exit 0
 
 $ cargo check --workspace --all-targets --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.40s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.46s
 exit 0
 
 $ cargo clippy --workspace --all-targets --locked -- -D warnings
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.07s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 46.82s
 exit 0
 
 $ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
-126 test-result lines: 6555 passed; 0 failed; 0 ignored.
-TUI: 1437 passed; core: 693 passed; tool-bash: 157 passed; PTY: 20 passed.
+128 result lines: 6594 passed; 0 failed; 0 ignored.
+TUI: 1446 passed; core: 717 passed; tool-bash: 157 passed; PTY: 20 passed.
 exit 0
 
 $ scripts/check_discipline.sh
@@ -34,7 +81,7 @@ exit 0
 
 $ scripts/budget.sh
 dependencies (unique, normal): 423 (max  423)
-target/debug: 16 GB (soft max  5)
+target/debug: 17 GB (soft max  5)
 budget ok
 exit 0
 
@@ -43,15 +90,15 @@ advisories ok, bans ok, licenses ok, sources ok
 exit 0
 
 $ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.40s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 10.08s
 exit 0
 
 $ cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.10s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 23.48s
 exit 0
 
 $ cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.13s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.89s
 exit 0
 
 $ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
@@ -65,7 +112,7 @@ warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-19
 exit 101
 
 $ cargo build -p bingo --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 33.71s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 39.92s
 exit 0
 
 $ TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh
@@ -79,47 +126,24 @@ PASS 80x24: enter/tab/up/down/esc/esc esc/ctrl+c/ctrl+d/!/ctrl+b/ctrl+v/?
 CLEAN 80x24: owned server and temporary HOME/data/cwd
 exit 0
 
-$ cargo test -p bingo-core --lib the_provider_reads_text_but_never_the_headline --locked
-Finished `test` profile [unoptimized + debuginfo] target(s) in 21.21s
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 692 filtered out; finished in 0.02s
-exit 0
-
-$ cargo test -p bingo-surface-tui --lib stop_answer_matches_the_kernel_for_a_running_tool --locked
-Finished `test` profile [unoptimized + debuginfo] target(s) in 11.39s
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1435 filtered out; finished in 0.03s
-exit 0
-
-$ cargo test -p bingo-surface-tui --lib acting_full_frames_match_the_prototype --locked
-Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1435 filtered out; finished in 0.27s
-exit 0
-
-$ cargo test -p bingo-surface-tui --lib --locked
-Finished `test` profile [unoptimized + debuginfo] target(s) in 11.85s
-test result: ok. 1437 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.79s
-exit 0
-
-$ Initial running-tool proof (before correcting the scripted command)
-FAILED: Bash rejects a bare foreground sleep; the call completed as Failed before interruption.
-Changed to sleep 60 && echo done; the focused proof and full suites pass.
-This was a fixture error, not a wall-clock failure.
-
-$ git diff --exit-code -- docs/design/ember/prototype docs/design/ember/scenes
-No prototype or sealed capture changes; live-stopped frame remains identical.
-
-$ cargo check --workspace --all-targets --locked  # final records tree
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.67s
-exit 0
-
-Round-4 regression lines from the workspace test run:
+Regression lines from cargo test --workspace --locked:
 test stopping_returns_a_queued_line_to_the_input ... ok
 test host::tests::queue::the_provider_reads_text_but_never_the_headline ... ok
 test input::acting_tests::a_sent_line_clears_the_toast_after_slash_dispatch ... ok
-test input::acting_tests::ctrl_c_and_escape_send_the_same_interaction_cancel ... ok
-test input::tests::ctrl_c_and_escape_leave_the_same_child_with_an_open_interaction ... ok
+test input::tests::ctrl_c_and_escape_close_the_same_child_interaction ... ok
+test input::tests::ctrl_c_twice_on_an_empty_line_in_a_child_exits ... ok
+test input::tests::escape_goes_home_but_ctrl_c_arms_exit_in_an_idle_child ... ok
 test keys::tests::every_acting_rung_obeys_the_policy_order ... ok
+test run::acting::proofs::stop_answer_leaves_streamed_tool_input_without_a_completion ... ok
 test run::acting::proofs::stop_answer_matches_the_kernel ... ok
+test run::acting::proofs::stop_answer_matches_the_kernel_for_a_queued_chain_call ... ok
 test run::acting::proofs::stop_answer_matches_the_kernel_for_a_running_tool ... ok
 test run::withdraw::tests::stopping_withdraws_two_lines_before_completion_can_drain_them ... ok
-test transcript::notice::tests::a_notice_has_a_divider_and_its_arrival_keeps_a_deadline_without_room ... ok
+test test_support::ember::answers::tests::a_queued_chain_call_gets_the_tool_marker_and_zero_duration ... ok
 test test_support::ember::acting::acting_full_frames_match_the_prototype ... ok
+
+No wall-clock test failed; no isolated retry was needed.
+
+$ cargo check --workspace --all-targets --locked # final records tree
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.43s
+exit 0

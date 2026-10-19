@@ -87,7 +87,7 @@ The input never moves, and every key in it does one predictable thing:
 
 - TUI: input/key policy, queue_rows, dock/composer, shell/chip/headline drawings, parts/tone toasts.
 - ADR-0098; sdk/headline.rs, Input/item/props/slot contracts and generated schemas.
-- Core/user.rs shares user-item construction for logging, opening and steering.
+- Core/user.rs shares user-item construction; turn.rs owns the shared record_item emitter.
 - TUI run/time.rs and clipboard.rs inject clock/clipboard; run/acting exercises real Run boundaries.
 - tool-bash notify/{headline,toast}.rs; m194b/fixtures.cjs exports turns only.
 - PTY tests, smoke and docs/verification/m196/drive.py. Palette/mentions implementation stays part 2.
@@ -119,31 +119,31 @@ Asks and questions (M197); sheets (M198); teammates and rooms (M200); the exit r
 
 ## Verified
 
-- [x] Round 4 history: fixup splits core's provider test out of the TUI commit; then
-  `unset $(git rev-parse --local-env-vars)` and
-  `git rebase -x 'cargo check --workspace --all-targets --locked' fec21d36`: 28 checks passed.
-  `Successfully rebased`; proof hashes unchanged, no failed commits. Final records checked separately.
-- [x] `cargo test --workspace --locked` (provider credentials unset): `6555 passed; 0 failed; 0 ignored`.
-  TUI `1437 passed`, core `693 passed`, bash `157 passed`; seven real-Host answer proofs pass.
-- [x] All ten keyed frames: `acting_full_frames_match_the_prototype ... ok`; live-stopped unchanged.
-  Running tools keep the kernel's interrupt error, clear progress and set duration; pending input stays alone.
-- [x] `stop_answer_matches_the_kernel_for_a_running_tool ... ok`; streaming proof also passes.
-  Bare foreground sleep is rejected by Bash; the proof uses `sleep 60 && echo done`.
-- [x] One typed close rung: `ctrl_c_and_escape_leave_the_same_child_with_an_open_interaction ... ok`.
-  All on_key rungs, double-press windows, alt+Enter, image, shell, toast and idle-? checks pass.
-- [x] `the_provider_reads_text_but_never_the_headline ... ok`: opening and background Wake delivery.
-- [x] Drain proof and black-box `stopping_returns_a_queued_line_to_the_input ... ok`; PTY `20 passed`.
-  Round-3 withdrawal mutation still documents the failure beyond CompletionReady's drain.
+- [x] Round 5: rebased onto `d00ff6c7`; kept round/headline tests and one free record_item emitter.
+  Drive commit reworded to test(docs); two historical mixed scopes accepted as directed.
+- [x] `unset $(git rev-parse --local-env-vars)`; `git rebase -x 'cargo check --workspace --all-targets --locked' d00ff6c7`:
+  32 successful checks, including corrected reruns; two stop-double commits amended for boxed ToolOutput.
+- [x] `cargo test --workspace --locked` (provider credentials unset): `6594 passed; 0 failed; 0 ignored`.
+  TUI `1446 passed`, core `717 passed`, bash `157 passed`; later fixture/records trees checked separately.
+- [x] All ten keyed frames: `acting_full_frames_match_the_prototype ... ok`; no sealed capture changed.
+  M202 tool fixtures carry began_at; no protected drawing function changed.
+- [x] Nine real-Host answer proofs pass, including running tools, queued chain calls and streamed input.
+  Queued calls get the tool marker and duration 0; only streamed pending input has no completion.
+- [x] `ctrl_c_and_escape_close_the_same_child_interaction ... ok`;
+  `escape_goes_home_but_ctrl_c_arms_exit_in_an_idle_child` and `ctrl_c_twice_on_an_empty_line_in_a_child_exits ... ok`.
+- [x] One shared closing order; Escape::Back stays outside Close. All other on_key and toast tests pass.
+  Printed Esc words and only their row in seven palette snapshots now include pane/search.
+- [x] Drain proof and `stopping_returns_a_queued_line_to_the_input ... ok`; black-box PTY `20 passed`.
 - [x] `cargo fmt --all -- --check`, workspace all-target check, clippy `-- -D warnings`: exit 0.
 - [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `423 (max 423)`, `budget ok`.
-  Target/debug 16 GB is a soft warning. `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+  Target/debug 17 GB is a soft warning. `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
 - [x] `cargo build -p bingo --locked`: exit 0; `TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
-- [x] `python3 docs/verification/m196/drive.py`: `PASS 100x32`, `PASS 80x24`, both `CLEAN`.
-  Background captures now wait for the provider's answer; refreshed terminal captures committed.
+- [x] `python3 docs/verification/m196/drive.py`: `PASS 100x32`, `PASS 80x24`, both `CLEAN`; captures refreshed.
 - [x] Windows all-target checks with `--locked --keep-going`: sdk/core/tool-bash pass fully.
 - [ ] Windows TUI: aws-lc-sys native build lacks stdlib.h/windows.h; no diagnostic bypassed.
 - [ ] Part 2: bricks 7–8/ranking and the ten named captures in Exit criteria await M198.
 - No new dependency or package; one kernel fact, ADR-0098: a delivery may carry its headline.
-- No sealed capture or protected-site changes; no wall-clock retry. Base remains fec21d36 despite dev moving.
-- Evidence/departures: [round 4](../verification/m196/round-4.md), [round 3](../verification/m196/round-3.md),
-  [round 2](../verification/m196/round-2.md), [checks](../verification/m196/checks.txt), [handoff](../verification/m196/handoff.md).
+- StopPhase is test-scenario input, not stored session state. No wall-clock failure or retry.
+- Conflicts, amendments, exceptions and evidence: [round 5](../verification/m196/round-5.md), [checks](../verification/m196/checks.txt).
+  Earlier departures: [round 4](../verification/m196/round-4.md), [round 3](../verification/m196/round-3.md),
+  [round 2](../verification/m196/round-2.md), [handoff](../verification/m196/handoff.md).
