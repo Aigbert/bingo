@@ -831,5 +831,2117 @@
       "endAt": 10002073.333333334,
       "answer": null
     }
+  ],
+  "ask-edit": [
+    {
+      "kind": "turn",
+      "id": 2,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998500,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998500,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9999300,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999400,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999600,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999700,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999850,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ask",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 8,
+      "paused": true,
+      "pauseAt": 10000120,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000120,
+          "kind": "edit",
+          "item": 4,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "ask-edit-down": [
+    {
+      "kind": "turn",
+      "id": 4,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998500,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998500,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9999300,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999400,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999600,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999700,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999850,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ask",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 8,
+      "paused": true,
+      "pauseAt": 10000120,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000120,
+          "kind": "edit",
+          "item": 4,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "ask-edit-allowed": [
+    {
+      "kind": "turn",
+      "id": 6,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998500,
+      "state": "live",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998500,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9999300,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999400,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999600,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999700,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999850,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 10001340,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10001590,
+          "tool": "write",
+          "arg": "crates/bingo-core/tests/queue_steer.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": "+",
+              "n": 1,
+              "t": "use bingo_core::session::Queue;"
+            },
+            {
+              "s": "+",
+              "n": 2,
+              "t": "use bingo_sdk::Message;"
+            },
+            {
+              "s": "+",
+              "n": 3,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 4,
+              "t": "#[test]"
+            },
+            {
+              "s": "+",
+              "n": 5,
+              "t": "fn steer_then_queue_keeps_both() {"
+            },
+            {
+              "s": "+",
+              "n": 6,
+              "t": "    let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 7,
+              "t": "    q.steer(Message::text(\"first\"));"
+            },
+            {
+              "s": "+",
+              "n": 8,
+              "t": "    q.push(Message::user(\"second\"));"
+            },
+            {
+              "s": "+",
+              "n": 9,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"first\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 10,
+              "t": "    q.reset();"
+            },
+            {
+              "s": "+",
+              "n": 11,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"second\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 12,
+              "t": "}"
+            },
+            {
+              "s": "+",
+              "n": 13,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 14,
+              "t": "#[test]"
+            },
+            {
+              "s": "+",
+              "n": 15,
+              "t": "fn a_second_steer_replaces_the_first() {"
+            },
+            {
+              "s": "+",
+              "n": 16,
+              "t": "    let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 17,
+              "t": "    q.steer(Message::text(\"old\"));"
+            },
+            {
+              "s": "+",
+              "n": 18,
+              "t": "    q.steer(Message::text(\"new\"));"
+            },
+            {
+              "s": "+",
+              "n": 19,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"new\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 20,
+              "t": "}"
+            }
+          ],
+          "end": 10001940,
+          "res": "",
+          "add": 20,
+          "del": 0
+        },
+        {
+          "k": "step",
+          "at": 10002140,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "run",
+          "tail": [
+            "   Compiling bingo-core v0.6.3 (crates/bingo-core)"
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 13,
+      "paused": false,
+      "pauseAt": 10000120,
+      "pausedMs": 1040,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000120,
+          "kind": "edit",
+          "item": 4,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "ask-bash": [
+    {
+      "kind": "turn",
+      "id": 8,
+      "prompt": "跑一下 queue 的测试",
+      "chips": [],
+      "t0": 10000000,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 2,
+      "paused": true,
+      "pauseAt": 10000100,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000100,
+          "kind": "bash",
+          "item": 0,
+          "why": "runs the queue tests",
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "ask-bash-change": [
+    {
+      "kind": "turn",
+      "id": 10,
+      "prompt": "跑一下 queue 的测试",
+      "chips": [],
+      "t0": 10000000,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 2,
+      "paused": true,
+      "pauseAt": 10000100,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000100,
+          "kind": "bash",
+          "item": 0,
+          "why": "runs the queue tests",
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "ask-bash-editing": [
+    {
+      "kind": "turn",
+      "id": 12,
+      "prompt": "跑一下 queue 的测试",
+      "chips": [],
+      "t0": 10000000,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 2,
+      "paused": true,
+      "pauseAt": 10000100,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000100,
+          "kind": "bash",
+          "item": 0,
+          "why": "runs the queue tests",
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "caution": [
+    {
+      "kind": "turn",
+      "id": 15,
+      "prompt": "把 dev 强推上去",
+      "chips": [],
+      "t0": 9998700,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998700,
+          "ms": 600,
+          "text": "远端 dev 上有两个本地没有的提交。强推会把它们从远端拿掉，这要问一下。"
+        },
+        {
+          "k": "step",
+          "at": 9999400,
+          "tool": "bash",
+          "arg": "git log --oneline origin/dev -3",
+          "st": "ok",
+          "tail": [
+            "b81f0d3 wip: try a ring buffer",
+            "4e1a9c2 wip: queue experiments"
+          ],
+          "end": 9999800,
+          "res": "3 lines",
+          "out": [
+            "b81f0d3 wip: try a ring buffer",
+            "4e1a9c2 wip: queue experiments",
+            "7c3e2a1 fix(core): keep queued lines across reset"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "git push --force origin dev",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 7,
+      "paused": true,
+      "pauseAt": 10000100,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "asks": [
+        {
+          "at": 10000100,
+          "kind": "caution",
+          "item": 2,
+          "why": null,
+          "caution": "rewrites remote history",
+          "lost": [
+            "4e1a9c2 wip: queue experiments",
+            "b81f0d3 wip: try a ring buffer"
+          ],
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "caution-no": [
+    {
+      "kind": "turn",
+      "id": 18,
+      "prompt": "把 dev 强推上去",
+      "chips": [],
+      "t0": 9998700,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998700,
+          "ms": 600,
+          "text": "远端 dev 上有两个本地没有的提交。强推会把它们从远端拿掉，这要问一下。"
+        },
+        {
+          "k": "step",
+          "at": 9999400,
+          "tool": "bash",
+          "arg": "git log --oneline origin/dev -3",
+          "st": "ok",
+          "tail": [
+            "b81f0d3 wip: try a ring buffer",
+            "4e1a9c2 wip: queue experiments"
+          ],
+          "end": 9999800,
+          "res": "3 lines",
+          "out": [
+            "b81f0d3 wip: try a ring buffer",
+            "4e1a9c2 wip: queue experiments",
+            "7c3e2a1 fix(core): keep queued lines across reset"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "git push --force origin dev",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 7,
+      "paused": true,
+      "pauseAt": 10000100,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "asks": [
+        {
+          "at": 10000100,
+          "kind": "caution",
+          "item": 2,
+          "why": null,
+          "caution": "rewrites remote history",
+          "lost": [
+            "4e1a9c2 wip: queue experiments",
+            "b81f0d3 wip: try a ring buffer"
+          ],
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "question": [
+    {
+      "kind": "turn",
+      "id": 20,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998100,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998100,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9998900,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999000,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999200,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999300,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999450,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 9999600,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 9999900,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10000100,
+          "tool": "ask",
+          "arg": "回归测试放在哪？",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 10,
+      "paused": true,
+      "pauseAt": 10000160,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000160,
+          "kind": "question",
+          "item": 5,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": [
+            {
+              "header": "位置",
+              "question": "回归测试放在哪？",
+              "options": [
+                {
+                  "label": "集成测试",
+                  "description": "新建 tests/queue_steer.rs，只走公开 API",
+                  "preview": "tests/queue_steer.rs\n\n#[test]\nfn steer_then_queue_keeps_both() {\n    let mut q = Queue::default();\n    q.steer(Message::text(\"first\"));\n    q.push(Message::text(\"second\"));\n    …\n}"
+                },
+                {
+                  "label": "单元测试",
+                  "description": "写在 queue.rs 底部，能看到私有字段",
+                  "preview": "src/session/queue.rs\n\n#[cfg(test)]\nmod steer_tests {\n    use super::*;\n\n    #[test]\n    fn steer_then_queue_keeps_both() {\n        …\n    }\n}"
+                }
+              ]
+            },
+            {
+              "header": "覆盖",
+              "question": "要覆盖哪些情况？",
+              "multi": true,
+              "options": [
+                {
+                  "label": "steer 之后排队",
+                  "description": "这次丢消息的情况"
+                },
+                {
+                  "label": "连续两次 steer",
+                  "description": "后一条替换前一条"
+                },
+                {
+                  "label": "工具调用中途 steer",
+                  "description": "等这一步做完才落地"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "question-preview": [
+    {
+      "kind": "turn",
+      "id": 22,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998100,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998100,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9998900,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999000,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999200,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999300,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999450,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 9999600,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 9999900,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10000100,
+          "tool": "ask",
+          "arg": "回归测试放在哪？",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 10,
+      "paused": true,
+      "pauseAt": 10000160,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000160,
+          "kind": "question",
+          "item": 5,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": [
+            {
+              "header": "位置",
+              "question": "回归测试放在哪？",
+              "options": [
+                {
+                  "label": "集成测试",
+                  "description": "新建 tests/queue_steer.rs，只走公开 API",
+                  "preview": "tests/queue_steer.rs\n\n#[test]\nfn steer_then_queue_keeps_both() {\n    let mut q = Queue::default();\n    q.steer(Message::text(\"first\"));\n    q.push(Message::text(\"second\"));\n    …\n}"
+                },
+                {
+                  "label": "单元测试",
+                  "description": "写在 queue.rs 底部，能看到私有字段",
+                  "preview": "src/session/queue.rs\n\n#[cfg(test)]\nmod steer_tests {\n    use super::*;\n\n    #[test]\n    fn steer_then_queue_keeps_both() {\n        …\n    }\n}"
+                }
+              ]
+            },
+            {
+              "header": "覆盖",
+              "question": "要覆盖哪些情况？",
+              "multi": true,
+              "options": [
+                {
+                  "label": "steer 之后排队",
+                  "description": "这次丢消息的情况"
+                },
+                {
+                  "label": "连续两次 steer",
+                  "description": "后一条替换前一条"
+                },
+                {
+                  "label": "工具调用中途 steer",
+                  "description": "等这一步做完才落地"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "question-second": [
+    {
+      "kind": "turn",
+      "id": 24,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998100,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998100,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9998900,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999000,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999200,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999300,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999450,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 9999600,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 9999900,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10000100,
+          "tool": "ask",
+          "arg": "回归测试放在哪？",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 10,
+      "paused": true,
+      "pauseAt": 10000160,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000160,
+          "kind": "question",
+          "item": 5,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": [
+            {
+              "header": "位置",
+              "question": "回归测试放在哪？",
+              "options": [
+                {
+                  "label": "集成测试",
+                  "description": "新建 tests/queue_steer.rs，只走公开 API",
+                  "preview": "tests/queue_steer.rs\n\n#[test]\nfn steer_then_queue_keeps_both() {\n    let mut q = Queue::default();\n    q.steer(Message::text(\"first\"));\n    q.push(Message::text(\"second\"));\n    …\n}"
+                },
+                {
+                  "label": "单元测试",
+                  "description": "写在 queue.rs 底部，能看到私有字段",
+                  "preview": "src/session/queue.rs\n\n#[cfg(test)]\nmod steer_tests {\n    use super::*;\n\n    #[test]\n    fn steer_then_queue_keeps_both() {\n        …\n    }\n}"
+                }
+              ]
+            },
+            {
+              "header": "覆盖",
+              "question": "要覆盖哪些情况？",
+              "multi": true,
+              "options": [
+                {
+                  "label": "steer 之后排队",
+                  "description": "这次丢消息的情况"
+                },
+                {
+                  "label": "连续两次 steer",
+                  "description": "后一条替换前一条"
+                },
+                {
+                  "label": "工具调用中途 steer",
+                  "description": "等这一步做完才落地"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "question-ticked": [
+    {
+      "kind": "turn",
+      "id": 26,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998100,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998100,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9998900,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999000,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999200,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999300,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999450,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 9999600,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 9999900,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10000100,
+          "tool": "ask",
+          "arg": "回归测试放在哪？",
+          "st": "ask",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 10,
+      "paused": true,
+      "pauseAt": 10000160,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000160,
+          "kind": "question",
+          "item": 5,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": [
+            {
+              "header": "位置",
+              "question": "回归测试放在哪？",
+              "options": [
+                {
+                  "label": "集成测试",
+                  "description": "新建 tests/queue_steer.rs，只走公开 API",
+                  "preview": "tests/queue_steer.rs\n\n#[test]\nfn steer_then_queue_keeps_both() {\n    let mut q = Queue::default();\n    q.steer(Message::text(\"first\"));\n    q.push(Message::text(\"second\"));\n    …\n}"
+                },
+                {
+                  "label": "单元测试",
+                  "description": "写在 queue.rs 底部，能看到私有字段",
+                  "preview": "src/session/queue.rs\n\n#[cfg(test)]\nmod steer_tests {\n    use super::*;\n\n    #[test]\n    fn steer_then_queue_keeps_both() {\n        …\n    }\n}"
+                }
+              ]
+            },
+            {
+              "header": "覆盖",
+              "question": "要覆盖哪些情况？",
+              "multi": true,
+              "options": [
+                {
+                  "label": "steer 之后排队",
+                  "description": "这次丢消息的情况"
+                },
+                {
+                  "label": "连续两次 steer",
+                  "description": "后一条替换前一条"
+                },
+                {
+                  "label": "工具调用中途 steer",
+                  "description": "等这一步做完才落地"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "question-answered": [
+    {
+      "kind": "turn",
+      "id": 28,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998100,
+      "state": "live",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998100,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9998900,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999000,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999200,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999300,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999450,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 9999600,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 9999900,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10000100,
+          "tool": "ask",
+          "arg": "回归测试放在哪？",
+          "st": "ok",
+          "tail": [],
+          "end": 10002200,
+          "res": "2 answers",
+          "qa": [
+            [
+              "回归测试放在哪？",
+              "单元测试"
+            ],
+            [
+              "要覆盖哪些情况？",
+              "steer 之后排队, 连续两次 steer"
+            ]
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10002200,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": "+",
+              "n": 215,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 216,
+              "t": "#[cfg(test)]"
+            },
+            {
+              "s": "+",
+              "n": 217,
+              "t": "mod steer_tests {"
+            },
+            {
+              "s": "+",
+              "n": 218,
+              "t": "    use super::*;"
+            },
+            {
+              "s": "+",
+              "n": 219,
+              "t": "    use bingo_sdk::Message;"
+            },
+            {
+              "s": "+",
+              "n": 220,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 221,
+              "t": "    #[test]"
+            },
+            {
+              "s": "+",
+              "n": 222,
+              "t": "    fn steer_then_queue_keeps_both() {"
+            },
+            {
+              "s": "+",
+              "n": 223,
+              "t": "        let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 224,
+              "t": "        q.steer(Message::text(\"first\"));"
+            },
+            {
+              "s": "+",
+              "n": 225,
+              "t": "        q.push(Message::user(\"second\"));"
+            },
+            {
+              "s": "+",
+              "n": 226,
+              "t": "        assert_eq!(q.drain().map(|m| m.text()), Some(\"first\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 227,
+              "t": "        q.reset();"
+            },
+            {
+              "s": "+",
+              "n": 228,
+              "t": "        assert_eq!(q.drain().map(|m| m.text()), Some(\"second\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 229,
+              "t": "    }"
+            },
+            {
+              "s": "+",
+              "n": 230,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 231,
+              "t": "    #[test]"
+            },
+            {
+              "s": "+",
+              "n": 232,
+              "t": "    fn a_second_steer_replaces_the_first() {"
+            },
+            {
+              "s": "+",
+              "n": 233,
+              "t": "        let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 234,
+              "t": "        q.steer(Message::text(\"old\"));"
+            },
+            {
+              "s": "+",
+              "n": 235,
+              "t": "        q.steer(Message::text(\"new\"));"
+            },
+            {
+              "s": "+",
+              "n": 236,
+              "t": "        assert_eq!(q.drain().map(|m| m.text()), Some(\"new\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 237,
+              "t": "    }"
+            },
+            {
+              "s": "+",
+              "n": 238,
+              "t": "}"
+            }
+          ],
+          "end": 10002550,
+          "res": "",
+          "add": 24,
+          "del": 0
+        },
+        {
+          "k": "step",
+          "at": 10002750,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "run",
+          "tail": [
+            "   Compiling bingo-core v0.6.3 (crates/bingo-core)",
+            "error[E0599]: no function or associated item named `user` found for enum `Message`"
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 15,
+      "paused": false,
+      "pauseAt": 10000160,
+      "pausedMs": 2040,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000160,
+          "kind": "question",
+          "item": 5,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": [
+            {
+              "header": "位置",
+              "question": "回归测试放在哪？",
+              "options": [
+                {
+                  "label": "集成测试",
+                  "description": "新建 tests/queue_steer.rs，只走公开 API",
+                  "preview": "tests/queue_steer.rs\n\n#[test]\nfn steer_then_queue_keeps_both() {\n    let mut q = Queue::default();\n    q.steer(Message::text(\"first\"));\n    q.push(Message::text(\"second\"));\n    …\n}"
+                },
+                {
+                  "label": "单元测试",
+                  "description": "写在 queue.rs 底部，能看到私有字段",
+                  "preview": "src/session/queue.rs\n\n#[cfg(test)]\nmod steer_tests {\n    use super::*;\n\n    #[test]\n    fn steer_then_queue_keeps_both() {\n        …\n    }\n}"
+                }
+              ]
+            },
+            {
+              "header": "覆盖",
+              "question": "要覆盖哪些情况？",
+              "multi": true,
+              "options": [
+                {
+                  "label": "steer 之后排队",
+                  "description": "这次丢消息的情况"
+                },
+                {
+                  "label": "连续两次 steer",
+                  "description": "后一条替换前一条"
+                },
+                {
+                  "label": "工具调用中途 steer",
+                  "description": "等这一步做完才落地"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "small-ask-edit": [
+    {
+      "kind": "turn",
+      "id": 30,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998500,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998500,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9999300,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999400,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999600,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999700,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999850,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ask",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 8,
+      "paused": true,
+      "pauseAt": 10000120,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000120,
+          "kind": "edit",
+          "item": 4,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
+  ],
+  "ascii-ask-edit": [
+    {
+      "kind": "turn",
+      "id": 32,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9998500,
+      "state": "asking",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9998500,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9999300,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9999400,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999600,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9999700,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9999850,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ask",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 8,
+      "paused": true,
+      "pauseAt": 10000120,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息",
+      "asks": [
+        {
+          "at": 10000120,
+          "kind": "edit",
+          "item": 4,
+          "why": null,
+          "caution": null,
+          "lost": null,
+          "qs": null
+        }
+      ]
+    }
   ]
 }
