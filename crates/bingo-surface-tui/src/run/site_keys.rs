@@ -79,7 +79,7 @@ fn submit(
 fn signature(run: &Run, session: &SessionId, pane: bool, name: &str) -> Option<bingo_sdk::Origin> {
     let focus = match &run.ui.focus {
         crate::focus::Focus::Pane(focus) if pane => focus,
-        _ => return Some(bingo_sdk::Origin::surface(crate::SURFACE_ID)),
+        _ => return Some(crate::origin()),
     };
     let state = run.session.tree.state(session)?;
     crate::pane::placed(state)

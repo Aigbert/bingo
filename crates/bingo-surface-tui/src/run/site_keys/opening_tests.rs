@@ -88,7 +88,7 @@ async fn a_key_routed_past_a_focused_pane_is_signed_by_its_own_site() {
     let submitted = session.submissions();
     assert!(
         matches!(&submitted[..], [(_, Input::Action { origin, .. })]
-            if origin == &Some(bingo_sdk::Origin::surface(crate::SURFACE_ID))),
+            if origin == &Some(crate::origin())),
         "{submitted:?}"
     );
 }

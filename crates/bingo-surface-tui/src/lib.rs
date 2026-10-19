@@ -157,7 +157,7 @@ pub const SURFACE_ID: &str = "tui";
 /// so a `<plugin>:ui` press reaches only its drawer and is the person's;
 /// anything else is nobody's (fail closed).
 pub(crate) fn pulled_signature(name: &str) -> Option<bingo_sdk::Origin> {
-    bingo_sdk::CommandSpec::is_ui(name).then(|| bingo_sdk::Origin::surface(SURFACE_ID))
+    bingo_sdk::CommandSpec::is_ui(name).then(origin)
 }
 
 /// A press on a pulled drawing, signed by [`pulled_signature`].
@@ -172,7 +172,7 @@ pub(crate) fn pulled(action: bingo_sdk::Action) -> bingo_sdk::Input {
 /// for the person to someone else (fail closed).
 pub(crate) fn drawer_signature(drawer: &str, name: &str) -> Option<bingo_sdk::Origin> {
     Some(match name == bingo_sdk::CommandSpec::ui_name(drawer) {
-        true => bingo_sdk::Origin::surface(SURFACE_ID),
+        true => origin(),
         false => bingo_sdk::Origin::surface(format!("plugin:{drawer}")),
     })
 }

@@ -155,7 +155,7 @@ fn a_pane_button_naming_another_command_is_signed_as_its_drawer() {
     use bingo_sdk::{Action, Input, Origin};
     use serde_json::json;
     let drawer = Some(Origin::surface("plugin:counter"));
-    let person = Some(Origin::surface(crate::SURFACE_ID));
+    let person = Some(crate::origin());
     for (name, args, signed) in [
         ("plugins", json!("trust evil full"), &drawer),
         ("permission", json!("bypassPermissions"), &drawer),
