@@ -864,7 +864,7 @@ pub(crate) mod tests {
         );
         assert_eq!(
             Probe::write("/work/project/note.txt").scope(),
-            Some("Write(/work/project/)".to_string()),
+            Some(format!("Write({})", path::native("/work/project/"))),
             "an ordinary write is scoped to its directory"
         );
     }

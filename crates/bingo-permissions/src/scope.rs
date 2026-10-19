@@ -99,7 +99,7 @@ mod tests {
         }];
         assert_eq!(
             scope("Write", &subjects),
-            Some("Write(/work/project/)".to_string())
+            Some(format!("Write({})", path::native("/work/project/")))
         );
     }
 

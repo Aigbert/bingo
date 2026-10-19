@@ -89,6 +89,13 @@ fn keep_trailing_separator(normalized: String, raw: &str) -> String {
     }
 }
 
+/// A `/`-spelled path in the platform's separator, which is what normalising
+/// emits.
+#[cfg(test)]
+pub(crate) fn native(path: &str) -> String {
+    path.replace('/', std::path::MAIN_SEPARATOR_STR)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,39 +114,39 @@ mod tests {
 
     #[test]
     fn a_relative_path_resolves_against_the_session_cwd() {
-        assert_eq!(norm("src/main.rs"), "/work/project/src/main.rs");
-        assert_eq!(norm("./src/main.rs"), "/work/project/src/main.rs");
+        assert_eq!(norm("src/main.rs"), native("/work/project/src/main.rs"));
+        assert_eq!(norm("./src/main.rs"), native("/work/project/src/main.rs"));
     }
 
     #[test]
     fn parent_components_collapse_without_touching_the_disk() {
-        assert_eq!(norm("/etc/../etc/passwd"), "/etc/passwd");
-        assert_eq!(norm("/etc/./ssh/../passwd"), "/etc/passwd");
-        assert_eq!(norm("../other/x"), "/work/other/x");
-        assert_eq!(norm("/.."), "/");
+        assert_eq!(norm("/etc/../etc/passwd"), native("/etc/passwd"));
+        assert_eq!(norm("/etc/./ssh/../passwd"), native("/etc/passwd"));
+        assert_eq!(norm("../other/x"), native("/work/other/x"));
+        assert_eq!(norm("/.."), native("/"));
     }
 
     #[test]
     fn a_tilde_expands_to_the_home_directory() {
-        assert_eq!(norm("~"), "/home/user");
-        assert_eq!(norm("~/.ssh/id_rsa"), "/home/user/.ssh/id_rsa");
+        assert_eq!(norm("~"), native("/home/user"));
+        assert_eq!(norm("~/.ssh/id_rsa"), native("/home/user/.ssh/id_rsa"));
         // Only a leading `~/` is a home reference.
-        assert_eq!(norm("x~/y"), "/work/project/x~/y");
+        assert_eq!(norm("x~/y"), native("/work/project/x~/y"));
     }
 
     #[test]
     fn without_a_home_a_tilde_is_just_a_name() {
         assert_eq!(
             normalize("~/x", &cwd(), None),
-            "/work/project/~/x",
+            native("/work/project/~/x"),
             "no home is not an excuse to guess one"
         );
     }
 
     #[test]
     fn a_trailing_separator_survives() {
-        assert_eq!(norm("/etc/"), "/etc/");
-        assert_eq!(norm("/etc"), "/etc");
+        assert_eq!(norm("/etc/"), native("/etc/"));
+        assert_eq!(norm("/etc"), native("/etc"));
     }
 
     #[test]
@@ -160,12 +167,13 @@ mod tests {
 
     #[test]
     fn containment_stops_at_a_component_boundary() {
-        assert!(is_within("/work/project/src", "/work/project"));
-        assert!(is_within("/work/project", "/work/project"));
-        assert!(is_within("/work/project/src", "/work/project/"));
-        assert!(!is_within("/work/project-other/src", "/work/project"));
-        assert!(!is_within("/work", "/work/project"));
-        assert!(is_within("/anything", "/"));
+        let within = |target: &str, root: &str| is_within(&norm(target), &norm(root));
+        assert!(within("/work/project/src", "/work/project"));
+        assert!(within("/work/project", "/work/project"));
+        assert!(within("/work/project/src", "/work/project/"));
+        assert!(!within("/work/project-other/src", "/work/project"));
+        assert!(!within("/work", "/work/project"));
+        assert!(within("/anything", "/"));
     }
 
     #[test]
