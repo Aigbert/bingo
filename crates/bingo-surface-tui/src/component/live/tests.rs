@@ -244,22 +244,3 @@ fn the_live_rows_appearance_deadline_follows_its_visible_window() {
     ui.scroll = Default::default();
     assert!(draw_tree(80, 24, &tree, &mut ui, still(later(born, 10_500))).contains("working"));
 }
-
-#[test]
-fn an_inline_card_hides_the_spinners_pull_key() {
-    let mut state = folded(vec![frame(1, started("live"))]);
-    state.config.kernel["render"] = json!({"Spinner":[{}]});
-    with_rows(&state, later(scene().1, 600), |rows| {
-        let mut frame = crate::layout::Layout::default();
-        frame.blocks.sync(&state, &Default::default(), rows);
-        frame.regions.transcript = ratatui::layout::Rect::new(0, 0, 80, 20);
-        frame.height = 20;
-        frame.inline = Some((0, 1, 20));
-        requests(rows, &mut frame, 20);
-        assert!(frame.pulls.is_empty());
-        frame.inline = None;
-        requests(rows, &mut frame, 20);
-        assert_eq!(frame.pulls.len(), 1);
-        assert_eq!(frame.pulls[0].request.component, Component::Spinner);
-    });
-}

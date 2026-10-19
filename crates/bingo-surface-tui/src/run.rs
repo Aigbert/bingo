@@ -1105,7 +1105,7 @@ mod tests {
     async fn a_dialog_answered_at_the_keyboard_reaches_the_kernel() {
         let mut harness = Harness::new();
         let frames = vec![frame(1, opened(permission(Some("Edit(src/)"), None)))];
-        let script = vec![typed('2'), ctrl('d')];
+        let script = vec![key(KeyCode::Down), key(KeyCode::Enter), ctrl('d')];
         let (_, session) = harness.go(frames, script, None).await;
         assert_eq!(
             session.answers(),
@@ -1219,7 +1219,9 @@ mod tests {
             child_frame(1, announced("reviewer")),
             child_frame(2, opened(child_permission())),
         ];
-        let (_, session) = harness.go(frames, vec![typed('y'), ctrl('d')], None).await;
+        let (_, session) = harness
+            .go(frames, vec![key(KeyCode::Enter), ctrl('d')], None)
+            .await;
         assert_eq!(
             session.answers(),
             vec![(
@@ -1230,8 +1232,12 @@ mod tests {
             "the tree's handle routes an answer to whoever asked"
         );
         assert!(
-            harness.recorder.last().contains("edit    · reviewer"),
-            "the dialog names the child: {}",
+            harness
+                .recorder
+                .frames
+                .iter()
+                .any(|frame| frame.contains("reviewer needs you")),
+            "the dock names the child: {}",
             harness.recorder.last()
         );
     }

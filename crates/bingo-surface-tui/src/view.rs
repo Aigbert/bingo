@@ -553,23 +553,19 @@ fn render_transcript(
 fn draw_stream(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, rows: &transcript::Rows<'_>) {
     welcome::render(rows, frame, area);
     frame.blocks.sync(rows.state, &tree.agents(), rows);
-    let inline = crate::ask::drawing::splice(tree, ui, frame, area, rows.now, &rows.tools);
     if area.height == 0 {
         return;
     }
     transcript_window(tree, ui, frame, area.height as usize, rows.now);
-    refresh_stream(tree, ui, frame, area, rows, inline.as_ref());
+    refresh_stream(tree, ui, frame, area, rows);
     frame.wake(stream_deadline(frame, area.height as usize));
     component_requests(ui, frame, area, rows);
     crate::component::live::requests(rows, frame, area.height);
     crate::component::closing::requests(rows.state, ui, frame, area.width, area.height, rows.now);
-    let mut shown = stream_lines(frame, inline.as_ref(), area.height as usize);
+    let mut shown = frame.blocks.window(frame.top, area.height as usize);
     let padding = prepare_lines(ui, tree, frame, &mut shown);
     frame.cells = graphics::placed::cells(&shown, area);
     frame.render_widget(Paragraph::new(shown), area);
-    if let Some((drawing, (at, _, _))) = inline.zip(frame.inline) {
-        crate::ask::drawing::place(frame, drawing, at, area);
-    }
     mark_transcript(ui, frame, area, padding, rows.now);
     draw_sparks(rows.state, frame, area, rows.now);
 }
@@ -580,7 +576,6 @@ fn refresh_stream(
     frame: &mut Layout,
     area: Rect,
     rows: &transcript::Rows<'_>,
-    inline: Option<&crate::component::sealed::Drawing>,
 ) {
     let height = frame.blocks.height();
     for range in frame.visible_lines(area.height as usize) {
@@ -589,9 +584,6 @@ fn refresh_stream(
             .refresh(rows.state, &tree.agents(), rows, range.start, range.len());
     }
     if frame.blocks.height() != height {
-        if let Some(drawing) = inline {
-            crate::ask::drawing::position(tree, frame, drawing.rows.len());
-        }
         transcript_window(tree, ui, frame, area.height as usize, rows.now);
     }
 }
@@ -602,23 +594,6 @@ fn stream_deadline(frame: &Layout, height: usize) -> Option<std::time::Instant> 
         .into_iter()
         .filter_map(|range| frame.blocks.next_change(range.start, range.len()))
         .min()
-}
-
-fn stream_lines(
-    frame: &Layout,
-    inline: Option<&crate::component::sealed::Drawing>,
-    height: usize,
-) -> Vec<Line<'static>> {
-    if let Some((drawing, (at, removed, _))) = inline.zip(frame.inline) {
-        let mut all = frame.blocks.window(0, frame.blocks.height());
-        all.splice(
-            at..at + removed,
-            drawing.rows.iter().map(|(line, _)| line.clone()),
-        );
-        all.into_iter().skip(frame.top).take(height).collect()
-    } else {
-        frame.blocks.window(frame.top, height)
-    }
 }
 
 fn draw_sparks(state: &SessionState, frame: &mut Layout, area: Rect, now: Now) {
@@ -634,9 +609,6 @@ fn draw_sparks(state: &SessionState, frame: &mut Layout, area: Rect, now: Now) {
 fn transcript_window(tree: &Tree, ui: &Ui, frame: &mut Layout, rows: usize, now: Now) {
     frame.height =
         frame.blocks.height() + usize::from(!tree.viewed().transcript.items().is_empty());
-    if let Some((_, removed, count)) = frame.inline {
-        frame.height = frame.height - removed + count;
-    }
     frame.top = ui.scroll.top(frame.height, rows, now.instant);
     if matches!(ui.focus, crate::focus::Focus::Detail(_)) {
         frame.top = crate::detail::top(ui, frame, rows);
@@ -645,9 +617,6 @@ fn transcript_window(tree: &Tree, ui: &Ui, frame: &mut Layout, rows: usize, now:
         && let Some(top) = search::top(search, frame, rows)
     {
         frame.top = top;
-    }
-    if let Some((at, _, count)) = frame.inline {
-        frame.top = (at + count).saturating_sub(rows);
     }
     if let Some(top) = crate::browse::top(ui, tree, frame, rows.saturating_sub(1)) {
         frame.top = top;
@@ -922,24 +891,6 @@ mod tests {
     }
 
     #[test]
-    fn a_live_row_hidden_by_an_inline_card_has_no_stream_deadline() {
-        let state = folded(vec![frame(1, started("live"))]);
-        let (_, born) = scene();
-        let now = still(later(born, 499));
-        let folds = Default::default();
-        let pictures = Default::default();
-        let linked = Default::default();
-        let rows = transcript::Rows::of(&state, 80, &folds, &pictures, &linked, now);
-        let mut frame = Layout::default();
-        frame.blocks.sync(&state, &Default::default(), &rows);
-        frame.regions.transcript = Rect::new(0, 0, 80, 20);
-        frame.height = 20;
-        frame.inline = Some((0, 1, 20));
-        assert!(frame.visible_lines(20).is_empty());
-        assert_eq!(stream_deadline(&frame, 20), None);
-    }
-
-    #[test]
     fn streaming_assistant_text() {
         let state = folded(vec![
             frame(1, started("trn_1")),
@@ -1040,18 +991,6 @@ mod tests {
     }
 
     #[test]
-    fn permission_expanded() {
-        let state = folded(vec![frame(
-            1,
-            opened(permission(Some("Edit(src/)"), Some(long_diff()))),
-        )]);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        crate::input::on_key(&mut ui, &solo(&state), ctrl('e'), now);
-        insta::assert_snapshot!(draw_sized(80, 34, &state, &mut ui, now));
-    }
-
-    #[test]
     fn permission_with_the_feedback_row_open() {
         let state = folded(vec![frame(
             1,
@@ -1067,78 +1006,16 @@ mod tests {
         )]);
         let (mut ui, now) = settled();
         ui.dialog.focus_on(state.interactions.first());
-        crate::input::on_key(&mut ui, &solo(&state), typed('n'), now);
+        let now = Now {
+            wall: now.wall + crate::ask::guard::GUARD,
+            ..now
+        };
         write(&mut ui, &state, "use cargo clean", now);
         insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]
-    fn a_card_comes_down_from_its_top_edge() {
-        let asked = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
-        let (mut ui, now) = scene();
-        ui.dialog.focus_on(asked.interactions.first());
-        // Frame 0 is the screen before the kernel opened it; then one frame
-        // every 33 ms until the card is whole.
-        let mut screens = vec![render(&state(), &mut ui, now)];
-        screens.extend((0..3).map(|f| render(&asked, &mut ui, later(now, f * 33))));
-        assert_eq!(
-            screens[3],
-            render(&asked, &mut ui, later(now, 500)),
-            "by the third frame it has arrived"
-        );
-        insta::assert_snapshot!(screens.join("\n"));
-    }
-
-    #[test]
-    fn a_card_hangs_under_the_row_that_asked_for_it() {
-        // The permission fixture names `itm_2` as the row that asked; the
-        // rows after it are what the card comes down over.
-        let mut frames = vec![
-            item_frame(1, user("itm_1", "edit it")),
-            item_frame(
-                2,
-                tool(
-                    "itm_2",
-                    "Edit",
-                    json!({"file_path": "src/lib.rs"}),
-                    None,
-                    ItemStatus::Running,
-                ),
-            ),
-        ];
-        // Few enough that the asking row stays on screen above the reserved
-        // activity band (view.rs's demand keeps two rows for it).
-        frames.extend((3..10).map(|i| {
-            item_frame(
-                i,
-                assistant(
-                    &format!("itm_{i}"),
-                    &format!("after {i}"),
-                    ItemStatus::Completed,
-                ),
-            )
-        }));
-        let state = folded(frames);
-        let mut state = state.clone();
-        state.apply(&frame(12, opened(permission(Some("Edit(src/)"), None))));
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        let screen = render(&state, &mut ui, now);
-        let rows: Vec<&str> = screen.lines().collect();
-        assert!(rows.iter().any(|row| row.contains("needs you")), "{screen}");
-        assert!(
-            !rows.iter().any(|row| row.contains("Edit(src/lib.rs)")),
-            "the waiting step is replaced by its sealed ask: {screen}"
-        );
-        assert!(
-            rows.last().is_some_and(|row| row.contains("fake-1")),
-            "and the frame under it did not move:\n{screen}"
-        );
-        insta::assert_snapshot!(screen);
-    }
-
-    #[test]
-    fn an_inline_ask_does_not_dim_the_conversation() {
+    fn an_ask_in_the_dock_does_not_dim_the_conversation() {
         let state = folded(vec![
             item_frame(1, user("itm_1", "edit it")),
             frame(2, opened(permission(None, None))),
@@ -1153,7 +1030,7 @@ mod tests {
                     .add_modifier
                     .contains(ratatui::style::Modifier::DIM)
         }));
-        assert!(render(&state, &mut ui, now).contains("needs you"));
+        assert!(render(&state, &mut ui, now).contains("No, and tell it why"));
     }
 
     #[test]

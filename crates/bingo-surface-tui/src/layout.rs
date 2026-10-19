@@ -21,7 +21,6 @@ pub struct Layout {
     pub sheet_actions: Vec<crate::views::targets::Target>,
     pub sheet: Option<Vec<ratatui::text::Line<'static>>>,
     pub growth: Option<crate::dock::Growth>,
-    pub inline: Option<(usize, usize, usize)>,
     pub card_actions: Vec<crate::views::targets::Target>,
     pub band_actions: Vec<crate::views::targets::Target>,
     pub seating: crate::pane::seat::Seating,
@@ -103,14 +102,10 @@ impl Layout {
         if line >= self.height {
             return None;
         }
-        match self.inline {
-            Some((at, _, count)) if line >= at && line < at + count => None,
-            Some((at, removed, count)) if line >= at + count => Some(line - count + removed),
-            _ => Some(line),
-        }
+        Some(line)
     }
 
-    /// Visible cache ranges exclude the rows replaced by an inline card.
+    /// The transcript lines on screen, as runs of consecutive lines.
     pub fn visible_lines(&self, height: usize) -> Vec<std::ops::Range<usize>> {
         // An empty stream still exposes its insertion point for a row's arrival.
         if self.height == 0 && height > 0 {
@@ -132,10 +127,6 @@ impl Layout {
     /// The row of the transcript region a line was drawn at, when it is on the
     /// screen — [`Layout::line_at`] the other way round.
     pub fn row_of(&self, line: usize) -> Option<u16> {
-        let line = match self.inline {
-            Some((at, removed, count)) if line >= at + removed => line + count - removed,
-            _ => line,
-        };
         let row = u16::try_from(line.checked_sub(self.top)? + self.padding()).ok()?;
         (row < self.regions.transcript.height).then_some(row)
     }

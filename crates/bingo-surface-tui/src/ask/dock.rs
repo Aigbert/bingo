@@ -117,7 +117,7 @@ fn drawn(view: &bingo_sdk::View, width: u16) -> Line<'static> {
 
 /// The picked row rises from the dock's ground while the guard holds, and
 /// its caret breathes while words are typed.
-fn lit(mut line: Line<'static>, fade: f64, typing: bool, now: Now) -> Line<'static> {
+pub(super) fn lit(mut line: Line<'static>, fade: f64, typing: bool, now: Now) -> Line<'static> {
     let pick = theme::ground("pick").and_then(|style| style.bg);
     let quote = bingo_sdk::glyph::Glyph::Quote.spell(theme::glyphs::set());
     let caret = theme::glyphs::get("caret");
@@ -148,7 +148,7 @@ fn lit(mut line: Line<'static>, fade: f64, typing: bool, now: Now) -> Line<'stat
 }
 
 /// The caret rests ten seconds after the last key, as the composer's does.
-fn rested(now: Now, keyed_at: Instant) -> (Now, Instant) {
+pub(super) fn rested(now: Now, keyed_at: Instant) -> (Now, Instant) {
     let rest = keyed_at + crate::composer::CARET_REST;
     (
         Now {

@@ -222,6 +222,11 @@ fn ctrl_c_and_escape_send_the_same_interaction_cancel() {
     let tree = solo(&folded(vec![frame(1, opened(permission(None, None)))]));
     let (mut escape_ui, now) = scene();
     let (mut interrupt_ui, _) = scene();
+    // esc waits out the ask's guard as every key does; ctrl+c does not.
+    let now = Now {
+        wall: now.wall + crate::ask::guard::GUARD,
+        ..now
+    };
     let escape = on_key(&mut escape_ui, &tree, key(KeyCode::Esc), now);
     let interrupt = on_key(
         &mut interrupt_ui,

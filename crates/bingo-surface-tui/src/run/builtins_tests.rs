@@ -188,12 +188,16 @@ async fn a_key_names_only_itself_never_the_drawing_it_was_pressed_on() {
     );
 }
 #[tokio::test]
-async fn escape_returns_from_aside_and_otherwise_stops_permission_asks() {
+async fn escape_leaves_aside_and_words_first_and_otherwise_stops_permission_asks() {
     for child_asks in [false, true] {
         for editing in ["list", "aside", "change"] {
             let root = Arc::new(TestSession::default());
             let child = Arc::new(TestSession::default());
             let now = still(scene().1);
+            let now = crate::clock::Now {
+                wall: now.wall + crate::ask::guard::GUARD,
+                ..now
+            };
             let mut run = tests::idle_in(state(), root.clone(), now.instant);
             let mut open = permission(None, None);
             let owner = if child_asks {
@@ -238,12 +242,12 @@ async fn escape_returns_from_aside_and_otherwise_stops_permission_asks() {
             };
             assert_eq!(
                 asking.interrupts(),
-                usize::from(editing != "aside"),
+                usize::from(editing == "list"),
                 "{child_asks} {editing}"
             );
             assert_eq!(
                 asking.answers().len(),
-                usize::from(editing != "aside"),
+                usize::from(editing == "list"),
                 "{child_asks} {editing}"
             );
             assert_eq!(other.interrupts(), 0);
@@ -397,7 +401,7 @@ async fn a_question_key_can_finish_the_pane_action_waiting_for_its_answer() {
         screen.last()
     );
     pull_question(&mut run, 108, now);
-    run.terminal_event(Term::Key(typed('2')));
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Enter)));
     let submissions = session.submissions();
     assert_eq!(
         submissions.len(),
@@ -410,7 +414,7 @@ async fn a_question_key_can_finish_the_pane_action_waiting_for_its_answer() {
     );
     answer_key(&mut run, &submissions[1], &open);
     assert!(
-        matches!(&session.answers()[0].1, bingo_sdk::Answer::Choice { ids, .. } if ids == &["o"])
+        matches!(&session.answers()[0].1, bingo_sdk::Answer::Choice { ids, .. } if ids == &["a"])
     );
     assert!(
         run.ui.actions.action().is_some(),
@@ -449,6 +453,10 @@ async fn escape_interrupts_even_without_an_offered_cancellation_answer() {
     for cached in [false, true] {
         let (host, root, child) = crate::doubles::TestHost::tree(Vec::new());
         let now = still(scene().1);
+        let now = crate::clock::Now {
+            wall: now.wall + crate::ask::guard::GUARD,
+            ..now
+        };
         let mut run = tests::idle_in(state(), root.clone(), now.instant);
         run.host = host;
         let (replies, mut waiting) = mpsc::channel(4);
@@ -543,7 +551,7 @@ async fn answer_across_sessions(child_asks: bool, cached: bool) {
             .insert(child_id(), SessionHandle(child.clone()));
     }
     pull_question(&mut run, 108, now);
-    run.terminal_event(Term::Key(typed('2')));
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Enter)));
     assert_eq!(
         run.site_keys.len(),
         1,
@@ -567,7 +575,7 @@ async fn answer_across_sessions(child_asks: bool, cached: bool) {
         "the viewed session must not receive the key"
     );
     answer_key(&mut run, &asking.submissions()[0], &open);
-    assert!(matches!(&root.answers()[0].1, bingo_sdk::Answer::Choice { ids, .. } if ids == &["o"]));
+    assert!(matches!(&root.answers()[0].1, bingo_sdk::Answer::Choice { ids, .. } if ids == &["a"]));
 }
 
 #[tokio::test(start_paused = true)]
@@ -597,7 +605,7 @@ async fn a_failed_owner_open_releases_the_pending_question_key() {
     let (replies, mut waiting) = mpsc::channel(4);
     run.replies = replies;
     pull_question(&mut run, 108, now);
-    run.terminal_event(Term::Key(typed('2')));
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Enter)));
     assert_eq!(run.site_keys.len(), 1);
     let reply = tokio::time::timeout(Duration::from_secs(1), waiting.recv())
         .await
@@ -650,9 +658,9 @@ async fn escape_discards_keys_waiting_for_the_asking_sessions_handle() {
         child.submitted().is_empty(),
         "a late open must not revive the key"
     );
-    assert_eq!(child.interrupts(), 0);
-    assert!(child.answers().is_empty());
-    assert_eq!(root.answers()[0].1, bingo_sdk::Answer::Cancel);
+    assert_eq!(child.interrupts(), 1, "esc stops the asking turn");
+    assert_eq!(child.answers()[0].1, bingo_sdk::Answer::Cancel);
+    assert!(root.answers().is_empty());
 }
 
 #[tokio::test(start_paused = true)]
@@ -665,7 +673,7 @@ async fn a_late_owner_handle_cannot_revive_a_resolved_question() {
     run.replies = replies;
     let open = cross_session_question(&mut run, true);
     pull_question(&mut run, 108, now);
-    run.terminal_event(Term::Key(typed('2')));
+    run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Enter)));
     run.frame(
         &child_frame(
             4,

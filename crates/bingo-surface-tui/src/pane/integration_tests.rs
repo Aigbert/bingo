@@ -69,7 +69,7 @@ fn pane_screens_cover_docked_collapsed_and_floating_places() {
     state.apply(&frame(1, opened(permission(Some("Edit(src/)"), None))));
     ui.dialog.focus_on(state.interactions.first());
     let screen = draw_sized(120, 40, &state, &mut ui, still(now));
-    assert!(screen.contains("Do you want"), "{screen}");
+    assert!(screen.contains("No, and tell it why"), "{screen}");
     insta::assert_snapshot!("permission_over_pane", screen);
 }
 fn mouse(

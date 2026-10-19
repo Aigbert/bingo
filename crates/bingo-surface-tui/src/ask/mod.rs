@@ -1,10 +1,10 @@
 pub mod aside;
 mod body;
 pub mod dock;
-pub mod drawing;
 pub mod guard;
 pub mod keys;
 pub mod options;
+pub mod question;
 pub mod receipts;
 pub mod scope;
 pub mod spec;
@@ -41,6 +41,9 @@ pub fn sheet(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<L
     if ui.focus.showing() {
         return None;
     }
+    if let Some(lines) = question::sheet(tree, ui, frame, now) {
+        return Some(lines);
+    }
     let (interaction, ask) = open(tree, ui)?;
     let picking = dock::Picking {
         cursor: ui.dialog.focus,
@@ -49,7 +52,46 @@ pub fn sheet(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<L
         keyed_at: ui.keyed_at,
     };
     let width = frame.area().width;
-    Some(frame.collect(dock::lines(&ask, &picking, width, now)))
+    let lines = frame.collect(dock::lines(&ask, &picking, width, now));
+    frame.sheet_actions = rows(lines.len(), ask.options.len(), width);
+    Some(lines)
+}
+
+/// Where each answer sits, so a click on it picks and gives it.
+fn rows(lines: usize, options: usize, width: u16) -> Vec<crate::views::targets::Target> {
+    let first = lines.saturating_sub(options);
+    (0..options)
+        .map(|index| crate::views::targets::Target {
+            area: ratatui::layout::Rect::new(0, (first + index) as u16, width, 1),
+            item: bingo_sdk::ActionItem {
+                meaning: None,
+                label: String::new(),
+                action: Action {
+                    name: CLICK.into(),
+                    args: serde_json::json!({ "pick": index }),
+                },
+                key: None,
+            },
+        })
+        .collect()
+}
+
+/// The action an answer's row carries.
+pub const CLICK: &str = "surface:ask";
+
+/// The answer a click landed on.
+pub fn clicked(ui: &Ui, column: u16, row: u16) -> Option<usize> {
+    ui.shown
+        .sheet_actions
+        .iter()
+        .filter(|target| target.item.action.name == CLICK)
+        .find(|target| {
+            target
+                .area
+                .contains(ratatui::layout::Position::new(column, row))
+        })
+        .and_then(|target| target.item.action.args["pick"].as_u64())
+        .and_then(|index| usize::try_from(index).ok())
 }
 
 pub fn handler(ui: &Ui, interaction: &Interaction, key: KeyEvent) -> Option<Action> {

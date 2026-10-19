@@ -362,46 +362,10 @@ fn the_next_turn_is_not_the_one_that_was_stopped() {
     assert!(!drawn.contains("stopping"), "{drawn}");
 }
 
-// ---- a card's guard -----------------------------------------------------
-
-/// A permission the kernel guards for 400 ms, as it does every card.
-fn guarded() -> bingo_sdk::Interaction {
-    let mut asking = permission(Some("Edit(src/)"), None);
-    asking.guard_until = Some(ts() + jiff::SignedDuration::from_millis(400));
-    asking
-}
+// ---- a sheet ------------------------------------------------------------
 
 #[test]
-fn a_cards_rows_are_dim_until_the_guard_lifts_and_plain_the_moment_it_does() {
-    let state = folded(vec![frame(1, opened(guarded()))]);
-    let (mut ui, now) = settled();
-    ui.dialog.focus_on(state.interactions.first());
-    let tree = solo(&state);
-    // The card is drawn from the wall clock the kernel stated the guard in.
-    let mut at = |ms| style_of(&tree, &mut ui, later(now, ms), "Do you want to");
-    assert_eq!(
-        at(199),
-        theme::as_drawn(theme::dim()),
-        "a key pressed now would be dropped, and the card says so"
-    );
-    assert_eq!(
-        at(200),
-        theme::as_drawn(theme::text()),
-        "and it brightens in one frame as the guard lifts"
-    );
-}
-
-#[test]
-fn a_card_reveals_top_down_and_a_sheet_slides_up() {
-    let asked = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
-    let (mut ui, now) = scene();
-    ui.dialog.focus_on(asked.interactions.first());
-    let tree = solo(&asked);
-    let card: Vec<String> = (0..4)
-        .map(|f| screen(&tree, &mut ui, later(now, f * 33)))
-        .collect();
-    insta::assert_snapshot!("card_reveal", card.join("\n"));
-
+fn a_sheet_slides_up() {
     let (mut sheet, now) = scene();
     sheet
         .focus
@@ -489,20 +453,6 @@ fn the_footer_holds_attention_words_still() {
         first.to_string().contains("◆ reviewer needs you"),
         "the needs-you lead names the waiting child"
     );
-}
-
-/// The card's border is the fourth place that beat is said, and no longer
-/// the exception: a card is on the screen exactly while it is unanswered, so
-/// it asks for the whole of its life and stops asking by going.
-#[test]
-fn an_inline_ask_keeps_its_attention_marker_without_a_border() {
-    let state = folded(vec![frame(1, opened(permission(None, None)))]);
-    let (mut ui, now) = settled();
-    ui.dialog.focus_on(state.interactions.first());
-    let tree = solo(&state);
-    for ms in [0, 1000, 2000] {
-        assert!(draw_tree(80, 24, &tree, &mut ui, later(now, ms)).contains("needs you"));
-    }
 }
 
 // ---- the context notice -------------------------------------------------

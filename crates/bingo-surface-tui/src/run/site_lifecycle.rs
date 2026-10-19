@@ -104,6 +104,8 @@ pub(super) fn rendered(run: &mut Run, epoch: u64, key: crate::pulled::Key, view:
     if retired(run, &key, &view) {
         return;
     }
+    let wall = run.now().wall;
+    crate::ask::question::shown(&mut run.ui, &key.request.request_id, &view, wall);
     run.ui.placed.pulled.answer_at(epoch, key, view);
     run.release_actions();
     typeahead::drain(run);

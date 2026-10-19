@@ -23,7 +23,7 @@ use crate::{complete, mention_list};
 
 #[cfg(test)]
 mod acting_tests;
-mod interaction;
+pub(crate) mod interaction;
 pub(crate) mod mode;
 
 pub(crate) use interaction::{cancel, interaction_keys, interaction_unhandled};
@@ -447,7 +447,7 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
 fn close(ui: &mut Ui, tree: &Tree, place: keys::Close, now: Now) -> Vec<Effect> {
     match place {
         keys::Close::Sheet => ui.focus.close(now.instant),
-        keys::Close::Card => return cancel(ui, tree),
+        keys::Close::Card => return cancel(ui, tree, now),
         keys::Close::Dropdown => ui.menu.dismissed = true,
         keys::Close::Search => crate::search::back(ui),
         keys::Close::Pane => {
@@ -1189,6 +1189,14 @@ mod tests {
         assert!(ui.notice.is_none(), "and it is silent about it");
     }
 
+    /// The moment the ask's guard lets keys through.
+    fn read(now: Now) -> Now {
+        Now {
+            wall: now.wall + crate::ask::guard::GUARD,
+            ..now
+        }
+    }
+
     fn press(
         ui: &mut Ui,
         state: &SessionState,
@@ -1546,9 +1554,11 @@ mod tests {
     fn the_session_option_answers_with_the_scope_the_kernel_named() {
         let state = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
+        press(&mut ui, &state, key(KeyCode::Down), now);
         assert_eq!(
-            press(&mut ui, &state, typed('2'), now),
+            press(&mut ui, &state, key(KeyCode::Enter), now),
             vec![Effect::Answer {
                 interaction: state.interactions[0].id.clone(),
                 answer: Answer::AllowSession {
@@ -1558,7 +1568,7 @@ mod tests {
             }]
         );
         assert!(
-            press(&mut ui, &state, typed('1'), now).is_empty(),
+            press(&mut ui, &state, key(KeyCode::Enter), now).is_empty(),
             "an answered dialog sends nothing more"
         );
     }
@@ -1569,6 +1579,7 @@ mod tests {
     fn a_form_is_answered_once_for_all_of_its_questions() {
         let state = folded(vec![frame(1, opened(crate::test_support::form()))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
         // Three questions fixed, and the walk lands on the tab that sends
         // (M57): nothing leaves the card until `⏎` is pressed there.
@@ -1608,20 +1619,21 @@ mod tests {
         );
     }
 
-    /// `esc` is the card's rung of the one stack, and a form's whole set is
-    /// what it leaves (§7).
+    /// `esc` leaves a form as it leaves any ask: the turn stops, and the
+    /// form's whole set is what it cancels (M197).
     #[test]
     fn esc_leaves_the_whole_form() {
         let state = folded(vec![frame(1, opened(crate::test_support::form()))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
         press(&mut ui, &state, key(KeyCode::Enter), now);
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::Answer {
+            vec![Effect::StopInteraction {
+                session: state.summary.id.clone(),
                 interaction: state.interactions[0].id.clone(),
-                answer: Answer::Cancel,
-                activation: Activation::Keyboard,
+                answer: Some(Answer::Cancel),
             }]
         );
     }
@@ -1630,9 +1642,10 @@ mod tests {
     fn refusing_collects_the_words_that_go_with_it() {
         let state = folded(vec![frame(1, opened(permission(None, None)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
-        assert!(press(&mut ui, &state, typed('n'), now).is_empty());
-        write(&mut ui, &state, "edit the test instead", now);
+        assert!(press(&mut ui, &state, typed('e'), now).is_empty());
+        write(&mut ui, &state, "dit the test instead", now);
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Enter), now),
             vec![Effect::Answer {
@@ -1649,8 +1662,12 @@ mod tests {
     fn an_empty_refusal_carries_no_feedback() {
         let state = folded(vec![frame(1, opened(permission(None, None)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
-        press(&mut ui, &state, typed('n'), now);
+        for _ in 0..3 {
+            press(&mut ui, &state, key(KeyCode::Down), now);
+        }
+        assert!(press(&mut ui, &state, key(KeyCode::Enter), now).is_empty());
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Enter), now),
             vec![Effect::Answer {
@@ -1661,40 +1678,44 @@ mod tests {
         );
     }
 
+    /// The ask holds keys back for 400 ms from when it opened (M197).
     #[test]
     fn a_key_before_the_guard_sends_nothing() {
-        let mut interaction = permission(Some("Edit(src/)"), None);
-        interaction.guard_until = Some(ts() + jiff::SignedDuration::from_secs(1));
-        let state = folded(vec![frame(1, opened(interaction))]);
-        let (mut ui, now) = scene();
-        ui.dialog.focus_on(state.interactions.first());
-        assert!(press(&mut ui, &state, typed('1'), now).is_empty());
-        let after = Now {
-            wall: ts() + jiff::SignedDuration::from_secs(2),
-            ..now
-        };
-        assert_eq!(press(&mut ui, &state, typed('1'), after).len(), 1);
-    }
-
-    #[test]
-    fn y_and_n_name_the_answers_wherever_they_sit() {
         let state = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
         let (mut ui, now) = scene();
         ui.dialog.focus_on(state.interactions.first());
+        let at = |ms| Now {
+            wall: ts() + jiff::SignedDuration::from_millis(ms),
+            ..now
+        };
+        assert!(press(&mut ui, &state, key(KeyCode::Enter), at(399)).is_empty());
         assert_eq!(
-            press(&mut ui, &state, typed('y'), now),
-            vec![Effect::Answer {
-                interaction: state.interactions[0].id.clone(),
-                answer: Answer::AllowOnce,
-                activation: Activation::Keyboard,
-            }]
+            press(&mut ui, &state, key(KeyCode::Enter), at(400)).len(),
+            1
         );
+    }
+
+    /// A letter on the list is the start of the no that says why; no letter
+    /// names an answer (ADR-0097 §8).
+    #[test]
+    fn typing_on_the_list_starts_the_no_that_says_why() {
+        let state = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
+        let (mut ui, now) = scene();
+        let now = read(now);
+        ui.dialog.focus_on(state.interactions.first());
+        assert!(press(&mut ui, &state, typed('y'), now).is_empty());
+        assert_eq!(
+            ui.dialog.words.as_ref().map(|w| w.text().to_string()),
+            Some("y".into())
+        );
+        assert_eq!(ui.dialog.focus, 2, "the pick moved to the no");
     }
 
     #[test]
     fn a_single_choice_question_answers_on_the_first_key() {
         let state = folded(vec![frame(1, opened(question(false, false)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Down), now),
@@ -1718,6 +1739,7 @@ mod tests {
     fn a_multiple_choice_question_toggles_then_confirms() {
         let state = folded(vec![frame(1, opened(question(true, false)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
         press(&mut ui, &state, typed(' '), now);
         press(&mut ui, &state, key(KeyCode::Down), now);
@@ -1737,17 +1759,20 @@ mod tests {
         );
     }
 
+    /// A question is left the way a permission is: esc stops the turn
+    /// (M197), and the kernel hears the question's own cancel.
     #[test]
     fn a_question_that_offers_cancel_takes_esc_as_one() {
         let state = folded(vec![frame(1, opened(question(false, false)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Esc), now),
-            vec![Effect::Answer {
+            vec![Effect::StopInteraction {
+                session: state.summary.id.clone(),
                 interaction: state.interactions[0].id.clone(),
-                answer: Answer::Cancel,
-                activation: Activation::Keyboard,
+                answer: Some(Answer::Cancel),
             }]
         );
     }
@@ -1756,8 +1781,11 @@ mod tests {
     fn a_free_text_question_sends_the_words_as_text() {
         let state = folded(vec![frame(1, opened(question(false, true)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
-        press(&mut ui, &state, typed('3'), now);
+        press(&mut ui, &state, key(KeyCode::Down), now);
+        press(&mut ui, &state, key(KeyCode::Down), now);
+        press(&mut ui, &state, key(KeyCode::Enter), now);
         write(&mut ui, &state, "neither", now);
         assert_eq!(
             press(&mut ui, &state, key(KeyCode::Enter), now),
@@ -1775,6 +1803,7 @@ mod tests {
     fn the_dialog_state_resets_when_the_next_interaction_opens() {
         let mut state = folded(vec![frame(1, opened(permission(None, None)))]);
         let (mut ui, now) = scene();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
         press(&mut ui, &state, typed('n'), now);
         assert!(ui.dialog.words.is_some());
@@ -1903,7 +1932,7 @@ mod tests {
         ui.dialog
             .focus_on(tree.open_interaction().map(|(_, open)| open));
         assert_eq!(
-            press_tree(&mut ui, &tree, typed('y'), now),
+            press_tree(&mut ui, &tree, key(KeyCode::Enter), read(now)),
             vec![Effect::Answer {
                 interaction: bingo_sdk::InteractionId::from_raw("int_2"),
                 answer: Answer::AllowOnce,
@@ -1919,6 +1948,7 @@ mod tests {
         tree.show(&child_id());
         let (mut esc_ui, now) = scene();
         let (mut ctrl_ui, _) = scene();
+        let now = read(now);
         let escaped = press_tree(&mut esc_ui, &tree, key(KeyCode::Esc), now);
         let interrupted = press_tree(
             &mut ctrl_ui,
@@ -2742,23 +2772,20 @@ mod tests {
     }
 
     #[test]
-    fn a_click_on_a_card_row_answers_it() {
+    fn a_click_on_an_answer_in_the_dock_gives_it() {
         let state = folded(vec![frame(1, opened(permission(Some("Edit(src/)"), None)))]);
         let (mut ui, now) = settled();
+        let now = read(now);
         ui.dialog.focus_on(state.interactions.first());
         render(&state, &mut ui, now);
-        let card = ui.shown.card.clone().expect("a card on screen");
-        let row = card
-            .options
+        let row = ui
+            .shown
+            .sheet_actions
             .iter()
-            .position(|option| option == &Some(1))
-            .expect("the second option has a row");
-        let effects = on_mouse(
-            &mut ui,
-            &solo(&state),
-            click(4, card.area.y + row as u16),
-            now,
-        );
+            .find(|target| target.item.action.args["pick"] == 1)
+            .map(|target| target.area.y)
+            .expect("the second answer has a row");
+        let effects = on_mouse(&mut ui, &solo(&state), click(4, row), now);
         assert_eq!(
             effects,
             vec![Effect::Answer {

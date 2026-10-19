@@ -57,7 +57,8 @@ fn install(ui: &mut crate::ui::Ui, key: &crate::pulled::Key, answer: View) {
 
 #[test]
 fn framed_cards_keep_host_facts_and_keys_at_both_sizes() {
-    for login in [false, true] {
+    // The dock draws a permission itself (M197); sign-in is the sealed card left.
+    for login in [true] {
         for (width, height) in [(80, 24), (200, 50)] {
             let state = state_with_card(login);
             let tree = solo(&state);
@@ -96,7 +97,7 @@ fn framed_cards_keep_host_facts_and_keys_at_both_sizes() {
 
 #[test]
 fn clipped_rewritten_missing_and_duplicate_engines_fall_back_once() {
-    for login in [false, true] {
+    for login in [true] {
         let state = state_with_card(login);
         let tree = solo(&state);
         let (mut ui, now) = scene();
@@ -144,8 +145,8 @@ fn clipped_rewritten_missing_and_duplicate_engines_fall_back_once() {
 }
 
 #[test]
-fn a_button_gets_its_own_click_but_cannot_take_the_yes_key() {
-    let state = state_with_card(false);
+fn a_button_gets_its_own_click_but_cannot_take_the_host_keys() {
+    let state = state_with_card(true);
     let tree = solo(&state);
     let (mut ui, now) = scene();
     let now = still(now);
@@ -155,10 +156,10 @@ fn a_button_gets_its_own_click_but_cannot_take_the_yes_key() {
         .shown
         .pulls
         .iter()
-        .find(|key| key.request.component == Component::Permission)
+        .find(|key| key.request.component == Component::SignIn)
         .unwrap()
         .clone();
-    let button: View = serde_json::from_value(json!({"kind":"Button","children":["Yes"],"hotkey":"y","onPress":{"name":"frame:ui","args":{"handler":"answer","event":"press"}}})).unwrap();
+    let button: View = serde_json::from_value(json!({"kind":"Button","children":["Leave"],"hotkey":"l","onPress":{"name":"frame:ui","args":{"handler":"answer","event":"press"}}})).unwrap();
     install(
         &mut ui,
         &key,
@@ -184,13 +185,13 @@ fn a_button_gets_its_own_click_but_cannot_take_the_yes_key() {
     let effects = crate::input::on_key(
         &mut ui,
         &tree,
-        KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE),
+        KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
         now,
     );
     assert!(matches!(
         &effects[..],
-        [Effect::Answer {
-            answer: Answer::AllowOnce,
+        [Effect::StopInteraction {
+            answer: Some(Answer::Cancel),
             ..
         }]
     ));
@@ -215,7 +216,7 @@ fn unmatched_cards_fall_back_and_input_needs_no_transcript_item() {
 
 #[test]
 fn resizing_rechecks_height_and_stale_props_never_draw() {
-    let state = state_with_card(false);
+    let state = state_with_card(true);
     let tree = solo(&state);
     let (mut ui, now) = scene();
     let now = still(now);
@@ -238,13 +239,19 @@ fn resizing_rechecks_height_and_stale_props_never_draw() {
     assert!(ui.shown.card_actions.is_empty());
     assert!(draw_tree(80, 24, &tree, &mut ui, now).contains("SEALED FRAME"));
     let mut changed = state.clone();
-    changed.interactions[0].answers = vec![AnswerSpec::Deny];
+    changed.interactions[0].kind = InteractionKind::Login {
+        provider: "example".into(),
+        flow: LoginFlow::Device {
+            url: "https://example.test/device".into(),
+            code: "WXYZ".into(),
+        },
+    };
     assert!(!draw_tree(80, 24, &solo(&changed), &mut ui, now).contains("SEALED FRAME"));
 }
 
 #[test]
 fn host_option_clicks_use_engine_cells() {
-    let state = state_with_card(false);
+    let state = state_with_card(true);
     let tree = solo(&state);
     let (mut ui, now) = scene();
     let now = still(now);
@@ -285,7 +292,10 @@ fn host_option_clicks_use_engine_cells() {
     assert!(matches!(
         &effects[..],
         [Effect::Answer {
-            answer: Answer::AllowOnce,
+            answer: Answer::Cancel,
+            ..
+        }] | [Effect::StopInteraction {
+            answer: Some(Answer::Cancel),
             ..
         }]
     ));

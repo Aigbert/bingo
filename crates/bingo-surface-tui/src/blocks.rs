@@ -1176,64 +1176,6 @@ mod refresh_tests {
     }
 
     #[test]
-    fn refresh_growth_repositions_the_inline_ask() {
-        let state = folded(vec![
-            frame(
-                1,
-                Event::ItemCompleted {
-                    item: loose(assistant(
-                        "itm_1",
-                        "first line\n\nlast line",
-                        ItemStatus::Completed,
-                    )),
-                },
-            ),
-            frame(
-                2,
-                Event::ItemStarted {
-                    item: running_tool("itm_2", "Edit", "checking"),
-                },
-            ),
-            frame(3, opened(permission(None, None))),
-        ]);
-        let tree = solo(&state);
-        let (mut ui, now) = settled();
-        ui.dialog.focus_on(state.interactions.first());
-        draw_tree(80, 24, &tree, &mut ui, now);
-        let expected = ui.shown.blocks.span(&ItemId::from_raw("itm_2")).unwrap();
-        let first = &mut ui.shown.blocks.blocks[0];
-        assert_eq!(first.id, ItemId::from_raw("itm_1"));
-        assert!(first.lines.len() > 1);
-        first.lines.pop().unwrap();
-        first.next = Some(now.instant);
-        ui.shown.blocks.height = ui.shown.blocks.measure();
-        draw_tree(80, 24, &tree, &mut ui, later(now, 40));
-        let (at, removed, _) = ui.shown.inline.unwrap();
-        assert_eq!((at, removed), (expected.0, expected.1 - expected.0));
-        let area = ui.shown.regions.transcript;
-        let card = ui.shown.card.as_ref().unwrap();
-        assert_eq!(
-            usize::from(card.area.y - area.y) + ui.shown.top - ui.shown.padding(),
-            at
-        );
-        let end = ui.shown.blocks.span(&ItemId::from_raw("itm_1")).unwrap().1;
-        let above: String = (area.x..area.right())
-            .map(|x| {
-                ui.shown.canvas.buffer[(
-                    x,
-                    area.y + (end - ui.shown.top - 1 + ui.shown.padding()) as u16,
-                )]
-                    .symbol()
-            })
-            .collect();
-        assert!(above.contains("last line"), "{above:?}");
-        assert_eq!(
-            ui.shown.line_at(at - ui.shown.top - 1 + ui.shown.padding()),
-            Some(at - 1)
-        );
-    }
-
-    #[test]
     fn refresh_can_remove_the_first_of_two_expiring_entries() {
         let mut state = folded(vec![
             frame(

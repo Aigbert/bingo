@@ -467,6 +467,7 @@ screen_test!(ledger_backend, Ledger);
 fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
     for component in Component::ALL {
         // Pulled sites wait for their first answer; they have no surface body.
+        // The dock draws a permission itself and pulls no site for it (M197).
         if matches!(
             component,
             Component::Pane
@@ -474,6 +475,7 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
                 | Component::ModelPicker
                 | Component::PromptHint
                 | Component::Composer
+                | Component::Permission
         ) {
             continue;
         }

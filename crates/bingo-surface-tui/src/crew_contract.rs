@@ -153,7 +153,13 @@ fn a_child_permission_and_room_posts_keep_the_selected_room_in_front() {
             .focus_on(tree.open_interaction().map(|(_, ask)| ask));
         assert_eq!(tree.view(), &log_id(), "step {step}");
         let screen = draw_tree(120, 40, &tree, &mut ui, now);
-        assert!(screen.contains("Post to #design"), "step {step}: {screen}");
+        // The child's ask takes the dock over the room's composer (M197).
+        let dock = if step == 0 {
+            "reviewer needs you"
+        } else {
+            "Post to #design"
+        };
+        assert!(screen.contains(dock), "step {step}: {screen}");
         assert_eq!(tree.open_interaction().is_some(), step == 0);
         assert_eq!(
             crate::focus::owner(&ui, &tree),

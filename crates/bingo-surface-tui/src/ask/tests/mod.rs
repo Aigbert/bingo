@@ -48,7 +48,20 @@ fn scene_for(mut open: Interaction, command: bool) -> (crate::tree::Tree, Ui, cr
     let (mut ui, now) = scene();
     catalogue(&mut ui);
     ui.dialog.focus_on(state.interactions.first());
-    (solo(&state), ui, still(now))
+    let now = still(now);
+    let read = crate::clock::Now {
+        wall: now.wall + super::guard::GUARD,
+        ..now
+    };
+    (solo(&state), ui, read)
+}
+
+/// Walk to the last answer, `Change it first`, and open it.
+fn change(tree: &crate::tree::Tree, ui: &mut Ui, now: crate::clock::Now) {
+    for _ in 0..3 {
+        crate::input::on_key(ui, tree, key(KeyCode::Down), now);
+    }
+    assert!(crate::input::on_key(ui, tree, key(KeyCode::Enter), now).is_empty());
 }
 fn install_question(
     tree: &crate::tree::Tree,
@@ -89,7 +102,7 @@ fn install_question(
 fn prototype_scenarios_at_both_sizes() {
     for (width, height) in [(108, 30), (80, 24)] {
         for scenario in [
-            "edit", "bash", "danger", "question", "multi", "form", "aside", "crew",
+            "edit", "bash", "danger", "question", "multi", "form", "crew",
         ] {
             let mut open = match scenario {
                 "question" | "multi" | "crew" => question(scenario == "multi", true),
@@ -116,9 +129,6 @@ fn prototype_scenarios_at_both_sizes() {
                 }
             }
             let (mut tree, mut ui, now) = scene_for(open, matches!(scenario, "bash" | "danger"));
-            if scenario == "aside" {
-                crate::input::on_key(&mut ui, &tree, typed('x'), now);
-            }
             if scenario == "crew" {
                 tree = asking_crew();
                 ui.dialog
@@ -157,14 +167,14 @@ fn asking_crew() -> crate::tree::Tree {
 }
 
 #[test]
-fn change_prefills_then_submits_and_plain_typing_sets_aside() {
+fn change_prefills_then_submits_and_typing_starts_the_no() {
     let mut open = permission(None, None);
     if let InteractionKind::Permission { tool, .. } = &mut open.kind {
         *tool = "Bash".into();
     }
     let (tree, mut ui, now) = scene_for(open, true);
     draw_tree(80, 24, &tree, &mut ui, now);
-    assert!(crate::input::on_key(&mut ui, &tree, typed('3'), now).is_empty());
+    change(&tree, &mut ui, now);
     assert_eq!(ui.dialog.words.as_ref().unwrap().text(), "cargo test");
     ui.dialog.words.as_mut().unwrap().set("cargo check");
     let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Enter), now);
@@ -173,16 +183,17 @@ fn change_prefills_then_submits_and_plain_typing_sets_aside() {
     );
     let (tree, mut ui, now) = scene_for(permission(None, None), false);
     assert!(crate::input::on_key(&mut ui, &tree, typed('x'), now).is_empty());
-    assert!(ui.dialog.aside);
-    assert_eq!(ui.composer.text(), "x");
-    assert!(crate::input::on_key(&mut ui, &tree, ctrl('g'), now).is_empty());
+    assert_eq!(ui.dialog.words.as_ref().unwrap().text(), "x");
     assert!(!ui.dialog.aside);
+    assert!(
+        ui.composer.text().is_empty(),
+        "the words are the no's, not the composer's"
+    );
 }
 
 #[test]
 fn caution_starts_on_no_and_escape_denies_and_stops() {
     let mut open = permission(None, None);
-    open.guard_until = Some(ts() + jiff::SignedDuration::from_secs(60));
     if let InteractionKind::Permission { caution, .. } = &mut open.kind {
         *caution = Some(bingo_sdk::Caution {
             reason: "destructive".into(),
@@ -191,7 +202,8 @@ fn caution_starts_on_no_and_escape_denies_and_stops() {
     }
     let (tree, mut ui, now) = scene_for(open, false);
     let screen = draw_tree(80, 24, &tree, &mut ui, now);
-    assert!(screen.contains("❯ 2  No"));
+    assert!(screen.contains("▎ No"), "{screen}");
+    assert!(!screen.contains("for this session"), "{screen}");
     let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
     assert!(matches!(
         effects.as_slice(),
@@ -213,50 +225,32 @@ fn change_and_sealed_props_use_the_gates_rewritten_input() {
         panic!("permission")
     };
     assert_eq!(props.input, json!({"command":"echo rewritten"}));
-    crate::input::on_key(&mut ui, &tree, typed('3'), now);
+    change(&tree, &mut ui, now);
     assert_eq!(ui.dialog.words.as_ref().unwrap().text(), "echo rewritten");
 }
 
+/// esc on words goes back to the list with the pick kept; esc on the list
+/// says no and stops the turn.
 #[test]
-fn changed_session_receipts_name_the_edit_and_the_rule() {
-    let body: bingo_sdk::ItemBody = serde_json::from_value(json!({"kind":"permissionReceipt", "interaction":"i", "tool":"sample", "decision":"allowChangedSession"})).unwrap();
-    assert_eq!(
-        super::receipts::label(&body).as_deref(),
-        Some("you changed it first; yes for this session")
-    );
-}
-#[test]
-fn ctrl_g_leaves_the_change_editor_and_the_hint_names_it() {
-    let (tree, mut ui, now) = scene_for(permission(None, None), true);
-    crate::input::on_key(&mut ui, &tree, typed('3'), now);
-    assert!(ui.dialog.words.is_some());
-    assert!(draw_tree(108, 30, &tree, &mut ui, now).contains("ctrl+g back"));
-    assert!(crate::input::on_key(&mut ui, &tree, ctrl('g'), now).is_empty());
-    assert!(ui.dialog.words.is_none());
-    assert!(ui.dialog.changing.is_none());
-}
-
-#[test]
-fn escaping_aside_returns_to_the_ask_but_the_change_editor_stops() {
+fn esc_leaves_the_words_first_and_the_ask_second() {
     for editing in [false, true] {
         let (tree, mut ui, now) = scene_for(permission(None, None), true);
         if editing {
-            crate::input::on_key(&mut ui, &tree, typed('3'), now);
+            change(&tree, &mut ui, now);
             assert!(ui.dialog.changing.is_some());
+            let screen = draw_tree(108, 30, &tree, &mut ui, now);
+            assert!(screen.contains("esc back"), "{screen}");
         } else {
             crate::input::on_key(&mut ui, &tree, typed('x'), now);
-            assert!(ui.dialog.aside);
         }
-        let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        if !editing {
-            assert!(effects.is_empty());
-            assert!(!ui.dialog.aside);
-            assert_eq!(ui.composer.text(), "x");
-            assert!(!ui.dialog.answered);
-            continue;
-        }
+        let picked = ui.dialog.focus;
+        let left = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
+        assert!(left.is_empty(), "{left:?}");
+        assert!(ui.dialog.words.is_none());
+        assert!(ui.dialog.changing.is_none());
+        assert_eq!(ui.dialog.focus, picked);
         assert!(matches!(
-            effects.as_slice(),
+            crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now).as_slice(),
             [crate::effect::Effect::StopInteraction {
                 answer: Some(Answer::Deny { .. }),
                 ..
@@ -266,22 +260,30 @@ fn escaping_aside_returns_to_the_ask_but_the_change_editor_stops() {
 }
 
 #[test]
-fn escaping_questions_and_forms_skips_without_stopping() {
+fn escaping_questions_and_forms_stops_the_turn() {
     for open in [question(false, true), form()] {
         let (tree, mut ui, now) = scene_for(open, false);
-        let id = tree.open_interaction().unwrap().1.id.clone();
+        let (owner, open) = tree.open_interaction().unwrap();
         assert_eq!(
             crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now),
-            vec![crate::effect::Effect::Answer {
-                interaction: id,
-                answer: Answer::Cancel,
-                activation: bingo_sdk::Activation::Keyboard,
+            vec![crate::effect::Effect::StopInteraction {
+                session: owner.summary.id.clone(),
+                interaction: open.id.clone(),
+                answer: Some(Answer::Cancel),
             }]
         );
-        assert!(ui.stop_asked.is_none());
+        assert!(ui.stop_asked.is_some());
         assert!(ui.dialog.answered);
-        assert!(crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now).is_empty());
     }
+}
+
+#[test]
+fn changed_session_receipts_name_the_edit_and_the_rule() {
+    let body: bingo_sdk::ItemBody = serde_json::from_value(json!({"kind":"permissionReceipt", "interaction":"i", "tool":"sample", "decision":"allowChangedSession"})).unwrap();
+    assert_eq!(
+        super::receipts::label(&body).as_deref(),
+        Some("you changed it first; yes for this session")
+    );
 }
 
 #[test]

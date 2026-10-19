@@ -347,13 +347,6 @@ fn permission_collapsed() {
 }
 
 #[test]
-fn permission_expanded() {
-    let (tree, mut ui, now) = asked(permission(Some("Edit(src/)"), Some(long_diff())));
-    crate::input::on_key(&mut ui, &tree, ctrl('e'), now);
-    both("permission_expanded", &tree, &mut ui, now);
-}
-
-#[test]
 fn permission_with_the_feedback_row_open() {
     let mut asking = permission(
         None,
@@ -369,7 +362,10 @@ fn permission_with_the_feedback_row_open() {
         *summary = "Bash rm -rf build".into();
     }
     let (tree, mut ui, now) = asked(asking);
-    crate::input::on_key(&mut ui, &tree, typed('n'), now);
+    let now = crate::clock::Now {
+        wall: now.wall + crate::ask::guard::GUARD,
+        ..now
+    };
     write(&mut ui, tree.root(), "use cargo clean", now);
     both("permission_feedback", &tree, &mut ui, now);
 }
@@ -632,9 +628,16 @@ fn without_colour() {
     );
     crate::theme::with(no_colour(), || {
         let painted = painted(80, 24, &card, &mut ui, now);
-        for row in ["Do you want to", "1  Yes", "+line 1", "Edit"] {
+        for row in ["▎ Yes", "Yes, allow edits", "+ line 1", "No, and tell"] {
+            // The picked row is reverse video, which is no colour.
+            let reset = |colour: Option<ratatui::style::Color>| {
+                colour.is_none_or(|colour| colour == ratatui::style::Color::Reset)
+            };
             assert!(
-                painted.coloured(row).is_empty(),
+                painted
+                    .row(row)
+                    .iter()
+                    .all(|(_, style)| reset(style.fg) && reset(style.bg)),
                 "NO_COLOR spends none on {row:?}"
             );
         }
@@ -809,14 +812,18 @@ fn a_permission_card_previews_a_word_level_diff() {
         }),
     ));
     both("permission_word_diff", &tree, &mut ui, now);
-    let painted = painted(108, 30, &tree, &mut ui, now);
-    let emphasised: Vec<String> = painted
-        .row("+    match busy")
-        .into_iter()
-        .filter(|(_, style)| style.add_modifier.contains(ratatui::style::Modifier::BOLD))
-        .map(|(text, _)| text.trim().to_string())
-        .collect();
-    assert_eq!(emphasised, vec!["breathing".to_string()]);
+    // The changed words sit on their own tint, as the prototype's `addWord`.
+    crate::theme::with(crate::painted::truecolor(), || {
+        let painted = painted(108, 30, &tree, &mut ui, now);
+        let word = crate::theme::ground("addWord").and_then(|style| style.bg);
+        let emphasised: Vec<String> = painted
+            .row("true => breathing")
+            .into_iter()
+            .filter(|(_, style)| word.is_some() && style.bg == word)
+            .map(|(text, _)| text.trim().to_string())
+            .collect();
+        assert_eq!(emphasised, vec!["breathing".to_string()]);
+    });
 }
 
 /// What a screen cannot show: which token every run of a fence was drawn in.

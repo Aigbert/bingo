@@ -378,36 +378,6 @@ async fn a_set_aside_ask_never_receives_keys_held_in_the_composer() {
     );
 }
 
-#[tokio::test]
-async fn an_unknown_command_never_answers_the_ask_it_set_aside() {
-    let now = still(scene().1);
-    for rendered in [false, true] {
-        let (_home, mut run, session) = palette_run(now);
-        if !rendered {
-            run.session = Attached::new(state(), SessionHandle(session.clone()));
-        }
-        run.session
-            .tree
-            .fold
-            .apply(&frame(1, opened(permission(None, None))));
-        type_burst(&mut run, "/");
-        assert!(run.ui.dialog.aside);
-        type_burst(&mut run, "nosuch\ny");
-        if rendered {
-            play_palette(&mut run, &session, now);
-        }
-        run.typeahead.expire(run.now().instant);
-        typeahead::drain(&mut run);
-        assert!(session.answers().is_empty(), "y was typed outside the ask");
-        assert!(run.session.tree.open_interaction().is_some());
-        assert!(run.typeahead.is_empty());
-        assert_eq!(
-            run.ui.notice().expect("a notice").plain().unwrap().text,
-            typeahead::kept_out_notice(1)
-        );
-    }
-}
-
 fn status_id() -> &'static str {
     bingo_sdk::Plugin::manifest(&bingo_mod_status::Status::default()).id
 }

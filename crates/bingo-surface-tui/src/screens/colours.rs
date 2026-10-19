@@ -92,9 +92,16 @@ fn a_skill_rows_mark_wears_the_state_and_spends_the_only_colour() {
 fn a_card_spends_its_colour_on_the_row_the_keyboard_is_on() {
     let (tree, mut ui, now) = asked(permission(Some("Edit(src/)"), None));
     let painted = painted(80, 24, &tree, &mut ui, now);
-    assert_eq!(painted.coloured("1  Yes"), vec!["❯".to_string()]);
-    assert!(painted.coloured("2  Yes for this session").is_empty());
-    assert!(painted.coloured("Do you want to").is_empty());
+    assert_eq!(painted.coloured("▎ Yes"), vec!["▎", "Yes"]);
+    // The rows the keyboard is not on keep their muted words and no mark.
+    assert_eq!(
+        painted.coloured("Yes, allow edits in src/"),
+        vec!["Yes, allow edits in", "for this session"]
+    );
+    assert_eq!(
+        painted.coloured("No, and tell it why"),
+        vec!["No, and tell it why"]
+    );
 }
 
 /// The quiet rule where the eye reads it: a notice wears the tool row's own

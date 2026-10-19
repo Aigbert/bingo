@@ -181,7 +181,7 @@ fn every_token_is_spent_where_the_design_says() {
             "dim",
             &[
                 "activity.rs",
-                "ask/drawing.rs",
+                "ask/body.rs",
                 "ask/receipts.rs",
                 "component/live.rs",
                 "component/retry.rs",
@@ -228,7 +228,6 @@ fn every_token_is_spent_where_the_design_says() {
             "presence",
             &[
                 "activity.rs",
-                "ask/drawing.rs",
                 "dialog.rs",
                 "form.rs",
                 "select.rs",
@@ -258,6 +257,7 @@ fn every_token_is_spent_where_the_design_says() {
             "bad",
             &[
                 "activity.rs",
+                "dock/edge.rs",
                 "transcript.rs",
                 "transcript/ran.rs",
                 "transcript/steps.rs",

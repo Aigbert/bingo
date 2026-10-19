@@ -52,6 +52,9 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
         crate::focus::Owner::Layer => return Vec::new(),
         crate::focus::Owner::Interaction => {
             return if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                if let Some(index) = crate::ask::clicked(ui, mouse.column, mouse.row) {
+                    return picked(ui, tree, index, now);
+                }
                 if let Some(target) = ui
                     .shown
                     .card_actions
@@ -309,6 +312,13 @@ fn answer(ui: &mut Ui, tree: &Tree, index: usize, now: Now) -> Vec<Effect> {
     };
     ui.dialog.focus = index;
     ui.dialog.on_key(interaction, mouse_enter(), now)
+}
+
+/// A click on an answer in the dock picks it and gives it, as ⏎ would.
+fn picked(ui: &mut Ui, tree: &Tree, index: usize, now: Now) -> Vec<Effect> {
+    crate::ask::keys::back(ui);
+    ui.dialog.focus = index;
+    crate::input::interaction::interaction_keys(ui, tree, mouse_enter(), now)
 }
 
 /// What a click on a card row means: the row it landed on, chosen.

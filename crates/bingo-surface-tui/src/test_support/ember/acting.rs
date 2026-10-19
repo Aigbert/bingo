@@ -243,5 +243,5 @@ fn m197_question_frames_are_answered_by_keys() {
 
 #[test]
 fn m197_an_answered_question_goes_on_with_the_turn() {
-    sheet_frame("question-answered", &[]);
+    sheet_frame("question-answered", &[(25, 3)]);
 }

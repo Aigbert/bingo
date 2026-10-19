@@ -17,7 +17,7 @@ pub fn draw(
         sealed::pairs(
             ui,
             ask,
-            question_focus(ui, frame, ask),
+            crate::ask::question::focus(ui, &frame.pulls, ask),
             !tree.is_root(tree.view()),
         )
     } else {
@@ -179,21 +179,6 @@ fn placeholder(state: &bingo_sdk::SessionState) -> String {
 
 #[cfg(test)]
 mod tests;
-
-fn question_focus<'a>(
-    ui: &'a Ui,
-    frame: &Layout,
-    ask: &bingo_sdk::Interaction,
-) -> Option<&'a bingo_sdk::component::QuestionFocus> {
-    let key = frame
-        .pulls
-        .iter()
-        .find(|key| key.request.request_id == ask.id.as_str())?;
-    let bingo_sdk::View::Box { layout, .. } = ui.placed.pulled.get(key)? else {
-        return None;
-    };
-    layout.question.as_ref()
-}
 
 pub fn composer(
     state: &bingo_sdk::SessionState,

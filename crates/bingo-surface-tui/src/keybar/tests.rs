@@ -63,7 +63,7 @@ fn an_open_ask_seals_the_keybar_even_when_a_mod_claims_it() {
     let (mut ui, now) = scene();
     ui.dialog.focus_on(Some(&ask));
     let screen = draw_tree(108, 30, &tree, &mut ui, now);
-    assert!(screen.contains("esc no, stop the turn"));
+    assert!(screen.contains("⏎ confirm   esc stop"), "{screen}");
     assert!(
         !ui.shown
             .pulls

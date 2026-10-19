@@ -36,6 +36,9 @@ pub struct Dialog {
     pub chosen: Vec<String>,
     /// Answered, waiting for the frame that closes it.
     pub answered: bool,
+    /// The question tab the `ask` mod last drew and when it came on, so
+    /// the guard restarts on each tab.
+    pub tab_at: Option<(usize, jiff::Timestamp)>,
     /// A form's own state: which question is on screen, and what each of the
     /// others was left on. `focus` is still the cursor of the one on screen,
     /// so every key, click and window here works on a form unchanged.
@@ -133,20 +136,6 @@ impl Dialog {
             KeyCode::Down => self.focus = (self.focus + 1).min(options.len().saturating_sub(1)),
             KeyCode::Char(' ') => return self.toggle(&options),
             KeyCode::Enter => return self.confirm(interaction, &options),
-            KeyCode::Char(c @ '1'..='9') if typed(key) => {
-                let Some(index) = digit(c, options.len()) else {
-                    return Vec::new();
-                };
-                self.focus = index;
-                return self.confirm(interaction, &options);
-            }
-            KeyCode::Char(c) if typed(key) => {
-                let Some(index) = letter(c, &options) else {
-                    return Vec::new();
-                };
-                self.focus = index;
-                return self.confirm(interaction, &options);
-            }
             _ => {}
         }
         Vec::new()
@@ -244,31 +233,6 @@ pub(crate) fn cancel(interaction: &Interaction) -> Option<Answer> {
         .then_some(Answer::Cancel)
 }
 
-/// A bare letter or digit, not a chord.
-fn typed(key: KeyEvent) -> bool {
-    (key.modifiers - KeyModifiers::SHIFT).is_empty()
-}
-
-fn digit(c: char, len: usize) -> Option<usize> {
-    let index = (c as usize) - ('1' as usize);
-    (index < len).then_some(index)
-}
-
-/// `y`, `a` and `n` name the three permission answers wherever they sit.
-fn letter(c: char, options: &[Opt]) -> Option<usize> {
-    let wanted = match c {
-        'y' => AnswerSpec::AllowOnce,
-        'a' => AnswerSpec::AllowSession,
-        'n' => AnswerSpec::Deny,
-        _ => return None,
-    };
-    options.iter().position(|o| match &o.choice {
-        Choice::Send(answer) => answer.spec() == wanted,
-        Choice::Words => wanted == AnswerSpec::Deny,
-        Choice::Toggle(_) | Choice::Change => false,
-    })
-}
-
 /// What this interaction is drawn as. Every card is a box but the form, which
 /// is a band — the user's word on 2026-09-04, recorded in design §2 and §10.
 pub fn shape(interaction: &Interaction) -> layers::Shape {
@@ -341,26 +305,7 @@ pub fn rows(
             .map(|line| (line, Some(index))),
         );
     }
-    out.extend(caution_rows(interaction));
     out.extend(answering(dialog));
-    out
-}
-
-fn caution_rows(interaction: &Interaction) -> Vec<(Line<'static>, Option<usize>)> {
-    let mut out = Vec::new();
-    if let InteractionKind::Permission {
-        caution: Some(caution),
-        ..
-    } = &interaction.kind
-    {
-        out.push((
-            Line::from(Span::styled(
-                format!("     no allow this session here: {}", caution.reason),
-                theme::presence(),
-            )),
-            None,
-        ));
-    }
     out
 }
 
