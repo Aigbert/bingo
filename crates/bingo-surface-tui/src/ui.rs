@@ -86,11 +86,27 @@ pub struct Notice {
     pub kind: NoticeKind,
     said: Instant,
     hold: Duration,
+    /// The first frame that drew it: a loaded machine can spend a whole hold
+    /// between saying and painting, and an unseen toast has said nothing.
+    shown: Option<Instant>,
 }
 impl Notice {
+    /// A local notice, whose hold waits for the frame that first draws it.
     pub fn new(kind: NoticeKind, said: Instant) -> Self {
         let hold = kind.hold();
-        Self { kind, said, hold }
+        Self {
+            kind,
+            said,
+            hold,
+            shown: None,
+        }
+    }
+    /// A placed notice, whose window its placer started when it placed it.
+    pub fn placed(kind: NoticeKind, said: Instant) -> Self {
+        Self {
+            shown: Some(said),
+            ..Self::new(kind, said)
+        }
     }
     #[cfg(test)]
     pub fn plain(&self) -> Option<Plain> {
@@ -113,8 +129,13 @@ impl Notice {
     pub(crate) fn said(&self) -> Instant {
         self.said
     }
+    /// How long it has been on screen, or since it was said while no frame
+    /// has drawn it.
+    pub(crate) fn age(&self, now: Instant) -> Duration {
+        now.saturating_duration_since(self.shown.unwrap_or(self.said))
+    }
     pub(crate) fn gone(&self, now: Instant) -> bool {
-        now.saturating_duration_since(self.said) >= self.hold + TOAST_FADE
+        self.age(now) >= self.hold + TOAST_FADE
     }
     #[cfg(test)]
     pub fn strength(&self, now: Now) -> f32 {
@@ -413,10 +434,17 @@ impl Ui {
     pub(crate) fn say(&mut self, message: Message, hold: Duration, now: Instant) {
         self.placed.toasts.discard();
         self.notice = Some(Notice {
-            kind: NoticeKind::Message(message),
-            said: now,
             hold,
+            ..Notice::new(NoticeKind::Message(message), now)
         });
+    }
+
+    /// The frame about to be drawn at `now` starts the hold of a notice no
+    /// frame has drawn yet.
+    pub fn draws_notice(&mut self, now: Instant) {
+        if let Some(notice) = &mut self.notice {
+            notice.shown.get_or_insert(now);
+        }
     }
 
     pub fn notify_mode(&mut self, now: Instant) {
@@ -459,7 +487,10 @@ impl Ui {
     /// Drop what has run out: a notice past its window, a layer that has
     /// finished leaving. Drawing never mutates, so the loop calls this.
     pub fn expire(&mut self, now: Now) {
-        if self.notice().is_some_and(|n| n.gone(now.instant)) {
+        if self
+            .notice()
+            .is_some_and(|n| n.shown.is_some() && n.gone(now.instant))
+        {
             self.notice = None;
         }
         self.focus.expire(now);
@@ -648,6 +679,7 @@ mod tests {
     fn a_notice_lives_its_window_and_the_frames_it_arrives_and_leaves_in() {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "careful", now.instant);
+        ui.draws_notice(now.instant);
         ui.expire(later(now, life() - 1));
         assert!(ui.notice.is_some());
         ui.expire(later(now, life()));
@@ -658,6 +690,7 @@ mod tests {
     fn a_toast_expires_after_2700_milliseconds() {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "careful", now.instant);
+        ui.draws_notice(now.instant);
         for ms in [0, 33, 66, 2000, 2699] {
             assert_eq!(ui.notice().map(|n| n.strength(later(now, ms))), Some(1.0));
         }
@@ -688,6 +721,7 @@ mod tests {
             ui.notify(Level::Info, *mode, later(now, step as i64 * 100).instant);
         }
         let last = later(now, 400);
+        ui.draws_notice(last.instant);
         ui.expire(last);
         assert_eq!(said(&ui), Some("default"));
         ui.expire(later(last, life()));
@@ -699,6 +733,7 @@ mod tests {
         let (mut ui, now) = scene();
         ui.notify(Level::Warn, "first", now.instant);
         ui.notify(Level::Info, "second", later(now, 1_000).instant);
+        ui.draws_notice(later(now, 1_000).instant);
         assert_eq!(
             said(&ui),
             Some("second"),
@@ -711,22 +746,22 @@ mod tests {
         assert_eq!(said(&ui), None);
     }
 
+    /// M199 §3: the hold is a promise to be seen, so it starts at the frame
+    /// that first draws the notice, however late that frame comes.
     #[test]
-    fn a_notice_expires_by_the_wall_clock_from_when_it_was_said() {
+    fn a_notice_first_drawn_late_still_holds_from_that_frame() {
         let (mut ui, now) = scene();
-        ui.notify(Level::Info, "said early", now.instant);
-        // The first frame to look at it comes late: its life is not restarted.
-        let looked = later(now, life() - 10);
-        ui.expire(looked);
-        assert_eq!(said(&ui), Some("said early"));
-        let strength = ui.notice().map_or(1.0, |n| n.strength(looked));
-        assert_eq!(strength, 1.0, "still inside its original window");
-        ui.expire(later(now, life()));
-        assert_eq!(
-            said(&ui),
-            None,
-            "gone at its own deadline, not one drawn later"
-        );
+        ui.notify(Level::Info, "resumed", now.instant);
+        let drawn = later(now, 3_000);
+        ui.expire(drawn);
+        ui.draws_notice(drawn.instant);
+        assert_eq!(said(&ui), Some("resumed"));
+        assert_eq!(ui.notice().map(|n| n.strength(drawn)), Some(1.0));
+        ui.draws_notice(later(drawn, 1_000).instant);
+        ui.expire(later(drawn, life() - 1));
+        assert_eq!(said(&ui), Some("resumed"), "a later frame restarts nothing");
+        ui.expire(later(drawn, life()));
+        assert_eq!(said(&ui), None, "gone a hold after its first frame");
     }
 
     /// M60 brick 2: a word the opening said and the terminal then disproved is

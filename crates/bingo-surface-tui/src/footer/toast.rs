@@ -17,7 +17,7 @@ pub(super) fn draw(
     now: Now,
 ) -> Option<Drawing> {
     let (notice, styled) = crate::toast::components(ui, state, now, width, &mut frame.pulls)?;
-    let age = now.since(notice.said());
+    let age = notice.age(now.instant);
     let hold = notice.hold();
     let mut spans = styled.unwrap_or_else(|| words(&notice.kind, state));
     fade(&mut spans, age, hold, now.motion);

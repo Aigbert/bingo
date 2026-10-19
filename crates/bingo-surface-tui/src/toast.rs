@@ -119,7 +119,7 @@ fn placed_notice(ui: &Ui, state: &SessionState, now: Now) -> Option<crate::ui::N
     let (toast, said) = ui.placed.toasts.active(state, now)?;
     local(ui, now)
         .is_none_or(|notice| said > notice.said())
-        .then(|| crate::ui::Notice::new(message(toast.parts, toast.tone), said))
+        .then(|| crate::ui::Notice::placed(message(toast.parts, toast.tone), said))
 }
 
 fn message(parts: Vec<bingo_sdk::view::TextChild>, tone: bingo_sdk::Tone) -> crate::ui::NoticeKind {

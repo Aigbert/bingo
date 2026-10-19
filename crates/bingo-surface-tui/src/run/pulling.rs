@@ -101,6 +101,7 @@ pub(super) fn paint(
     let began = Instant::now();
     let (width, height) = screen.size();
     pulling::sync(run, screen, now)?;
+    run.ui.draws_notice(now.instant);
     run.ui.prepare(&run.session.tree.viewed().summary.cwd);
     read_changes(run);
     let previous = std::mem::take(&mut run.ui.shown);

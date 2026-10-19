@@ -94,9 +94,8 @@ fn exit_receipt_matches_the_prototype_rows_byte_for_byte() {
         Ground::Eight,
         Some(seed),
     );
-    // The resume toast holds 2.4 s from attach, which a loaded machine can spend before
-    // the first paint; the drawn transcript is what the receipt waits on.
     terminal.wait_for("file-1.rs");
+    terminal.wait_for("resumed · steer");
     terminal.send(&[0x03]);
     terminal.wait_for("again");
     terminal.send(&[0x03]);

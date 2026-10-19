@@ -51,5 +51,5 @@ impl Mode {
 /// A mode acknowledgement already owns its clock; the edge owns no timer.
 pub fn changed(ui: &Ui, now: Now) -> Option<std::time::Duration> {
     let notice = ui.notice()?;
-    matches!(notice.kind, crate::ui::NoticeKind::Mode).then(|| now.since(notice.said()))
+    matches!(notice.kind, crate::ui::NoticeKind::Mode).then(|| notice.age(now.instant))
 }
