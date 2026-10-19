@@ -12,6 +12,7 @@ use bingo_sdk::component::{Props, SessionModeProps};
 use ratatui::text::{Line, Span};
 use std::time::Duration;
 mod toast;
+mod view;
 
 pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, width: usize, now: Now) -> Drawing {
     let available = width.saturating_sub(grid::TX + grid::RM);
@@ -69,14 +70,14 @@ fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> D
         now,
     };
     let lead = needs_you(tree);
-    let needs = !lead.lines.is_empty();
-    let mut parts = vec![
-        lead,
-        model(tree.viewed(), &mut site),
-        mode(tree.viewed(), &mut site),
-    ];
+    let mut parts = match view::draw(tree) {
+        Some(whose) if view::is_room(tree.viewed()) => vec![whose, lead],
+        Some(whose) => vec![whose, model(tree.viewed(), &mut site), lead],
+        None => vec![lead, model(tree.viewed(), &mut site)],
+    };
+    parts.push(mode(tree.viewed(), &mut site));
     parts.push(context(tree.viewed()));
-    if !needs {
+    if tree.viewing().is_none() && tree.needers().next().is_none() {
         parts.push(crew(tree, now));
     }
     parts.extend(slots(tree.viewed(), now));
@@ -141,9 +142,6 @@ fn context(state: &bingo_sdk::SessionState) -> Drawing {
     ))])
 }
 fn crew(tree: &Tree, now: Now) -> Drawing {
-    if tree.viewing().is_some() {
-        return Drawing::default();
-    }
     let agents: Vec<_> = crate::crew::active(tree)
         .into_iter()
         .filter(|s| s.busy() && s.interactions.is_empty())

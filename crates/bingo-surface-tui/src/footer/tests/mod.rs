@@ -1,5 +1,6 @@
 use crate::test_support::ember::{Band, Capture, assert_regions, moved};
 use crate::test_support::*;
+use crate::theme;
 use crate::ui::Ui;
 use bingo_sdk::{Event, ItemStatus, Level, SessionState, TurnStatus};
 use serde_json::json;
@@ -580,4 +581,53 @@ fn ember_live_motion_is_only_side_light_spinner_and_comet() {
             "{cells:?}"
         );
     });
+}
+
+#[test]
+fn away_the_footer_leads_with_whose_session_it_is() {
+    let mut tree = folded_tree(vec![child_frame(1, announced("reviewer"))]);
+    tree.show(&child_id());
+    let (ui, now) = scene();
+    let line = crate::footer::draw(&tree, &ui, &mut Default::default(), 120, now).lines[0].clone();
+    assert!(
+        line.to_string()
+            .trim_start()
+            .starts_with("reviewer · fake-1"),
+        "{line}"
+    );
+    let name = line
+        .spans
+        .iter()
+        .find(|span| span.content == "reviewer")
+        .unwrap();
+    let ink = crate::face::Faces::of(&tree).ink(&child_id());
+    assert_eq!(
+        name.style,
+        theme::foreground(ink).unwrap().patch(theme::bold())
+    );
+}
+
+#[test]
+fn in_a_room_the_footer_names_who_sits_there_and_no_model() {
+    let mut tree = folded_tree(vec![
+        child_frame(1, announced("reviewer")),
+        log_frame(3, log_announced("#design")),
+        log_frame(
+            4,
+            extended(
+                "bingo.rooms",
+                "members",
+                roster_payload(&["reviewer", "parent"], &[]),
+            ),
+        ),
+    ]);
+    tree.show(&log_id());
+    let (ui, now) = scene();
+    let line =
+        crate::footer::draw(&tree, &ui, &mut Default::default(), 120, now).lines[0].to_string();
+    assert!(
+        line.trim_start().starts_with("#design  reviewer   "),
+        "{line}"
+    );
+    assert!(!line.contains("fake-1"), "{line}");
 }
