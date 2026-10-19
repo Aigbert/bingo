@@ -253,7 +253,10 @@ fn record(
     round: u32,
     body: ItemBody,
 ) -> ItemId {
-    let item = mint(turn, round, body, ItemStatus::Completed);
+    record_item(transcript, host, mint(turn, round, body, ItemStatus::Completed))
+}
+
+fn record_item(transcript: &mut Transcript, host: &dyn TurnHost, item: Item) -> ItemId {
     let id = item.id.clone();
     emit_and_fold(transcript, host, Event::ItemCompleted { item });
     id
@@ -715,11 +718,7 @@ impl Turn<'_> {
             if let Some(item) =
                 crate::user::item(input, |body| mint(&self.id, self.round, body, ItemStatus::Completed))
             {
-                emit_and_fold(
-                    &mut self.transcript,
-                    self.host,
-                    Event::ItemCompleted { item },
-                );
+                record_item(&mut self.transcript, self.host, item);
             }
         }
         let usage = self.measure(&self.cfg.system, &ContextView::model_view(&self.transcript));

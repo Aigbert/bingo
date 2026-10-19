@@ -175,12 +175,11 @@ impl Actor {
     /// A `Log` session's input (ADR-0011 §1): a user item in the journal at
     /// once, acknowledged as applied, and nothing answers it.
     async fn log_input(&mut self, intent: IntentId, input: Input) -> Result<(), KernelError> {
-        if !matches!(input, Input::Text { .. }) {
+        let Some(id) = self.journal_prose(None, intent.clone(), input).await? else {
             return self
                 .reject(intent, ErrorCode::InvalidInput, "a log records text")
                 .await;
-        }
-        let id = self.journal_prose(None, intent.clone(), input).await?;
+        };
         self.applied(intent, json!({ "item": id })).await?;
         Ok(())
     }
@@ -605,14 +604,13 @@ impl Actor {
         let mut ids = Vec::new();
         let mut acks = Vec::new();
         for (intent, input) in inputs {
-            if !matches!(input, Input::Text { .. }) {
-                continue;
+            if let Some(id) = self
+                .journal_prose(Some(turn.clone()), intent.clone(), input)
+                .await?
+            {
+                acks.push(intent);
+                ids.push(id);
             }
-            acks.push(intent.clone());
-            ids.push(
-                self.journal_prose(Some(turn.clone()), intent, input)
-                    .await?,
-            );
         }
         Ok((ids, acks))
     }
@@ -625,15 +623,16 @@ impl Actor {
         turn: Option<TurnId>,
         intent: IntentId,
         input: Input,
-    ) -> Result<ItemId, KernelError> {
-        let item = crate::user::item(input, |body| self.fresh(turn, Some(intent.clone()), body))
-            .ok_or_else(|| {
-                KernelError::new(ErrorCode::InvalidInput, "a user item requires text")
-            })?;
+    ) -> Result<Option<ItemId>, KernelError> {
+        let Some(item) =
+            crate::user::item(input, |body| self.fresh(turn, Some(intent.clone()), body))
+        else {
+            return Ok(None);
+        };
         let id = item.id.clone();
         self.publish(Event::ItemCompleted { item }, Some(intent))
             .await?;
-        Ok(id)
+        Ok(Some(id))
     }
 
     async fn ack_turn_started(

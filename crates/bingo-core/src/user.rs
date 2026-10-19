@@ -13,6 +13,7 @@ pub(crate) fn item(input: Input, mint: impl FnOnce(ItemBody) -> Item) -> Option<
         return None;
     };
     let mut parts = Vec::with_capacity(images.len() + 1);
+    // An image-only ask has no empty text part (ADR-0040 §3).
     if !text.is_empty() {
         parts.push(ContentPart::text(text));
     }
