@@ -65,7 +65,7 @@ Then every one of the 105 captures passes, and what the old look left behind is 
    - A backgrounded step reads `in background` on the right, and the footer counts `N shells`.
    - When the job ends, a notice reads
      `── ✓ <command> finished in the background · <outcome> ──`, with the toast
-     `✓ background job finished · <outcome>`. A failed job reads `✗` bad.
+     `✓ background job finished · <outcome>`. A failed job reads `×` bad.
 7. **Waking** (`wakeNow`).
    - A wake step reads `∞ wake  in 5m … set`. While one is pending, the footer reads
      `wakes in X`, counting down at render time from the wake's instant.
