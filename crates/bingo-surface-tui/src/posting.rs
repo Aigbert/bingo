@@ -1,14 +1,15 @@
 //! A line typed into a room (`submitInput`, `post`): refused while the room
 //! is closed, and once it goes, told who it called on.
 use bingo_collab::mentions::named;
+use bingo_collab::room::is_room;
 use bingo_sdk::toast::Say;
-use bingo_sdk::{Driver, SessionState, pick, view::TextChild};
+use bingo_sdk::{SessionState, pick, view::TextChild};
 
-use crate::tree::{self, Tree};
+use crate::tree::Tree;
 
 /// Why a line does not go: a closed room takes no post. A command still runs.
 pub fn refused(state: &SessionState, text: &str) -> Option<Say> {
-    let closed = state.summary.driver == Driver::Log && bingo_collab::room::closed_of(state);
+    let closed = is_room(&state.summary) && bingo_collab::room::closed_of(state);
     (closed && !command(text)).then(|| Say::new(["this room is closed"]))
 }
 
@@ -16,7 +17,7 @@ pub fn refused(state: &SessionState, text: &str) -> Option<Say> {
 /// not seated, or that it called on nobody.
 pub fn told(tree: &Tree, text: &str) -> Option<Say> {
     let room = tree.viewed();
-    if room.summary.driver != Driver::Log || command(text) || text.trim().is_empty() {
+    if !is_room(&room.summary) || command(text) || text.trim().is_empty() {
         return None;
     }
     let seated = crate::seats::members(room);
@@ -34,10 +35,9 @@ pub fn told(tree: &Tree, text: &str) -> Option<Say> {
 
 /// The first teammate of the tree the line names who has no seat here.
 fn away(tree: &Tree, text: &str, seated: &[String]) -> Option<String> {
-    let crew: Vec<String> = tree
-        .sessions()
-        .filter(|state| state.summary.driver == Driver::Model && !tree.is_root(&state.summary.id))
-        .map(tree::name)
+    let crew: Vec<String> = crate::face::Faces::of(tree)
+        .teammates()
+        .map(|row| bingo_collab::name::of_session(row).to_owned())
         .filter(|name| {
             !seated
                 .iter()
@@ -57,7 +57,10 @@ fn command(text: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::{child_frame, child_summary, log_frame, room_tree, roster_payload};
+    use crate::test_support::{
+        agent_frame, agent_id, agent_summary, child_frame, child_id, child_summary, log_frame,
+        room_tree, roster_payload,
+    };
 
     fn room(members: &[&str]) -> Tree {
         let mut frames = vec![log_frame(
@@ -103,5 +106,38 @@ mod tests {
         assert_eq!(said.plain(), "posted · @ someone to ask for an answer");
         assert!(told(&room(&["scout"]), "@scout look").is_none());
         assert!(told(&tree, "/seat scout").is_none());
+    }
+
+    /// `away` and the inks read one crew: a teammate's own hire is not
+    /// home's teammate, so naming it is not naming someone away.
+    #[test]
+    fn a_teammates_own_hire_is_neither_away_nor_crew_ink() {
+        let mut tree = room(&[]);
+        let hire = bingo_sdk::SessionSummary {
+            parent: Some(bingo_sdk::ParentLink {
+                session: child_id(),
+                item: None,
+            }),
+            ..agent_summary(7, "helper")
+        };
+        tree.fold.apply(&agent_frame(
+            7,
+            4,
+            bingo_sdk::Event::SessionUpdated { summary: hire },
+        ));
+        assert!(
+            tree.state(&agent_id(7)).is_some(),
+            "the hire is in the tree"
+        );
+        let faces = crate::face::Faces::of(&tree);
+        assert_eq!(faces.ink(&agent_id(7)), "muted");
+        assert!(faces.ink(&child_id()).starts_with("crew"));
+        let said = told(&tree, "@helper look").expect("nobody seated was called");
+        assert_eq!(said.plain(), "posted · @ someone to ask for an answer");
+        let said = told(&tree, "@scout look").expect("scout is home's teammate");
+        assert_eq!(
+            said.plain(),
+            "scout is not in this room · /seat scout · brings them in"
+        );
     }
 }

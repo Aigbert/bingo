@@ -848,7 +848,7 @@ fn calls(item: &Item, tool: &str) -> bool {
 /// What opens a session's stream before anything was said in it: a room's
 /// head, or a teammate's role. It belongs to no item, as the closing does.
 pub fn opening(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
-    if state.summary.driver == bingo_sdk::Driver::Log {
+    if bingo_collab::room::is_room(&state.summary) {
         return room::head(rows);
     }
     hired::head(rows)
@@ -863,7 +863,7 @@ pub fn opening(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
 /// next turn takes it away.
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
     let mut out = live::draw(state, rows);
-    if state.summary.driver == bingo_sdk::Driver::Log {
+    if bingo_collab::room::is_room(&state.summary) {
         out.append(room::writers(rows));
     }
     for props in crate::component::closing::props(state) {
@@ -1010,6 +1010,7 @@ mod tests {
         let mut state = stated(items);
         state.summary.title = Some("#design".to_string());
         state.summary.driver = bingo_sdk::Driver::Log;
+        state.summary.key = Some(format!("{}ses_1/design", bingo_collab::room::KEY));
         rendered(&state)
     }
 

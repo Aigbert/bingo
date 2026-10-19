@@ -69,7 +69,7 @@ fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> V
     };
     let lead = needs_you(tree);
     let mut parts = match view::draw(tree) {
-        Some(whose) if view::is_room(tree.viewed()) => vec![whose, lead],
+        Some(whose) if bingo_collab::room::is_room(&tree.viewed().summary) => vec![whose, lead],
         Some(whose) => vec![whose, model(tree.viewed(), &mut site), lead],
         None => vec![lead, model(tree.viewed(), &mut site)],
     };

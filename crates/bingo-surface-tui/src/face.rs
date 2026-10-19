@@ -71,6 +71,11 @@ impl Faces {
             .is_some_and(|row| self.working.contains(&row.id))
     }
 
+    /// The home's teammates, in the order they were created.
+    pub fn teammates(&self) -> impl Iterator<Item = &SessionSummary> {
+        bingo_collab::face::teammates(&self.home, &self.rows)
+    }
+
     /// The home's teammate that signs with `name`.
     pub fn teammate(&self, name: &str) -> Option<&SessionSummary> {
         bingo_collab::face::teammate(name, &self.home, &self.rows)

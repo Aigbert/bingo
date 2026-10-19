@@ -14,15 +14,10 @@ pub fn draw(tree: &Tree) -> Option<Drawing> {
         ink(faces.ink(&state.summary.id)).patch(theme::bold()),
     );
     let mut spans = vec![name];
-    if is_room(state) {
+    if bingo_collab::room::is_room(&state.summary) {
         spans.extend(room(state, &faces));
     }
     Some(Drawing::still(vec![Line::from(spans)]))
-}
-
-/// A room is a session that answers nobody: the `Log` driver.
-pub fn is_room(state: &SessionState) -> bool {
-    state.summary.driver == bingo_sdk::Driver::Log
 }
 
 fn room(state: &SessionState, faces: &Faces) -> Vec<Span<'static>> {

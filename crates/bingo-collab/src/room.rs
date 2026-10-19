@@ -129,17 +129,20 @@ pub struct Room {
     pub closed: bool,
 }
 
-impl Room {
-    /// The room a summary announces, or `None` for a session that is not one.
-    pub fn of(summary: &SessionSummary) -> Option<Room> {
-        if summary.driver != Driver::Log {
-            return None;
-        }
-        if !summary
+/// Whether a session is a room: one nothing answers, kept under this
+/// plugin's key. Another plugin's log session is not a room.
+pub fn is_room(summary: &SessionSummary) -> bool {
+    summary.driver == Driver::Log
+        && summary
             .key
             .as_deref()
             .is_some_and(|key| key.starts_with(KEY))
-        {
+}
+
+impl Room {
+    /// The room a summary announces, or `None` for a session that is not one.
+    pub fn of(summary: &SessionSummary) -> Option<Room> {
+        if !is_room(summary) {
             return None;
         }
         Some(Room {

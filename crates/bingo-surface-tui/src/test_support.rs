@@ -236,6 +236,7 @@ pub fn log_summary(title: &str) -> SessionSummary {
             effort: None,
         },
         id: log_id(),
+        key: Some(format!("{}ses_1/{title}", bingo_collab::room::KEY)),
         title: Some(title.into()),
         driver: bingo_sdk::Driver::Log,
         provider: None,

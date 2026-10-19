@@ -7,28 +7,36 @@ pub fn ink(id: &SessionId, home: &str, rows: &[SessionSummary]) -> &'static str 
     let Some(row) = rows.iter().find(|row| &row.id == id) else {
         return "muted";
     };
-    if crate::room::Room::of(row).is_some() {
+    if crate::room::is_room(row) {
         return "plan";
     }
     if row.id.as_str() == home {
         return "glow";
     }
-    let mut teammates = rows
+    teammates(home, rows)
+        .position(|row| &row.id == id)
+        .map_or("muted", |slot| CREW[slot % CREW.len()])
+}
+
+/// The home tree's teammates, in the order they were created: the sessions
+/// home itself started that are not rooms. A teammate's own hire is not one.
+pub fn teammates<'a>(
+    home: &str,
+    rows: &'a [SessionSummary],
+) -> impl Iterator<Item = &'a SessionSummary> {
+    let mut crew = rows
         .iter()
         .filter(|row| {
             row.parent.as_ref().map(|parent| parent.session.as_str()) == Some(home)
-                && crate::room::Room::of(row).is_none()
+                && !crate::room::is_room(row)
         })
         .collect::<Vec<_>>();
-    teammates.sort_by(|a, b| {
+    crew.sort_by(|a, b| {
         a.created_at
             .cmp(&b.created_at)
             .then_with(|| a.id.cmp(&b.id))
     });
-    teammates
-        .iter()
-        .position(|row| &row.id == id)
-        .map_or("muted", |slot| CREW[slot % CREW.len()])
+    crew.into_iter()
 }
 
 pub fn who(name: &str, home: &str, rows: &[SessionSummary]) -> &'static str {
@@ -49,16 +57,11 @@ pub fn accent(id: &SessionId, home: &str, rows: &[SessionSummary]) -> &'static s
     if CREW.contains(&ink) { ink } else { "glow" }
 }
 
-/// The teammate of the home tree that signs with `name`: a session the home
-/// started that is not a room.
+/// The teammate of the home tree that signs with `name`.
 pub fn teammate<'a>(
     name: &str,
     home: &str,
     rows: &'a [SessionSummary],
 ) -> Option<&'a SessionSummary> {
-    rows.iter().find(|row| {
-        crate::name::of_session(row) == name
-            && row.parent.as_ref().map(|parent| parent.session.as_str()) == Some(home)
-            && crate::room::Room::of(row).is_none()
-    })
+    teammates(home, rows).find(|row| crate::name::of_session(row) == name)
 }

@@ -36,10 +36,10 @@ pub enum Target {
 /// roster list them.
 pub fn targets(tree: &Tree) -> Vec<Target> {
     let viewed = tree.viewed();
-    match viewed.summary.driver {
-        Driver::Log => roster(tree, viewed),
-        Driver::Model => agents(tree, &viewed.summary.id),
+    if bingo_collab::room::is_room(&viewed.summary) {
+        return roster(tree, viewed);
     }
+    agents(tree, &viewed.summary.id)
 }
 
 /// The agents this session's own `@name` reaches: the children of it this

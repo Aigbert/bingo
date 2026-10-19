@@ -66,7 +66,7 @@ fn resting(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
 /// to stop.
 fn away(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
     let state = tree.viewed();
-    let room = state.summary.driver == bingo_sdk::Driver::Log;
+    let room = bingo_collab::room::is_room(&state.summary);
     if !ui.composer.is_empty() {
         if state.busy() {
             return vec![
@@ -191,7 +191,7 @@ fn composer_props(
 }
 fn placeholder(state: &bingo_sdk::SessionState) -> String {
     let name = crate::tree::name(state);
-    if state.summary.driver == bingo_sdk::Driver::Log {
+    if bingo_collab::room::is_room(&state.summary) {
         return if bingo_collab::room::closed_of(state) {
             "This room is closed".into()
         } else {

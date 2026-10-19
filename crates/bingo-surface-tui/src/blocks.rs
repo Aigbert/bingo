@@ -109,7 +109,7 @@ fn revision(
             && matches!(item.body, ItemBody::Assistant { .. })
             && rows.arriving(item),
         names: rows.faces.names().to_vec(),
-        room: (rows.state.summary.driver == bingo_sdk::Driver::Log).then_some(rows.state.seq),
+        room: bingo_collab::room::is_room(&rows.state.summary).then_some(rows.state.seq),
         size: size(&item.body),
         agent: agent.map(|child| child.seq),
         fold,

@@ -95,7 +95,7 @@ fn cautioned(open: &bingo_sdk::Interaction) -> bool {
 /// when their turn began (`edgeLine`'s `typing`).
 fn written_in(tree: &Tree, width: usize, now: Now) -> Option<Drawing> {
     let state = tree.viewed();
-    if state.summary.driver != bingo_sdk::Driver::Log {
+    if !bingo_collab::room::is_room(&state.summary) {
         return None;
     }
     let faces = crate::face::Faces::of(tree);

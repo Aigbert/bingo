@@ -16,7 +16,7 @@ pub fn known(tree: &Tree, faces: &crate::face::Faces) -> Vec<Name> {
     tree.sessions()
         .map(|state| Name {
             text: tree::name(state),
-            room: state.summary.driver == bingo_sdk::Driver::Log,
+            room: bingo_collab::room::is_room(&state.summary),
             ink: faces.ink(&state.summary.id),
         })
         .chain([Name {

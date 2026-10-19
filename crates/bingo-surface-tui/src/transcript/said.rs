@@ -7,7 +7,7 @@
 //! render time (ADR-0002): nothing here remembers a thing, and no kind of
 //! saying is a second representation of another.
 
-use bingo_sdk::{ContentPart, Driver, Item, Origin};
+use bingo_sdk::{ContentPart, Item, Origin};
 use ratatui::text::{Line, Span};
 
 use super::{OUTPUT_ROWS, Rows, bullet_style, kept, plain, returns, speaks};
@@ -46,7 +46,7 @@ pub fn lines(
         );
     }
 
-    if rows.state.summary.driver == Driver::Log {
+    if bingo_collab::room::is_room(&rows.state.summary) {
         return super::room::post(item, place, rows);
     }
     if is_post(origin) {
@@ -85,7 +85,7 @@ pub fn joins(item: &Item, previous: Option<&Item>, state: &bingo_sdk::SessionSta
     let Some(previous) = previous else {
         return false;
     };
-    if state.summary.driver == Driver::Log {
+    if bingo_collab::room::is_room(&state.summary) {
         return super::room::joins(item, Some(previous));
     }
     signed(item)
