@@ -11,7 +11,7 @@
 
 use std::time::Instant;
 
-use bingo_sdk::Level;
+use bingo_sdk::toast::Say;
 
 use crate::ui::Ui;
 
@@ -19,10 +19,11 @@ use crate::ui::Ui;
 /// when the pictures could not reach the terminal behind it (M49 brick 3),
 /// or the setting a herdr pane needs to draw them; a terminal that simply
 /// draws none says nothing, because there is nothing a person could do
-/// about it.
+/// about it. It keeps its slot: a placed toast the opening also brings,
+/// such as the palette's key hint, waits for it to end.
 pub(super) fn raise(ui: &mut Ui, notice: Option<&'static str>, now: Instant) {
     if let Some(text) = notice {
-        ui.notify(Level::Info, text, now);
+        ui.arrive(Say::new([text]), now);
     }
 }
 
