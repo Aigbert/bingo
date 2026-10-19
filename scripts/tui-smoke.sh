@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # The terminal surface through a real pty. tmux gives us the terminal a unit
 # test cannot: a reply arrives, Esc interrupts a running turn, a permission
-# dialog answered `y` really writes the file, and ctrl+c twice hands the
+# in the dock answered ⏎ really writes the file, and ctrl+c twice hands the
 # terminal back with status 0.
 #
 # Every wait is a bounded poll of `capture-pane`, never a fixed sleep: the
@@ -112,6 +112,12 @@ start() {
 
 # Press `$1` until `$2` shows. A dialog ignores keys until its guard has
 # passed (the kernel's, not ours), so the first press may land on nothing.
+# An ask holds its keys for 400 ms after it opens (M197); a key sent into
+# that window is dropped on purpose, so the script waits it out once.
+guarded() {
+  sleep 0.5
+}
+
 press_until() {
   local i=0
   while ! pane | grep -qF -- "$2"; do
@@ -310,16 +316,16 @@ vanish 'type to filter by title or directory'
 await 'fake-1'
 finish
 
-step 'a permission dialog answered y runs the tool'
+step 'a permission in the dock answered enter runs the tool'
 start '{"responses":[
   {"steps":[{"toolCall":{"name":"Write","input":{"file_path":"note.txt","content":"written by the smoke test\n"}}}]},
   {"steps":[{"text":"Wrote it."}]}]}'
 keys 'write the note' Enter
-await 'Do you want to '
-if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
-# The pending question leaves the prompt available below the rule.
-await '▍Answer above'
-press_until 'y' 'Wrote it.'
+await '↑↓ choose'
+await '▎ Yes'
+guarded
+keys Enter
+await 'Wrote it.'
 [ -f "$WORK/cwd/note.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
 grep -q 'written by the smoke test' "$WORK/cwd/note.txt"
 finish
@@ -342,9 +348,10 @@ start '{"responses":[
 # as well as to the screen — and not one byte of it may land on the pane.
 focus O
 keys 'write the note' Enter
-await 'Do you want to '
-if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
-press_until 'y' 'Wrote it.'
+await '↑↓ choose'
+guarded
+keys Enter
+await 'Wrote it.'
 [ -f "$WORK/cwd/away.txt" ] || { echo "tui-smoke: the approved Write wrote nothing" >&2; exit 1; }
 if pane | grep -qE 'notify|777|Ptmux'; then
   echo 'tui-smoke: a notification was printed onto the screen' >&2
@@ -508,32 +515,28 @@ sealed_card() {
     {"steps":[{"toolCall":{"name":"Write","input":{"file_path":"sealed.txt","content":"sealed input"}}}]},
     {"steps":[{"text":"Sealed done."}]}]}' 'BINGO_MOTION=off' "--plugin-dir $installed"
   keys 'write sealed input' Enter
-  await 'Do you want to '
-  if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
-  case "$fixture" in
-    sealed-frame)
-      await 'SEALED FRAME'
-      await '"content": "sealed input"'
-      ;;
-    sealed-clip|sealed-hide|sealed-zero)
-      await 'showing host card'
-      [ "$(pane | grep -cF 'showing host card')" -eq 1 ]
-      ;;
-    *) ;; # The built-in card may cover the transcript notice until answered.
-  esac
+  # The dock draws a permission itself; a sealed site reshapes nothing (M197).
+  await '↑↓ choose'
+  await '▎ Yes'
+  if pane | grep -qF 'SEALED FRAME'; then
+    echo "tui-smoke: $fixture drew over the dock's permission" >&2
+    pane >&2
+    exit 1
+  fi
+  guarded
   if [ "$answer" = Escape ]; then
     keys Escape
     await 'said no'
     await 'stopped'
   else
-    press_until "$answer" 'Sealed done.'
+    keys Enter
+    await 'Sealed done.'
   fi
-  case "$fixture" in
-    sealed-rewrite|sealed-omit|sealed-duplicate)
-      await "$fixture (ui.render)"
-      [ "$(pane | grep -cF "$fixture (ui.render)")" -eq 1 ]
-      ;;
-  esac
+  # No Permission site is pulled, so no fixture's `ui.render` note appears.
+  if pane | grep -qF "$fixture (ui.render)"; then
+    echo "tui-smoke: $fixture rendered a permission the dock owns" >&2
+    exit 1
+  fi
   if [ "$answer" = y ]; then
     [ "$(cat "$WORK/cwd/sealed.txt")" = 'sealed input' ]
   else
@@ -554,31 +557,36 @@ start '{"responses":[
   {"steps":[{"toolCall":{"name":"Bash","input":{"command":"echo before"}}}]},
   {"steps":[{"text":"Changed done."}]}]}' 'BINGO_MOTION=off'
 keys 'run the command' Enter
-await 'Do you want to run this command?'
-if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
-# Enter the editor only after its guard has lifted.
-press_until '4' '⏎ make this edit'
+await 'Run this command?'
+guarded
+keys Down Down Down
+await '▎ Change it first'
+keys Enter
+await '⏎ send'
 keys C-u
 keys 'echo after' Enter
+# The kernel gates the changed command again, so it asks once more.
 await '$ echo after'
-if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
-press_until 'y' 'Changed done.'
+await '▎ Yes'
+guarded
+keys Enter
+await 'Changed done.'
 await 'changed by you'
 pane
 finish
 
-step 'M169: the built-in question handles a number'
+step 'M197: the built-in question picks with the arrows'
 start '{"responses":[
   {"steps":[{"toolCall":{"name":"AskUserQuestion","input":{"questions":[{"question":"Which route?","header":"Route","options":[{"label":"Alpha"},{"label":"Beta"}]}]}}}]},
   {"steps":[{"text":"Question done."}]}]}' 'BINGO_MOTION=off'
 keys 'pick a route' Enter
 await 'Which route?'
-if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
-await 'something else'
-press_until x 'esc back to the ask'
-pane
-keys C-g
-press_until '2' 'Question done.'
+await 'Something else'
+guarded
+keys Down
+await '▎ Beta'
+keys Enter
+await 'Question done.'
 await 'Beta'
 if ! pane | grep -qE '^[[:space:]]+\? ask[[:space:]]+Beta[[:space:]]*$'; then
   echo 'tui-smoke: the question step must end in the answer alone' >&2
@@ -592,19 +600,18 @@ fi
 pane
 finish
 
-step 'M182: Escape skips a question and the turn continues'
+step 'M197: Escape on a question stops the turn'
 start '{"responses":[
   {"steps":[{"toolCall":{"name":"AskUserQuestion","input":{"questions":[{"question":"Which route?","header":"Route","options":[{"label":"Alpha"},{"label":"Beta"}]}]}}}]},
   {"steps":[{"text":"Skipped question; continued."}]}]}' 'BINGO_MOTION=off'
 keys 'choose for me' Enter
 await 'Which route?'
-if pane | grep -qF 'esc back to the ask'; then keys Escape; fi
-await 'something else'
+await 'Something else'
+guarded
 keys -l "$(printf '\033[27u')"
-await 'Skipped question; continued.'
-await 'skipped · it decides'
-if pane | grep -qE 'stopped · [0-9]+(s|m [0-9]{2}s|h [0-9]{2}m)'; then
-  echo 'tui-smoke: skipping the question interrupted its turn' >&2
+await 'stopped'
+if pane | grep -qF 'Skipped question; continued.'; then
+  echo 'tui-smoke: escaping the question let its turn go on' >&2
   exit 1
 fi
 finish
