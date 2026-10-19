@@ -9,9 +9,9 @@ fn state_with_card(login: bool) -> SessionState {
         interaction(
             InteractionKind::Login {
                 provider: "example".into(),
-                flow: LoginFlow::Device {
+                // A device code docks (M199); the browser flow keeps the sealed card.
+                flow: LoginFlow::Browser {
                     url: "https://example.test/device".into(),
-                    code: "ABCD".into(),
                 },
             },
             vec![AnswerSpec::Cancel],
@@ -78,7 +78,7 @@ fn framed_cards_keep_host_facts_and_keys_at_both_sizes() {
             let screen = draw_tree(width, height, &tree, &mut ui, now);
             assert!(screen.contains("SEALED FRAME"), "{screen}");
             assert!(
-                screen.contains(if login { "ABCD" } else { "full input" }),
+                screen.contains(if login { "example.test" } else { "full input" }),
                 "{screen}"
             );
             let code = if login {
