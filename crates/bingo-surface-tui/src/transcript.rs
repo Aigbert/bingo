@@ -886,16 +886,7 @@ fn calls(item: &Item, tool: &str) -> bool {
 /// next turn takes it away.
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
     let mut out = live::draw(state, rows);
-    if !out.lines.is_empty()
-        && state
-            .turn
-            .as_ref()
-            .is_none_or(|turn| turn.retrying.is_none())
-    {
-        out.lines.insert(0, Line::default());
-    }
     for props in crate::component::closing::props(state) {
-        out.lines.push(Line::default());
         out.append(crate::component::closing::draw(
             state,
             rows.pulled,
