@@ -41,6 +41,17 @@ async fn selected(run: &mut Run, fixture: &Fixture, now: crate::clock::Now) -> S
         .into()
 }
 
+/// Two rows, so ↓ moves the mod's cursor.
+fn two_commands() -> Vec<bingo_sdk::CatalogEntry> {
+    let spec = |name: &str| {
+        serde_json::from_value(
+            serde_json::json!({"name":name,"hint":name,"args":{"kind":"none"},"family":"session"}),
+        )
+        .expect("a command spec")
+    };
+    crate::commands::entries(vec![spec("model"), spec("think")])
+}
+
 #[tokio::test]
 async fn ctrl_c_preserves_the_draft_and_retires_the_mod_cursor_in_the_run_loop() {
     for busy in [false, true] {
@@ -53,6 +64,7 @@ async fn ctrl_c_preserves_the_draft_and_retires_the_mod_cursor_in_the_run_loop()
         let session = Arc::new(TestSession::default());
         let mut run = tests::idle_in(state, session.clone(), now.instant);
         let fixture = Fixture::new();
+        run.ui.catalogs.commands = two_commands();
         run.ui.composer.set("keep this draft");
         crate::palette::open(&mut run.ui, PaletteOpen::Commands, now);
         let opening = run.ui.focus.open().clone();

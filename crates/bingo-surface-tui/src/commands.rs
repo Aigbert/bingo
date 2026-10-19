@@ -12,10 +12,7 @@ pub enum Local {
 }
 
 /// Name and hint of each local command, in dropdown order.
-const LOCAL: &[(&str, &str)] = &[
-    ("clear", "start a fresh session here"),
-    ("exit", "leave bingo"),
-];
+const LOCAL: &[(&str, &str)] = &[("clear", "start a fresh session"), ("exit", "leave bingo")];
 
 /// The local commands as specs, so the dropdown ranks one kind of thing.
 pub fn local_specs() -> Vec<CommandSpec> {
@@ -24,7 +21,8 @@ pub fn local_specs() -> Vec<CommandSpec> {
         .map(|(name, hint)| CommandSpec {
             opens: false,
             keys: vec![],
-            hidden: false,
+            // `ctrl+d` is how the list says to leave; `/exit` still runs.
+            hidden: *name == "exit",
             name: (*name).to_string(),
             aliases: if *name == "exit" {
                 vec!["quit".into()]
