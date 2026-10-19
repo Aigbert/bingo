@@ -31,3 +31,11 @@ ctrl_f view snapshot: find lives in the dock and lands on the newest hit, centre
 inked_diff: shared character-run emphasis excludes the unchanged semicolon.
 pager_sheet / reasoning_sheet (4 deleted): the pager and the reasoning sheet are gone (brick 7).
 Permission text snapshots: unchanged.
+
+Round 4 (rebase onto dev 6a45057ed): dev's M198 versions kept for the palette (6) and shell_lines (3)
+snapshots; they no longer differ from dev, since the ctrl+o row and the shell well both now come from dev.
+Accepted on the rebased code:
+shell_ran_80x24, shell_ran_120x40: the backgrounded step's output sits in the detail well (pad rows,
+two-cell inset) because dev's shell well now draws through well::frame.
+Orphans: palette_keys (2) and sessions blocked_delete/probed/refused_rename (6) have no asserting test
+on dev either (check_discipline warns "no source reference"); left as dev has them.

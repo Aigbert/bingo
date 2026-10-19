@@ -121,18 +121,22 @@ Evidence in `docs/verification/m195/`: `gates.txt`, `contracts.txt`, `snapshots.
 - [x] Scroll: one `Layout::below()`; the renderer writes no UI state. Detail pins once on open and
   closes into `Held`. `closing_detail_holds_the_drawn_place_when_more_rows_arrive` and
   `closing_detail_follows_when_the_folded_stream_fits` pass; the second fails without its fix.
+- [x] Rebased onto dev 6a45057ed (M198): one esc chain (`Close::Search` gives the scroll back,
+  ctrl+c folds detail), M198 sheets and captures as dev has them, the shell well drawn by
+  `well::frame`, `pill::below` deleted for `Layout::below`.
 - [x] Gates (`gates.txt`): fmt exit 0; check and clippy `-D warnings` finished; `cargo test
-  --workspace --locked` 6571 passed, 0 failed, 0 ignored (TUI 1427, PTY 19); `discipline ok`;
+  --workspace --locked` 6629 passed, 0 failed, 0 ignored (TUI 1461, PTY 20); `discipline ok`;
   budget 423 of 423, `budget ok`; `cargo deny check` all ok.
 - [x] Drive: `python3 docs/verification/m195/drive.py` gives `PASS`/`CLEAN` at 100x32 and 80x24
   (ctrl+o, up/down, enter on a diff, a command and a read, esc; ctrl+f, typing, up, esc).
+  M198's `drive.py` passes every step at both sizes; dumps differ only in animation timing.
   `scripts/tui-smoke.sh`: `tui-smoke ok`.
 - [x] Windows: sdk and schedule `cargo check --target x86_64-pc-windows-msvc` exit 0.
 - [ ] Windows tool-fs, TUI, Feishu, bin: owed to CI: aws-lc-sys headers (`stdlib.h`/`windows.h`
   are not on this machine).
 - [x] History: a `rebase -x` fmt and check run over every commit (`history.txt`).
-- Snapshots: 17 modified, 1 added, 5 deleted, each with a reason in `snapshots.txt`. Six are
-  palette changes from the ctrl+o key row. The permission text snapshots are unchanged.
+- Snapshots (`snapshots.txt`): after the rebase, 8 modified, 1 added, 5 deleted against dev.
+  Accepted: `shell_ran` 80x24/120x40, the backgrounded output now sits in a well.
 
 Departures:
 - The diff renderer has one parser and one pairing pass. `DiffStyle` picks the look; `Well` adds

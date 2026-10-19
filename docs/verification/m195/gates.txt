@@ -1,18 +1,24 @@
+Round 4, rebased onto dev 6a45057ed, head before records a36c7e7b4.
 cargo fmt --all -- --check: exit 0
 cargo check --workspace --all-targets --locked: Finished dev profile; exit 0
 cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile; exit 0
-cargo test --workspace --locked: 127 result lines; 6571 passed; 0 failed; 0 ignored
-TUI: 1427 passed; 0 failed. PTY: 19 passed; 0 failed.
+cargo test --workspace --locked: exit 0; 133 result lines; 6629 passed; 0 failed; 0 ignored
+TUI: 1461 passed; 0 failed. PTY: 20 passed; 0 failed.
 scripts/check_discipline.sh: discipline ok
 scripts/budget.sh:
 dependencies (unique, normal): 423 (max  423)
 warm cargo check -p bingo-core: 0s (max  20s)
 relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
-target/debug: 15 GB (soft max  5)
+target/debug: 17 GB (soft max  5)
 warn: target/debug exceeds the soft limit
-test binaries: 198
+test binaries: 215
 budget ok
 cargo deny check: advisories ok, bans ok, licenses ok, sources ok
 cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc: Finished dev profile; exit 0
 cargo check -p bingo-schedule --all-targets --target x86_64-pc-windows-msvc: Finished dev profile; exit 0
-owed to CI: aws-lc-sys headers (tool-fs, TUI, Feishu and binary dependency tree); known local limit, not retried.
+cargo check -p bingo-tool-fs / -p bingo (pty test) --target x86_64-pc-windows-msvc: aws-lc-sys build script fails (no Windows headers here)
+owed to CI: aws-lc-sys headers (tool-fs, TUI and the binary's dependency tree); known local limit.
+Drive: python3 docs/verification/m195/drive.py -> PASS/CLEAN 100x32 and 80x24;
+python3 docs/verification/m198/drive.py -> every PASS line, CLEAN 100x32 and 80x24.
+Rewritten dumps differed only in animation timing (spinner frames, caret and edge fade
+colours, schedule running/paused, a toast edge, temp path names) and were not committed.
