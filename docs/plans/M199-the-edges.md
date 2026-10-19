@@ -126,36 +126,13 @@ Sign-in flows other than the device code; changing how compaction works; schedul
   an outside mod replaces the whole welcome through the `Welcome` site.
 
 ## Verified
-Bricks 1–7; brick 8 waits for M200. Evidence in `docs/verification/m199/checks.txt`.
-- [x] Full frames — `edges_full_frames_match_the_prototype ... ok`: welcome, welcome-recent,
-  welcome-sent, exit-back, retry, retry-recovered, context, context-compacted, background,
-  background-notified, narrow, signedout, signedout-login, wake, wake-later.
-- [x] `exit` — `exit_receipt_matches_the_prototype_rows_byte_for_byte ... ok`, waiting on
-  the resume toast again; `a_notice_first_drawn_late_still_holds_from_that_frame ... ok`.
+Bricks 1–7 on dev 11d46a5a4; brick 8 waits for M200. Commands, output lines, departures and
+what is owed: `docs/verification/m199/checks.txt`.
+- [x] Full frames — `edges_full_frames_match_the_prototype ... ok`, all fifteen captures.
+- [x] `exit` — `exit_receipt_matches_the_prototype_rows_byte_for_byte ... ok`, on the toast.
 - [ ] Sweep — brick 8, after M200.
-- [x] Retry fold, compaction window, welcome site — round 2 tests still `ok`.
-- [x] Signed out — `an_expired_sign_in_says_what_happened_then_what_to_do`,
-  `a_bare_login_after_a_refused_turn_signs_in_again ... ok`.
-- [x] Waking — `the_journal_payload_carries_the_wake_and_its_countdown`,
-  `a_countdown_wakes_only_when_its_words_change ... ok`.
-- [x] Gates — fmt 0; check, clippy `Finished`; `cargo test --workspace --locked` 135 result
-  lines, `6659 passed; 0 failed`; discipline ok; budget `423 (max 423)`; deny all `ok`.
-- [x] Commits build — `rebase -x 'cargo fmt … && cargo check …' 6a45057e`: 18 `Executing`,
-  `Successfully rebased`. dev moved to M195 after the rebase; the next rebase follows it.
-- [x] Drive — `drive.py` adds `/login` after a fake auth failure and `/wake`:
-  `PASS 100x32`, `PASS 80x24`, both `CLEAN`; footer `fake-1 · wakes in 6s`.
-- [ ] Windows — sdk, core, context, skills, mod-sessions, mod-models, provider-fake, schedule
-  exit 0; surface-tui and bin owed to CI (aws-lc-sys and tree-sitter C builds).
-Departures, each where the prototype or a real run decided:
-- Prototype wins: retry-recovered at 4700 ms shows another retry; no edited files at zero;
-  a failed turn has no tail gap (M198's gap now skips it).
-- Only a device-code login docks; paste and browser stay a card. The fake provider gained a
-  scripted device login; core `/login` with no name signs in to the session's provider.
-- bingo-mod-models opened its picker on a bare `/login`; it now passes a signed-out one
-  through. Not signed out, its fallback still runs the login before the picker (owed).
-- Not drawn: the prototype's 900 ms "signed in to X" line inside the sheet. Drawn beyond it:
-  the kernel's `login(fake)` receipt row in the transcript.
-- `/wake` is folded into `/schedule` in the palette; the prototype lists it as its own row
-  (palette owner M196). The wake captures have no keys: the wake fires on its own.
-- The schedule journal payload gained the `wakes` status slot (additive); the countdown
-  changes each second under an hour.
+- [x] Retry fold — `retry_fold_retains_the_wait_and_its_frame_clock ... ok`.
+- [x] Gates — fmt, check, clippy, test `6662 passed; 0 failed`, discipline, budget
+  `423 (max 423)`, deny: all pass. Each commit builds (`rebase -x … dev`).
+- [x] Drive — `drive.py` `PASS`/`CLEAN` at 100x32 and 80x24; `tui-smoke ok`.
+- [ ] Windows — surface-tui and bin owed to CI (aws-lc-sys, tree-sitter C builds).
