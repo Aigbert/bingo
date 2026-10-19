@@ -327,11 +327,6 @@ pub fn interrupt(at: Pressed) -> Interrupt {
         .unwrap_or(Interrupt::Arm)
 }
 
-/// Legacy terminals fold ESC CR into alt+Enter. A real binding keeps it.
-pub fn split_return(bound: bool) -> bool {
-    !bound
-}
-
 #[cfg(test)]
 mod tests {
 

@@ -42,7 +42,8 @@ fn words(kind: &NoticeKind, state: &bingo_sdk::SessionState) -> Vec<Span<'static
             spans
         }
         NoticeKind::Message(toast) => {
-            let mut spans = crate::tone::parts(&toast.parts, toast.tone, false, None);
+            let mut spans =
+                crate::tone::parts(&toast.parts, toast.tone, crate::tone::Content::Plain, None);
             if let Some(about) = &toast.about {
                 spans.push(Span::styled(format!(" · {about}"), ink("dim")));
             }

@@ -468,7 +468,8 @@ fn split_return(ui: &Ui, tree: &Tree, key: KeyEvent) -> bool {
         crate::focus::Owner::Composer | crate::focus::Owner::Menu => !ui.dialog.aside,
         _ => false,
     };
-    keys::split_return(bound)
+    // Legacy terminals fold ESC CR into alt+Enter. A real binding keeps it.
+    !bound
 }
 
 fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
@@ -492,7 +493,7 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     }
     match rung {
         keys::Interrupt::Turn => return ask_to_stop(ui, tree.viewed()),
-        keys::Interrupt::Close => return close(ui, tree, now),
+        keys::Interrupt::Close => return close_focused(ui, tree, owner, now),
         keys::Interrupt::Fold => {
             ui.focus = crate::focus::Focus::Composer;
             ui.folds.clear();
@@ -512,21 +513,35 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     Vec::new()
 }
 
-fn close(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+fn close_focused(ui: &mut Ui, tree: &Tree, owner: crate::focus::Owner, now: Now) -> Vec<Effect> {
     use crate::focus::Owner;
-    match crate::focus::owner(ui, tree) {
-        Owner::Layer => ui.focus.close(now.instant),
-        Owner::Search => ui.focus = crate::focus::Focus::Composer,
-        Owner::Interaction => return cancel(ui, tree),
+    let rung = match owner {
+        Owner::Layer => keys::Escape::Sheet,
+        Owner::Search => {
+            ui.focus = crate::focus::Focus::Composer;
+            return Vec::new();
+        }
         Owner::Pane => {
+            // A plugin pane owns its close action and exposes it through Esc.
             return crate::pane::key(
                 ui,
                 tree.viewed(),
                 KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
             );
         }
-        _ if tree.open_interaction().is_some() => return cancel(ui, tree),
-        _ => ui.menu.dismissed = true,
+        Owner::Interaction => keys::Escape::Card,
+        _ if tree.open_interaction().is_some() => keys::Escape::Card,
+        _ => keys::Escape::Dropdown,
+    };
+    close(ui, tree, rung, now)
+}
+
+fn close(ui: &mut Ui, tree: &Tree, rung: keys::Escape, now: Now) -> Vec<Effect> {
+    match rung {
+        keys::Escape::Sheet => ui.focus.close(now.instant),
+        keys::Escape::Card => return cancel(ui, tree),
+        keys::Escape::Dropdown => ui.menu.dismissed = true,
+        _ => {}
     }
     Vec::new()
 }
@@ -564,8 +579,8 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         ui.escaped_at = None;
     }
     match rung {
-        Some(keys::Escape::Sheet | keys::Escape::Card | keys::Escape::Dropdown) => {
-            return close(ui, tree, now);
+        Some(rung @ (keys::Escape::Sheet | keys::Escape::Card | keys::Escape::Dropdown)) => {
+            return close(ui, tree, rung, now);
         }
         Some(keys::Escape::Interrupt) => return ask_to_stop(ui, tree.viewed()),
         Some(keys::Escape::Clear) => {
@@ -617,10 +632,11 @@ fn ask_to_stop(ui: &mut Ui, state: &SessionState) -> Vec<Effect> {
     ui.stop_asked = state.turn.as_ref().map(|turn| turn.id.clone());
     ui.armed = None;
     ui.escaped_at = None;
+    let empty = ui.composer.is_empty();
     let withdraw = state
         .queue
         .iter()
-        .filter(|entry| ui.composer.is_empty() && entry.origin.surface == SURFACE_ID)
+        .filter(|entry| empty && entry.origin.surface == SURFACE_ID)
         .map(|entry| entry.intent.clone())
         .collect();
     vec![Effect::Stop { withdraw }]
@@ -951,9 +967,6 @@ pub(crate) fn typed_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Ve
 /// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
 fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect> {
     let text = ui.composer.take();
-    if delivery == Delivery::Wake && !text.trim().is_empty() {
-        ui.clear_notice();
-    }
     ui.history.remember(&text);
     ui.edited();
     send(ui, tree, now, text, |text| own_line(text, delivery))
@@ -997,7 +1010,15 @@ fn send(
             },
         })],
         Some(Local::Exit) => vec![Effect::Exit],
-        None => vec![line(text)],
+        None => {
+            let effect = line(text);
+            if matches!(&effect, Effect::Submit(Input::Text { text, delivery: Delivery::Wake, .. }) if !text.trim().is_empty())
+            {
+                // p7-input.js:84 clears a sent line's toast after slash dispatch.
+                ui.clear_notice();
+            }
+            vec![effect]
+        }
     }
 }
 

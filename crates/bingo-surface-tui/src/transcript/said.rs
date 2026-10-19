@@ -234,15 +234,6 @@ fn headline(head: &str, principal: Option<&str>, conversation: Option<&str>) -> 
     Line::from(spans)
 }
 
-/// A person's own line, on a bar the width of the transcript. An origin that
-/// names a principal is somebody else speaking — a channel's correspondent, a
-/// person writing from elsewhere — so the line says who, as a chat does. Where
-/// they said it is the view one is looking at; saying it again would be noise.
-///
-/// A wake is on the bar too and wears its own word instead of the `>`: it
-/// opened this turn the way typing does, and it is not what anybody typed.
-/// Every row of a block on the raised bar. A shell line the person ran is on
-/// the same bar for the same reason ([`super::ran`]): it is theirs.
 #[cfg(test)]
 mod voice_contract {
     use super::*;

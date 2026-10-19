@@ -232,3 +232,19 @@ fn ctrl_c_and_escape_send_the_same_interaction_cancel() {
     assert!(!escape.is_empty());
     assert_eq!(interrupt, escape);
 }
+
+#[test]
+fn a_sent_line_clears_the_toast_after_slash_dispatch() {
+    let tree = solo(&state());
+    let (mut ui, now) = scene();
+    ui.notify(Level::Info, "still here", now.instant);
+    ui.composer.set("/exit");
+    assert_eq!(
+        submit(&mut ui, &tree, now, Delivery::Wake),
+        vec![Effect::Exit]
+    );
+    assert!(ui.notice().is_some());
+    ui.composer.set("next line");
+    submit(&mut ui, &tree, now, Delivery::Wake);
+    assert!(ui.notice().is_none());
+}

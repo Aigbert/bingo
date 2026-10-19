@@ -4,10 +4,16 @@ use bingo_sdk::{Tone, view::TextMotion};
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use ratatui::{style::Style, text::Span};
 
+#[derive(Clone, Copy)]
+pub enum Content {
+    Plain,
+    Markdown,
+}
+
 pub fn parts(
     parts: &[String],
     tone: Tone,
-    markdown: bool,
+    content: Content,
     fade: Option<(TextMotion, Now)>,
 ) -> Vec<Span<'static>> {
     let mut out = Vec::new();
@@ -28,7 +34,7 @@ pub fn parts(
         } else {
             "muted"
         };
-        if markdown {
+        if matches!(content, Content::Markdown) {
             out.extend(inline(part, ink, &fade));
         } else {
             out.push(span(part.clone(), ink, &fade));
@@ -102,13 +108,13 @@ mod tests {
         let drawn = parts(
             &["cannot read".into(), "alt+m switches model".into()],
             Tone::Attention,
-            false,
+            Content::Plain,
             None,
         );
         assert_eq!(drawn[0].style, theme::foreground("amber").unwrap());
         assert_eq!(drawn[1].style, theme::foreground("faint").unwrap());
         assert_eq!(drawn[2].style, theme::foreground("muted").unwrap());
-        let one = parts(&["a · b".into()], Tone::Neutral, false, None);
+        let one = parts(&["a · b".into()], Tone::Neutral, Content::Plain, None);
         assert_eq!(one.len(), 1);
     }
     #[test]
@@ -116,7 +122,7 @@ mod tests {
         let drawn = parts(
             &["`` echo `date` `` finished".into(), r"\*ok\_".into()],
             Tone::Good,
-            true,
+            Content::Markdown,
             None,
         );
         assert!(
