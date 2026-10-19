@@ -7,7 +7,7 @@ use jiff::Timestamp;
 use serde::Serialize;
 use serde_json::{Value, json};
 
-use crate::mentions::Mention;
+use crate::mentions::{self, Mention, Post};
 
 /// The kind the card is published under. The latest payload is the whole of
 /// it, and `Null` is what takes the card away (ADR-0013 §2).
@@ -100,6 +100,76 @@ pub fn age(at: Timestamp, now: Timestamp) -> String {
         0..=59 => format!("{seconds}s"),
         60..=3599 => format!("{}m", seconds / 60),
         _ => format!("{}h", seconds / 3600),
+    }
+}
+
+/// What a room still waits on: every `@` its posts opened that nobody has
+/// answered, against the members seated now. Unseating someone drops what they
+/// owed and closing the room drops all of it, because nobody can answer there.
+pub fn open(posts: &[Post], members: &[String], closed: bool) -> Vec<Mention> {
+    if closed {
+        return Vec::new();
+    }
+    mentions::mentions(posts, members)
+}
+
+/// Who one post still waits on, in the order it named them.
+pub fn on(open: &[Mention], post: &bingo_sdk::ItemId) -> Vec<String> {
+    open.iter()
+        .filter(|mention| &mention.post == post)
+        .map(|mention| mention.owed_by.said())
+        .collect()
+}
+
+/// What a room's own journal says it still waits on.
+pub fn of_state(state: &bingo_sdk::SessionState) -> Vec<Mention> {
+    let posts: Vec<Post> = state
+        .transcript
+        .items()
+        .iter()
+        .filter_map(|item| Post::of(item))
+        .collect();
+    open(
+        &posts,
+        &crate::room::members_of(state),
+        crate::room::closed_of(state),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn post(n: i64, author: &str, text: &str) -> Post {
+        Post {
+            id: bingo_sdk::ItemId::from_raw(format!("itm_{n}")),
+            author: author.into(),
+            at: Timestamp::from_second(n).unwrap(),
+            text: text.into(),
+        }
+    }
+
+    fn seated(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| name.to_string()).collect()
+    }
+
+    #[test]
+    fn a_called_member_owes_until_they_post() {
+        let asked = post(1, "parent", "@ada @scout what about reset()?");
+        let members = seated(&["ada", "scout", "reviewer"]);
+        let waiting = open(std::slice::from_ref(&asked), &members, false);
+        assert_eq!(on(&waiting, &asked.id), ["ada", "scout"]);
+        let answered = [asked.clone(), post(2, "ada", "leave the queue alone")];
+        assert_eq!(on(&open(&answered, &members, false), &asked.id), ["scout"]);
+    }
+
+    #[test]
+    fn unseating_or_closing_drops_what_was_owed() {
+        let asked = post(1, "parent", "@ada @scout what about reset()?");
+        let posts = std::slice::from_ref(&asked);
+        let unseated = open(posts, &seated(&["ada"]), false);
+        assert_eq!(on(&unseated, &asked.id), ["ada"]);
+        assert!(open(posts, &seated(&["ada", "scout"]), true).is_empty());
     }
 }
 
