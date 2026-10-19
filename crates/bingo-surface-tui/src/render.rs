@@ -127,12 +127,6 @@ impl Detection {
             heard.and(crate::graphics::probe::parse(reply));
         }
     }
-    pub fn now(&self) -> crate::clock::Now {
-        crate::clock::Now {
-            motion: self.motion,
-            ..crate::clock::Now::real()
-        }
-    }
 }
 
 #[cfg(test)]

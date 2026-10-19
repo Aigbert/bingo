@@ -11,6 +11,7 @@ use std::sync::{Arc, Mutex};
 
 mod checks;
 #[cfg(test)]
+#[path = "acting/tests/proofs.rs"]
 mod proofs;
 mod setup;
 mod timeline;

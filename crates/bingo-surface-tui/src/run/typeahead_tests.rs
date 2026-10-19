@@ -171,7 +171,7 @@ async fn keys_typed_behind_a_command_reach_the_site_it_opens() {
         .collect();
     for _ in 0..16 {
         // The directory's drawing carries the minute, so it is drawn now.
-        let drawn = run.detection.now();
+        let drawn = run.now();
         pull(&mut run, Component::Sessions, drawn);
         let Some((intent, action)) = unanswered(&session, &answered) else {
             if run.typeahead.is_empty() {

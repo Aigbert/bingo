@@ -28,6 +28,7 @@ pub struct Now {
 }
 
 impl Now {
+    #[cfg(test)]
     pub fn real() -> Self {
         Self {
             // The clock the loop sleeps on is the clock it measures with:

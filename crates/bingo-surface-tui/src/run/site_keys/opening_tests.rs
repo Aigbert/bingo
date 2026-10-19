@@ -56,7 +56,7 @@ async fn a_pane_key_waits_for_its_handle_and_reaches_its_site() {
 #[tokio::test]
 async fn a_directory_request_survives_opening_its_handle() {
     let (mut run, session, mut replies) = pane_run();
-    let now = run.detection.now();
+    let now = run.now();
     crate::sessions::open(&mut run.ui, now);
     send_key(&mut run);
     run.reply(replies.recv().await.unwrap(), &mut None);
