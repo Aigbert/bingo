@@ -35,136 +35,86 @@ impl Interceptor for Drawing {
         };
         serde_json::to_value(tree(
             &cursor.groups,
-            cursor.selected,
-            cursor.confirming.as_ref(),
+            cursor.selected.as_deref(),
             request.viewport.rows,
             request.viewport.columns,
+            request.viewport.glyphs,
         ))
         .map_err(crate::error)
     }
 }
 pub fn tree(
     groups: &[Group],
-    selected: usize,
-    confirming: Option<&Target>,
+    selected: Option<&str>,
     height: u16,
     width: u16,
+    glyphs: bingo_sdk::glyph::GlyphSet,
 ) -> View {
-    let (lines, at) = group_lines(groups, selected);
-    let room = usize::from(height).saturating_sub(4).max(1);
-    let start = at
-        .saturating_sub(room / 2)
-        .min(lines.len().saturating_sub(room));
-    let mut children = vec![pair(
-        format!(
-            " memory · {} tokens carried",
-            crate::rows::about(crate::rows::total(groups))
-        ),
-        String::new(),
-    )];
-    children.extend(lines.into_iter().skip(start).take(room));
-    children.push(dim(format!(
-        " {}",
-        "─".repeat(usize::from(width).saturating_sub(1))
-    )));
-    children.push(dim(match confirming {
-        Some(Target::Memory { name, .. }) => {
-            format!(" forget \"{name}\"? the file and its index line go.")
-        }
-        Some(target) => format!(" forget \"{}\"? the entry goes.", target.name()),
-        None => String::new(),
-    }));
-    let target = groups
+    use bingo_sdk::{pick, sheet::Sheet};
+    let all = groups.iter().flat_map(|g| &g.rows).collect::<Vec<_>>();
+    let selected = all
         .iter()
-        .flat_map(|g| &g.rows)
-        .nth(selected)
-        .map(|r| &r.target);
-    View::Box {
-        children,
-        layout: Box::new(view::BoxStyle {
-            hints: Some(
-                if confirming.is_some() {
-                    component::SiteHints::new([
-                        component::KeyPair::new("⏎", "yes"),
-                        component::KeyPair::new("esc", "cancel"),
-                    ])
-                } else {
-                    component::SiteHints::new([
-                        component::KeyPair::new("↑↓", "pick"),
-                        component::KeyPair::new("⏎", "read"),
-                        component::KeyPair::new("d", "forget"),
-                        component::KeyPair::new("esc", "close"),
-                    ])
-                }
-                .composer("/memory", ""),
-            ),
-            on_key: Some(Action {
-                name: CommandSpec::ui_name(crate::ID),
-                args: json!({"handler":crate::REQUEST,"event":"press","target":target,"confirming":confirming}),
-            }),
-            ..Default::default()
-        }),
+        .position(|r| Some(r.target.id().as_str()) == selected)
+        .unwrap_or(0);
+    let target = all.get(selected).map(|r| &r.target);
+    let count = all
+        .iter()
+        .filter(|r| matches!(r.target, Target::Memory { .. }))
+        .count();
+    let rows = all
+        .iter()
+        .enumerate()
+        .map(|(i, r)| row_view(r, i == selected))
+        .collect();
+    let mut view = Sheet {
+        head: "Memory".into(),
+        fact: Some(pick::text(format!("{count} memories"), "dim")),
+        top: vec![],
+        rows,
+        selected: target.map(Target::id),
+        foot: vec![],
+        pick: true,
     }
-}
-fn group_lines(groups: &[Group], selected: usize) -> (Vec<View>, usize) {
-    let mut lines = Vec::new();
-    let mut index = 0;
-    let mut at = 0;
-    for group in groups {
-        if group.rows.is_empty() && index == selected {
-            at = lines.len();
+    .view(width, height, glyphs);
+    if let View::Box { layout, .. } = &mut view {
+        let mut pairs = vec![component::KeyPair::new("↑↓", "item")];
+        if matches!(target, Some(Target::Memory { .. })) {
+            pairs.push(component::KeyPair::new("⌫", "forget"));
         }
-        lines.push(dim(format!(" {} ({})", group.name, group.rows.len())));
-        for row in &group.rows {
-            if index == selected {
-                at = lines.len();
-            }
-            lines.push(pair(
-                format!(
-                    "{}{}",
-                    if index == selected { "❯ " } else { "  " },
-                    row.label
-                ),
-                crate::rows::about(row.tokens),
-            ));
-            index += 1;
-        }
+        pairs.push(component::KeyPair::new("esc", "close"));
+        layout.hints = Some(component::SiteHints::new(pairs));
+        layout.on_key = Some(Action {
+            name: CommandSpec::ui_name(crate::ID),
+            args: json!({"handler":crate::REQUEST,"event":"press","target":target}),
+        });
     }
-    (lines, at)
+    bingo_sdk::sheet::clicks(view)
 }
-fn pair(label: String, value: String) -> View {
-    View::Box {
-        children: vec![
-            View::Box {
-                children: vec![View::Text {
-                    children: vec![view::TextChild::String(label)],
-                    style: view::TextStyle {
-                        ..Default::default()
-                    },
-                }],
-                layout: Box::new(view::BoxStyle {
-                    flex_grow: Some(1),
-                    width: Some(0),
-                    ..Default::default()
-                }),
-            },
-            dim(value),
-        ],
-        layout: Box::new(view::BoxStyle {
-            flex_direction: Some(view::Direction::Row),
-            gap: Some(1),
-            justify_content: Some(view::Justify::SpaceBetween),
-            height: Some(1),
-            ..Default::default()
-        }),
+fn row_view(r: &crate::rows::Row, selected: bool) -> pick::Row {
+    let kind = match r.target {
+        Target::Instruction(_) => "instructions",
+        Target::Memory { .. } => "memory",
+        Target::Experience(_) => "experience",
+    };
+    let label = match r.target {
+        Target::Instruction(_) => r.label.clone(),
+        _ => r.target.name(),
+    };
+    let name = if selected {
+        pick::bold(label, "fg")
+    } else {
+        pick::text(label, "muted")
+    };
+    let row = pick::Row::new(
+        r.target.id(),
+        pick::line([pick::pad(pick::text(kind, "dim"), 14), name]),
+    );
+    if matches!(r.target, Target::Instruction(_)) {
+        row
+    } else {
+        row.right(pick::text(&r.label, "dim"))
     }
 }
 fn dim(text: impl Into<String>) -> View {
-    View::Text {
-        children: vec![view::TextChild::String(text.into())],
-        style: view::TextStyle {
-            dim_color: Some(true),
-            ..Default::default()
-        },
-    }
+    pick::text(text, "dim")
 }

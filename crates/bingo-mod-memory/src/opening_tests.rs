@@ -76,8 +76,15 @@ fn bare_experience_selects_its_group_and_keeps_its_original_text() {
         assert_eq!(reply["fallback"], "experience list");
         let state = shared.lock().unwrap();
         let cursor = &state[&cx.session];
-        assert_eq!(cursor.selected, 1, "skip the loaded instruction");
-        let view = draw::tree(&cursor.groups, cursor.selected, None, 5, 80).fold();
+        assert_eq!(cursor.selected.as_deref(), Some("/unused/AGENTS.md"));
+        let view = draw::tree(
+            &cursor.groups,
+            cursor.selected.as_deref(),
+            5,
+            80,
+            Default::default(),
+        )
+        .fold();
         if entries {
             assert!(matches!(
                 cursor.groups[2].rows[0].target,
@@ -86,8 +93,8 @@ fn bare_experience_selects_its_group_and_keeps_its_original_text() {
             assert!(view.contains("learned"));
         } else {
             assert!(
-                view.contains("experience"),
-                "the empty group stays visible: {view}"
+                !view.contains("experience"),
+                "empty groups add no rows: {view}"
             );
         }
     }

@@ -30,7 +30,7 @@ impl Interceptor for Open {
             serde_json::from_value(value.clone()).map_err(crate::error)?;
         if input.name != self.2
             || !input.args.trim().is_empty()
-            || input.surface != Some(render::SurfaceName::Terminal)
+            || !input.surface.is_some_and(render::SurfaceName::shows_sheets)
             || !available(&cx.host, &input.name)
         {
             return next.run(value).await;
@@ -45,14 +45,10 @@ impl Interceptor for Open {
             _ => None,
         };
         open(cx).await?;
-        self.0.lock().map_err(crate::error)?.insert(
-            cx.session.clone(),
-            crate::Cursor {
-                groups,
-                selected,
-                ..Default::default()
-            },
-        );
+        self.0
+            .lock()
+            .map_err(crate::error)?
+            .insert(cx.session.clone(), crate::Cursor { groups, selected });
         serde_json::to_value(CommandOutcome::Surface {
             action: Action {
                 name: "Pane".into(),
@@ -70,16 +66,12 @@ fn available(host: &HostHandle, command: &str) -> bool {
         _ => false,
     }
 }
-fn selected(groups: &[Group], command: &str) -> usize {
-    if command == "experience" {
-        groups
-            .iter()
-            .take_while(|group| group.name != "experience")
-            .map(|group| group.rows.len())
-            .sum()
-    } else {
-        0
-    }
+fn selected(groups: &[Group], _command: &str) -> Option<String> {
+    groups
+        .iter()
+        .flat_map(|g| &g.rows)
+        .next()
+        .map(|r| r.target.id())
 }
 pub async fn groups(
     host: &HostHandle,
@@ -113,7 +105,7 @@ async fn open(cx: &HookContext) -> Result<(), KernelError> {
         close_on_escape: false,
         hold_toasts: false,
         asked: true,
-        place: vec![slot::Place::Overlay],
+        place: vec![slot::Place::Dock],
         size,
         view: slot::Shown::Pull {
             request: render::PullRequest {

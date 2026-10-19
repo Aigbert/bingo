@@ -2,8 +2,4 @@
 source: crates/bingo-surface-tui/src/run/memory_scene_tests.rs
 expression: "snapshot(width, height, scene)"
 ---
- memory · about 0 tokens carried
- memories (0)
- instructions (0)
- experience (0)
- ───────────────────────────────────────────────────────────────────────────────
+   Memory                                                           0 memories

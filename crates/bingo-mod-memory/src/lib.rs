@@ -15,9 +15,8 @@ use std::{
 pub struct MemoryPanel;
 #[derive(Default)]
 struct Cursor {
-    selected: usize,
+    selected: Option<String>,
     groups: Vec<rows::Group>,
-    confirming: Option<rows::Target>,
 }
 type Shared = Arc<Mutex<BTreeMap<SessionId, Cursor>>>;
 /// The plugin id the memory pane is placed, drawn and answered under.

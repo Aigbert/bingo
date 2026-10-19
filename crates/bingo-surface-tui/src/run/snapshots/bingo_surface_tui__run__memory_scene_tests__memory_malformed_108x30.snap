@@ -2,17 +2,14 @@
 source: crates/bingo-surface-tui/src/run/memory_scene_tests.rs
 expression: "snapshot(width, height, scene)"
 ---
- memory · about 6.0k tokens carried
- memories (4)
-❯ project  malformed  no-sonnet-workers          missing frontmatter: description                  about 320
-  user     user       a-memory-name-far-past-…   Rust reviewer, prefers concise answers            about 110
-  project  project    wire-fixtures              Fixtures before implementation                    about 180
-  user     reference  guide                      Read the architecture first                       about 130
- instructions (2)
-  ~/.bingo/AGENTS.md                                                                               about 900
-  ./AGENTS.md                                                                                     about 4.2k
- experience (3)
-  01J9ABC  active  fixture before impl for wire formats  3 ok · 0 harmful                           about 80
-  01J9DEF  active  fixture before impl for wire formats  3 ok · 0 harmful                           about 80
-  01J9GHI  unreadable  missing frontmatter                                                           about 0
- ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+   Memory                                                                                       4 memories
+
+ ▎ instructions  ~/.bingo/AGENTS.md
+   instructions  ./AGENTS.md
+   memory        no-sonnet-workers                                        missing frontmatter: description
+   memory        a-memory-name-far-past-the-column-cap              Rust reviewer, prefers concise answers
+   memory        wire-fixtures                                              Fixtures before implementation
+   memory        guide                                                         Read the architecture first
+   experience    01J9ABC           01J9ABC  active  fixture before impl for wire formats  3 ok · 0 harmful
+   experience    01J9DEF           01J9DEF  active  fixture before impl for wire formats  3 ok · 0 harmful
+   8 of 9

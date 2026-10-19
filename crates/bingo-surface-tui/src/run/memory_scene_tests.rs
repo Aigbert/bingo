@@ -1,7 +1,4 @@
-use bingo_mod_memory::{
-    draw,
-    rows::{self, Target},
-};
+use bingo_mod_memory::{draw, rows};
 use bingo_services::{
     experience::{EntryRow, Outcome, Status},
     memory::{Listing, Loaded, MemoryRow, Scope},
@@ -95,8 +92,7 @@ fn snapshot(width: u16, height: u16, scene: &str) -> String {
         entries[2].tokens = 0;
     }
     let groups = rows::rows(listed, entries);
-    let confirming: Option<&Target> = (scene == "confirming").then(|| &groups[0].rows[0].target);
-    let view = draw::tree(&groups, 0, confirming, height, width);
+    let view = draw::tree(&groups, None, height, width, Default::default());
     let lines = crate::views::render(&view, usize::from(width));
     let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
     terminal
@@ -119,7 +115,7 @@ fn snapshot(width: u16, height: u16, scene: &str) -> String {
 #[test]
 fn memory_panel_sketch_at_both_sizes() {
     for (width, height) in [(108, 30), (80, 24)] {
-        for scene in ["full", "empty", "confirming", "malformed"] {
+        for scene in ["full", "empty", "malformed"] {
             insta::assert_snapshot!(
                 format!("memory_{scene}_{width}x{height}"),
                 snapshot(width, height, scene)

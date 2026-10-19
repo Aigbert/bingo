@@ -16,6 +16,12 @@ pub enum Target {
     Experience(String),
 }
 impl Target {
+    pub fn id(&self) -> String {
+        match self {
+            Self::Memory { path, .. } | Self::Instruction(path) => path.display().to_string(),
+            Self::Experience(id) => id.clone(),
+        }
+    }
     pub fn name(&self) -> String {
         match self {
             Self::Memory { name, .. } | Self::Experience(name) => name.clone(),
@@ -34,24 +40,11 @@ pub struct Group {
     pub name: &'static str,
     pub rows: Vec<Row>,
 }
-/// Past this a memory name is cut, so one long name does not squeeze every
-/// description beside it at 80 columns.
-const NAME_WIDTH: usize = 24;
 pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
-    let name_width = listing
-        .memories
-        .iter()
-        .map(|row| row.name.chars().count().min(NAME_WIDTH))
-        .max()
-        .unwrap_or(0);
-    vec![
+    let mut groups = vec![
         Group {
             name: "memories",
-            rows: listing
-                .memories
-                .into_iter()
-                .map(|row| memory(row, name_width))
-                .collect(),
+            rows: listing.memories.into_iter().map(memory).collect(),
         },
         Group {
             name: "instructions",
@@ -69,17 +62,13 @@ pub fn rows(listing: Listing, entries: Vec<EntryRow>) -> Vec<Group> {
             name: "experience",
             rows: entries.into_iter().map(experience).collect(),
         },
-    ]
+    ];
+    groups.sort_by_key(|g| g.name != "instructions");
+    groups
 }
-fn memory(row: bingo_services::memory::MemoryRow, name_width: usize) -> Row {
+fn memory(row: bingo_services::memory::MemoryRow) -> Row {
     Row {
-        label: format!(
-            "{:<7}  {:<9}  {:name_width$}   {}",
-            row.scope.as_str(),
-            row.kind.as_str(),
-            cut(&row.name, NAME_WIDTH),
-            row.error.unwrap_or(row.description)
-        ),
+        label: row.error.unwrap_or(row.description),
         tokens: row.tokens,
         target: Target::Memory {
             scope: row.scope,
@@ -110,13 +99,6 @@ fn experience(row: EntryRow) -> Row {
 fn counted(outcomes: &[Outcome], which: Outcome) -> usize {
     outcomes.iter().filter(|outcome| **outcome == which).count()
 }
-fn cut(name: &str, width: usize) -> String {
-    if name.chars().count() <= width {
-        return name.into();
-    }
-    let kept: String = name.chars().take(width.saturating_sub(1)).collect();
-    format!("{kept}…")
-}
 pub fn total(groups: &[Group]) -> u64 {
     groups
         .iter()
@@ -131,9 +113,11 @@ pub fn about(tokens: u64) -> String {
         format!("about {tokens}")
     }
 }
+/// A project's file by its name in the project, the person's own from their
+/// home, and anything else whole.
 pub fn path_label(path: &std::path::Path, home: &std::path::Path, cwd: &std::path::Path) -> String {
     if let Ok(relative) = path.strip_prefix(cwd) {
-        return format!("./{}", relative.display());
+        return relative.display().to_string();
     }
     if let Ok(relative) = path.strip_prefix(home) {
         return format!("~/{}", relative.display());
@@ -143,12 +127,24 @@ pub fn path_label(path: &std::path::Path, home: &std::path::Path, cwd: &std::pat
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
+    #[test]
+    fn instruction_files_are_named_from_the_project_then_the_home() {
+        let (home, cwd) = (Path::new("/home/me"), Path::new("/home/me/work"));
+        for (path, label) in [
+            ("/home/me/work/AGENTS.md", "AGENTS.md"),
+            ("/home/me/.bingo/AGENTS.md", "~/.bingo/AGENTS.md"),
+            ("/etc/AGENTS.md", "/etc/AGENTS.md"),
+        ] {
+            assert_eq!(path_label(Path::new(path), home, cwd), label);
+        }
+    }
     #[test]
     fn empty_scopes_and_missing_experience_keep_all_groups() {
         let groups = rows(Listing::default(), vec![]);
         assert_eq!(
             groups.iter().map(|g| g.name).collect::<Vec<_>>(),
-            ["memories", "instructions", "experience"]
+            ["instructions", "memories", "experience"]
         );
         assert_eq!(total(&groups), 0);
     }
@@ -170,7 +166,7 @@ mod tests {
             },
             vec![],
         );
-        assert!(groups[0].rows[0].label.contains("missing frontmatter"));
+        assert!(groups[1].rows[0].label.contains("missing frontmatter"));
         assert_eq!(total(&groups), 8);
     }
     #[test]
@@ -187,7 +183,7 @@ mod tests {
         assert_eq!(label, "broken  unreadable  missing frontmatter");
     }
     #[test]
-    fn a_long_name_is_cut_and_does_not_widen_the_column() {
+    fn a_long_name_keeps_its_identity_and_description() {
         let memory = |name: &str| bingo_services::memory::MemoryRow {
             scope: Scope::User,
             name: name.into(),
@@ -205,19 +201,10 @@ mod tests {
             },
             vec![],
         );
-        let cut = format!("{}…", "a".repeat(23));
-        assert!(
-            groups[0].rows[0]
-                .label
-                .contains(&format!("{cut}   what it says"))
-        );
-        assert!(
-            groups[0].rows[1]
-                .label
-                .contains(&format!("short{}   what it says", " ".repeat(19)))
-        );
+        assert_eq!(groups[1].rows[0].label, "what it says");
+        assert_eq!(groups[1].rows[1].label, "what it says");
         assert!(matches!(
-            &groups[0].rows[0].target,
+            &groups[1].rows[0].target,
             Target::Memory { name, .. } if *name == long
         ));
     }

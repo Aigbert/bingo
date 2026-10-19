@@ -1,53 +1,33 @@
 use crate::{Cursor, Shared, rows::Target};
 use bingo_sdk::*;
 use bingo_services::{experience, memory};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 #[derive(Debug, PartialEq)]
 enum Operation {
-    Read(Target),
     Forget(Target),
-    Refuse,
+    Refuse(Target),
     Close,
     Handled(bool),
 }
-fn press(
-    cursor: &mut Cursor,
-    count: usize,
-    target: Option<Target>,
-    confirming: Option<Target>,
-    key: &str,
-) -> Operation {
+fn press(cursor: &mut Cursor, target: Option<Target>, key: &str) -> Operation {
     match key {
-        "up" => {
-            cursor.selected = cursor.selected.saturating_sub(1);
-            cursor.confirming = None;
-        }
-        "down" => {
-            cursor.selected = (cursor.selected + 1).min(count.saturating_sub(1));
-            cursor.confirming = None;
-        }
-        "esc" if cursor.confirming.is_some() => {
-            cursor.confirming = None;
+        "up" | "down" => {
+            let rows = cursor
+                .groups
+                .iter()
+                .flat_map(|g| &g.rows)
+                .map(|r| pick::Row::new(r.target.id(), pick::text("", "fg")))
+                .collect::<Vec<_>>();
+            cursor.selected = pick::moved(&rows, cursor.selected.as_deref(), key == "down");
         }
         "esc" | "ctrl+c" => return Operation::Close,
-        "d" => match target {
-            Some(Target::Instruction(_)) => return Operation::Refuse,
-            target => cursor.confirming = target,
+        "backspace" => match target {
+            Some(target @ Target::Instruction(_)) => return Operation::Refuse(target),
+            Some(target) => return Operation::Forget(target),
+            None => {}
         },
-        "enter" => {
-            if let Some(confirmed) = confirming {
-                if cursor.confirming.as_ref() == Some(&confirmed) {
-                    cursor.confirming = None;
-                    return Operation::Forget(confirmed);
-                }
-            } else if cursor.confirming.is_none()
-                && let Some(target) = target
-            {
-                return Operation::Read(target);
-            }
-        }
-        _ => return Operation::Handled(false),
+        _ => {}
     }
     Operation::Handled(true)
 }
@@ -62,10 +42,17 @@ impl Command for Handler {
         if args["event"] != "press" || args["handler"] != crate::REQUEST {
             return Ok(CommandOutcome::Handled { handled: false });
         }
+        let press_value = sheet::pressed(&args);
+        if press_value.is_none() {
+            return Ok(CommandOutcome::Handled { handled: false });
+        }
+        let picked = press_value.as_ref().and_then(sheet::Press::picked);
+        let key = press_value
+            .as_ref()
+            .and_then(sheet::Press::key)
+            .unwrap_or("enter");
         let target: Option<Target> =
             serde_json::from_value(args["target"].clone()).map_err(crate::error)?;
-        let confirming: Option<Target> =
-            serde_json::from_value(args["confirming"].clone()).map_err(crate::error)?;
         let operation = {
             let mut shared = self.0.lock().map_err(crate::error)?;
             let Some(cursor) = shared.get_mut(&cx.session) else {
@@ -77,21 +64,20 @@ impl Command for Handler {
                 .flat_map(|group| &group.rows)
                 .map(|row| row.target.clone())
                 .collect::<Vec<_>>();
-            let selected = targets.get(cursor.selected).cloned();
-            if target != selected
-                || confirming
-                    .as_ref()
-                    .is_some_and(|target| Some(target) != selected.as_ref())
+            if let Some(id) = picked
+                && targets.iter().any(|target| target.id() == id)
             {
+                cursor.selected = Some(id.into());
+            }
+            let selected = targets
+                .iter()
+                .find(|t| Some(t.id()) == cursor.selected)
+                .cloned()
+                .or_else(|| targets.first().cloned());
+            if target != selected && picked.is_none() {
                 return Ok(CommandOutcome::Handled { handled: true });
             }
-            press(
-                cursor,
-                targets.len(),
-                selected,
-                confirming,
-                args["value"]["key"].as_str().unwrap_or_default(),
-            )
+            press(cursor, selected, key)
         };
         let outcome = self.apply(operation, cx).await;
         cx.host
@@ -112,27 +98,22 @@ impl Handler {
         target: Target,
         cx: &CommandContext,
     ) -> Result<CommandOutcome, KernelError> {
+        let title = self.title(&target, cx);
         let result = forget(target, cx).await;
         let groups = crate::panel::groups(&cx.host, &cx.cwd, &self.1).await?;
         if let Some(cursor) = self.0.lock().map_err(crate::error)?.get_mut(&cx.session) {
-            cursor.groups = groups;
-            let count = cursor
-                .groups
-                .iter()
-                .map(|group| group.rows.len())
-                .sum::<usize>();
-            cursor.selected = cursor.selected.min(count.saturating_sub(1));
-            cursor.confirming = None;
+            retain_selection(cursor, groups);
         }
-        Ok(CommandOutcome::Applied {
-            message: Some(match result {
-                Ok(_) => "Forgotten. Prompt refreshes later; say not to relearn it.".into(),
-                Err(error) if error.code == ErrorCode::NotFound => {
-                    "Already gone; nothing forgotten.".into()
-                }
-                Err(error) => return Err(error),
+        match result {
+            Ok(_) => {
+                let said = toast::Say::ok(format!("forgot · {title}"));
+                Ok(said.outcome(said.plain()))
+            }
+            Err(error) if error.code == ErrorCode::NotFound => Ok(CommandOutcome::Applied {
+                message: Some("Already gone; nothing forgotten.".into()),
             }),
-        })
+            Err(error) => Err(error),
+        }
     }
     async fn apply(
         &self,
@@ -141,9 +122,13 @@ impl Handler {
     ) -> Result<CommandOutcome, KernelError> {
         match operation {
             Operation::Handled(handled) => Ok(CommandOutcome::Handled { handled }),
-            Operation::Refuse => Ok(CommandOutcome::Applied {
-                message: Some("edit the file itself".into()),
-            }),
+            Operation::Refuse(target) => {
+                let said = toast::Say::new([
+                    "instructions live in files".into(),
+                    format!("edit {}", self.title(&target, cx)),
+                ]);
+                Ok(said.outcome(said.plain()))
+            }
             Operation::Close => {
                 self.0.lock().map_err(crate::error)?.remove(&cx.session);
                 cx.host
@@ -151,43 +136,7 @@ impl Handler {
                     .await?;
                 Ok(CommandOutcome::Handled { handled: true })
             }
-            Operation::Read(target) => {
-                let text = read(&target, cx).await?;
-                Ok(CommandOutcome::Surface {
-                    action: Action {
-                        name: "Pager".into(),
-                        args: json!({
-                            "title": self.title(&target, cx),
-                            "text": crate::fence::document(&text),
-                            "return_to": {"plugin": crate::ID, "id": crate::REQUEST},
-                        }),
-                    },
-                    fallback: Some(text),
-                })
-            }
             Operation::Forget(target) => self.forget(target, cx).await,
-        }
-    }
-}
-async fn read(target: &Target, cx: &CommandContext) -> Result<String, KernelError> {
-    match target {
-        Target::Memory { path, .. } | Target::Instruction(path) => {
-            memory::find(&cx.host)
-                .ok_or_else(crate::unavailable)?
-                .read(memory::Read {
-                    cwd: cx.cwd.clone(),
-                    path: path.clone(),
-                })
-                .await
-        }
-        Target::Experience(id) => {
-            experience::find(&cx.host)
-                .ok_or_else(crate::unavailable)?
-                .read(experience::Read {
-                    cwd: cx.cwd.clone(),
-                    id: id.clone(),
-                })
-                .await
         }
     }
 }
@@ -218,102 +167,77 @@ async fn forget(target: Target, cx: &CommandContext) -> Result<String, KernelErr
         )),
     }
 }
+fn retain_selection(cursor: &mut crate::Cursor, groups: Vec<crate::rows::Group>) {
+    let ids = groups
+        .iter()
+        .flat_map(|group| &group.rows)
+        .map(|row| row.target.id())
+        .collect::<Vec<_>>();
+    if !ids.iter().any(|id| Some(id) == cursor.selected.as_ref()) {
+        let previous = cursor
+            .groups
+            .iter()
+            .flat_map(|group| &group.rows)
+            .map(|row| row.target.id())
+            .collect::<Vec<_>>();
+        let at = previous
+            .iter()
+            .position(|id| Some(id) == cursor.selected.as_ref())
+            .unwrap_or(0);
+        cursor.selected = previous
+            .iter()
+            .skip(at + 1)
+            .chain(previous[..at].iter().rev())
+            .find(|id| ids.contains(id))
+            .cloned()
+            .or_else(|| ids.first().cloned());
+    }
+    cursor.groups = groups;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn the_handler_answers_to_the_name_the_pane_is_placed_under() {
-        let name = CommandSpec::ui_name(crate::ID);
-        let handler = Handler(Shared::default(), Default::default());
-        assert_eq!(handler.spec().name, name);
-        assert!(
-            crate::MANIFEST
-                .provides
-                .contains(&format!("command:{name}").as_str())
+    fn memory_rows_come_from_the_builder_and_letters_do_nothing() {
+        let view = crate::draw::tree(&[], None, 18, 100, Default::default());
+        bingo_sdk::testing::assert_separate_hints(&view);
+        assert!(view.fold().contains("Memory"));
+        let mut cursor = Cursor::default();
+        assert_eq!(press(&mut cursor, None, "d"), Operation::Handled(true));
+        let target = Target::Instruction("AGENTS.md".into());
+        assert_eq!(
+            press(&mut cursor, Some(target.clone()), "backspace"),
+            Operation::Refuse(target)
         );
-        let drawn = crate::draw::tree(&[], 0, None, 10, 40);
-        bingo_sdk::testing::assert_separate_hints(&drawn);
-        let drawer = crate::draw::Drawing(Shared::default());
-        view::answer_ok(
-            render::Component::Pane,
-            &json!({"owner":crate::ID}),
-            drawer.id(),
-            None,
-            &drawn,
-        )
-        .unwrap();
-        let View::Box { layout, .. } = drawn else {
-            panic!("the memory pane is a box");
-        };
-        assert_eq!(layout.on_key.map(|action| action.name), Some(name));
+    }
+}
+
+#[cfg(test)]
+mod selection_tests {
+    use super::*;
+    fn group(names: &[&str]) -> Vec<crate::rows::Group> {
+        vec![crate::rows::Group {
+            name: "instructions",
+            rows: names
+                .iter()
+                .map(|name| crate::rows::Row {
+                    label: (*name).into(),
+                    tokens: 0,
+                    target: Target::Instruction((*name).into()),
+                })
+                .collect(),
+        }]
     }
     #[test]
-    fn keys_read_confirm_cancel_and_refuse_instructions() {
-        for target in [
-            Target::Experience("a".into()),
-            Target::Memory {
-                scope: memory::Scope::User,
-                name: "a".into(),
-                path: "a.md".into(),
-            },
-        ] {
-            let mut cursor = Cursor::default();
-            assert_eq!(
-                press(&mut cursor, 2, Some(target.clone()), None, "enter"),
-                Operation::Read(target.clone())
-            );
-            assert_eq!(
-                press(&mut cursor, 2, Some(target.clone()), None, "d"),
-                Operation::Handled(true)
-            );
-            assert_eq!(
-                press(&mut cursor, 2, Some(target.clone()), None, "enter"),
-                Operation::Handled(true),
-                "an old drawing cannot confirm"
-            );
-            assert_eq!(
-                press(
-                    &mut cursor,
-                    2,
-                    Some(target.clone()),
-                    Some(target.clone()),
-                    "enter"
-                ),
-                Operation::Forget(target.clone())
-            );
-            press(&mut cursor, 2, Some(target.clone()), None, "d");
-            press(
-                &mut cursor,
-                2,
-                Some(target.clone()),
-                Some(target.clone()),
-                "esc",
-            );
-            assert!(cursor.confirming.is_none());
-            assert_eq!(press(&mut cursor, 2, None, None, "esc"), Operation::Close);
-        }
-        let mut cursor = Cursor::default();
-        assert_eq!(
-            press(
-                &mut cursor,
-                1,
-                Some(Target::Instruction("AGENTS.md".into())),
-                None,
-                "d"
-            ),
-            Operation::Refuse
-        );
-        for _ in 0..4 {
-            press(&mut cursor, 2, None, None, "down");
-        }
-        assert_eq!(cursor.selected, 1);
-        for _ in 0..4 {
-            press(&mut cursor, 2, None, None, "up");
-        }
-        assert_eq!(cursor.selected, 0);
-        assert_eq!(
-            press(&mut cursor, 0, None, None, "enter"),
-            Operation::Handled(true)
-        );
+    fn forgetting_selects_the_next_surviving_identity_then_the_previous() {
+        let mut cursor = crate::Cursor {
+            groups: group(&["a", "b", "c"]),
+            selected: Some("b".into()),
+        };
+        retain_selection(&mut cursor, group(&["a", "c"]));
+        assert_eq!(cursor.selected.as_deref(), Some("c"));
+        retain_selection(&mut cursor, group(&["a"]));
+        assert_eq!(cursor.selected.as_deref(), Some("a"));
     }
 }

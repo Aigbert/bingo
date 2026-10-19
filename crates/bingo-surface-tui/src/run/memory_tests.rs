@@ -230,96 +230,51 @@ impl MemoryFixture {
     }
 }
 #[tokio::test]
-async fn memory_panel_reads_forgets_and_refuses_instruction_deletion() {
+async fn memory_sheet_forgets_and_refuses_instruction_deletion() {
     let mut fixture = MemoryFixture::new();
     let dir = fixture.seed();
     fixture.open().await;
     assert!(fixture.paint(108, 30).await.contains("Use fixtures"));
-    fixture.press(key(KeyCode::Enter)).await;
-    assert!(matches!(fixture.run.ui.focus.open(), Open::Pager(_)));
-    let screen = draw_tree(
-        108,
-        30,
-        &fixture.run.session.tree,
-        &mut fixture.run.ui,
-        still(scene().1),
-    );
-    assert!(screen.contains("Read this full memory."), "{screen}");
-    assert!(
-        screen
-            .lines()
-            .any(|line| line.trim_matches('"').trim() == "---"),
-        "the panel fences its own frontmatter: {screen}"
-    );
-    crate::pager::keys(
-        &mut fixture.run.ui,
-        &fixture.run.session.tree,
-        key(KeyCode::Esc),
-        still(scene().1),
-    );
+    fixture.press(key(KeyCode::Backspace)).await;
+    assert!(fixture.env.config_dir.join("AGENTS.md").exists());
+    let screen = fixture.paint(108, 30).await;
+    assert!(screen.contains("instructions live in files"), "{screen}");
+    fixture.press(key(KeyCode::Down)).await;
     fixture.paint(108, 30).await;
-    fixture.press(typed('d')).await;
-    assert!(
-        fixture
-            .paint(108, 30)
-            .await
-            .contains("the file and its index line go")
-    );
-    fixture.press(key(KeyCode::Enter)).await;
+    fixture.press(key(KeyCode::Backspace)).await;
     assert!(!dir.join("rule.md").exists());
     assert_eq!(
         std::fs::read_to_string(dir.join("MEMORY.md")).unwrap(),
         "# Memory\nkeep\n"
     );
-    assert!(!fixture.paint(108, 30).await.contains("Use fixtures"));
-    fixture.run.ui.notice = None;
-    fixture.press(typed('d')).await;
-    let screen = fixture.paint(108, 30).await;
-    assert!(screen.contains("edit the file itself"), "{screen}");
-    assert!(fixture.env.config_dir.join("AGENTS.md").exists());
+    assert!(fixture.paint(108, 30).await.contains("✓ forgot · rule"));
 }
 #[tokio::test]
-async fn a_vanished_confirmation_never_forgets_the_next_row() {
+async fn a_vanished_memory_never_forgets_the_next_row() {
     let mut fixture = MemoryFixture::new();
     let dir = fixture.seed();
     std::fs::write(dir.join("second.md"), "malformed").unwrap();
     fixture.open().await;
     fixture.paint(80, 24).await;
-    fixture.press(typed('d')).await;
+    fixture.press(key(KeyCode::Down)).await;
     fixture.paint(80, 24).await;
     std::fs::remove_file(dir.join("rule.md")).unwrap();
-    fixture.press(key(KeyCode::Enter)).await;
+    fixture.press(key(KeyCode::Backspace)).await;
     assert!(dir.join("second.md").exists());
 }
-
 #[tokio::test]
-async fn escape_cancels_confirmation_then_closes_the_panel() {
+async fn escape_closes_the_sheet_with_the_draft_intact() {
     let mut fixture = MemoryFixture::new();
     let dir = fixture.seed();
+    fixture.run.ui.composer.set("keep this");
     fixture.open().await;
     fixture.paint(80, 24).await;
     fixture.press(typed('d')).await;
-    fixture.paint(80, 24).await;
-    fixture.press(key(KeyCode::Esc)).await;
-    assert!(
-        !fixture
-            .paint(80, 24)
-            .await
-            .contains("the file and its index line go")
-    );
     assert!(dir.join("rule.md").exists());
+    assert_eq!(fixture.run.ui.composer.text(), "keep this");
     fixture.press(key(KeyCode::Esc)).await;
     assert!(crate::pane::placed(fixture.run.session.tree.viewed()).is_empty());
-}
-
-impl MemoryFixture {
-    async fn forged(&self, target: serde_json::Value, confirming: serde_json::Value, key: &str) {
-        let cx = self.cx();
-        self.handler.run(
-            &json!({"handler":"memory","event":"press","target":target,"confirming":confirming,"value":{"key":key}}).to_string(),
-            &CommandContext { surface: None, session: cx.session, cwd: cx.cwd, host: cx.host, cancel: Default::default() },
-        ).await.unwrap();
-    }
+    assert_eq!(fixture.run.ui.composer.text(), "keep this");
 }
 #[tokio::test]
 async fn closed_and_mismatched_drawings_cannot_forget_a_listed_file() {
@@ -337,75 +292,23 @@ async fn closed_and_mismatched_drawings_cannot_forget_a_listed_file() {
             name: "second".into(),
             path: second.clone(),
         });
-        fixture
-            .forged(target.clone(), serde_json::Value::Null, "d")
-            .await;
-        fixture.forged(target.clone(), target, "enter").await;
+        let cx = fixture.cx();
+        fixture.handler.run(&json!({"handler":"memory","event":"press","target":target,"value":{"key":"backspace"}}).to_string(),
+            &CommandContext { surface: None, session:cx.session,cwd:cx.cwd,host:cx.host,cancel:Default::default() }).await.unwrap();
         assert!(second.exists());
         assert!(dir.join("rule.md").exists());
     }
 }
 #[tokio::test]
-async fn listings_stay_cached_until_forgetting_refreshes_them() {
-    for (width, height) in [(80, 24), (108, 30)] {
-        let mut fixture = MemoryFixture::new();
-        let dir = fixture.seed();
-        fixture.open().await;
-        fixture.paint(width, height).await;
-        std::fs::write(dir.join("second.md"), "malformed").unwrap();
-        assert!(!fixture.paint(width, height).await.contains("second"));
-        fixture.press(typed('d')).await;
-        assert!(!fixture.paint(width, height).await.contains("second"));
-        fixture.press(key(KeyCode::Enter)).await;
-        let screen = fixture.paint(width, height).await;
-        assert!(screen.contains("second"));
-        assert!(screen.contains("Forgotten."));
-    }
-}
-#[tokio::test]
-async fn instruction_pager_uses_a_relative_title() {
+async fn forgetting_refreshes_the_listing() {
     let mut fixture = MemoryFixture::new();
-    fixture.seed();
+    let dir = fixture.seed();
     fixture.open().await;
     fixture.paint(80, 24).await;
+    std::fs::write(dir.join("second.md"), "malformed").unwrap();
+    assert!(!fixture.paint(80, 24).await.contains("second"));
     fixture.press(key(KeyCode::Down)).await;
     fixture.paint(80, 24).await;
-    fixture.press(key(KeyCode::Enter)).await;
-    let Open::Pager(pager) = fixture.run.ui.focus.open() else {
-        panic!("pager");
-    };
-    let crate::pager::Source::Text { title, .. } = &pager.source else {
-        panic!("text");
-    };
-    assert!(title.starts_with("./"));
-    assert!(title.ends_with("AGENTS.md"));
-}
-
-#[tokio::test]
-async fn memory_returns_to_focus_after_typing_and_reopening() {
-    let mut fixture = MemoryFixture::new();
-    fixture.open().await;
-    fixture.paint(108, 30).await;
-    fixture.press(typed('a')).await;
-    assert_eq!(fixture.run.ui.composer.text(), "a");
-    assert!(matches!(
-        fixture.run.ui.focus,
-        crate::focus::Focus::Composer
-    ));
-    fixture.paint(108, 30).await;
-    fixture.run.terminal_event(Term::Key(key(KeyCode::Tab)));
-    assert!(matches!(fixture.run.ui.focus, crate::focus::Focus::Pane(_)));
-    fixture.press(key(KeyCode::Esc)).await;
-    assert!(crate::pane::placed(fixture.run.session.tree.viewed()).is_empty());
-    fixture.open().await;
-    fixture.paint(108, 30).await;
-    fixture.run.ui.focus = crate::focus::Focus::Composer;
-    fixture.open().await;
-    fixture.paint(108, 30).await;
-    assert!(matches!(fixture.run.ui.focus, crate::focus::Focus::Pane(_)));
-    assert_eq!(
-        crate::pane::placed(fixture.run.session.tree.viewed()).len(),
-        1
-    );
-    assert_eq!(fixture.run.ui.composer.text(), "a");
+    fixture.press(key(KeyCode::Backspace)).await;
+    assert!(fixture.paint(160, 24).await.contains("second"));
 }
