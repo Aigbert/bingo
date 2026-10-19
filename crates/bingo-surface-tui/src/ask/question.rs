@@ -36,12 +36,13 @@ pub fn sheet(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<L
     let fade = guard::fade(opened, now);
     let (caret_now, rest) = dock::rested(now, ui.keyed_at);
     let writing = focus(ui, &frame.pulls, interaction).is_some_and(|focus| focus.writing);
-    let lines = drawn
+    let lines: Vec<Line<'static>> = drawn
         .rows
         .into_iter()
         .map(|(line, _)| dock::lit(line, fade, writing, caret_now))
         .collect();
     let caret = (writing && caret_now.motion).then(|| (now.instant + clock::FRAME).min(rest));
+    frame.sheet_actions = choices(ui, &frame.pulls, interaction, area.width, lines.len());
     Some(frame.collect(views::Drawing {
         lines,
         next: guard::next(opened, now).into_iter().chain(caret).min(),
@@ -70,13 +71,55 @@ pub fn focus<'a>(
     pulls: &[crate::pulled::Key],
     interaction: &Interaction,
 ) -> Option<&'a QuestionFocus> {
-    let key = pulls
-        .iter()
-        .find(|key| key.request.request_id == interaction.id.as_str())?;
-    let View::Box { layout, .. } = ui.placed.pulled.get(key)? else {
+    let View::Box { layout, .. } = pulled(ui, pulls, interaction)? else {
         return None;
     };
     layout.question.as_ref()
+}
+
+/// Where the mod's choices sit, each carrying the press that picks it. A
+/// drawing whose rows are not the mod's own, one by one, offers none.
+fn choices(
+    ui: &Ui,
+    pulls: &[crate::pulled::Key],
+    interaction: &Interaction,
+    width: u16,
+    rows: usize,
+) -> Vec<views::targets::Target> {
+    let Some(view) = pulled(ui, pulls, interaction) else {
+        return Vec::new();
+    };
+    let (mask, actions) = views::targets::render(view, usize::from(width));
+    if mask.len() != rows {
+        return Vec::new();
+    }
+    let area = ratatui::layout::Rect::new(0, 0, width, rows as u16);
+    views::targets::cells(&mask, &actions, area)
+}
+
+/// The press a click on the open question's choice carries.
+pub fn clicked(ui: &Ui, column: u16, row: u16) -> Option<bingo_sdk::Action> {
+    ui.shown
+        .sheet_actions
+        .iter()
+        .filter(|target| target.item.action.name != super::CLICK)
+        .find(|target| {
+            target
+                .area
+                .contains(ratatui::layout::Position::new(column, row))
+        })
+        .map(|target| target.item.action.clone())
+}
+
+fn pulled<'a>(
+    ui: &'a Ui,
+    pulls: &[crate::pulled::Key],
+    interaction: &Interaction,
+) -> Option<&'a View> {
+    let key = pulls
+        .iter()
+        .find(|key| key.request.request_id == interaction.id.as_str())?;
+    ui.placed.pulled.get(key)
 }
 
 /// Whether the person is typing their own words into the open question.

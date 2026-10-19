@@ -67,7 +67,8 @@ fn tabs(sheet: &Sheet<'_>) -> View {
 }
 
 fn line(left: View, right: Option<View>, sheet: &Sheet<'_>) -> View {
-    let row = pick::Row::new("line", left);
+    // No identity: a heading is not a choice a click could pick.
+    let row = pick::Row::new("", left);
     let row = match right {
         Some(right) => row.right(right),
         None => row,
@@ -201,23 +202,30 @@ fn beside(
     let band = list;
     let well = sheet.columns.saturating_sub(band + 3);
     let room = usize::from(well.saturating_sub(4));
-    let mut out: Vec<View> = rows
+    // The choice's own cells sit in the row itself, so a click finds its
+    // identity where it finds every pick list's (`sheet::clicks`).
+    let mut out: Vec<Vec<View>> = rows
         .enumerate()
-        .map(|(index, row)| pick::pick_line(&row, choice.picked(index), band + 1, sheet.glyphs))
-        .map(|row| pick::cell(row, band))
+        .map(|(index, row)| {
+            match pick::pick_line(&row, choice.picked(index), band + 1, sheet.glyphs) {
+                View::Box { children, .. } => children,
+                other => vec![pick::cell(other, band)],
+            }
+        })
         .collect();
     while out.len() < lines.len() {
-        out.push(blank(band));
+        out.push(vec![blank(band)]);
     }
-    for (index, row) in out.iter_mut().enumerate() {
-        let text = lines.get(index).copied().unwrap_or("");
-        let shown = fitted(text, room, "code", sheet.glyphs);
-        let ground = pick::line([pick::text("  ", "code"), shown]);
-        let pane = grounded(pick::cell(ground, well), well);
-        let left = std::mem::replace(row, blank(0));
-        *row = boxed(vec![left, blank(2), pane, blank(1)]);
-    }
-    out
+    out.into_iter()
+        .enumerate()
+        .map(|(index, mut row)| {
+            let text = lines.get(index).copied().unwrap_or("");
+            let shown = fitted(text, room, "code", sheet.glyphs);
+            let ground = pick::line([pick::text("  ", "code"), shown]);
+            row.extend([blank(2), grounded(pick::cell(ground, well), well), blank(1)]);
+            boxed(row)
+        })
+        .collect()
 }
 
 fn blank(width: u16) -> View {

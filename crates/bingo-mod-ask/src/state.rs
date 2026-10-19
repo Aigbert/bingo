@@ -54,6 +54,24 @@ impl State {
         (true, None)
     }
 
+    /// A click on a choice: the cursor goes to it and it is chosen, as
+    /// `enter` on it would. Words being typed keep the keys to themselves.
+    pub fn pick(&mut self, questions: &[Question], id: &str) -> Outcome {
+        self.fields.resize_with(questions.len(), Field::default);
+        self.tab = self.tab.min(questions.len().saturating_sub(1));
+        let Some(question) = questions.get(self.tab) else {
+            return (false, None);
+        };
+        let Some(index) = id.parse().ok().filter(|index| *index < choices(question)) else {
+            return (false, None);
+        };
+        if self.words.is_some() {
+            return (false, None);
+        }
+        self.fields[self.tab].cursor = index;
+        self.choose(questions)
+    }
+
     /// A printable key on the list starts `Something else` with it.
     fn start_words(&mut self, question: &Question, key: &str) -> Outcome {
         let Some(typed) = printable(key).filter(|_| question.free_text) else {
@@ -188,6 +206,17 @@ mod tests {
             state.key(&questions, "enter").1,
             Some(vec![choice(&["b"]), choice(&["a", "b"])])
         );
+    }
+
+    #[test]
+    fn a_pick_answers_as_enter_on_that_choice_does() {
+        let questions = [question(false)];
+        let mut state = State::default();
+        assert_eq!(state.pick(&questions, "9"), (false, None));
+        assert_eq!(state.pick(&questions, "1").1, Some(vec![choice(&["b"])]));
+        let mut state = State::default();
+        assert_eq!(state.pick(&questions, "2"), (true, None));
+        assert_eq!(state.words.as_deref(), Some(""), "the words row opens");
     }
 
     #[test]

@@ -50,26 +50,7 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
     match crate::focus::owner(ui, tree) {
         crate::focus::Owner::Search => return Vec::new(),
         crate::focus::Owner::Layer => return Vec::new(),
-        crate::focus::Owner::Interaction => {
-            return if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-                if let Some(index) = crate::ask::clicked(ui, mouse.column, mouse.row) {
-                    return picked(ui, tree, index, now);
-                }
-                if let Some(target) = ui
-                    .shown
-                    .card_actions
-                    .iter()
-                    .find(|target| target.area.contains(Position::new(mouse.column, mouse.row)))
-                {
-                    return vec![Effect::Submit(crate::pulled(target.item.action.clone()))];
-                }
-                card_option(ui, mouse)
-                    .map(|index| answer(ui, tree, index, now))
-                    .unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-        }
+        crate::focus::Owner::Interaction => return on_ask(ui, tree, mouse, now),
         _ => {}
     }
     if let Some(effects) = crate::pane::mouse(ui, tree.viewed(), mouse, now) {
@@ -87,6 +68,31 @@ pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Ef
         _ => {}
     }
     Vec::new()
+}
+
+/// A press while an ask is open: an option of the dialog, a question's
+/// choice, a card's action, or a card's option row.
+fn on_ask(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
+    if mouse.kind != MouseEventKind::Down(MouseButton::Left) {
+        return Vec::new();
+    }
+    if let Some(index) = crate::ask::clicked(ui, mouse.column, mouse.row) {
+        return picked(ui, tree, index, now);
+    }
+    if let Some(action) = crate::ask::question::clicked(ui, mouse.column, mouse.row) {
+        return crate::input::interaction::choice_clicked(ui, tree, action, now);
+    }
+    if let Some(target) = ui
+        .shown
+        .card_actions
+        .iter()
+        .find(|target| target.area.contains(Position::new(mouse.column, mouse.row)))
+    {
+        return vec![Effect::Submit(crate::pulled(target.item.action.clone()))];
+    }
+    card_option(ui, mouse)
+        .map(|index| answer(ui, tree, index, now))
+        .unwrap_or_default()
 }
 
 /// A press lands on whatever is under it: a card's option answers, a block

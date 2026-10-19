@@ -29,6 +29,26 @@ pub(crate) fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now
     ui.dialog.on_key(interaction, key, now)
 }
 
+/// A click on a question's choice: the press the mod drew on it, held back
+/// by the same guard as the `⏎` it stands for.
+pub(crate) fn choice_clicked(
+    ui: &mut Ui,
+    tree: &Tree,
+    action: bingo_sdk::Action,
+    now: Now,
+) -> Vec<Effect> {
+    let Some((_, interaction)) = tree.open_interaction() else {
+        return Vec::new();
+    };
+    if guarded(ui, interaction, now) || ui.dialog.answered {
+        return Vec::new();
+    }
+    vec![Effect::SiteKey {
+        action,
+        key: KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+    }]
+}
+
 /// An ask takes no key, not even esc, until it has been on screen long
 /// enough to be read; a sign-in keeps the kernel's own guard.
 fn guarded(ui: &Ui, interaction: &bingo_sdk::Interaction, now: Now) -> bool {

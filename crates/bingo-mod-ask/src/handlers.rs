@@ -11,13 +11,12 @@ impl Command for Handler {
         let args: Value = serde_json::from_str(args).map_err(error)?;
         let id = args["handler"].as_str().unwrap_or_default();
         let session: SessionId = serde_json::from_value(args["session"].clone()).map_err(error)?;
-        let key = args["value"]["key"].as_str().unwrap_or_default();
-        if args["event"] != "press" || key == "ctrl+c" {
+        let Some(press) = press(&args) else {
             return Ok(handled(false));
-        }
+        };
         let props: component::QuestionProps =
             serde_json::from_value(args["props"].clone()).map_err(error)?;
-        let (used, answer) = answer(&self.0, &session, id, &props, key)?;
+        let (used, answer) = answer(&self.0, &session, id, &props, &press)?;
         cx.host
             .invalidate(
                 &session,
@@ -27,20 +26,35 @@ impl Command for Handler {
         Ok(answer.map_or_else(|| handled(used), |answer| CommandOutcome::Answer { answer }))
     }
 }
-/// A key on the question; a form's answers go back together, a single
+/// A key pressed or a choice clicked; `ctrl+c` is the surface's own.
+fn press(args: &Value) -> Option<sheet::Press> {
+    if args["event"] != "press" {
+        return None;
+    }
+    if let Some(id) = args["value"]["pick"].as_str() {
+        return Some(sheet::Press::Pick(id.to_owned()));
+    }
+    let key = args["value"]["key"].as_str().unwrap_or_default();
+    (key != "ctrl+c").then(|| sheet::Press::Key(key.to_owned()))
+}
+
+/// A press on the question; a form's answers go back together, a single
 /// question's on its own.
 fn answer(
     states: &States,
     session: &SessionId,
     id: &str,
     props: &component::QuestionProps,
-    key: &str,
+    press: &sheet::Press,
 ) -> Result<(bool, Option<Answer>), KernelError> {
     let mut states = states.lock().map_err(error)?;
     let Some(state) = states.get_mut(&(session.clone(), id.into())) else {
         return Ok((false, None));
     };
-    let (used, answers) = state.key(&props.questions, key);
+    let (used, answers) = match press {
+        sheet::Press::Key(key) => state.key(&props.questions, key),
+        sheet::Press::Pick(id) => state.pick(&props.questions, id),
+    };
     let answer = answers.and_then(|answers| match props.form {
         true => Some(Answer::Form { answers }),
         false => answers.into_iter().next(),

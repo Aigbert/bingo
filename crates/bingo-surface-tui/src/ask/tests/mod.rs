@@ -262,6 +262,39 @@ fn esc_leaves_the_words_first_and_the_ask_second() {
 }
 
 #[test]
+fn a_click_on_a_choice_presses_it_once_the_guard_lets_keys_through() {
+    let (tree, mut ui, read) = scene_for(question(false, true), false);
+    install_question(&tree, &mut ui, read, 108, 30);
+    draw_tree(108, 30, &tree, &mut ui, read);
+    let target = ui
+        .shown
+        .sheet_actions
+        .iter()
+        .find(|target| target.item.action.args["value"]["pick"] == "1")
+        .expect("the second choice is a click target");
+    let mouse = crossterm::event::MouseEvent {
+        kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+        column: target.area.x + 4,
+        row: target.area.y,
+        modifiers: crossterm::event::KeyModifiers::NONE,
+    };
+    let early = crate::clock::Now {
+        wall: read.wall - super::guard::GUARD,
+        ..read
+    };
+    let (_, open) = tree.open_interaction().unwrap();
+    assert!(!super::guard::open(
+        super::guard::armed(&ui, open, early),
+        early.wall
+    ));
+    assert!(crate::pointer::on_mouse(&mut ui, &tree, mouse, early).is_empty());
+    assert!(matches!(
+        crate::pointer::on_mouse(&mut ui, &tree, mouse, read).as_slice(),
+        [crate::effect::Effect::SiteKey { action, .. }] if action.args["value"]["pick"] == "1"
+    ));
+}
+
+#[test]
 fn escaping_questions_and_forms_stops_the_turn() {
     for open in [question(false, true), form()] {
         let (tree, mut ui, now) = scene_for(open, false);

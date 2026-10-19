@@ -64,7 +64,8 @@ pub fn tree(props: &component::QuestionProps, state: &State, asked: &Asked<'_>) 
         glyphs: asked.glyphs,
     };
     let field = state.field(state.tab);
-    View::Box {
+    // A click on a choice is the same as walking to it and pressing Enter.
+    sheet::clicks(View::Box {
         children: rows::rows(&sheet),
         layout: Box::new(view::BoxStyle {
             question: Some(component::QuestionFocus {
@@ -78,7 +79,7 @@ pub fn tree(props: &component::QuestionProps, state: &State, asked: &Asked<'_>) 
             }),
             ..Default::default()
         }),
-    }
+    })
 }
 
 #[cfg(test)]
