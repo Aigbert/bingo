@@ -252,13 +252,14 @@ pub enum Close {
 pub enum Escape {
     /// Leave the selected place with its own close or cancel action.
     Close(Close),
-    /// Nothing is open, so the turn is what `esc` stops.
+    /// Nothing is open at home, so the turn is what `esc` stops; away from
+    /// home `esc` never stops anything.
     Interrupt,
     /// Save the draft in history and empty the input.
     Clear,
     /// Return the transcript to its newest row.
     Latest,
-    /// An empty child view returns to its parent.
+    /// Any other session, its draft empty, returns home.
     Back,
     /// The second empty escape opens the rewind picker.
     Rewind,

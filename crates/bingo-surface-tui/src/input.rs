@@ -523,15 +523,7 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
                 now.instant,
             );
         }
-        Some(keys::Escape::Back) => {
-            let parent = tree
-                .viewed()
-                .summary
-                .parent
-                .as_ref()
-                .map_or_else(|| tree.root_id().clone(), |parent| parent.session.clone());
-            return vec![Effect::View(parent)];
-        }
+        Some(keys::Escape::Back) => return vec![Effect::View(tree.root_id().clone())],
         // The stack was empty, so this `esc` is one of `esc esc`.
         None => {}
     }
@@ -1979,6 +1971,26 @@ mod tests {
         assert_eq!(
             ui.notice().unwrap().plain().unwrap().text,
             "ctrl+c again to quit"
+        );
+    }
+
+    /// Away from home esc never stops anything: the working teammate keeps
+    /// working and you go home; ctrl+c is what stops its turn.
+    #[test]
+    fn escape_in_a_working_teammate_goes_home_and_ctrl_c_stops_it() {
+        let mut tree = with_child(vec![child_frame(2, started("trn_9"))]);
+        tree.show(&child_id());
+        let (mut ui, now) = scene();
+        assert_eq!(
+            press_tree(&mut ui, &tree, key(KeyCode::Esc), now),
+            vec![Effect::View(tree.root_id().clone())],
+        );
+        let ctrl_c = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        assert_eq!(
+            press_tree(&mut ui, &tree, ctrl_c, now),
+            vec![Effect::Stop {
+                withdraw: Vec::new()
+            }]
         );
     }
 
