@@ -17,6 +17,11 @@ fn seed(home: &std::path::Path) {
     let start = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(9990);
     summary.created_at = start;
     summary.updated_at = start;
+    // The palette's once-per-install key hint is a placed toast that would
+    // race the resume toast for the one notice; this install has seen it.
+    let hint = home.join(".bingo/data/plugins/palette/key-hint");
+    std::fs::create_dir_all(hint.parent().unwrap()).unwrap();
+    std::fs::write(&hint, "").unwrap();
     let dir = home.join(".bingo/data/sessions").join(ID);
     bingo_store_jsonl::journal::create(&dir, &summary.id).unwrap();
     bingo_store_jsonl::summary::write(&dir, &summary).unwrap();
