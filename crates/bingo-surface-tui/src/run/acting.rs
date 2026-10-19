@@ -14,7 +14,11 @@ mod checks;
 #[path = "acting/tests/proofs.rs"]
 mod proofs;
 mod setup;
+#[path = "acting/tests/sheets/mod.rs"]
+mod sheets;
 mod timeline;
+
+pub(crate) use sheets::draw as draw_sheet;
 
 const QUEUED: &str = "做完以后更新一下 CHANGELOG";
 

@@ -1,4 +1,4 @@
-use crate::test_support::ember::{Band, Capture, assert_regions, story};
+use crate::test_support::ember::{Capture, story};
 use crate::test_support::*;
 use bingo_sdk::{
     slot::{Place, Slot},
@@ -6,7 +6,7 @@ use bingo_sdk::{
 };
 use serde_json::json;
 
-pub(super) fn fixture(capture: &Capture) -> (SessionState, crate::ui::Ui) {
+fn fixture(capture: &Capture) -> (SessionState, crate::ui::Ui) {
     let (mut state, _) = story::scene("done");
     let mut summary = state.summary.clone();
     summary.model = Some("opus-5.5".into());
@@ -21,7 +21,7 @@ pub(super) fn fixture(capture: &Capture) -> (SessionState, crate::ui::Ui) {
     ui.last_typed = Some(capture.now().wall);
     (state, ui)
 }
-pub(super) fn show(state: &mut SessionState, ui: &mut crate::ui::Ui, owner: &str, view: View) {
+fn show(state: &mut SessionState, ui: &mut crate::ui::Ui, owner: &str, view: View) {
     let slot = Slot::Pane {
         hints: None,
         id: "sheet".into(),
@@ -40,168 +40,6 @@ pub(super) fn show(state: &mut SessionState, ui: &mut crate::ui::Ui, owner: &str
     ));
     ui.sync_panes(state);
 }
-fn models(selected: usize, width: u16, height: u16) -> View {
-    let models = crate::test_support::ember::world::rows("models").into_iter().map(|row| {
-        let id = row["id"].as_str().unwrap();
-        let provider = row["prov"].as_str().unwrap();
-        let ctx = row["ctx"].as_str().unwrap();
-        let context = ctx[..ctx.len()-1].parse::<u64>().unwrap() * if ctx.ends_with('M') { 1_000_000 } else { 1000 };
-        CatalogEntry { id: format!("{provider}/{id}"), label: id.into(), meta: json!({"provider":provider,"context":context,"images":row["img"],"efforts":row["effs"]}) }
-    }).collect::<Vec<_>>();
-    let picker = bingo_mod_models::state::Picker {
-        id: "model".into(),
-        props: bingo_sdk::component::ModelPickerProps {
-            selected: Some(format!("model:{}", models[selected].id)),
-            effort: Some(if selected == 1 {
-                Effort::Max
-            } else {
-                Effort::High
-            }),
-            ..Default::default()
-        },
-        ..Default::default()
-    };
-    bingo_mod_models::draw::tree(
-        &picker,
-        &models,
-        &[],
-        &bingo_mod_models::card::Chat {
-            effort: Some(Effort::High),
-            current: models[0].id.clone(),
-            ..Default::default()
-        },
-        width,
-        height,
-        Default::default(),
-    )
-}
-#[test]
-fn m198_model_full_frame() {
-    let capture = Capture::load("model");
-    capture.render(|| {
-        let (mut state, mut ui) = fixture(&capture);
-        let size = capture.size();
-        show(
-            &mut state,
-            &mut ui,
-            "bingo.mod.models",
-            models(
-                0,
-                size.width,
-                crate::layout::grid::dock_cap(size.height.into()),
-            ),
-        );
-        let screen = drawn(
-            size.width,
-            size.height,
-            &solo(&state),
-            &mut ui,
-            capture.now(),
-        );
-        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
-    });
-}
-
-#[test]
-fn m198_model_moved_full_frame() {
-    let capture = Capture::load("model-moved");
-    capture.render(|| {
-        let (mut state, mut ui) = fixture(&capture);
-        let size = capture.size();
-        show(
-            &mut state,
-            &mut ui,
-            "bingo.mod.models",
-            models(
-                1,
-                size.width,
-                crate::layout::grid::dock_cap(size.height.into()),
-            ),
-        );
-        let screen = drawn(
-            size.width,
-            size.height,
-            &solo(&state),
-            &mut ui,
-            capture.now(),
-        );
-        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
-    });
-}
-
-fn tasks() -> Vec<bingo_tasks::Task> {
-    crate::test_support::ember::world::rows("tasks")
-        .into_iter()
-        .map(|row| {
-            serde_json::from_value(
-                json!({"id":row["id"],"subject":row["t"],"status":row["st"],"owner":row["who"]}),
-            )
-            .unwrap()
-        })
-        .collect()
-}
-#[test]
-fn m198_tasks_full_frame() {
-    tasks_frame("tasks");
-}
-#[test]
-fn m198_tasks_again_full_frame() {
-    tasks_frame("tasks-again");
-}
-fn tasks_frame(name: &str) {
-    let capture = Capture::load(name).spinners(&[(25, 3), (26, 3)]);
-    capture.render(|| {
-        let (mut state, mut ui) = fixture(&capture);
-        let size = capture.size();
-        let roster = crate::test_support::ember::world::roster(&state.summary);
-        show(
-            &mut state,
-            &mut ui,
-            "bingo.tasks",
-            bingo_tasks::sheet::tree(
-                &tasks(),
-                None,
-                size.width,
-                crate::layout::grid::dock_cap(size.height.into()),
-                Default::default(),
-                &roster,
-            ),
-        );
-        let screen = drawn(
-            size.width,
-            size.height,
-            &solo(&state),
-            &mut ui,
-            capture.now(),
-        );
-        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
-    });
-}
-#[test]
-fn m198_keys_closed_full_frame() {
-    let capture = Capture::load("keys-closed");
-    capture.render(|| {
-        let (state, mut ui) = fixture(&capture);
-        let size = capture.size();
-        ui.focus
-            .show(crate::ui::Open::Keys(None), capture.now().instant);
-        crate::input::on_key(
-            &mut ui,
-            &solo(&state),
-            key(crossterm::event::KeyCode::Esc),
-            capture.now(),
-        );
-        let screen = drawn(
-            size.width,
-            size.height,
-            &solo(&state),
-            &mut ui,
-            capture.now(),
-        );
-        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
-    });
-}
-
 #[test]
 fn m198_permission_mode_band_uses_policy_meanings_and_session_rules() {
     let capture = Capture::load("model");
@@ -290,57 +128,5 @@ fn m198_wake_band_has_six_delays_and_only_a_pending_cancel() {
                 crate::theme::palette().named("pick").unwrap()
             );
         }
-    });
-}
-
-#[test]
-fn m198_model_chosen_full_frame() {
-    let capture = Capture::load("model-chosen");
-    capture.render(|| {
-        let (mut state, mut ui) = fixture(&capture);
-        let mut summary = state.summary.clone();
-        summary.model = Some("sonnet-5.5".into());
-        summary.effort = Some(Effort::Max);
-        state.apply(&frame(state.seq.0 + 1, Event::SessionUpdated { summary }));
-        ui.notify(
-            Level::Info,
-            "✓ sonnet-5.5 max",
-            capture.now().instant - std::time::Duration::from_millis(400),
-        );
-        let screen = drawn(100, 32, &solo(&state), &mut ui, capture.now());
-        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
-    });
-}
-#[test]
-fn m198_rewind_full_frame() {
-    let capture = Capture::load("rewind");
-    capture.render(|| {
-        let (state, mut ui) = fixture(&capture);
-        let touched = bingo_services::checkpoints::Touched {
-            files: [
-                "crates/bingo-core/src/session/queue.rs",
-                "crates/bingo-core/tests/queue_steer.rs",
-            ]
-            .into_iter()
-            .map(|path| bingo_services::checkpoints::File {
-                path: path.into(),
-                changed: true,
-                fate: bingo_services::checkpoints::Fate::Restored,
-            })
-            .collect(),
-            shell_calls: 2,
-        };
-        let card = crate::rewind::Rewind {
-            selected: None,
-            touched: bingo_sdk::transcript::turns(&state.transcript)
-                .iter()
-                .map(|turn| (turn.id.clone(), Some(touched.clone())))
-                .collect(),
-            ..Default::default()
-        };
-        ui.focus
-            .show(crate::ui::Open::Rewind(card), capture.now().instant);
-        let screen = drawn(100, 32, &solo(&state), &mut ui, capture.now());
-        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
     });
 }

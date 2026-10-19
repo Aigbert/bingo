@@ -42,46 +42,20 @@ pub fn script(state: &mut SessionState, name: &str, title: &str, start: Timestam
         start.as_millisecond(),
         Event::ItemCompleted { item: prompt },
     );
-    for (n, mut data) in super::world::rows(name).into_iter().enumerate() {
-        let offset = data["at"].as_i64().unwrap();
-        if offset > elapsed {
+    let now = start.as_millisecond() + elapsed;
+    for (at, end, mut item) in script_steps(name, title, start) {
+        if at > now {
             continue;
         }
-        let at = start.as_millisecond() + offset;
-        data["at"] = json!(at);
-        if let Some(end) = data["end"].as_i64() {
-            data["end"] = json!(start.as_millisecond() + end);
-        }
-        if let Some(text) = data["text"].as_str() {
-            data["text"] = json!(
-                text.replace("{title}", title)
-                    .replace(
-                        "{text}",
-                        &if title.chars().count() > 24 {
-                            format!("{}…", title.chars().take(24).collect::<String>())
-                        } else {
-                            title.into()
-                        }
-                    )
-                    .replace("{T2P}", "修好它，加一个回归测试")
-            );
-        }
-        let mut item = from_data(&format!("{id}-{n}"), &data);
-        item.turn = Some(TurnId::from_raw(&id));
-        let end = data["end"]
-            .as_i64()
-            .unwrap_or(at + data["ms"].as_i64().unwrap_or(0));
-        if end > start.as_millisecond() + elapsed {
+        if end > now {
             item.status = ItemStatus::Running;
+            stamp(&mut item, at, None);
         }
-        let end = item.status.is_terminal().then_some(end);
-        stamp(&mut item, at, end);
-        let event = if item.status.is_terminal() {
-            Event::ItemCompleted { item }
+        if item.status.is_terminal() {
+            emit(state, end, Event::ItemCompleted { item });
         } else {
-            Event::ItemStarted { item }
-        };
-        emit(state, end.unwrap_or(at), event);
+            emit(state, at, Event::ItemStarted { item });
+        }
     }
     if name == "pastScript" {
         emit(
@@ -90,6 +64,56 @@ pub fn script(state: &mut SessionState, name: &str, title: &str, start: Timestam
             completed(&id, TurnStatus::Completed),
         );
     }
+}
+
+/// A script's items as the provider streams them: each one starts at its
+/// moment and completes at its end.
+pub fn script_timeline(name: &str, title: &str, start: Timestamp) -> Vec<(i64, Event)> {
+    let mut timeline = vec![];
+    for (at, end, item) in script_steps(name, title, start) {
+        let mut running = item.clone();
+        running.status = ItemStatus::Running;
+        stamp(&mut running, at, None);
+        timeline.push((at, Event::ItemStarted { item: running }));
+        if item.status.is_terminal() {
+            timeline.push((end, Event::ItemCompleted { item }));
+        }
+    }
+    timeline
+}
+
+/// Every item of a script, finished, with the moments it starts and ends.
+fn script_steps(name: &str, title: &str, start: Timestamp) -> Vec<(i64, i64, Item)> {
+    let id = format!("script-{name}");
+    let shown = if title.chars().count() > 24 {
+        format!("{}…", title.chars().take(24).collect::<String>())
+    } else {
+        title.into()
+    };
+    let mut steps = vec![];
+    for (n, mut data) in super::world::rows(name).into_iter().enumerate() {
+        let at = start.as_millisecond() + data["at"].as_i64().unwrap();
+        data["at"] = json!(at);
+        if let Some(end) = data["end"].as_i64() {
+            data["end"] = json!(start.as_millisecond() + end);
+        }
+        if let Some(text) = data["text"].as_str() {
+            data["text"] = json!(
+                text.replace("{title}", title)
+                    .replace("{text}", &shown)
+                    .replace("{T2P}", "修好它，加一个回归测试")
+            );
+        }
+        let mut item = from_data(&format!("{id}-{n}"), &data);
+        item.turn = Some(TurnId::from_raw(&id));
+        let end = data["end"]
+            .as_i64()
+            .unwrap_or(at + data["ms"].as_i64().unwrap_or(0));
+        let ended = item.status.is_terminal().then_some(end);
+        stamp(&mut item, at, ended);
+        steps.push((at, end, item));
+    }
+    steps
 }
 
 fn clock_origin(value: &mut Value) {

@@ -8,7 +8,17 @@ pub(super) fn compare(
     buffer: &Buffer,
     area: Rect,
 ) -> Result<(), String> {
-    let expected = capture.area(band);
+    within(capture, band, capture.area(band), buffer, area)
+}
+
+/// The capture's `expected` cells against the buffer's `area`, named by `band`.
+pub(super) fn within(
+    capture: &Capture,
+    band: Band,
+    expected: Rect,
+    buffer: &Buffer,
+    area: Rect,
+) -> Result<(), String> {
     if (expected.width, expected.height) != (area.width, area.height) {
         return Err(format!(
             "{} {band:?}: expected {}×{}, rendered {}×{}",
@@ -26,7 +36,15 @@ pub(super) fn compare(
                 area.y + y,
                 capture.spinner_cells.contains(&(expected.y + y, x)),
             ) {
-                return Err(report(capture, band, buffer, area, (x, y), &reason));
+                return Err(report(
+                    capture,
+                    band,
+                    expected,
+                    buffer,
+                    area,
+                    (x, y),
+                    &reason,
+                ));
             }
         }
     }
@@ -125,12 +143,12 @@ fn same_spinner(expected: &str, actual: &str) -> bool {
 fn report(
     capture: &Capture,
     band: Band,
+    expected: Rect,
     buffer: &Buffer,
     area: Rect,
     at: (u16, u16),
     reason: &str,
 ) -> String {
-    let expected = capture.area(band);
     let mut out = format!(
         "{} {band:?}: first difference at cell ({}, {}): {reason}\n     capture{} | rendered\n",
         capture.entry.file,

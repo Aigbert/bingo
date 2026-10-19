@@ -328,6 +328,8 @@ impl TestHost {
 #[derive(Debug, Default)]
 pub struct Recorder {
     pub motion: Option<bool>,
+    /// The terminal's size, when a test draws at another than 80×24.
+    pub size: Option<(u16, u16)>,
     pub frames: Vec<String>,
     pub painted_at: Vec<std::time::Instant>,
     pub titles: Vec<String>,
@@ -406,7 +408,7 @@ impl Screen for Recorder {
     }
 
     fn size(&self) -> (u16, u16) {
-        (80, 24)
+        self.size.unwrap_or((80, 24))
     }
 }
 

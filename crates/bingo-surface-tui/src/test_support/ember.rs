@@ -166,6 +166,27 @@ pub fn assert_regions(
     assert_area(capture, band, buffer, area);
 }
 
+/// The capture's `rows` and `columns` against the frame's rows from `top`,
+/// for a capture one of whose facts is owed elsewhere and may move what
+/// follows it.
+pub fn assert_cells(
+    capture: &Capture,
+    buffer: &Buffer,
+    (rows, columns): (std::ops::Range<u16>, std::ops::Range<u16>),
+    top: u16,
+) {
+    let expected = Rect::new(
+        columns.start,
+        rows.start,
+        columns.end - columns.start,
+        rows.end - rows.start,
+    );
+    let area = Rect { y: top, ..expected };
+    if let Err(report) = compare::within(capture, Band::Frame, expected, buffer, area) {
+        panic!("{report}");
+    }
+}
+
 pub fn assert_area(capture: &Capture, band: Band, buffer: &Buffer, area: Rect) {
     if let Err(report) = compare::compare(capture, band, buffer, area) {
         panic!("{report}");
