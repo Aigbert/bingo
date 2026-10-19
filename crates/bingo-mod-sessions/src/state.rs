@@ -1,5 +1,5 @@
 use bingo_sdk::*;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 #[derive(Default)]
 pub(crate) struct State {
     pub cursors: BTreeMap<(SessionId, String), Cursor>,
@@ -8,31 +8,25 @@ pub(crate) struct State {
 pub(crate) struct Cursor {
     pub query: String,
     pub selected: Option<crate::rows::Target>,
-    pub expanded: BTreeSet<String>,
-    pub searching: bool,
-    pub sheet: Sheet,
-    /// Why the last verb was refused, until the next key.
-    pub refusal: Option<String>,
     pub probed: crate::probe::Probed,
 }
-#[derive(Default)]
-pub(crate) enum Sheet {
-    #[default]
-    None,
-    Loading(SessionId),
-    Preview(String),
-    Delete(Vec<crate::verbs::Deletion>),
-    Rename {
-        id: SessionId,
-        text: String,
-    },
-}
 impl Cursor {
+    /// A new filter starts the cursor over at its best match.
     pub fn sync(&mut self, query: &str) {
         if self.query != query {
             self.query = query.into();
             self.selected = None;
-            self.sheet = Sheet::None;
+        }
+    }
+
+    /// The cursor stays on its row while the row is listed, and otherwise
+    /// falls to the first.
+    pub fn settle(&mut self, rows: &[crate::rows::Row]) {
+        if !rows
+            .iter()
+            .any(|row| Some(&row.target) == self.selected.as_ref())
+        {
+            self.selected = rows.first().map(|row| row.target.clone());
         }
     }
 }

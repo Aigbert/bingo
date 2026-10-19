@@ -974,6 +974,7 @@ impl Run {
         let now = self.now();
         self.ui.focus.close(now.instant);
         interactions::refocus(self);
+        surface::resumed(self);
     }
 }
 

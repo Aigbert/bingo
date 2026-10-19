@@ -155,276 +155,81 @@ fn setup() -> (Ui, Tree, Now) {
     (ui, solo(&state), now)
 }
 #[tokio::test]
-async fn directory_matches_the_sketch_at_both_sizes() {
+async fn directory_matches_the_sheet_at_both_sizes() {
     let fixture = Fixture::new(rows());
     for (width, height) in [(108, 30), (80, 24)] {
         let (mut ui, tree, now) = setup();
         let screen = fixture.paint(&mut ui, &tree, now, width, height).await;
         insta::assert_snapshot!(format!("sessions_{width}x{height}"), screen);
-        assert_eq!(screen.matches('❯').count(), 1);
-        assert!(screen.contains("schedule (1)"));
+        assert_eq!(screen.matches('▎').count(), 1);
+        assert!(screen.contains("nightly report"));
+        assert!(screen.contains("needs you"));
         assert!(screen.contains("review: action FIFO"));
     }
 }
 #[tokio::test]
-async fn scope_paging_filter_fork_and_rename_are_client_actions() {
-    let fixture = Fixture::new(rows());
-    let (mut ui, tree, now) = setup();
-    fixture.paint(&mut ui, &tree, now, 108, 30).await;
-    let effects = fixture.press(&mut ui, &tree, "f", now).await;
-    assert!(
-        matches!(&effects[..], [Effect::Open(SessionSelector::ById { id })] if id.as_str() == "fork")
-    );
-    let (mut ui, tree, now) = setup();
-    fixture.paint(&mut ui, &tree, now, 108, 30).await;
-    let effects = fixture.press(&mut ui, &tree, "r", now).await;
-    assert!(effects.is_empty());
-    assert!(matches!(ui.focus.open(), Open::Sessions(_)));
-    assert!(
-        fixture
-            .paint(&mut ui, &tree, now, 108, 30)
-            .await
-            .contains("save title")
-    );
-    fixture.press(&mut ui, &tree, "ctrl+u", now).await;
-    fixture.press(&mut ui, &tree, "x", now).await;
-    assert_eq!(
-        fixture.press(&mut ui, &tree, "enter", now).await,
-        vec![Effect::ListSessions]
-    );
-    assert!(fixture.host.calls().iter().any(|call| matches!(call,
-        testing::HostCall::Reconfigure { session, change: bingo_sdk::SessionChange::Title(title) }
-        if session.as_str() == "root" && title == "x")));
-    assert!(
-        !fixture
-            .host
-            .calls()
-            .iter()
-            .any(|call| matches!(call, testing::HostCall::Open { .. }))
-    );
-    let (mut ui, tree, now) = setup();
-    fixture.paint(&mut ui, &tree, now, 108, 30).await;
-    assert_eq!(
-        fixture.press(&mut ui, &tree, "tab", now).await,
-        vec![Effect::ListSessions]
-    );
-    assert!(matches!(ui.focus.open(), Open::Sessions(o) if o.scope == SessionsScope::All));
-}
-#[tokio::test]
-async fn delete_names_children_then_removes_them_first() {
-    let fixture = Fixture::new(rows());
-    let (mut ui, tree, now) = setup();
-    fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    fixture.press(&mut ui, &tree, "d", now).await;
-    let screen = fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    assert!(screen.contains("Delete 2 session(s), children first?"));
-    assert!(screen.contains("review: action FIFO"));
-    fixture.press(&mut ui, &tree, "enter", now).await;
-    let deleted = fixture
-        .host
-        .calls()
-        .into_iter()
-        .filter_map(|call| match call {
-            testing::HostCall::Delete { session } => Some(session.to_string()),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    assert_eq!(deleted, ["root"]);
-}
-
-#[tokio::test]
-async fn a_refused_rename_closes_the_editor_and_says_why() {
-    let fixture = Fixture::new(rows());
-    fixture.host.on_reconfigure(|_, _| async {
-        Err(KernelError::new(
-            ErrorCode::SessionLocked,
-            "session is open elsewhere; close it before renaming",
-        ))
-    });
-    for (width, height) in [(108, 30), (80, 24)] {
+async fn letters_filter_and_never_fork_rename_or_delete() {
+    for letter in ["f", "r", "d"] {
+        let fixture = Fixture::new(rows());
         let (mut ui, tree, now) = setup();
-        fixture.paint(&mut ui, &tree, now, width, height).await;
-        fixture.press(&mut ui, &tree, "r", now).await;
-        fixture.paint(&mut ui, &tree, now, width, height).await;
-        assert!(fixture.press(&mut ui, &tree, "enter", now).await.is_empty());
-        let screen = fixture.paint(&mut ui, &tree, now, width, height).await;
-        insta::assert_snapshot!(format!("refused_rename_{width}x{height}"), screen);
-        assert!(!screen.contains("❯ title"), "the editor closed");
-        assert!(screen.contains("open elsewhere; close it before renaming"));
-        fixture.press(&mut ui, &tree, "down", now).await;
-        let screen = fixture.paint(&mut ui, &tree, now, width, height).await;
-        assert!(
-            !screen.contains("close it before renaming"),
-            "one key later"
-        );
+        fixture.paint(&mut ui, &tree, now, 80, 24).await;
+        assert!(fixture.press(&mut ui, &tree, letter, now).await.is_empty());
+        assert_eq!(ui.composer.text(), letter);
+        assert!(!fixture.host.calls().iter().any(|call| matches!(
+            call,
+            testing::HostCall::Delete { .. }
+                | testing::HostCall::Reconfigure { .. }
+                | testing::HostCall::Open { .. }
+        )));
     }
 }
-
 #[tokio::test]
-async fn a_blocked_delete_says_why_and_enter_deletes_nothing() {
-    let fixture = Fixture::new(rows());
-    fixture.host.on_check_delete(|id| async move {
-        if id.as_str() == "child" {
-            Err(KernelError::new(ErrorCode::SessionLocked, "open elsewhere"))
-        } else {
-            Ok(())
-        }
-    });
-    for (width, height) in [(108, 30), (80, 24)] {
-        let (mut ui, tree, now) = setup();
-        fixture.paint(&mut ui, &tree, now, width, height).await;
-        fixture.press(&mut ui, &tree, "d", now).await;
-        let screen = fixture.paint(&mut ui, &tree, now, width, height).await;
-        insta::assert_snapshot!(format!("blocked_delete_{width}x{height}"), screen);
-        assert!(screen.contains("Cannot delete: 1 of 2 session(s)"));
-        assert!(screen.contains("review: action FIFO · open elsewhere"));
-        assert!(!screen.contains("delete permanently"));
-        assert!(fixture.press(&mut ui, &tree, "enter", now).await.is_empty());
-        let again = fixture.paint(&mut ui, &tree, now, width, height).await;
-        assert!(again.contains("Cannot delete"), "enter leaves the sheet up");
-    }
-    assert!(
-        !fixture
-            .host
-            .calls()
-            .iter()
-            .any(|call| matches!(call, testing::HostCall::Delete { .. }))
-    );
-}
-
-/// Paints until the probes the first paint started have answered.
-async fn settled(
-    fixture: &Fixture,
-    ui: &mut Ui,
-    tree: &Tree,
-    now: Now,
-    size: (u16, u16),
-) -> String {
-    let mut screen = fixture.paint(ui, tree, now, size.0, size.1).await;
-    for _ in 0..50 {
-        tokio::task::yield_now().await;
-        let next = fixture.paint(ui, tree, now, size.0, size.1).await;
-        if next == screen {
-            break;
-        }
-        screen = next;
-    }
-    screen
-}
-
-#[tokio::test]
-async fn visible_rows_learn_foreign_locks_and_unlisted_fork_sources() {
-    let fixture = Fixture::new(rows());
-    fixture
-        .host
-        .on_open_elsewhere(|id| async move { Ok(id.as_str() == "fixture") });
-    fixture.host.on_summary(|id| async move {
-        if id.as_str() == "far-source" {
-            let mut source = summary("far-source", "the original plan");
-            source.history.messages = None;
-            Ok(source)
-        } else {
-            Err(KernelError::new(ErrorCode::SessionNotFound, "gone"))
-        }
-    });
-    let mut far = summary("far-fork", "a fork of something older");
-    far.history.forked_from = Some(bingo_sdk::ForkLink {
-        session: SessionId::from_raw("far-source"),
-        turn: None,
-    });
-    let mut lost = summary("lost-fork", "a fork of something deleted");
-    lost.history.forked_from = Some(bingo_sdk::ForkLink {
-        session: SessionId::from_raw("ses_01JDELETEDSOURCE42"),
-        turn: None,
-    });
-    for (width, height) in [(108, 30), (80, 24)] {
-        let (mut ui, tree, now) = setup();
-        if let Some(Open::Sessions(open)) = ui.focus.open_mut() {
-            open.sessions.extend([far.clone(), lost.clone()]);
-        }
-        let screen = settled(&fixture, &mut ui, &tree, now, (width, height)).await;
-        insta::assert_snapshot!(format!("probed_{width}x{height}"), screen);
-        assert!(screen.contains("● open elsewhere"));
-        assert!(screen.contains("⑂ from the original plan"));
-        assert!(screen.contains("⑂ from SOURCE42"));
-    }
-    let calls = fixture.host.calls();
-    let probes = |id: &str| {
-        calls
-            .iter()
-            .filter(|call| {
-                matches!(call, testing::HostCall::OpenElsewhere { session } if session.as_str() == id)
-            })
-            .count()
-    };
-    assert_eq!(probes("fixture"), 2, "once per directory, at each size");
-    assert_eq!(probes("current"), 0, "this session is open here");
-    assert!(
-        !calls
-            .iter()
-            .any(|call| matches!(call, testing::HostCall::Open { .. })),
-        "probing opens nothing"
-    );
-}
-
-#[tokio::test]
-async fn more_filter_and_group_expansion_stay_in_the_directory() {
+async fn typing_filters_and_enter_opens_the_selected_identity() {
     let fixture = Fixture::new(rows());
     let (mut ui, tree, now) = setup();
-    if let Some(Open::Sessions(open)) = ui.focus.open_mut() {
-        open.limit = 1;
-    }
-    fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    fixture.press(&mut ui, &tree, "down", now).await;
-    fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    assert_eq!(
-        fixture.press(&mut ui, &tree, "enter", now).await,
-        vec![Effect::ListSessions]
-    );
-    assert!(matches!(ui.focus.open(), Open::Sessions(o) if o.limit == 51));
-    fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    fixture.press(&mut ui, &tree, "/", now).await;
-    for chord in ["f", "i", "x"] {
+    for chord in ["f", "i", "x", "t", "u", "r", "e"] {
         fixture.paint(&mut ui, &tree, now, 80, 24).await;
         fixture.press(&mut ui, &tree, chord, now).await;
     }
     let screen = fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    assert_eq!(ui.composer.text(), "fix");
-    assert!(!screen.contains("schedule (1)"));
-    fixture.press(&mut ui, &tree, "esc", now).await;
-    fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    for _ in 0..3 {
-        fixture.press(&mut ui, &tree, "down", now).await;
-        fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    }
-    fixture.press(&mut ui, &tree, "enter", now).await;
-    assert!(
-        fixture
-            .paint(&mut ui, &tree, now, 80, 24)
-            .await
-            .contains("nightly report")
+    assert!(screen.contains("1 of 4"));
+    assert!(!screen.contains("nightly report"));
+    assert_eq!(
+        fixture.press(&mut ui, &tree, "enter", now).await,
+        vec![Effect::Open(SessionSelector::ById {
+            id: SessionId::from_raw("fixture")
+        })]
     );
 }
-#[test]
-fn disabled_directory_leaves_the_recent_palette_available() {
-    let (mut ui, now) = scene();
-    let effects = crate::palette::command(&mut ui, "/sessions", now).unwrap();
-    assert!(effects.is_empty());
-    assert!(!active(&ui));
-    assert!(crate::palette::command(&mut ui, "/resume", now).is_some());
-    assert!(crate::palette::active(&ui));
-}
-
 #[tokio::test]
-async fn a_long_title_cannot_hide_age_count_or_attention_at_eighty_columns() {
+async fn refresh_keeps_selection_by_id_and_escape_restores_the_draft() {
+    let fixture = Fixture::new(rows());
+    let (mut ui, tree, now) = setup();
+    if let Some(Open::Sessions(open)) = ui.focus.open_mut() {
+        open.draft = "keep this".into();
+    }
+    fixture.paint(&mut ui, &tree, now, 80, 24).await;
+    fixture.press(&mut ui, &tree, "down", now).await;
+    if let Some(Open::Sessions(open)) = ui.focus.open_mut() {
+        open.sessions.reverse();
+    }
+    let screen = fixture.paint(&mut ui, &tree, now, 80, 24).await;
+    assert!(
+        screen
+            .lines()
+            .any(|line| line.contains('▎') && line.contains("review: action FIFO"))
+    );
+    fixture.press(&mut ui, &tree, "esc", now).await;
+    assert_eq!(ui.composer.text(), "keep this");
+}
+#[tokio::test]
+async fn a_long_title_cannot_hide_attention_at_eighty_columns() {
     let fixture = Fixture::new(rows());
     let (mut ui, tree, now) = setup();
     if let Some(Open::Sessions(open)) = ui.focus.open_mut() {
         open.sessions[0].title = Some("long title ".repeat(30));
     }
     let screen = fixture.paint(&mut ui, &tree, now, 80, 24).await;
-    let selected = screen.lines().find(|line| line.contains('❯')).unwrap();
-    assert!(selected.contains("38 msg"), "{selected}");
-    assert!(selected.contains("● asking"), "{selected}");
-    assert!(selected.contains("ago"), "{selected}");
+    let selected = screen.lines().find(|line| line.contains('▎')).unwrap();
+    assert!(selected.contains("needs you"), "{selected}");
 }

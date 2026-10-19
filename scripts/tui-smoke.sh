@@ -308,14 +308,14 @@ await 'fake-1'
 vanish '/help lists every command'
 finish
 
-step 'ctrl+r opens the session palette and esc closes it'
+step 'ctrl+r opens the sessions sheet and esc closes it'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys 'ask me' Enter
 await 'nothing to do'
 keys C-r
-await 'this one'
+await 'type to filter by title or directory'
 keys Escape
-vanish 'this one'
+vanish 'type to filter by title or directory'
 await 'fake-1'
 finish
 

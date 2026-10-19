@@ -2,7 +2,6 @@
 pub mod draw;
 mod guide;
 mod keys;
-mod preview;
 mod probe;
 pub mod rows;
 mod state;

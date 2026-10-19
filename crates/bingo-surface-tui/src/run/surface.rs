@@ -144,6 +144,14 @@ pub(super) fn undone(run: &mut Run, frame: &bingo_sdk::Frame) -> Option<String> 
     (&frame.session == run.session.tree.view()).then_some(text)
 }
 
+pub(super) fn resumed(run: &mut Run) {
+    let now = run.now().instant;
+    if let Some(title) = &run.session.tree.root().summary.title {
+        let said = bingo_sdk::toast::Say::ok(format!("resumed · {title}"));
+        run.ui.tell(said, now);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

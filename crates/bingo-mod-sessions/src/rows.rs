@@ -222,27 +222,53 @@ fn row(summary: &SessionSummary, now: jiff::Timestamp, current: &SessionId, dept
     }
 }
 pub(crate) fn listed(props: &component::SessionsProps, cursor: &crate::state::Cursor) -> Vec<Row> {
-    let end = props.limit.min(props.sessions.len());
-    let mut rows = expanded(
-        &props.sessions[..end],
-        props.now,
-        &props.query,
-        &props.session,
-        &cursor.expanded,
-        &cursor.probed,
-    );
-    if props.sessions.len() > props.limit {
-        rows.push(Row {
-            target: Target::More,
-            title: "more…".into(),
-            first_ask: None,
-            provenance: None,
-            detail: "50 at a time".into(),
-            depth: 0,
-            current: false,
-        });
+    let _ = cursor;
+    let query = props.query.to_lowercase();
+    let mut summaries = props
+        .sessions
+        .iter()
+        .filter_map(|s| {
+            score(
+                &format!("{} {}", s.title.as_deref().unwrap_or_default(), s.cwd),
+                &query,
+            )
+            .map(|score| (s, score))
+        })
+        .collect::<Vec<_>>();
+    summaries.sort_by_key(|(s, score)| {
+        (
+            if s.asking {
+                0
+            } else if s.busy {
+                1
+            } else {
+                2
+            },
+            std::cmp::Reverse(*score),
+        )
+    });
+    summaries
+        .into_iter()
+        .map(|(s, _)| row(s, props.now, &props.session, 0))
+        .collect()
+}
+
+fn score(text: &str, query: &str) -> Option<usize> {
+    let text = text.to_lowercase();
+    if query.is_empty() {
+        return Some(0);
     }
-    rows
+    if text.starts_with(query) {
+        return Some(1000);
+    }
+    if let Some(at) = text.find(query) {
+        return Some(500usize.saturating_sub(at));
+    }
+    let mut chars = text.chars();
+    query
+        .chars()
+        .all(|c| chars.by_ref().any(|x| x == c))
+        .then_some(1)
 }
 
 #[cfg(test)]

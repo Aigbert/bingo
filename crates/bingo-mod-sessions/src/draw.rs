@@ -1,7 +1,7 @@
 use crate::{
     Shared,
     rows::{Row, Target},
-    state::{Cursor, Sheet},
+    state::Cursor,
 };
 use bingo_sdk::{component::SessionsProps, *};
 use serde_json::{Value, json};
@@ -50,66 +50,26 @@ impl Drawing {
     ) -> (View, crate::probe::Wanted) {
         cursor.sync(&props.query);
         let rows = crate::rows::listed(props, cursor);
-        if cursor.selected.is_none() {
-            cursor.selected = rows.first().map(|row| row.target.clone());
-        }
-        let wanted = if matches!(cursor.sheet, Sheet::None | Sheet::Rename { .. }) {
-            let visible = visible(&rows, cursor, room(request.viewport.rows));
-            crate::probe::wanted(&mut cursor.probed, &visible, props)
-        } else {
-            crate::probe::Wanted::default()
-        };
-        let view = tree(
+        cursor.settle(&rows);
+        let sheet = sheet(props, &rows, cursor, request.viewport.glyphs);
+        let visible = sheet
+            .window(request.viewport.rows)
+            .map(|i| &rows[i])
+            .collect::<Vec<_>>();
+        let wanted = crate::probe::wanted(&mut cursor.probed, &visible, props);
+        let view = finish(
+            sheet.view(
+                request.viewport.columns,
+                request.viewport.rows,
+                request.viewport.glyphs,
+            ),
             props,
-            &rows,
-            cursor,
             &request.request_id,
-            request.viewport.rows,
-            request.viewport.columns,
         );
         (view, wanted)
     }
 }
-/// Lines left for rows under the header and above the rule and hint.
-fn room(height: u16) -> usize {
-    usize::from(height).saturating_sub(3)
-}
-/// Lines a row takes: itself, where it was forked from, and its first ask.
-fn height(row: &Row) -> usize {
-    1 + usize::from(row.provenance.is_some()) + usize::from(row.first_ask.is_some())
-}
-/// The first line drawn, keeping the selection near the middle.
-fn first_line(selected: usize, lines: usize, room: usize) -> usize {
-    selected
-        .saturating_sub(room / 2)
-        .min(lines.saturating_sub(room))
-}
-/// The rows with a line on screen, in the window `directory` draws.
-fn visible<'a>(rows: &'a [Row], cursor: &Cursor, room: usize) -> Vec<&'a Row> {
-    let owners: Vec<usize> = rows
-        .iter()
-        .enumerate()
-        .flat_map(|(index, row)| std::iter::repeat_n(index, height(row)))
-        .collect();
-    let selected = owners
-        .iter()
-        .position(|&index| cursor.selected.as_ref() == Some(&rows[index].target))
-        .unwrap_or(0);
-    let mut shown: Vec<&Row> = Vec::new();
-    for &index in owners
-        .iter()
-        .skip(first_line(selected, owners.len(), room))
-        .take(room)
-    {
-        if shown
-            .last()
-            .is_none_or(|last| !std::ptr::eq(*last, &rows[index]))
-        {
-            shown.push(&rows[index]);
-        }
-    }
-    shown
-}
+#[cfg(test)]
 pub(crate) fn tree(
     props: &SessionsProps,
     rows: &[Row],
@@ -117,225 +77,172 @@ pub(crate) fn tree(
     request: &str,
     height: u16,
     width: u16,
+    glyphs: bingo_sdk::glyph::GlyphSet,
 ) -> View {
-    let scope = if props.scope == component::SessionsScope::Here {
-        "here"
-    } else {
-        "all"
-    };
-    let total = props.sessions.len().min(props.limit);
-    let count = rows
-        .iter()
-        .filter(|r| matches!(r.target, Target::Session(_)))
-        .count();
-    let mut children = vec![pair(
-        dim(format!(" sessions · {scope} · {}", props.query)),
-        dim(format!(
-            "{count} of {total}{}",
-            if props.sessions.len() > props.limit {
-                "+"
-            } else {
-                ""
-            }
-        )),
-        width,
-    )];
-    let room = room(height);
-    let lines = match &cursor.sheet {
-        Sheet::None | Sheet::Rename { .. } => directory(rows, cursor, room, width, props, request),
-        Sheet::Loading(_) => vec![dim(" loading…")],
-        Sheet::Preview(text) => text
-            .lines()
-            .take(room)
-            .map(|s| View::text(format!(" {s}")))
-            .collect(),
-        Sheet::Delete(doomed) => confirmation(doomed, room),
-    };
-    children.extend(lines);
-    children.push(dim("─".repeat(usize::from(width))));
-    if let Some(refusal) = &cursor.refusal {
-        children.push(View::text(format!(" {refusal}")));
+    finish(
+        sheet(props, rows, cursor, glyphs).view(width, height, glyphs),
+        props,
+        request,
+    )
+}
+fn finish(mut view: View, props: &SessionsProps, request: &str) -> View {
+    if let View::Box { layout, .. } = &mut view {
+        layout.hints = Some(component::SiteHints::new([
+            component::KeyPair::new("↑↓", "session"),
+            component::KeyPair::new("⏎", "open"),
+            component::KeyPair::new("esc", "close"),
+        ]));
+        layout.on_key = Some(Action {
+            name: "sessions:ui".into(),
+            args: json!({"handler":request,"event":"press","props":props}),
+        });
     }
-    View::Box {
-        children,
-        layout: Box::new(view::BoxStyle {
-            hints: Some(component::SiteHints::new(hint(cursor)).composer("⟲ ", "filter sessions")),
-            on_key: Some(Action {
-                name: "sessions:ui".into(),
-                args: json!({"handler":request,"event":"press","props":props}),
-            }),
-            ..Default::default()
-        }),
+    bingo_sdk::sheet::clicks(view)
+}
+fn sheet(
+    props: &SessionsProps,
+    rows: &[Row],
+    cursor: &Cursor,
+    glyphs: glyph::GlyphSet,
+) -> bingo_sdk::sheet::Sheet {
+    use bingo_sdk::{pick, sheet::Sheet};
+    let list = rows
+        .iter()
+        .map(|row| row_view(row, props, cursor, glyphs))
+        .collect();
+    let fact = if props.query.is_empty() {
+        "needs you first".into()
+    } else {
+        format!("{} of {}", rows.len(), props.sessions.len())
+    };
+    let query = if props.query.is_empty() {
+        pick::line([
+            pick::text(glyph::Glyph::Caret.spell(glyphs), "glow"),
+            pick::text("type to filter by title or directory", "dim"),
+        ])
+    } else {
+        pick::line([
+            pick::text(&props.query, "fg"),
+            pick::text(glyph::Glyph::Caret.spell(glyphs), "glow"),
+        ])
+    };
+    Sheet {
+        head: "Sessions".into(),
+        fact: Some(pick::text(fact, "dim")),
+        top: vec![
+            pick::line([pick::text("filter  ", "dim"), query]),
+            pick::text("", "dim"),
+        ],
+        rows: list,
+        selected: cursor.selected.as_ref().map(identity),
+        foot: vec![],
+        pick: true,
     }
 }
-fn hint(cursor: &Cursor) -> Vec<component::KeyPair> {
-    use component::KeyPair as Pair;
-    match &cursor.sheet {
-        Sheet::None => vec![
-            Pair::new("↑↓", "pick"),
-            Pair::new("⏎", "resume"),
-            Pair::new("→", "preview"),
-            Pair::new("r", "rename"),
-            Pair::new("d", "delete"),
-            Pair::new("f", "fork"),
-            Pair::new("tab", "here/all"),
-            Pair::new(
-                "esc",
-                if cursor.searching {
-                    "leave search"
-                } else {
-                    "close"
-                },
-            ),
-        ],
-        Sheet::Delete(doomed) if crate::verbs::blocked(doomed) > 0 => {
-            vec![Pair::new("esc", "back")]
-        }
-        Sheet::Delete(_) => vec![
-            Pair::new("⏎", "delete permanently"),
-            Pair::new("esc", "cancel"),
-        ],
-        Sheet::Rename { .. } => vec![Pair::new("⏎", "save title"), Pair::new("esc", "cancel")],
-        _ => vec![Pair::new("↑↓", "pick"), Pair::new("esc", "back")],
+pub(crate) fn identity(target: &Target) -> String {
+    match target {
+        Target::Session(id) => id.to_string(),
+        Target::Group(id) => id.clone(),
+        Target::More => "more".into(),
+    }
+}
+fn row_view(
+    row: &Row,
+    props: &SessionsProps,
+    cursor: &Cursor,
+    glyphs: glyph::GlyphSet,
+) -> pick::Row {
+    use bingo_sdk::pick::{bold, line, text};
+    let summary = props
+        .sessions
+        .iter()
+        .find(|s| row.target == Target::Session(s.id.clone()));
+    let asking = summary.is_some_and(|s| s.asking);
+    let working = summary.is_some_and(|s| s.busy);
+    let selected = cursor.selected.as_ref() == Some(&row.target);
+    let mut lamp = text(
+        glyph::Glyph::Lamp.spell(glyphs),
+        if asking {
+            "amberGlow"
+        } else if working {
+            "glow"
+        } else {
+            "faint"
+        },
+    );
+    if (asking || working)
+        && let View::Text { style, .. } = &mut lamp
+    {
+        style.motion = Some(Box::new(view::TextMotion::Breathe {
+            with: "you".into(),
+            period_ms: if asking { 1100 } else { 1800 },
+            depth: if asking { 0.6 } else { 0.55 },
+        }));
+    }
+    let title = if selected {
+        bold(&row.title, "fg")
+    } else {
+        text(&row.title, "muted")
+    };
+    let left = line([
+        lamp,
+        text("  ", "fg"),
+        pick::pad(title, 26),
+        text(summary.map(|s| s.cwd.as_str()).unwrap_or_default(), "dim"),
+    ]);
+    let right = if asking {
+        text("needs you", "amber")
+    } else if working {
+        text("working", "muted")
+    } else {
+        text(
+            summary
+                .map(|s| when(props.now, s.updated_at))
+                .unwrap_or_default(),
+            "dim",
+        )
+    };
+    pick::Row::new(identity(&row.target), left).right(right)
+}
+
+fn when(now: jiff::Timestamp, at: jiff::Timestamp) -> String {
+    let seconds = (now.as_second() - at.as_second()).max(0);
+    if seconds < 60 {
+        "now".into()
+    } else if seconds < 3600 {
+        format!("{}m", seconds / 60)
+    } else if seconds < 86400 {
+        format!("{}h", seconds / 3600)
+    } else if seconds < 172800 {
+        "yesterday".into()
+    } else {
+        at.strftime("%b %-d").to_string()
     }
 }
 
-fn directory(
-    rows: &[Row],
-    cursor: &Cursor,
-    room: usize,
-    width: u16,
-    props: &SessionsProps,
-    request: &str,
-) -> Vec<View> {
-    if rows.is_empty() {
-        return vec![dim(" no sessions match")];
-    }
-    let mut lines = Vec::new();
-    let mut selected_line = 0;
-    for row in rows {
-        let selected = cursor.selected.as_ref() == Some(&row.target);
-        if selected {
-            selected_line = lines.len();
-        }
-        let view = match &cursor.sheet {
-            Sheet::Rename { id, text } if row.target == Target::Session(id.clone()) => {
-                View::Input {
-                    input: Box::new(view::InputProps {
-                        key: Some(format!("rename:{id}")),
-                        label: Some("❯ title".into()),
-                        value: Some(text.clone()),
-                        ..Default::default()
-                    }),
-                }
-            }
-            _ => row_view(row, selected, width, props, request),
+#[cfg(test)]
+mod sheet_tests {
+    use super::*;
+    #[test]
+    fn sessions_use_the_shared_window_after_need_ordering() {
+        let mut props = crate::tests::props();
+        props.sessions = (0..12)
+            .map(|i| crate::tests::summary(&i.to_string(), Some(&format!("session {i}"))))
+            .collect();
+        props.sessions[11].asking = true;
+        let cursor = Cursor {
+            selected: Some(Target::Session(SessionId::from_raw("11"))),
+            ..Default::default()
         };
-        lines.push(View::Box {
-            children: vec![view],
-            layout: Box::new(view::BoxStyle {
-                key: Some(format!("{:?}", row.target)),
-                ..Default::default()
-            }),
-        });
-        if let Some(source) = &row.provenance {
-            lines.push(dim(format!("     {source}")));
-        }
-        if let Some(ask) = &row.first_ask {
-            lines.push(dim(format!("     {}\"{ask}\"", "  ".repeat(row.depth))));
-        }
-    }
-    let start = first_line(selected_line, lines.len(), room);
-    lines.into_iter().skip(start).take(room).collect()
-}
-fn confirmation(doomed: &[crate::verbs::Deletion], room: usize) -> Vec<View> {
-    let blocked = crate::verbs::blocked(doomed);
-    let mut lines = vec![View::text(if blocked == 0 {
-        format!(" Delete {} session(s), children first?", doomed.len())
-    } else {
-        format!(
-            " Cannot delete: {blocked} of {} session(s) blocked, reasons below.",
-            doomed.len()
-        )
-    })];
-    lines.extend(doomed.iter().take(room.saturating_sub(2)).map(|row| {
-        dim(format!(
-            "   {}{}",
-            row.label,
-            row.blocked
-                .as_ref()
-                .map(|reason| format!(" · {reason}"))
-                .unwrap_or_default()
-        ))
-    }));
-    if doomed.len() > room.saturating_sub(2) {
-        lines.push(dim(format!(
-            "   … {} more children",
-            doomed.len() - room.saturating_sub(2)
-        )));
-    }
-    lines
-}
-fn row_view(row: &Row, selected: bool, width: u16, props: &SessionsProps, request: &str) -> View {
-    let indent = if row.depth > 0 {
-        format!("{}└ ", "  ".repeat(row.depth))
-    } else {
-        String::new()
-    };
-    pair(
-        View::Button {
-            children: vec![],
-            button: Box::new(view::ButtonProps {
-                key: Some("title".into()),
-                variant: Some("plain".into()),
-                on_press: Some(Action {
-                    name: "sessions:ui".into(),
-                    args: json!({"handler":format!("{request}:{:?}", row.target),"request":request,"event":"activate","target":row.target,"session":props.session,"action":props.action}),
-                }),
-                label: Some(format!(
-                    "{} {indent}{}{}",
-                    if selected { "❯" } else { " " },
-                    row.title,
-                    if row.current { " · current" } else { "" }
-                )),
-                ..Default::default()
-            }),
-        },
-        dim(row.detail.clone()),
-        width,
-    )
-}
-fn pair(left: View, right: View, width: u16) -> View {
-    // Ages, counts and state badges use single-cell glyphs; the surface clips the title.
-    let detail = u16::try_from(right.fold().chars().count()).unwrap_or(width);
-    let title = width.saturating_sub(detail).saturating_sub(1);
-    View::Box {
-        children: vec![
-            View::Box {
-                children: vec![left],
-                layout: Box::new(view::BoxStyle {
-                    key: Some("title-column".into()),
-                    width: Some(title),
-                    ..Default::default()
-                }),
-            },
-            right,
-        ],
-        layout: Box::new(view::BoxStyle {
-            key: Some("columns".into()),
-            flex_direction: Some(view::Direction::Row),
-            justify_content: Some(view::Justify::SpaceBetween),
-            height: Some(1),
-            ..Default::default()
-        }),
-    }
-}
-fn dim(text: impl Into<String>) -> View {
-    View::Text {
-        children: vec![view::TextChild::String(text.into())],
-        style: view::TextStyle {
-            dim_color: Some(true),
-            ..Default::default()
-        },
+        let rows = crate::rows::listed(&props, &cursor);
+        assert_eq!(rows[0].target, cursor.selected.clone().unwrap());
+        let view = tree(&props, &rows, &cursor, "list", 19, 100, Default::default());
+        assert!(view.fold().contains("8 of 12"));
+        assert!(
+            serde_json::to_string(&view)
+                .unwrap()
+                .contains("\"ground\":\"pick\"")
+        );
+        bingo_sdk::testing::assert_separate_hints(&view);
     }
 }

@@ -91,6 +91,9 @@ pub fn draw(
     if let Some(key) = key {
         frame.pulls.push(key);
     }
+    if let Some(view) = answer {
+        crate::dock::sheets::targets(frame, view, width);
+    }
     let drawing = crate::component::draw_marked(
         &props,
         answer,
@@ -114,13 +117,13 @@ pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
     let Some(id) = request(ui) else {
         return false;
     };
-    let area = ui.shown.regions.above();
+    let area = ui.shown.area();
     let Some(key) = crate::component::key(
         tree.viewed(),
         id,
         &Props::Sessions(Box::new(props)),
         area.width,
-        area.height,
+        crate::layout::grid::dock_cap(usize::from(area.height)),
     ) else {
         return false;
     };
