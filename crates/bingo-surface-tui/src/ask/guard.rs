@@ -27,7 +27,9 @@ pub fn next(opened: Timestamp, now: Now) -> Option<Instant> {
 }
 
 fn elapsed(opened: Timestamp, now: Timestamp) -> Duration {
-    Duration::from_millis(u64::try_from((now - opened).get_milliseconds()).unwrap_or(0))
+    Duration::from_millis(
+        u64::try_from(now.as_millisecond() - opened.as_millisecond()).unwrap_or(0),
+    )
 }
 
 #[cfg(test)]
@@ -43,6 +45,10 @@ mod tests {
         assert!(!open(at(0), at(399)));
         assert!(open(at(0), at(400)));
         assert!(!open(at(0), at(-5)));
+        assert!(
+            open(at(0), at(1_040)),
+            "a second and more is past the guard"
+        );
     }
 
     #[test]

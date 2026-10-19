@@ -274,7 +274,7 @@ pub(super) fn from_data(id: &str, data: &Value) -> Item {
 
 fn call(id: &str, data: &Value) -> Item {
     let status = match data["st"].as_str().unwrap() {
-        "run" => ItemStatus::Running,
+        "run" | "ask" => ItemStatus::Running,
         "fail" => ItemStatus::Failed,
         "cut" | "skip" => ItemStatus::Interrupted,
         _ => ItemStatus::Completed,

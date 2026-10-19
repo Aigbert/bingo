@@ -3,6 +3,7 @@ use crate::test_support::*;
 use bingo_sdk::{
     Answer, AnswerSpec, Event, InteractionKind, ItemStatus, Preview, component::Props,
 };
+use crossterm::event::KeyCode;
 use serde_json::json;
 
 fn preview_command(kind: &InteractionKind) -> &str {

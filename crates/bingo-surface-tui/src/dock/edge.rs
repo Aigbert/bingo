@@ -10,6 +10,9 @@ use std::time::Duration;
 
 pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
     let state = tree.viewed();
+    if state.interactions.iter().any(cautioned) {
+        return Drawing::still(vec![super::line(theme::bad(), width)]);
+    }
     // A device code waits on the browser, not on an answer typed here: its
     // sheet is the whole signal, so the edge keeps its quiet.
     if state.interactions.iter().any(|open| {
@@ -72,6 +75,17 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
         return flash(width, ink, now.past(turn.ended_at), 1100, now);
     }
     Drawing::still(vec![Line::default()])
+}
+
+/// An ask that could lose work holds the edge still, in the colour of harm.
+fn cautioned(open: &bingo_sdk::Interaction) -> bool {
+    matches!(
+        open.kind,
+        bingo_sdk::InteractionKind::Permission {
+            caution: Some(_),
+            ..
+        }
+    )
 }
 
 fn sampled(line: Line<'static>, next: Option<std::time::Instant>) -> Drawing {

@@ -26,7 +26,6 @@ pub enum Body {
         stakes: Option<Stakes>,
     },
     Text(String),
-    Nothing,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -56,11 +55,10 @@ impl Does {
     }
 }
 
-/// Where the ask is read: whose words a refusal goes to, the session's
-/// directory and home, and the verb the tool's look gives the call.
+/// Where the ask is read: whose words a refusal goes to, the home a
+/// directory is named from, and the verb the tool's look gives the call.
 pub struct Reading<'a> {
     pub worker: &'a str,
-    pub cwd: &'a str,
     pub home: Option<&'a str>,
     pub verb: &'a str,
     pub target: &'a str,
@@ -270,7 +268,6 @@ mod tests {
     fn reading() -> Reading<'static> {
         Reading {
             worker: "bingo",
-            cwd: "/home/me/bingo",
             home: Some("/home/me"),
             verb: "edit",
             target: "crates/bingo-core/src/session/queue.rs",

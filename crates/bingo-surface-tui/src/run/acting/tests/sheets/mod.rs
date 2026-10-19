@@ -3,6 +3,7 @@
 use super::*;
 use crossterm::event::{KeyCode, KeyEvent};
 
+mod asks;
 mod builtins;
 mod kernel;
 mod memories;
@@ -15,6 +16,8 @@ struct Stage {
     calls: usize,
     /// What the provider streams for the prompts it was given, by scene time.
     provider: Vec<(i64, Event)>,
+    /// The ask an ask scene holds open until a key answers it.
+    ask: Option<asks::Asking>,
 }
 
 /// The frame the capture's keys leave on screen at its moment.
@@ -42,6 +45,9 @@ pub(crate) async fn draw(capture: &Capture) -> ratatui::buffer::Buffer {
 /// The world the capture starts from, with its sheet already opened by the
 /// key or line that opens it.
 async fn open(capture: &Capture) -> Stage {
+    if asks::is_ask(&capture.entry.file) {
+        return asks::open(capture).await;
+    }
     let mut scene = setup::new(capture);
     scene.screen.size = Some((capture.size().width, capture.size().height));
     let mut state = world_state();
@@ -69,6 +75,7 @@ async fn open(capture: &Capture) -> Stage {
         kernel,
         calls: 0,
         provider: vec![],
+        ask: None,
     };
     stage.scene.set_time(-OPENING_MS);
     super::catalogues::fetch_all(&mut stage.scene.run).await;
@@ -235,7 +242,7 @@ impl Stage {
     async fn settle(&mut self) {
         let mut quiet = 0;
         while quiet < 5 {
-            let moved = self.forward() | self.deliver() | self.answer();
+            let moved = self.forward() | self.deliver() | self.answer() | self.resolve();
             self.paint();
             for _ in 0..16 {
                 tokio::task::yield_now().await;

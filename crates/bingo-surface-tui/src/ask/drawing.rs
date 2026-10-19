@@ -12,9 +12,12 @@ use ratatui::{
 };
 
 pub fn inline(tree: &Tree, ui: &Ui) -> bool {
-    tree.open_interaction()
-        .is_some_and(|(_, open)| !matches!(open.kind, InteractionKind::Login { .. }))
-        && !ui.focus.showing()
+    tree.open_interaction().is_some_and(|(_, open)| {
+        matches!(
+            open.kind,
+            InteractionKind::Question(_) | InteractionKind::Form { .. }
+        )
+    }) && !ui.focus.showing()
 }
 
 pub fn splice(

@@ -648,6 +648,13 @@ pub fn blended(from: &str, to: &str, weight: f64) -> Option<Style> {
     Some(depth::foreground(from, color))
 }
 
+/// A ground part way between two named ones, as a band fading in is.
+pub fn blended_ground(from: &str, to: &str, weight: f64) -> Option<Style> {
+    let palette = palette();
+    let color = ink::mix(palette.named(from)?, palette.named(to)?, weight);
+    Some(depth::ground(from, color))
+}
+
 pub fn caret_ink(now: crate::clock::Now, base: &str, ground: &str) -> Option<Style> {
     blended(base, ground, crate::clock::caret_fade(now))
 }

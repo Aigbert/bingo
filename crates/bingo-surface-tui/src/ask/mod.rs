@@ -1,14 +1,56 @@
 pub mod aside;
+mod body;
+pub mod dock;
 pub mod drawing;
 pub mod guard;
+pub mod keys;
 pub mod options;
 pub mod receipts;
 pub mod scope;
 pub mod spec;
 
-use crate::ui::Ui;
-use bingo_sdk::{Action, Interaction, SessionState, View};
-use crossterm::event::{KeyCode, KeyEvent};
+use crate::{clock::Now, layout::Layout, tree::Tree, ui::Ui};
+use bingo_sdk::{Action, Interaction, InteractionKind, SessionState, View};
+use crossterm::event::KeyEvent;
+use ratatui::text::Line;
+
+/// The open permission or confirmation, read in the dock's words.
+pub fn open<'a>(tree: &'a Tree, ui: &Ui) -> Option<(&'a Interaction, spec::Ask)> {
+    let (owner, interaction) = tree.open_interaction()?;
+    let worker = (owner.summary.id != *tree.view()).then(|| crate::tree::name(owner));
+    let step = match &interaction.kind {
+        InteractionKind::Permission { tool, input, .. } => Some(crate::tool_rows::resolve(
+            tool,
+            input,
+            &crate::tool_rows::Looks::in_ui(ui),
+            crate::theme::bullet().is_ascii(),
+        )),
+        _ => None,
+    };
+    let reading = spec::Reading {
+        worker: worker.as_deref().unwrap_or("bingo"),
+        home: crate::paths::home(),
+        verb: step.as_ref().map_or("", |step| step.verb.as_str()),
+        target: step.as_ref().map_or("", |step| step.target.as_str()),
+    };
+    Some((interaction, spec::ask(interaction, &reading)?))
+}
+
+/// The dock's rows while a permission or a confirmation is open.
+pub fn sheet(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<Line<'static>>> {
+    if ui.focus.showing() {
+        return None;
+    }
+    let (interaction, ask) = open(tree, ui)?;
+    let picking = dock::Picking {
+        cursor: ui.dialog.focus,
+        typing: ui.dialog.words.as_ref().map(|words| words.text()),
+        opened: interaction.opened_at,
+        keyed_at: ui.keyed_at,
+    };
+    let width = frame.area().width;
+    Some(frame.collect(dock::lines(&ask, &picking, width, now)))
+}
 
 pub fn handler(ui: &Ui, interaction: &Interaction, key: KeyEvent) -> Option<Action> {
     if !matches!(
@@ -54,45 +96,6 @@ pub fn waiting(ui: &Ui, owner: &SessionState, interaction: &Interaction) -> bool
         .find(|key| key.request.request_id == interaction.id.as_str())
         .unwrap_or(&key);
     ui.placed.pulled.get(request).is_none()
-}
-
-pub fn begin_change(
-    ui: &mut Ui,
-    owner: &SessionState,
-    interaction: &Interaction,
-    key: KeyEvent,
-) -> bool {
-    if ui.dialog.words.is_some() {
-        return false;
-    }
-    let options = options::options(interaction);
-    let selected = match key.code {
-        KeyCode::Enter => Some(ui.dialog.focus),
-        KeyCode::Char(c @ '1'..='9') => c.to_digit(10).map(|n| n as usize - 1),
-        _ => None,
-    };
-    let Some(index) = selected else { return false };
-    if options
-        .get(index)
-        .is_none_or(|opt| opt.choice != options::Choice::Change)
-    {
-        return false;
-    }
-    let Some(bingo_sdk::component::Props::Permission(props)) =
-        crate::component::sealed::props(owner, interaction)
-    else {
-        return false;
-    };
-    let text = props.input["command"]
-        .as_str()
-        .or_else(|| props.input["new_string"].as_str());
-    let Some(text) = text else { return false };
-    let mut words = crate::composer::Composer::default();
-    words.set(text);
-    ui.dialog.focus = index;
-    ui.dialog.words = Some(words);
-    ui.dialog.changing = Some(props.input);
-    true
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
-use bingo_sdk::Interaction;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+//! An ask that opens while the person is typing leaves the keys with the
+//! composer, so words meant for it do not land in the ask.
 use jiff::Timestamp;
 
 pub const RECENT_MS: i64 = 900;
@@ -9,40 +9,6 @@ pub fn recent(received: Timestamp, typed: Option<Timestamp>) -> bool {
         let elapsed = received.as_millisecond() - typed.as_millisecond();
         (0..RECENT_MS).contains(&elapsed)
     })
-}
-
-pub fn printable(key: KeyEvent, interaction: &Interaction) -> bool {
-    if !(key.modifiers - KeyModifiers::SHIFT).is_empty() {
-        return false;
-    }
-    let KeyCode::Char(c) = key.code else {
-        return false;
-    };
-    let options = super::options::options(interaction);
-    if c.to_digit(10)
-        .is_some_and(|n| n > 0 && n as usize <= options.len())
-    {
-        return false;
-    }
-    if matches!(
-        interaction.kind,
-        bingo_sdk::InteractionKind::Permission { .. }
-    ) && matches!(c, 'y' | 'n' | 'a')
-    {
-        return false;
-    }
-    if c == ' '
-        && matches!(
-            interaction.kind,
-            bingo_sdk::InteractionKind::Question(bingo_sdk::Question { multi: true, .. })
-        )
-    {
-        return false;
-    }
-    !matches!(
-        interaction.kind,
-        bingo_sdk::InteractionKind::Form { .. } | bingo_sdk::InteractionKind::Login { .. }
-    )
 }
 
 #[cfg(test)]
@@ -67,21 +33,5 @@ mod tests {
             );
         }
         assert!(!recent(opened, None));
-    }
-    #[test]
-    fn unrecognized_printing_sets_aside_without_answering() {
-        let open = crate::test_support::permission(None, None);
-        for (key, expected) in [
-            ('1', false),
-            ('2', false),
-            ('x', true),
-            ('9', true),
-            ('y', false),
-        ] {
-            assert_eq!(
-                printable(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE), &open),
-                expected
-            );
-        }
     }
 }

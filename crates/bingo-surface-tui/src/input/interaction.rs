@@ -4,19 +4,25 @@ pub(crate) fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now
     let Some((owner, interaction)) = tree.open_interaction() else {
         return Vec::new();
     };
-    if key.code == KeyCode::Esc {
-        return escape(ui, tree, now);
-    }
     if keys::look(key) == Some(keys::Look::Detail) {
         super::open_detail(ui, tree.viewed(), now);
         return Vec::new();
     }
-    if ui.dialog.answered
-        || interaction
-            .guard_until
-            .is_some_and(|until| now.wall < until)
-    {
+    if guarded(interaction, now) {
         return Vec::new();
+    }
+    let ask = crate::ask::open(tree, ui);
+    if key.code == KeyCode::Esc {
+        if ask.is_some() && crate::ask::keys::back(ui) {
+            return Vec::new();
+        }
+        return escape(ui, tree, now);
+    }
+    if ui.dialog.answered {
+        return Vec::new();
+    }
+    if let Some((interaction, ask)) = ask {
+        return crate::ask::keys::on_key(ui, interaction, &ask, key, now);
     }
     if crate::ask::waiting(ui, owner, interaction) {
         return vec![Effect::AwaitSiteKey(key)];
@@ -24,29 +30,18 @@ pub(crate) fn interaction_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now
     if let Some(action) = crate::ask::handler(ui, interaction, key) {
         return vec![Effect::SiteKey { action, key }];
     }
-    interaction_fallback(ui, tree, owner, interaction, key, now)
+    ui.dialog.on_key(interaction, key, now)
 }
 
-fn interaction_fallback(
-    ui: &mut Ui,
-    tree: &Tree,
-    owner: &SessionState,
-    interaction: &bingo_sdk::Interaction,
-    key: KeyEvent,
-    now: Now,
-) -> Vec<Effect> {
-    if ui.dialog.words.is_none() && crate::ask::aside::printable(key, interaction) {
-        ui.dialog.aside = true;
-        return composer_keys(ui, tree, key, now);
+/// An ask takes no key, not even esc, until it has been on screen long
+/// enough to be read; a sign-in keeps the kernel's own guard.
+fn guarded(interaction: &bingo_sdk::Interaction, now: Now) -> bool {
+    match interaction.kind {
+        bingo_sdk::InteractionKind::Login { .. } => interaction
+            .guard_until
+            .is_some_and(|until| now.wall < until),
+        _ => !crate::ask::guard::open(interaction.opened_at, now.wall),
     }
-    if interaction
-        .guard_until
-        .is_none_or(|until| now.wall >= until)
-        && crate::ask::begin_change(ui, owner, interaction, key)
-    {
-        return Vec::new();
-    }
-    ui.dialog.on_key(interaction, key, now)
 }
 
 pub(crate) fn interaction_unhandled(

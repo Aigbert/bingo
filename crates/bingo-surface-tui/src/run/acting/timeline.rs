@@ -200,8 +200,13 @@ pub(super) fn land(scene: &mut Scene, id: &str, prompt: &str) {
 }
 
 pub(super) fn promote(scene: &mut Scene, id: bingo_sdk::ItemId) {
-    // This is the tool plugin's declared action, absent from the turn data.
-    scene.emit(fixture::extended(
+    scene.emit(promotion(id));
+}
+
+/// The bash plugin's declared `background` action on a running call, which
+/// the turn data does not carry.
+pub(super) fn promotion(id: bingo_sdk::ItemId) -> Event {
+    fixture::extended(
         "fixture.bash",
         "promote",
         bingo_sdk::slot::with(
@@ -224,5 +229,5 @@ pub(super) fn promote(scene: &mut Scene, id: bingo_sdk::ItemId) {
                 }],
             }],
         ),
-    ));
+    )
 }

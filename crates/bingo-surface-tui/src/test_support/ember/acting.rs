@@ -206,3 +206,42 @@ fn m196_mention_inserted_keeps_its_space_before_the_cursor() {
 fn m196_palette_ran_waits_for_m199_branch_and_m200_agents() {
     sheet_rows("palette-ran", &[(0..26, 1), (27..28, 28), (29..32, 29)]);
 }
+
+#[test]
+fn m197_permission_frames_are_answered_by_keys() {
+    for name in [
+        "ask-edit",
+        "ask-edit-down",
+        "ask-bash",
+        "ask-bash-change",
+        "ask-bash-editing",
+        "caution",
+        "caution-no",
+        "ascii-ask-edit",
+        "small-ask-edit",
+    ] {
+        sheet_frame(name, &[]);
+    }
+}
+
+#[test]
+fn m197_an_allowed_edit_goes_on_with_its_session_rule() {
+    sheet_frame("ask-edit-allowed", &[(25, 3)]);
+}
+
+#[test]
+fn m197_question_frames_are_answered_by_keys() {
+    for name in [
+        "question",
+        "question-preview",
+        "question-second",
+        "question-ticked",
+    ] {
+        sheet_frame(name, &[]);
+    }
+}
+
+#[test]
+fn m197_an_answered_question_goes_on_with_the_turn() {
+    sheet_frame("question-answered", &[]);
+}

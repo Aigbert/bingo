@@ -261,11 +261,17 @@ fn layers(
             ),
             None => layer(tree, ui, frame, above, now),
         },
-        None if !crate::ask::drawing::inline(tree, ui) && !crate::sign_in::docked(tree, ui) => {
+        None if signing_in(tree) && !crate::sign_in::docked(tree, ui) => {
             card(tree, ui, frame, regions, now, tools)
         }
         None => {}
     }
+}
+
+/// Only a sign-in keeps a card; every other ask opens in the dock.
+fn signing_in(tree: &Tree) -> bool {
+    tree.open_interaction()
+        .is_some_and(|(_, open)| matches!(open.kind, bingo_sdk::InteractionKind::Login { .. }))
 }
 
 /// The layer a person opened: a sheet over the whole of the frame, or the

@@ -14,7 +14,12 @@ pub fn draw(
     now: Now,
 ) -> crate::views::Drawing {
     let pairs = if let Some((_, ask)) = tree.open_interaction() {
-        sealed::pairs(ui, ask, question_focus(ui, frame, ask))
+        sealed::pairs(
+            ui,
+            ask,
+            question_focus(ui, frame, ask),
+            !tree.is_root(tree.view()),
+        )
     } else {
         site::hints(tree.viewed(), ui, frame).map_or_else(|| resting(tree, ui), |hints| hints.pairs)
     };

@@ -12,7 +12,8 @@ use ratatui::{layout::Rect, text::Line};
 pub fn prepare(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<Line<'static>>> {
     let area = frame.area();
     let cap = crate::layout::grid::dock_cap(usize::from(area.height));
-    native(tree, ui, frame, cap, now)
+    crate::ask::sheet(tree, ui, frame, now)
+        .or_else(|| native(tree, ui, frame, cap, now))
         .or_else(|| crate::sign_in::prepare(tree, ui, frame, cap, now))
         .or_else(|| pane(tree, ui, frame, cap, now))
 }
