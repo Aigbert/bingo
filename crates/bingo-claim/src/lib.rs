@@ -121,7 +121,9 @@ pub fn probe(dir: &Path, protocol: Protocol<'_>) -> Result<bool, ClaimError> {
     let path = dir.join(protocol.file);
     let mut file = match File::options().read(true).write(true).open(&path) {
         Ok(file) => file,
-        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(false),
+        // Windows answers a path under a regular file with not-found where
+        // unix says not-a-directory; a store that is a file is a fault.
+        Err(e) if e.kind() == io::ErrorKind::NotFound && !dir.is_file() => return Ok(false),
         Err(e) => return Err(ClaimError::io(&path, e)),
     };
     match acquire(&file, &path) {
