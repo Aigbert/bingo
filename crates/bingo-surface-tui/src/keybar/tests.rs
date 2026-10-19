@@ -102,7 +102,7 @@ fn an_expired_toast_never_uses_a_stale_mod_answer() {
             serde_json::json!({}),
             [bingo_sdk::slot::Slot::Toast {
                 tone: bingo_sdk::Tone::Neutral,
-                text: "gone forever".into(),
+                parts: vec!["gone forever".into()],
                 until: later(now, 2700).wall,
                 alert: false,
             }],
@@ -168,4 +168,65 @@ fn the_opening_lines_fit_whole_at_eighty_columns() {
     assert!(drawn.contains("/ commands"));
     assert_eq!(drawn.lines().count(), 24);
     assert!(drawn.lines().last().unwrap().contains("? keys"));
+}
+
+fn mod_toast(state: &mut bingo_sdk::SessionState, now: Now) {
+    state.signals.entry("fixture".into()).or_default().insert(
+        "toast".into(),
+        bingo_sdk::slot::with(
+            serde_json::json!({}),
+            [bingo_sdk::slot::Slot::Toast {
+                tone: bingo_sdk::Tone::Good,
+                parts: vec![
+                    bingo_sdk::pick::bold("counter", "fg").into(),
+                    "saved".into(),
+                ],
+                until: later(now, 2700).wall,
+                alert: false,
+            }],
+        )
+        .into(),
+    );
+}
+
+#[test]
+fn a_mod_toast_draws_its_parts_with_their_own_ink() {
+    let mut state = state();
+    let (mut ui, now) = scene();
+    mod_toast(&mut state, now);
+    let tree = solo(&state);
+    let buffer = drawn(108, 30, &tree, &mut ui, now);
+    let screen = buffer.to_string();
+    let row = row_carrying(&screen, "counter");
+    let line: String = (0..108)
+        .map(|x| buffer.buffer()[(x, row)].symbol().to_string())
+        .collect();
+    let at = line.find("counter").unwrap();
+    let column = line[..at].chars().count() as u16;
+    let cell = &buffer.buffer()[(column, row)];
+    assert_eq!(cell.fg, theme::foreground("fg").unwrap().fg.unwrap());
+    assert!(cell.modifier.contains(theme::bold().add_modifier));
+    assert!(line.contains("saved"));
+    assert!(line.contains(theme::glyphs::get("ok")));
+}
+
+#[test]
+fn a_mod_can_replace_how_a_toast_is_drawn() {
+    let mut state = state();
+    state.config.kernel["render"] = serde_json::json!({"Toast":[{}]});
+    let (mut ui, now) = scene();
+    mod_toast(&mut state, now);
+    let tree = solo(&state);
+    draw_tree(108, 30, &tree, &mut ui, now);
+    let key = ui
+        .shown
+        .pulls
+        .iter()
+        .find(|key| key.request.component == bingo_sdk::render::Component::Toast)
+        .unwrap()
+        .clone();
+    assert_eq!(key.request.props["parts"][1], "saved");
+    ui.placed.pulled.request(&key);
+    ui.placed.pulled.answer(key, View::text("drawn by a mod"));
+    assert!(draw_tree(108, 30, &tree, &mut ui, now).contains("drawn by a mod"));
 }

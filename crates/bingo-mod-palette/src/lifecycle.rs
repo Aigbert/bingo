@@ -31,7 +31,7 @@ impl Hook for Lifecycle {
         };
         let slot = slot::Slot::Toast {
             tone: bingo_sdk::Tone::Neutral,
-            text: "Sessions now open with ctrl+r; ctrl+g returns to a pending ask".into(),
+            parts: vec!["Sessions now open with ctrl+r; ctrl+g returns to a pending ask".into()],
             until,
             alert: false,
         };

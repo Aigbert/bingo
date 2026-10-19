@@ -552,7 +552,7 @@ fn placed_site(component: Component) -> bingo_sdk::SessionState {
                     json!({}),
                     [Slot::Toast {
                         tone: bingo_sdk::Tone::Neutral,
-                        text: "original".into(),
+                        parts: vec!["original".into()],
                         until: ts() + std::time::Duration::from_secs(10),
                         alert: false,
                     }],
@@ -687,8 +687,13 @@ fn flattened_toast_has_no_motion_deadline() {
         .unwrap(),
     );
     crate::theme::with(crate::painted::daylight(), || {
-        let (toast, _) = crate::toast::components(&ui, &state, now, 80, &mut frame.pulls).unwrap();
-        assert_eq!(toast.plain().unwrap().text, "still words");
+        let (_, spans) = crate::toast::components(&ui, &state, now, 80, &mut frame.pulls).unwrap();
+        let drawn: String = spans
+            .unwrap()
+            .iter()
+            .map(|span| span.content.as_ref())
+            .collect();
+        assert_eq!(drawn, "still words");
         assert_eq!(frame.deadline(), None);
     });
 }

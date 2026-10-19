@@ -1313,7 +1313,15 @@ export type SignInProps = { "flow": LoginFlow; "interactionId": InteractionId; "
 export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 export type SiteScroll = { "bodyRows": number; "offset": number; [key: string]: unknown; };
 export type SiteView = { "agentId"?: (string | null); [key: string]: unknown; };
-export type Slot = ({ "branch"?: (string | null); "cwd": string; "kind": "location"; [key: string]: unknown; } | { "kind": "status"; "text": string; "tone": Tone; "until"?: (string | null); [key: string]: unknown; } | { "kind": "activity"; "verb"?: (string | null); "view": Shown; [key: string]: unknown; } | { "kind": "rail"; "title": string; "view": Shown; [key: string]: unknown; } | { "kind": "panel"; "title": string; "view": Shown; [key: string]: unknown; } | { "asked": boolean; "closeOnEscape": boolean; "focus": boolean; "hints"?: (SiteHints | null); "holdToasts": boolean; "id": string; "kind": "pane"; "place"?: Array<PanePlace>; "size"?: PaneSize; "title": string; "view": Shown; [key: string]: unknown; } | { "alert": boolean; "kind": "toast"; "text": string; "tone"?: Tone; "until": string; [key: string]: unknown; } | {
+export type Slot = ({ "branch"?: (string | null); "cwd": string; "kind": "location"; [key: string]: unknown; } | { "kind": "status"; "text": string; "tone": Tone; "until"?: (string | null); [key: string]: unknown; } | { "kind": "activity"; "verb"?: (string | null); "view": Shown; [key: string]: unknown; } | { "kind": "rail"; "title": string; "view": Shown; [key: string]: unknown; } | { "kind": "panel"; "title": string; "view": Shown; [key: string]: unknown; } | { "asked": boolean; "closeOnEscape": boolean; "focus": boolean; "hints"?: (SiteHints | null); "holdToasts": boolean; "id": string; "kind": "pane"; "place"?: Array<PanePlace>; "size"?: PaneSize; "title": string; "view": Shown; [key: string]: unknown; } | {
+  "alert": boolean;
+  "kind": "toast";
+  /** Plain strings draw muted; a `Text` node keeps its own ink. */
+  "parts": Array<TextChild>;
+  "tone"?: Tone;
+  "until": string;
+  [key: string]: unknown;
+} | {
   /** The mode's value: the argument of the item that chooses it. */
   "current": string;
   "kind": "mode";
@@ -1393,7 +1401,7 @@ export type Timer = {
   "session": SessionId;
   [key: string]: unknown;
 };
-export type ToastProps = { "alert": boolean; "text": string; "tone"?: Tone; "until": string; [key: string]: unknown; };
+export type ToastProps = { "alert": boolean; "parts": Array<TextChild>; "tone"?: Tone; "until": string; [key: string]: unknown; };
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** A call the model asked for, before or after the gate. */

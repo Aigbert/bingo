@@ -78,7 +78,8 @@ pub enum Slot {
         view: Shown,
     },
     Toast {
-        text: String,
+        /// Plain strings draw muted; a `Text` node keeps its own ink.
+        parts: Vec<crate::view::TextChild>,
         #[serde(default, skip_serializing_if = "crate::Tone::is_neutral")]
         tone: crate::Tone,
         #[schemars(with = "String")]
@@ -426,8 +427,9 @@ mod pull_contract {
             json!({"kind":"pane","id":"counter","title":"Count","focus":true,"closeOnEscape":true,
                 "holdToasts":true,"asked":true,"place":["above"],"size":PaneSize::default(),"view":{"request":{"component":"Pane",
                 "requestId":"counter","props":{},"viewport":{"columns":80,"rows":8}}}}),
-            json!({"kind":"toast","text":"Saved","until":"2026-10-14T12:00:00Z","alert":false}),
-            json!({"kind":"toast","text":"Saved","tone":"good","until":"2026-10-14T12:00:00Z","alert":false}),
+            json!({"kind":"toast","parts":["Saved"],"until":"2026-10-14T12:00:00Z","alert":false}),
+            json!({"kind":"toast","parts":[{"kind":"Text","children":["counter"],"color":"fg","bold":true},"saved"],
+                "tone":"good","until":"2026-10-14T12:00:00Z","alert":false}),
         ] {
             let slot: Slot = serde_json::from_value(wire.clone()).unwrap();
             assert_eq!(serde_json::to_value(slot).unwrap(), wire);

@@ -37,5 +37,5 @@ test('only a turn beyond two minutes publishes a toast', async $ => {
   await hooks.get('turn.complete')(api, {}, async () => null);
   await Promise.all(pending);
   expect((await toasts()).length).toBe(1);
-  expect((await toasts())[0].text).toContain('121');
+  expect((await toasts())[0].parts[0]).toContain('121');
 });

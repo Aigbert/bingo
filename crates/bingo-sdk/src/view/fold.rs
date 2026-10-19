@@ -216,13 +216,15 @@ fn progress(value: u64, total: Option<u64>, label: Option<&str>) -> String {
 }
 
 pub fn text_children(children: &[TextChild]) -> String {
-    children
-        .iter()
-        .map(|child| match child {
+    children.iter().map(TextChild::fold).collect()
+}
+impl TextChild {
+    pub fn fold(&self) -> String {
+        match self {
             TextChild::String(text) => text.clone(),
             TextChild::Node(view) => view.fold(),
-        })
-        .collect()
+        }
+    }
 }
 fn labeled(label: Option<&str>, value: &str) -> String {
     label

@@ -106,5 +106,6 @@ pub mod spent;
 
 pub mod pick;
 pub mod sheet;
+pub mod toast;
 
 pub mod glyph;

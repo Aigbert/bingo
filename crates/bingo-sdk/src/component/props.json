@@ -251,7 +251,16 @@
   {
     "component": "Toast",
     "props": {
-      "text": "Saved",
+      "parts": [
+        {
+          "kind": "Text",
+          "children": ["counter"],
+          "color": "fg",
+          "bold": true
+        },
+        "saved"
+      ],
+      "tone": "good",
       "until": "2026-10-14T00:00:00Z",
       "alert": false
     }

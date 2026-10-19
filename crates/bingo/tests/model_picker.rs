@@ -151,8 +151,9 @@ async fn pasted_key_is_masked_in_frames_and_absent_from_the_journal() {
     );
     assert!(
         slot::placed(&session.snapshot).iter().any(|placed| {
-            matches!(&placed.slot, slot::Slot::Toast { text, .. }
-            if text.contains("Paste the provider's address first"))
+            matches!(&placed.slot, slot::Slot::Toast { parts, .. }
+            if parts.iter().any(|part| matches!(part, view::TextChild::String(text)
+                if text.contains("Paste the provider's address first"))))
         }),
         "the refusal belongs to the KeyBar toast"
     );

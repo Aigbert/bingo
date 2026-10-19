@@ -15,7 +15,7 @@ pub struct State {
 }
 struct Toast {
     key: String,
-    text: String,
+    parts: Vec<bingo_sdk::view::TextChild>,
     tone: bingo_sdk::Tone,
     until: jiff::Timestamp,
     alert: bool,
@@ -24,21 +24,24 @@ fn placed(state: &SessionState) -> Vec<Toast> {
     bingo_sdk::slot::placed(state)
         .into_iter()
         .filter_map(|placed| {
-            let (text, tone, until, alert) = match placed.slot {
+            let (parts, tone, until, alert) = match placed.slot {
                 Slot::Toast {
-                    text,
+                    parts,
                     tone,
                     until,
                     alert,
-                } => (text, tone, until, alert),
+                } => (parts, tone, until, alert),
                 _ => return None,
             };
             Some(Toast {
                 key: format!(
-                    "{}/{}/{}/{until}/{text}/{tone:?}/{alert}",
-                    state.summary.id, placed.plugin, placed.kind
+                    "{}/{}/{}/{until}/{}/{tone:?}/{alert}",
+                    state.summary.id,
+                    placed.plugin,
+                    placed.kind,
+                    serde_json::to_string(&parts).unwrap_or_default()
                 ),
-                text,
+                parts,
                 tone,
                 until,
                 alert,
@@ -102,22 +105,32 @@ fn remaining(until: jiff::Timestamp, now: Now) -> Duration {
     }
 }
 pub fn current(ui: &Ui, state: &SessionState, now: Now) -> Option<crate::ui::Notice> {
-    let notice = ui.notice().filter(|notice| !notice.gone(now.instant));
-    if let Some((toast, said)) = ui.placed.toasts.active(state, now)
-        && notice.is_none_or(|notice| said > notice.said())
-    {
-        return Some(crate::ui::Notice::new(
-            crate::ui::NoticeKind::Message(crate::ui::Message {
-                about: None,
-                parts: vec![toast.text],
-                tone: toast.tone,
-            }),
-            said,
-        ));
-    }
-    notice.cloned()
+    placed_notice(ui, state, now).or_else(|| local(ui, now))
 }
 
+fn local(ui: &Ui, now: Now) -> Option<crate::ui::Notice> {
+    ui.notice()
+        .filter(|notice| !notice.gone(now.instant))
+        .cloned()
+}
+
+/// The newest placed toast, while it is newer than the local one.
+fn placed_notice(ui: &Ui, state: &SessionState, now: Now) -> Option<crate::ui::Notice> {
+    let (toast, said) = ui.placed.toasts.active(state, now)?;
+    local(ui, now)
+        .is_none_or(|notice| said > notice.said())
+        .then(|| crate::ui::Notice::new(message(toast.parts, toast.tone), said))
+}
+
+fn message(parts: Vec<bingo_sdk::view::TextChild>, tone: bingo_sdk::Tone) -> crate::ui::NoticeKind {
+    crate::ui::NoticeKind::Message(crate::ui::Message {
+        about: None,
+        parts,
+        tone,
+    })
+}
+
+/// A placed toast is a component a mod may draw; a local one is the surface's own.
 pub fn components(
     ui: &Ui,
     state: &SessionState,
@@ -125,20 +138,12 @@ pub fn components(
     width: usize,
     pulls: &mut Vec<crate::pulled::Key>,
 ) -> Option<(crate::ui::Notice, Option<Vec<ratatui::text::Span<'static>>>)> {
-    let mut notice = current(ui, state, now)?;
-    let crate::ui::NoticeKind::Message(toast) = &mut notice.kind else {
-        return Some((notice, None));
+    let Some(notice) = placed_notice(ui, state, now) else {
+        return local(ui, now).map(|notice| (notice, None));
     };
-    let Some((placed, _)) = ui
-        .placed
-        .toasts
-        .active(state, now)
-        .filter(|(placed, _)| toast.parts == [placed.text.as_str()])
-    else {
-        return Some((notice, None));
-    };
+    let (placed, _) = ui.placed.toasts.active(state, now)?;
     let props = bingo_sdk::component::Props::Toast(bingo_sdk::component::ToastProps {
-        text: placed.text,
+        parts: placed.parts,
         tone: placed.tone,
         until: placed.until,
         alert: placed.alert,
@@ -157,20 +162,16 @@ pub fn components(
             let bingo_sdk::component::Props::Toast(props) = props else {
                 return Vec::new();
             };
-            vec![ratatui::text::Line::from(props.text.clone())]
+            vec![ratatui::text::Line::from(crate::tone::parts(
+                &props.parts,
+                props.tone,
+                crate::tone::Content::Plain,
+                None,
+            ))]
         },
     );
-    toast.parts = drawing.lines.iter().map(ToString::to_string).collect();
-    Some((
-        notice,
-        Some(
-            drawing
-                .lines
-                .into_iter()
-                .flat_map(|line| line.spans)
-                .collect(),
-        ),
-    ))
+    let spans = drawing.lines.into_iter().flat_map(|line| line.spans);
+    Some((notice, Some(spans.collect())))
 }
 
 #[cfg(test)]
@@ -188,7 +189,7 @@ mod tests {
                 serde_json::json!({}),
                 [Slot::Toast {
                     tone: bingo_sdk::Tone::Neutral,
-                    text: "latest".into(),
+                    parts: vec!["latest".into()],
                     until: later(now, 2900).wall,
                     alert: false,
                 }],
@@ -218,7 +219,7 @@ mod tests {
             serde_json::json!({}),
             [Slot::Toast {
                 tone: bingo_sdk::Tone::Neutral,
-                text: "once".into(),
+                parts: vec!["once".into()],
                 until: later(now, 2000).wall,
                 alert: true,
             }],
@@ -258,7 +259,7 @@ mod tests {
                 serde_json::json!({}),
                 [Slot::Toast {
                     tone: bingo_sdk::Tone::Neutral,
-                    text: "Saved counter".into(),
+                    parts: vec!["Saved counter".into()],
                     until: now.wall + std::time::Duration::from_secs(4),
                     alert: false,
                 }],
@@ -276,7 +277,7 @@ mod tests {
         let mut slots = [
             Slot::Toast {
                 tone: bingo_sdk::Tone::Neutral,
-                text: "held".into(),
+                parts: vec!["held".into()],
                 until: now.wall + std::time::Duration::from_secs(4),
                 alert: true,
             },

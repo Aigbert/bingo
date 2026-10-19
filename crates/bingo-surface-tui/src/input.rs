@@ -570,7 +570,7 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
                 Level::Info,
                 vec![
                     "cleared".into(),
-                    format!("{} brings it back", crate::theme::glyphs::key_text("↑")),
+                    format!("{} brings it back", crate::theme::glyphs::key_text("↑")).into(),
                 ],
                 keys::CLEARED_HOLD,
                 now.instant,

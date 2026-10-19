@@ -181,8 +181,8 @@ pub(crate) fn refuse(
     ui.notify_parts(
         bingo_sdk::Level::Warn,
         vec![
-            format!("{model} can't read images"),
-            format!("{} switches model", crate::theme::glyphs::key_text("alt+m")),
+            format!("{model} can't read images").into(),
+            format!("{} switches model", crate::theme::glyphs::key_text("alt+m")).into(),
         ],
         now.instant,
     );

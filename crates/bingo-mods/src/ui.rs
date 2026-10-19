@@ -270,7 +270,7 @@ async fn toast(caller: &Caller, input: Toast, alert: bool) -> Result<Value, Serv
             slot: format!("toast:{}", ItemId::mint()),
             view: Some(Slot::Toast {
                 tone: bingo_sdk::Tone::Neutral,
-                text: input.text,
+                parts: vec![input.text.into()],
                 until,
                 alert,
             }),

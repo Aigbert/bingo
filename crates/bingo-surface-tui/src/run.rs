@@ -906,7 +906,7 @@ impl Run {
     /// where it has scrolled away, the status line says it once instead.
     fn told_of(&mut self, version: String) {
         if self.ui.shown.top > 0 {
-            let parts = vec![format!("↑ v{version} is out"), "bingo update".into()];
+            let parts = vec![format!("↑ v{version} is out").into(), "bingo update".into()];
             self.ui.notify_parts(Level::Info, parts, self.now().instant);
         }
         self.ui.welcome.update = Some(version);

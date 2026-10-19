@@ -15,8 +15,9 @@ pub(super) fn draw(head: &bingo_sdk::Headline, at: i64, width: usize, now: Now) 
         ms: 400,
         curve: None,
     };
+    let parts: Vec<_> = head.parts.iter().map(|part| part.as_str().into()).collect();
     let mut label = Line::from(crate::tone::parts(
-        &head.parts,
+        &parts,
         head.tone,
         crate::tone::Content::Markdown,
         Some((motion.clone(), now)),

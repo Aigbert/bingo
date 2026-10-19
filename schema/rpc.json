@@ -6840,8 +6840,11 @@
     "ToastProps": {
       "type": "object",
       "properties": {
-        "text": {
-          "type": "string"
+        "parts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TextChild"
+          }
         },
         "tone": {
           "$ref": "#/$defs/Tone"
@@ -6854,7 +6857,7 @@
         }
       },
       "required": [
-        "text",
+        "parts",
         "until",
         "alert"
       ]

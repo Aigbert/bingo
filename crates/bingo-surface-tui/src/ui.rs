@@ -7,7 +7,7 @@
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{CommandSpec, Level, Tone, View};
+use bingo_sdk::{CommandSpec, Level, Tone, View, view::TextChild};
 
 use crate::clock::{FRAME, Now};
 use crate::commands::{self, Suggestion};
@@ -48,7 +48,7 @@ pub const SWITCH: Duration = Duration::from_millis(2 * FRAME.as_millis() as u64)
 #[derive(Clone, Debug)]
 pub struct Message {
     pub about: Option<String>,
-    pub parts: Vec<String>,
+    pub parts: Vec<TextChild>,
     pub tone: Tone,
 }
 
@@ -98,7 +98,12 @@ impl Notice {
     pub fn plain(&self) -> Option<Plain> {
         match &self.kind {
             NoticeKind::Message(message) => Some(Plain {
-                text: message.parts.join(" · "),
+                text: message
+                    .parts
+                    .iter()
+                    .map(TextChild::fold)
+                    .collect::<Vec<_>>()
+                    .join(" · "),
                 tone: message.tone,
             }),
             NoticeKind::Mode => None,
@@ -362,14 +367,20 @@ impl Ui {
     }
 
     pub fn notify(&mut self, level: Level, text: impl Into<String>, now: Instant) {
-        self.notify_parts(level, vec![text.into()], now);
+        self.notify_parts(level, vec![TextChild::String(text.into())], now);
     }
 
-    pub fn notify_parts(&mut self, level: Level, parts: Vec<String>, now: Instant) {
+    pub fn notify_parts(&mut self, level: Level, parts: Vec<TextChild>, now: Instant) {
         self.notify_for(level, parts, TOAST_HOLD, now);
     }
 
-    pub fn notify_for(&mut self, level: Level, parts: Vec<String>, hold: Duration, now: Instant) {
+    pub fn notify_for(
+        &mut self,
+        level: Level,
+        parts: Vec<TextChild>,
+        hold: Duration,
+        now: Instant,
+    ) {
         self.say(
             Message {
                 parts,
@@ -381,12 +392,25 @@ impl Ui {
         );
     }
 
+    /// What a command asked to say, in the inks its owner gave each part.
+    pub fn tell(&mut self, said: bingo_sdk::toast::Say, now: Instant) {
+        self.say(
+            Message {
+                parts: said.parts,
+                tone: said.tone,
+                about: None,
+            },
+            TOAST_HOLD,
+            now,
+        );
+    }
+
     /// A notice that names what it is about — the line an intent carried,
     /// said after it in dim.
     pub fn notify_about(&mut self, level: Level, text: String, about: String, now: Instant) {
         self.say(
             Message {
-                parts: vec![text],
+                parts: vec![TextChild::String(text)],
                 tone: tone(level),
                 about: Some(about),
             },
@@ -436,7 +460,7 @@ impl Ui {
     pub fn withdraw(&mut self, text: &str) {
         if self
             .notice()
-            .is_some_and(|notice| matches!(&notice.kind, NoticeKind::Message(message) if message.parts == [text]))
+            .is_some_and(|notice| matches!(&notice.kind, NoticeKind::Message(message) if message.parts == [TextChild::from(text)]))
         {
             self.notice = None;
         }
@@ -634,7 +658,10 @@ mod tests {
 
     fn said(ui: &Ui) -> Option<&str> {
         ui.notice().and_then(|notice| match &notice.kind {
-            NoticeKind::Message(message) => message.parts.first().map(String::as_str),
+            NoticeKind::Message(message) => match message.parts.first()? {
+                TextChild::String(text) => Some(text.as_str()),
+                TextChild::Node(_) => None,
+            },
             NoticeKind::Mode => None,
         })
     }
@@ -657,7 +684,10 @@ mod tests {
         let NoticeKind::Message(message) = &notice.kind else {
             panic!("message")
         };
-        assert_eq!(message.parts, ["cannot read", "switch model"]);
+        assert_eq!(
+            message.parts,
+            [TextChild::from("cannot read"), "switch model".into()]
+        );
         assert_eq!(message.tone, Tone::Attention);
         assert_eq!(notice.hold(), hold);
         assert!(!notice.gone(now.instant + hold));

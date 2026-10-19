@@ -1,6 +1,9 @@
 //! Parts keep their own inks in both a footer toast and a transcript headline.
 use crate::{clock::Now, theme, views};
-use bingo_sdk::{Tone, view::TextMotion};
+use bingo_sdk::{
+    Tone,
+    view::{TextChild, TextMotion},
+};
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 use ratatui::{style::Style, text::Span};
 
@@ -11,7 +14,7 @@ pub enum Content {
 }
 
 pub fn parts(
-    parts: &[String],
+    parts: &[TextChild],
     tone: Tone,
     content: Content,
     fade: Option<(TextMotion, Now)>,
@@ -34,13 +37,32 @@ pub fn parts(
         } else {
             "muted"
         };
-        if matches!(content, Content::Markdown) {
-            out.extend(inline(part, ink, &fade));
-        } else {
-            out.push(span(part.clone(), ink, &fade));
-        }
+        out.extend(part_spans(part, ink, content, &fade));
     }
     out
+}
+
+/// A plain part takes the tone's ink; a styled node keeps the ink its owner gave it.
+fn part_spans(
+    part: &TextChild,
+    ink: &str,
+    content: Content,
+    fade: &Option<(TextMotion, Now)>,
+) -> Vec<Span<'static>> {
+    match (part, content) {
+        (TextChild::String(text), Content::Markdown) => inline(text, ink, fade),
+        (TextChild::String(text), Content::Plain) => vec![span(text.clone(), ink, fade)],
+        (TextChild::Node(node), _) => views::render(node, usize::MAX)
+            .into_iter()
+            .flat_map(|line| line.spans)
+            .map(|mut drawn| {
+                if let (Some((motion, now)), Some(base)) = (fade, drawn.style.fg) {
+                    drawn.style = views::motion::style(drawn.style, base, Some(motion), Some(*now));
+                }
+                drawn
+            })
+            .collect(),
+    }
 }
 
 fn style(ink: &str, fade: &Option<(TextMotion, Now)>) -> Style {

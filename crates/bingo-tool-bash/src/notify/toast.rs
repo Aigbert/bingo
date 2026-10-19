@@ -10,7 +10,7 @@ pub fn toast(now: jiff::Timestamp, state: State, outcome: &str) -> serde_json::V
     bingo_sdk::slot::with(
         serde_json::json!({}),
         [bingo_sdk::slot::Slot::Toast {
-            text: format!("background job finished · {outcome}"),
+            parts: vec![format!("background job finished · {outcome}").into()],
             tone: tone(state),
             until: now + Duration::from_millis(2400),
             alert: false,
@@ -32,7 +32,10 @@ mod tests {
         ] {
             let payload = toast(now, state, "2 tests failed");
             let slot = &payload["slots"][0];
-            assert_eq!(slot["text"], "background job finished · 2 tests failed");
+            assert_eq!(
+                slot["parts"],
+                serde_json::json!(["background job finished · 2 tests failed"])
+            );
             assert_eq!(slot["until"], "2026-10-14T12:00:02.4Z");
             assert_eq!(slot["alert"], false);
             assert_eq!(

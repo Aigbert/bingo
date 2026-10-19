@@ -5753,8 +5753,12 @@
         {
           "type": "object",
           "properties": {
-            "text": {
-              "type": "string"
+            "parts": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/TextChild"
+              },
+              "description": "Plain strings draw muted; a `Text` node keeps its own ink."
             },
             "tone": {
               "$ref": "#/$defs/Tone"
@@ -5772,7 +5776,7 @@
           },
           "required": [
             "kind",
-            "text",
+            "parts",
             "until",
             "alert"
           ]

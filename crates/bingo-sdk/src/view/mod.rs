@@ -220,6 +220,21 @@ pub enum TextChild {
     String(String),
     Node(Box<View>),
 }
+impl From<String> for TextChild {
+    fn from(text: String) -> Self {
+        Self::String(text)
+    }
+}
+impl From<&str> for TextChild {
+    fn from(text: &str) -> Self {
+        Self::String(text.into())
+    }
+}
+impl From<View> for TextChild {
+    fn from(view: View) -> Self {
+        Self::Node(Box::new(view))
+    }
+}
 
 pub const NARROW: usize = 60;
 pub const COLUMN_GAP: usize = 2;
