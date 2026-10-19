@@ -1,4 +1,4 @@
-//! `/login <provider> [browser|device|paste]` and `/logout <provider>`: a
+//! `/login [provider] [browser|device|paste]` and `/logout <provider>`: a
 //! provider's credential, from inside a session (ADR-0012 §5). Login is not
 //! instant — it takes minutes and asks through the session's own dialog, so
 //! the queue waits behind it; logout is one call and runs at once.
@@ -11,7 +11,7 @@ use serde_json::json;
 
 use crate::host::Host;
 
-const USAGE: &str = "usage: /login <provider> [browser|device|paste]";
+const USAGE: &str = "usage: /login [provider] [browser|device|paste]";
 
 pub(super) struct LoginCommand {
     pub(super) host: Weak<Host>,
@@ -47,7 +47,12 @@ impl Command for LoginCommand {
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let host = super::host(&self.host)?;
         let (id, method) = parse(args)?;
-        let provider = host.provider(Some(id)).await?;
+        // Signed out mid-session, a person means the provider that refused them.
+        let session = match id {
+            Some(_) => None,
+            None => host.session_summary(&cx.session).await?.provider,
+        };
+        let provider = host.provider(id.or(session.as_deref())).await?;
         let prompter = host.prompter(&cx.session)?;
         let receipt = provider
             .login(prompter, method)
@@ -89,13 +94,11 @@ impl Command for LogoutCommand {
     }
 }
 
-/// `<provider> [method]`; an unknown method is refused before any flow
-/// starts.
-fn parse(args: &str) -> Result<(&str, Option<LoginMethod>), KernelError> {
-    let mut words = args.split_whitespace();
-    let provider = words
-        .next()
-        .ok_or_else(|| KernelError::new(ErrorCode::InvalidInput, USAGE))?;
+/// `[provider] [method]`; an unknown method is refused before any flow
+/// starts. A lone method word names the method, not a provider.
+fn parse(args: &str) -> Result<(Option<&str>, Option<LoginMethod>), KernelError> {
+    let mut words = args.split_whitespace().peekable();
+    let provider = words.next_if(|word| LoginMethod::parse(word).is_none());
     let method = match words.next() {
         None => None,
         Some(word) => Some(LoginMethod::parse(word).ok_or_else(|| {
@@ -132,17 +135,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_provider_is_required_and_the_method_optional() {
-        assert_eq!(parse("codex").unwrap(), ("codex", None));
+    fn the_provider_and_the_method_are_both_optional() {
+        assert_eq!(parse("codex").unwrap(), (Some("codex"), None));
         assert_eq!(
             parse("codex device").unwrap(),
-            ("codex", Some(LoginMethod::Device))
+            (Some("codex"), Some(LoginMethod::Device))
         );
         assert_eq!(
             parse("  codex   PASTE ").unwrap(),
-            ("codex", Some(LoginMethod::Paste))
+            (Some("codex"), Some(LoginMethod::Paste))
         );
-        assert_eq!(parse("").unwrap_err().code, ErrorCode::InvalidInput);
+        assert_eq!(parse("").unwrap(), (None, None));
+        assert_eq!(parse("device").unwrap(), (None, Some(LoginMethod::Device)));
         assert!(parse("codex sms").unwrap_err().message.contains("sms"));
         assert!(parse("codex device extra").is_err());
     }

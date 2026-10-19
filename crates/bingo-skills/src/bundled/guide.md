@@ -56,7 +56,7 @@ These are the kernel's and the surface's — every other is a plugin's.
   eligible plugins switch now, others at next start with a reason. See
   `guide-mods-switches`. `bingo plugins list|enable|disable` manages the wish.
 - `/status` — cwd, provider and model, mode, context against the window, tokens.
-- `/login <provider> [browser|device|paste]`, `/logout <provider>` — the
+- `/login [provider] [browser|device|paste]`, `/logout <provider>` — the
   credential of a provider that signs in rather than take a key; `bingo login
   <provider>` is the same from a shell. Tokens live in `~/.bingo/data/`.
 - `/help`, `/clear`, `/resume`, `/exit` — the surface's own, never the kernel's.

@@ -266,6 +266,11 @@ async fn login_names_a_registered_provider_and_logout_answers_a_receipt() {
         matches!(&ack, IntentOutcome::Rejected { error } if error.code == ErrorCode::InvalidInput && error.message.contains("login")),
         "a provider without a sign-in says so: {ack:?}"
     );
+    let (ack, _) = client.ack("/login").await;
+    assert!(
+        matches!(&ack, IntentOutcome::Rejected { error } if error.code == ErrorCode::InvalidInput && error.message.contains("login") && !error.message.contains("usage")),
+        "no provider named means the session's own: {ack:?}"
+    );
     let (ack, _) = client.ack("/login signing sms").await;
     assert!(
         matches!(&ack, IntentOutcome::Rejected { error } if error.message.contains("sms")),
