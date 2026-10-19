@@ -201,7 +201,11 @@ async fn stop_answer_matches_the_kernel() {
     kernel
         .until(|e| matches!(e, Event::ItemDelta { data, .. } if data.ends_with('.')))
         .await;
-    let expected = answers::stopped(&kernel.attached.snapshot, jiff::Timestamp::UNIX_EPOCH);
+    let expected = answers::stopped(
+        &kernel.attached.snapshot,
+        jiff::Timestamp::UNIX_EPOCH,
+        answers::StopPhase::Streaming,
+    );
     kernel
         .attached
         .handle
@@ -241,7 +245,11 @@ async fn stop_answer_matches_the_kernel_for_a_running_tool() {
         bingo_sdk::Activation::Pointer,
     );
     kernel.until(|e| matches!(e, Event::ItemUpdated { item } if item.status == bingo_sdk::ItemStatus::Running && matches!(item.body, ItemBody::ToolCall { .. }))).await;
-    let expected = answers::stopped(&kernel.attached.snapshot, jiff::Timestamp::UNIX_EPOCH);
+    let expected = answers::stopped(
+        &kernel.attached.snapshot,
+        jiff::Timestamp::UNIX_EPOCH,
+        answers::StopPhase::Tools,
+    );
     kernel
         .attached
         .handle
@@ -257,6 +265,43 @@ async fn stop_answer_matches_the_kernel_for_a_running_tool() {
         .into_iter()
         .filter(|e| matches!(e, Event::ItemCompleted { .. }))
         .collect();
+    assert_eq!(normalized(&actual), normalized(&expected));
+    kernel.host.shutdown().await;
+}
+
+#[tokio::test]
+async fn stop_answer_leaves_streamed_tool_input_without_a_completion() {
+    let mut kernel = Kernel::new(json!([{"steps":[
+        {"toolCall":{"name":"Bash","input":{"command":"echo pending"}}},
+        {"delay":{"ms":60000}}
+    ]}]))
+    .await;
+    kernel
+        .attached
+        .handle
+        .submit(IntentId::mint(), Input::text("start", crate::origin()));
+    kernel.until(|e| matches!(e, Event::ItemStarted { item } if matches!(item.body, ItemBody::ToolCall { .. }))).await;
+    let expected = answers::stopped(
+        &kernel.attached.snapshot,
+        jiff::Timestamp::UNIX_EPOCH,
+        answers::StopPhase::Streaming,
+    );
+    kernel
+        .attached
+        .handle
+        .interrupt(IntentId::mint(), InterruptScope::Head);
+    let actual = kernel
+        .until(|e| matches!(e, Event::TurnCompleted { .. }))
+        .await;
+    let actual: Vec<_> = actual
+        .into_iter()
+        .filter(|e| matches!(e, Event::ItemCompleted { .. }))
+        .collect();
+    let expected: Vec<_> = expected
+        .into_iter()
+        .filter(|e| matches!(e, Event::ItemCompleted { .. }))
+        .collect();
+    assert!(!actual.iter().any(|e| matches!(e, Event::ItemCompleted { item } if matches!(item.body, ItemBody::ToolCall { .. }))));
     assert_eq!(normalized(&actual), normalized(&expected));
     kernel.host.shutdown().await;
 }

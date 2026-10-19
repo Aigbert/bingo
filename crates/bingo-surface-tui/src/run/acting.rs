@@ -94,6 +94,7 @@ impl Scene {
             self.emit_all(answers::stopped(
                 self.run.session.tree.viewed(),
                 self.run.now().wall,
+                answers::StopPhase::Tools,
             ));
         }
     }

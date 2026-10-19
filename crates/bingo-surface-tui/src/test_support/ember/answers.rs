@@ -118,7 +118,13 @@ pub fn withdrawn(input: &Input) -> Result<Input, KernelError> {
     Ok(input.clone())
 }
 
-pub fn stopped(state: &SessionState, at: Timestamp) -> Vec<Event> {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum StopPhase {
+    Streaming,
+    Tools,
+}
+
+pub fn stopped(state: &SessionState, at: Timestamp, phase: StopPhase) -> Vec<Event> {
     let turn = &state.turn.as_ref().unwrap().id;
     let mut events = Vec::new();
     for mut item in state
@@ -128,9 +134,13 @@ pub fn stopped(state: &SessionState, at: Timestamp) -> Vec<Event> {
         .filter(|i| i.turn.as_ref() == Some(turn) && !i.is_terminal())
         .map(|item| item.as_ref().clone())
     {
-        if matches!(item.body, ItemBody::ToolCall { .. }) && item.status != ItemStatus::Running {
+        if phase == StopPhase::Streaming
+            && matches!(item.body, ItemBody::ToolCall { .. })
+            && item.status == ItemStatus::Pending
+        {
             continue;
         }
+        let ran = item.status == ItemStatus::Running;
         item.status = ItemStatus::Interrupted;
         item.completed_at = Some(at);
         if let ItemBody::ToolCall {
@@ -144,11 +154,13 @@ pub fn stopped(state: &SessionState, at: Timestamp) -> Vec<Event> {
                 bingo_core::executor::INTERRUPTED_MARKER,
             )));
             *progress = None;
-            *duration_ms = Some(
+            *duration_ms = Some(if ran {
                 at.as_millisecond()
                     .saturating_sub(item.started_at.as_millisecond())
-                    .max(0) as u64,
-            );
+                    .max(0) as u64
+            } else {
+                0
+            });
         }
         events.push(Event::ItemCompleted { item });
     }
@@ -157,7 +169,7 @@ pub fn stopped(state: &SessionState, at: Timestamp) -> Vec<Event> {
         ItemStatus::Completed,
         ItemBody::Interruption {
             asked_at: None,
-            marker: "[Request interrupted by user]".into(),
+            marker: bingo_core::turn::INTERRUPTED_MARKER.into(),
         },
     );
     marker.turn = Some(turn.clone());
@@ -196,4 +208,49 @@ pub fn shell(
     item.started_at = at;
     item.completed_at = Some(at);
     Event::ItemCompleted { item }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::{folded, frame, started, tool, ts};
+
+    #[test]
+    fn a_queued_chain_call_gets_the_tool_marker_and_zero_duration() {
+        let call = tool(
+            "queued-call",
+            "Bash",
+            serde_json::json!({}),
+            None,
+            ItemStatus::Pending,
+        );
+        let state = folded(vec![
+            frame(1, started("trn_1")),
+            frame(2, Event::ItemStarted { item: call }),
+        ]);
+        let events = stopped(
+            &state,
+            ts() + std::time::Duration::from_secs(1),
+            StopPhase::Tools,
+        );
+        let Event::ItemCompleted { item } = &events[0] else {
+            panic!("the queued call completes");
+        };
+        assert_eq!(item.status, ItemStatus::Interrupted);
+        let ItemBody::ToolCall {
+            output,
+            duration_ms,
+            progress,
+            ..
+        } = &item.body
+        else {
+            panic!("the call stays a call");
+        };
+        assert_eq!(
+            output.as_deref().unwrap(),
+            &ToolOutput::error(bingo_core::executor::INTERRUPTED_MARKER)
+        );
+        assert_eq!(*duration_ms, Some(0));
+        assert!(progress.is_none());
+    }
 }
