@@ -7,11 +7,17 @@ pub fn row(item: &Item) -> bool {
     match &item.body {
         ItemBody::Reasoning { text, .. } => !text.trim().is_empty(),
         ItemBody::ToolCall {
-            asked_at, began_at, ..
+            asked_at,
+            began_at,
+            quiet,
+            output,
+            ..
         } => {
-            asked_at.is_some()
-                || began_at.is_some()
-                || item.status.is_terminal() && item.status != bingo_sdk::ItemStatus::Interrupted
+            (!*quiet || item.status.failed(output.as_deref()))
+                && (asked_at.is_some()
+                    || began_at.is_some()
+                    || item.status.is_terminal()
+                        && item.status != bingo_sdk::ItemStatus::Interrupted)
         }
         _ => false,
     }

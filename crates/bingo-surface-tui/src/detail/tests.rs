@@ -330,3 +330,21 @@ fn closing_detail_follows_when_the_folded_stream_fits() {
     crate::detail::close(&mut ui, &solo(&state), now);
     assert!(ui.scroll.following());
 }
+
+#[test]
+fn quiet_successes_do_not_become_invisible_detail_stops() {
+    let mut call = tool(
+        "quiet",
+        "Inspect",
+        serde_json::json!({}),
+        None,
+        ItemStatus::Completed,
+    );
+    let ItemBody::ToolCall { quiet, .. } = &mut call.body else {
+        panic!("tool");
+    };
+    *quiet = true;
+    assert!(!super::row(&call));
+    call.status = ItemStatus::Failed;
+    assert!(super::row(&call));
+}
