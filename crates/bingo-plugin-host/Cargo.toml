@@ -15,6 +15,8 @@ tier = "library"
 workspace = true
 
 [dependencies]
+# Already in the tree (M139): canonical paths without the Windows verbatim prefix.
+dunce = "1"
 # M137: shared WireService operation faces.
 async-trait.workspace = true
 thiserror.workspace = true

@@ -25,10 +25,11 @@ pub async fn author(action: &Action) -> Option<Result<i32, KernelError>> {
 }
 
 /// The author commands take a plugin directory; one that is not there is
-/// named, since the bare OS error says nothing about which path.
+/// named, since the bare OS error says nothing about which path. The plain
+/// spelling, not the verbatim one, is what is printed and what a plugin is
+/// started in.
 fn directory(dir: &std::path::Path) -> Result<std::path::PathBuf, KernelError> {
-    dir.canonicalize()
-        .map_err(|error| invalid(format!("{}: {error}", dir.display())))
+    dunce::canonicalize(dir).map_err(|error| invalid(format!("{}: {error}", dir.display())))
 }
 
 /// Only this binary knows which session commands have a headless twin.

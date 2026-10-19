@@ -7,7 +7,8 @@ pub(super) fn contained(root: &Path) -> io::Result<()> {
     let Some(entry) = manifest.get("entry") else {
         return Ok(());
     };
-    let root = root.canonicalize()?;
+    // A verbatim root would make every `/` after `${PLUGIN_ROOT}` a filename byte.
+    let root = dunce::canonicalize(root)?;
     for raw in entry
         .get("command")
         .and_then(serde_json::Value::as_str)
@@ -38,7 +39,7 @@ fn check(root: &Path, raw: &str) -> io::Result<()> {
             "entry path {raw:?} uses a foreign separator"
         )));
     }
-    let path = root.join(&expanded).canonicalize().map_err(|error| {
+    let path = dunce::canonicalize(root.join(&expanded)).map_err(|error| {
         io::Error::other(format!("entry path {raw:?} cannot be resolved: {error}"))
     })?;
     if !path.starts_with(root) {

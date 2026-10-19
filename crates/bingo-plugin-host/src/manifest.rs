@@ -163,9 +163,11 @@ impl Entry {
     }
 }
 
-/// Every occurrence, not the first: a value may name the root twice.
+/// Every occurrence, not the first: a value may name the root twice. A
+/// verbatim root is spelled plainly, since in a verbatim path the `/` a
+/// manifest writes after the placeholder is not a separator.
 fn expand(raw: &str, root: &Path) -> String {
-    raw.replace(PLUGIN_ROOT, &root.to_string_lossy())
+    raw.replace(PLUGIN_ROOT, &dunce::simplified(root).to_string_lossy())
 }
 
 #[cfg(test)]

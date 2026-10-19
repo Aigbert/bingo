@@ -133,7 +133,7 @@ fn check_children(map: &serde_json::Map<String, Value>) -> Result<(), String> {
 }
 
 pub async fn validate(root: &Path, env: &Env) -> Result<Vec<String>, KernelError> {
-    let root = root.canonicalize().map_err(invalid)?;
+    let root = dunce::canonicalize(root).map_err(invalid)?;
     let manifest = read(&root)?;
     let connection = Connection::spawn(
         &manifest.name,

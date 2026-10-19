@@ -13,6 +13,8 @@ description = "bingo: a local coding-agent harness"
 workspace = true
 
 [dependencies]
+# Already in the tree (M139): canonical paths without the Windows verbatim prefix.
+dunce = "1"
 bingo-mod-hello.workspace = true
 # M133: typed scenarios, their schema, streams and disposable author-test homes.
 serde.workspace = true
