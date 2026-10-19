@@ -51,12 +51,29 @@ pub struct Sheet {
     pub foot: Vec<View>,
     pub pick: bool,
 }
+/// What the builder draws around the rows: a sheet heads them and takes the
+/// dock; a list rides over the input with no head and ends on a blank row,
+/// and keeps one row fewer back for what is around it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Shape {
+    Sheet,
+    List,
+}
+impl Shape {
+    fn reserved(self) -> usize {
+        match self {
+            Self::Sheet => 4,
+            Self::List => 3,
+        }
+    }
+}
+
 impl Sheet {
     pub fn window(&self, rows: u16) -> std::ops::Range<usize> {
-        self.window_with_limit(rows, 8)
+        self.window_with_limit(rows, 8, Shape::Sheet)
     }
-    fn window_with_limit(&self, rows: u16, max: usize) -> std::ops::Range<usize> {
-        let max = capacity(rows, self.top.len(), max);
+    fn window_with_limit(&self, rows: u16, max: usize, shape: Shape) -> std::ops::Range<usize> {
+        let max = room(rows, shape.reserved() + self.top.len(), max);
         let at = pick::selected(&self.rows, self.selected.as_deref());
         if self.pick {
             pick::list_window(self.rows.len(), at, max)
@@ -76,14 +93,37 @@ impl Sheet {
         max: usize,
         glyphs: crate::glyph::GlyphSet,
     ) -> View {
+        self.build(columns, rows, max, glyphs, Shape::Sheet)
+    }
+    /// The rows with no head, for a list over the input: the `/` palette
+    /// shows eight at most and the `@` mentions six. `head` and `fact` are
+    /// not drawn; `top` carries what a list says when nothing matches.
+    pub fn list(
+        &self,
+        columns: u16,
+        rows: u16,
+        max: usize,
+        glyphs: crate::glyph::GlyphSet,
+    ) -> View {
+        self.build(columns, rows, max, glyphs, Shape::List)
+    }
+    fn build(
+        &self,
+        columns: u16,
+        rows: u16,
+        max: usize,
+        glyphs: crate::glyph::GlyphSet,
+        shape: Shape,
+    ) -> View {
         let at = pick::selected(&self.rows, self.selected.as_deref());
-        let window = self.window_with_limit(rows, max);
-        let head = Row {
-            id: String::new(),
-            left: pick::bold(&self.head, "fg"),
-            right: self.fact.clone(),
+        let window = self.window_with_limit(rows, max, shape);
+        let mut children = match shape {
+            Shape::Sheet => vec![
+                pick::pick_line(&self.head(), false, columns, glyphs),
+                blank(),
+            ],
+            Shape::List => vec![],
         };
-        let mut children = vec![pick::pick_line(&head, false, columns, glyphs), blank()];
         children.extend(self.top.iter().cloned().map(|v| inset(v, columns)));
         children.extend(
             window
@@ -93,7 +133,7 @@ impl Sheet {
         if let Some(count) = pick::count(window, self.rows.len()) {
             children.push(inset(count, columns));
         }
-        if !self.foot.is_empty() {
+        if !self.foot.is_empty() || shape == Shape::List {
             children.push(blank());
             children.extend(self.foot.iter().cloned().map(|v| inset(v, columns)));
         }
@@ -105,10 +145,20 @@ impl Sheet {
             }),
         }
     }
+    fn head(&self) -> Row {
+        Row {
+            id: String::new(),
+            left: pick::bold(&self.head, "fg"),
+            right: self.fact.clone(),
+        }
+    }
 }
 /// Visible list capacity, also used when an owner fetches facts for visible rows.
 pub fn capacity(rows: u16, top: usize, max: usize) -> usize {
-    max.min(usize::from(rows).saturating_sub(4 + top).max(3))
+    room(rows, Shape::Sheet.reserved() + top, max)
+}
+fn room(rows: u16, reserved: usize, max: usize) -> usize {
+    max.min(usize::from(rows).saturating_sub(reserved).max(3))
 }
 
 fn blank() -> View {
@@ -272,6 +322,26 @@ mod tests {
                 .fold()
                 .contains("3 of 20")
         );
+    }
+    #[test]
+    fn a_list_has_no_head_keeps_three_rows_back_and_ends_on_a_blank() {
+        let list = sheet().list(100, 10, 8, Default::default());
+        let View::Box { children, .. } = &list else {
+            panic!("a list is a box");
+        };
+        assert!(!list.fold().contains("Models"));
+        assert!(list.fold().contains("7 of 20"));
+        assert_eq!(children.len(), 9);
+        assert_eq!(children.last().map(View::fold), Some(String::new()));
+        let mentions = sheet().list(100, 40, 6, Default::default());
+        assert!(mentions.fold().contains("6 of 20"));
+        let mut empty = sheet();
+        empty.rows.clear();
+        empty.top = vec![pick::text("nothing matches", "dim")];
+        let View::Box { children, .. } = empty.list(100, 40, 8, Default::default()) else {
+            panic!("a list is a box");
+        };
+        assert_eq!(children.len(), 2);
     }
     #[test]
     fn unpicked_pages_scroll_without_a_pick_ground() {
