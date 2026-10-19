@@ -327,9 +327,15 @@ impl SpawnAgentTool {
                 .await
                 .map_err(failed)?,
             ),
-            None => start(&plan, names::names_of(&children), cx)
-                .await
-                .map_err(failed)?,
+            None => {
+                let started = start(&plan, names::names_of(&children), cx)
+                    .await
+                    .map_err(failed)?;
+                described(host, &started.1.session, definition)
+                    .await
+                    .map_err(failed)?;
+                started
+            }
         };
         let session = attachment.session.clone();
         let prompt = Input::text(args.prompt.clone(), message::origin(None));
@@ -372,6 +378,26 @@ impl SpawnAgentTool {
             .await?;
         Ok(ToolOutput::text(named(&name, &session)))
     }
+}
+
+/// A new teammate's journal opens with what its definition says it is for,
+/// so whoever walks in reads it first. A spawn with no definition has none.
+async fn described(
+    host: &HostHandle,
+    session: &SessionId,
+    definition: Option<&Definition>,
+) -> Result<(), KernelError> {
+    let Some(definition) = definition.filter(|d| !d.description.trim().is_empty()) else {
+        return Ok(());
+    };
+    let role = bingo_collab::role::payload(&definition.description);
+    host.extend(
+        session,
+        bingo_collab::role::PLUGIN,
+        bingo_collab::role::KIND,
+        role,
+    )
+    .await
 }
 
 fn failed(error: KernelError) -> ToolError {
@@ -921,6 +947,45 @@ mod tests {
                 .contains("an unlabelled line in its own conversation is the person it works for"),
             "{DESCRIPTION}"
         );
+    }
+
+    #[tokio::test]
+    async fn a_new_teammate_s_journal_opens_with_its_definition_s_role() {
+        let fleet = Fleet::default();
+        fleet.script([turn_completed()]);
+        let root = fleet.root();
+        let host = Recorder::new(&fleet);
+        let tool = SpawnAgentTool::default();
+        let mut reviewer = definition("reviewer", "You review diffs.");
+        reviewer.description = "reads diffs and says what breaks".into();
+        reviewer.model = None;
+        reviewer.provider = None;
+        tool.definitions.register(reviewer).unwrap();
+        let out = tool
+            .call(
+                json!({ "prompt": "go", "agent": "reviewer" }),
+                &tool_context(&root, host.clone()),
+            )
+            .await
+            .unwrap();
+        let named: Value = serde_json::from_str(out.parts[0].as_text().unwrap()).unwrap();
+        let child = SessionId::from_raw(named["session"].as_str().unwrap());
+        let state = watch::snapshot(&fleet.handle(), &child).await.unwrap();
+        assert_eq!(
+            bingo_collab::role::of_state(&state).as_deref(),
+            Some("reads diffs and says what breaks")
+        );
+        let plain = SpawnAgentTool::default()
+            .call(
+                json!({ "prompt": "go", "name": "scout" }),
+                &tool_context(&root, host),
+            )
+            .await
+            .unwrap();
+        let named: Value = serde_json::from_str(plain.parts[0].as_text().unwrap()).unwrap();
+        let child = SessionId::from_raw(named["session"].as_str().unwrap());
+        let state = watch::snapshot(&fleet.handle(), &child).await.unwrap();
+        assert_eq!(bingo_collab::role::of_state(&state), None);
     }
 
     #[test]

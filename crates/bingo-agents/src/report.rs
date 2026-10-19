@@ -9,7 +9,7 @@ use bingo_sdk::{
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-pub(crate) const PLUGIN: &str = "bingo.agents";
+pub(crate) const PLUGIN: &str = bingo_collab::role::PLUGIN;
 const PREFIX: &str = "report:";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
