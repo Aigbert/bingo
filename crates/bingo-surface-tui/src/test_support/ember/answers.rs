@@ -128,10 +128,27 @@ pub fn stopped(state: &SessionState, at: Timestamp) -> Vec<Event> {
         .filter(|i| i.turn.as_ref() == Some(turn) && !i.is_terminal())
         .map(|item| item.as_ref().clone())
     {
+        if matches!(item.body, ItemBody::ToolCall { .. }) && item.status != ItemStatus::Running {
+            continue;
+        }
         item.status = ItemStatus::Interrupted;
         item.completed_at = Some(at);
-        if let ItemBody::ToolCall { output, .. } = &mut item.body {
-            *output = None;
+        if let ItemBody::ToolCall {
+            output,
+            progress,
+            duration_ms,
+            ..
+        } = &mut item.body
+        {
+            *output = Some(Box::new(bingo_sdk::ToolOutput::error(
+                bingo_core::executor::INTERRUPTED_MARKER,
+            )));
+            *progress = None;
+            *duration_ms = Some(
+                at.as_millisecond()
+                    .saturating_sub(item.started_at.as_millisecond())
+                    .max(0) as u64,
+            );
         }
         events.push(Event::ItemCompleted { item });
     }
