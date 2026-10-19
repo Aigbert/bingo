@@ -176,7 +176,11 @@ fn change_prefills_then_submits_and_typing_starts_the_no() {
     draw_tree(80, 24, &tree, &mut ui, now);
     change(&tree, &mut ui, now);
     assert_eq!(ui.dialog.words.as_ref().unwrap().text(), "cargo test");
-    ui.dialog.words.as_mut().unwrap().set("cargo check");
+    crate::input::on_key(&mut ui, &tree, ctrl('u'), now);
+    assert_eq!(ui.dialog.words.as_ref().unwrap().text(), "");
+    for c in "cargo check".chars() {
+        crate::input::on_key(&mut ui, &tree, typed(c), now);
+    }
     let effects = crate::input::on_key(&mut ui, &tree, key(KeyCode::Enter), now);
     assert!(
         matches!(&effects[0],crate::effect::Effect::Answer {answer:Answer::AllowChanged {input},..} if input["command"]=="cargo check")

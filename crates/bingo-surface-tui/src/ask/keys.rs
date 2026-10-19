@@ -71,15 +71,7 @@ fn typing(ui: &mut Ui, interaction: &Interaction, ask: &Ask, key: KeyEvent) -> V
     let Some(words) = ui.dialog.words.as_mut() else {
         return Vec::new();
     };
-    match key.code {
-        KeyCode::Enter => {}
-        KeyCode::Backspace => words.backspace(),
-        KeyCode::Left => words.left(),
-        KeyCode::Right => words.right(),
-        KeyCode::Char(c) if typed(key) => words.insert(&c.to_string()),
-        _ => {}
-    }
-    if key.code != KeyCode::Enter {
+    if !crate::dialog::words_key(words, key) {
         return Vec::new();
     }
     let text = words.text().trim().to_owned();

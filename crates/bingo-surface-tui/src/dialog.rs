@@ -197,7 +197,7 @@ fn guarded(interaction: &Interaction, now: Now) -> bool {
 }
 
 /// Edit the words row; `true` when the person is done with it.
-fn words_key(words: &mut Composer, key: KeyEvent) -> bool {
+pub(crate) fn words_key(words: &mut Composer, key: KeyEvent) -> bool {
     match key.code {
         KeyCode::Enter => return true,
         KeyCode::Backspace => words.backspace(),
