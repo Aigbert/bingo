@@ -106,6 +106,7 @@ fn spinner_props(
         message: stopping.then(|| "stopping".into()),
         suffix: String::new(),
         mode: mode.into(),
+        retry: None,
     })
 }
 
@@ -131,7 +132,7 @@ pub fn draw(state: &bingo_sdk::SessionState, rows: &Rows<'_>) -> views::Drawing 
             next,
         }
     };
-    if let Some(retry) = state.turn.as_ref().and_then(|turn| turn.retrying) {
+    if let Some(retry) = state.turn.as_ref().and_then(|turn| turn.retrying.as_ref()) {
         drawing.lines.push(Line::from(Span::styled(
             format!("   retrying {}/{}", retry.attempt, retry.max),
             theme::ash(),

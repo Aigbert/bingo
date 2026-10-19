@@ -130,11 +130,22 @@ pub struct LastTurn {
 }
 
 /// A stream attempt failed and the turn is waiting to try again.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Retry {
     pub attempt: u32,
     pub max: u32,
+    #[serde(default)]
+    pub delay_ms: u64,
+    #[serde(default)]
+    pub reason: String,
+    #[serde(default = "retry_epoch")]
+    #[schemars(with = "String")]
+    pub started_at: Timestamp,
+}
+
+fn retry_epoch() -> Timestamp {
+    Timestamp::UNIX_EPOCH
 }
 
 /// What a frame changed, so a renderer can redraw only that.
@@ -221,7 +232,19 @@ impl SessionState {
             Event::SessionUpdated { summary } => self.session_updated(summary),
             Event::SessionClosed { .. } => self.session_closed(),
             Event::TurnStarted { turn, origin, .. } => self.turn_started(turn, *origin, frame.ts),
-            Event::TurnRetrying { attempt, max, .. } => self.turn_retrying(*attempt, *max),
+            Event::TurnRetrying {
+                attempt,
+                max,
+                delay_ms,
+                reason,
+                ..
+            } => self.turn_retrying(Retry {
+                attempt: *attempt,
+                max: *max,
+                delay_ms: *delay_ms,
+                reason: reason.clone(),
+                started_at: frame.ts,
+            }),
             Event::TurnUsage { usage, context, .. } => self.turn_usage(*usage, *context),
             Event::ContextChanged { context } => self.context_changed(*context),
             Event::UsageCharged { turn, usage, .. } => self.usage_charged(turn.as_ref(), *usage),
@@ -370,9 +393,9 @@ impl SessionState {
         Applied::Turn
     }
 
-    fn turn_retrying(&mut self, attempt: u32, max: u32) -> Applied {
+    fn turn_retrying(&mut self, retry: Retry) -> Applied {
         if let Some(t) = self.turn.as_mut() {
-            t.retrying = Some(Retry { attempt, max });
+            t.retrying = Some(retry);
         }
         Applied::Turn
     }

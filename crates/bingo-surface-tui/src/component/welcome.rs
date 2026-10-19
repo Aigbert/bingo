@@ -8,6 +8,12 @@ pub fn props(rows: &Rows<'_>) -> Props {
         modes: bingo_sdk::slot::modes(rows.state).collect(),
         update: rows.update.map(str::to_owned),
         resume: rows.entrance.resume.cloned(),
+        started_at_ms: None,
+        out_at_ms: None,
+        recent: None,
+        selected: None,
+        branch: None,
+        changed: None,
     }))
 }
 

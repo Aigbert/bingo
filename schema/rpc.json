@@ -5429,6 +5429,39 @@
         "status"
       ]
     },
+    "ReceiptFacts": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/SessionId"
+        },
+        "title": {
+          "type": "string"
+        },
+        "turns": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        },
+        "durationMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "editedFiles": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "turns",
+        "durationMs",
+        "editedFiles"
+      ]
+    },
     "Rect": {
       "type": "object",
       "properties": {
@@ -5608,6 +5641,20 @@
           "type": "integer",
           "format": "uint32",
           "minimum": 0
+        },
+        "delayMs": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 0
+        },
+        "reason": {
+          "type": "string",
+          "default": ""
+        },
+        "startedAt": {
+          "type": "string",
+          "default": "1970-01-01T00:00:00Z"
         }
       },
       "required": [
@@ -6024,6 +6071,16 @@
     "SessionStatusProps": {
       "type": "object",
       "properties": {
+        "receipt": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReceiptFacts"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "modelScope": {
           "anyOf": [
             {
@@ -6418,6 +6475,16 @@
         },
         "mode": {
           "type": "string"
+        },
+        "retry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Retry"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -8395,6 +8462,51 @@
               "type": "null"
             }
           ]
+        },
+        "startedAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "outAtMs": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int64"
+        },
+        "recent": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/$defs/SessionSummary"
+          }
+        },
+        "selected": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
+        },
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "changed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
         }
       },
       "required": [

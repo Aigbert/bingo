@@ -298,6 +298,7 @@ pub(crate) fn session_facts(
     state: &bingo_sdk::SessionState,
 ) -> bingo_sdk::component::SessionStatusProps {
     bingo_sdk::component::SessionStatusProps {
+        receipt: None,
         title: state.summary.title.clone(),
         cwd: state.summary.cwd.clone(),
         provider: state.summary.provider.clone(),

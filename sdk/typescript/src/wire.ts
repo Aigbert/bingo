@@ -1137,6 +1137,7 @@ export type Read = {
 export type Reads = ("path" | "command" | "text");
 export type Reason = ({ "kind": "rule"; "rule": string; "source"?: (RuleSource | null); [key: string]: unknown; } | { "kind": "mode"; "mode": string; [key: string]: unknown; } | { "hook": string; "kind": "hook"; [key: string]: unknown; } | { "detail": string; "kind": "safety"; [key: string]: unknown; } | { "kind": "readOnly"; [key: string]: unknown; } | { "detail": string; "kind": "confirm"; [key: string]: unknown; } | { "kind": "default"; [key: string]: unknown; });
 export type ReasoningProps = { "status": ItemStatus; "text": string; [key: string]: unknown; };
+export type ReceiptFacts = { "durationMs": number; "editedFiles": number; "id": SessionId; "title": string; "turns": number; [key: string]: unknown; };
 /**
  * A fixed rectangle: `width` by `height`, offset by `x` and `y` from
  * `anchor`, a corner or the `center` (`topLeft` unless given).
@@ -1178,6 +1179,8 @@ export type ResultValue8 = { "result"?: (string | null); [key: string]: unknown;
 export type ResultValue9 = { "result"?: (ToolSpec | null); [key: string]: unknown; };
 export type _Result_5f_of_5f_Array_5f_of_5f_ModelEvent_5f_or_5f_ProviderError = ({ "Ok": Array<ModelEvent>; [key: string]: unknown; } | { "Err": ProviderError; [key: string]: unknown; });
 export type _Result_5f_of_5f_Compaction_5f_or_5f_CompactError = ({ "Ok": Compaction; [key: string]: unknown; } | { "Err": CompactError; [key: string]: unknown; });
+/** A stream attempt failed and the turn is waiting to try again. */
+export type Retry = { "attempt": number; "delayMs"?: number; "max": number; "reason"?: string; "startedAt"?: string; [key: string]: unknown; };
 export type RewindProps = { "dropped": number; "toTurn": TurnId; [key: string]: unknown; };
 export type Role = ("user" | "assistant");
 /** Where the matched permission rule was installed. */
@@ -1244,7 +1247,7 @@ export type Session = {
 /** One persisted context: one journal, one actor. */
 export type SessionId = string;
 export type SessionModeProps = { "modes": Array<string>; [key: string]: unknown; };
-export type SessionStatusProps = { "context"?: (ContextUsage | null); "cwd": string; "effort"?: (Effort | null); "model"?: (string | null); "modelScope"?: (ChoiceScope | null); "provider"?: (string | null); "title"?: (string | null); "usage": Usage; [key: string]: unknown; };
+export type SessionStatusProps = { "context"?: (ContextUsage | null); "cwd": string; "effort"?: (Effort | null); "model"?: (string | null); "modelScope"?: (ChoiceScope | null); "provider"?: (string | null); "receipt"?: (ReceiptFacts | null); "title"?: (string | null); "usage": Usage; [key: string]: unknown; };
 export type SessionSummary = {
   /** An interaction is open; stamped only by the session actor. */
   "asking"?: boolean;
@@ -1339,7 +1342,7 @@ export type Span = {
   "min": Length;
   [key: string]: unknown;
 };
-export type SpinnerProps = { "message"?: (string | null); "mode": string; "suffix": string; "word": string; [key: string]: unknown; };
+export type SpinnerProps = { "message"?: (string | null); "mode": string; "retry"?: (Retry | null); "suffix": string; "word": string; [key: string]: unknown; };
 /** The local consequences a command preview can establish before it runs. */
 export type Stakes = { "items": Array<string>; "line": string; [key: string]: unknown; };
 export type StateGet = { "key": string; "scope": string; [key: string]: unknown; };
@@ -1779,5 +1782,5 @@ export type Viewport = {
 };
 /** How a producer intends an utterance to be drawn. */
 export type Voice = ("said" | "note" | "quiet" | "aside");
-export type WelcomeProps = { "effort"?: (Effort | null); "modes": Array<string>; "resume"?: (SessionSummary | null); "session": SessionSummary; "update"?: (string | null); [key: string]: unknown; };
+export type WelcomeProps = { "branch"?: (string | null); "changed"?: (number | null); "effort"?: (Effort | null); "modes": Array<string>; "outAtMs"?: (number | null); "recent"?: (Array<SessionSummary> | null); "resume"?: (SessionSummary | null); "selected"?: (number | null); "session": SessionSummary; "startedAtMs"?: (number | null); "update"?: (string | null); [key: string]: unknown; };
 export type Wrap = ("wrap" | "nowrap");

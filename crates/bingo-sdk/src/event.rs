@@ -83,8 +83,12 @@ pub enum Event {
         turn: TurnId,
         attempt: u32,
         max: u32,
+        #[serde(default)]
+        #[schemars(!default)]
         delay_ms: u64,
         dropped: Vec<ItemId>,
+        #[serde(default)]
+        #[schemars(!default)]
         reason: String,
     },
     TurnUsage {

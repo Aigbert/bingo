@@ -56,7 +56,11 @@ props!(CommandOutputProps {
     text: String,
     is_errored: bool
 });
-props!(SpinnerProps { word: String, message: Option<String>, suffix: String, mode: String });
+props!(SpinnerProps {
+    word: String, message: Option<String>, suffix: String, mode: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    retry: Option<crate::Retry>
+});
 props!(TurnDurationProps {
     word: String,
     duration_ms: u64
@@ -119,7 +123,16 @@ props!(PermissionReceiptProps { interaction: crate::InteractionId, tool: String,
 props!(AssetProps { asset: String, label: Option<String> });
 props!(ShellRunProps { command: String, output: String, exit: Option<i32>, cwd: std::path::PathBuf, status: crate::ItemStatus });
 props!(ActionProps { name: String, args: Value, result: Option<Value>, status: crate::ItemStatus });
+props!(ReceiptFacts {
+    id: crate::SessionId,
+    title: String,
+    turns: usize,
+    duration_ms: u64,
+    edited_files: usize
+});
 props!(SessionStatusProps {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    receipt: Option<ReceiptFacts>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     model_scope: Option<crate::ChoiceScope>,
     title: Option<String>, cwd: String, provider: Option<String>, model: Option<String>, effort: Option<crate::Effort>, context: Option<crate::ContextUsage>, usage: crate::Usage });
@@ -131,7 +144,21 @@ props!(ToastProps {
     until: jiff::Timestamp,
     alert: bool
 });
-props!(WelcomeProps { session: crate::SessionSummary, effort: Option<crate::Effort>, modes: Vec<String>, update: Option<String>, resume: Option<crate::SessionSummary> });
+props!(WelcomeProps {
+    session: crate::SessionSummary, effort: Option<crate::Effort>, modes: Vec<String>, update: Option<String>, resume: Option<crate::SessionSummary>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    started_at_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    out_at_ms: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    recent: Option<Vec<crate::SessionSummary>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    selected: Option<usize>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    branch: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    changed: Option<usize>
+});
 
 /// Optional facts supplied by the asking surface, without transcript bodies.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
