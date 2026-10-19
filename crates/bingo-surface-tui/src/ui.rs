@@ -89,6 +89,8 @@ pub struct Notice {
     /// The first frame that drew it: a loaded machine can spend a whole hold
     /// between saying and painting, and an unseen toast has said nothing.
     shown: Option<Instant>,
+    /// A placed toast that arrives while it is up waits for it to end.
+    keeps: bool,
 }
 impl Notice {
     /// A local notice, whose hold waits for the frame that first draws it.
@@ -99,6 +101,7 @@ impl Notice {
             said,
             hold,
             shown: None,
+            keeps: false,
         }
     }
     /// A placed notice, whose window its placer started when it placed it.
@@ -136,6 +139,10 @@ impl Notice {
     }
     pub(crate) fn gone(&self, now: Instant) -> bool {
         self.age(now) >= self.hold + TOAST_FADE
+    }
+    /// When it will be gone, counting an undrawn one from `now`.
+    fn ends(&self, now: Instant) -> Instant {
+        self.shown.unwrap_or(now) + self.hold + TOAST_FADE
     }
     #[cfg(test)]
     pub fn strength(&self, now: Now) -> f32 {
@@ -416,6 +423,22 @@ impl Ui {
         );
     }
 
+    /// A notice that keeps its slot: what the opening says is not cut short
+    /// by a placed toast, which waits for it to end.
+    pub fn arrive(&mut self, said: bingo_sdk::toast::Say, now: Instant) {
+        let message = Message {
+            parts: said.parts,
+            tone: said.tone,
+            about: None,
+        };
+        let notice = Notice {
+            keeps: true,
+            ..Notice::new(NoticeKind::Message(message), now)
+        };
+        self.placed.toasts.wait_for(notice.ends(now));
+        self.notice = Some(notice);
+    }
+
     /// A notice that names what it is about — the line an intent carried,
     /// said after it in dim.
     pub fn notify_about(&mut self, level: Level, text: String, about: String, now: Instant) {
@@ -453,8 +476,14 @@ impl Ui {
     }
 
     pub fn sync_toasts(&mut self, state: &bingo_sdk::SessionState, now: Now) -> bool {
-        let alert = self.placed.toasts.sync(state, now);
-        if let Some(notice) = &self.notice
+        let held = self
+            .notice
+            .as_ref()
+            .filter(|notice| notice.keeps && !notice.gone(now.instant))
+            .map(|notice| notice.ends(now.instant));
+        let alert = self.placed.toasts.sync(state, now, held);
+        if held.is_none()
+            && let Some(notice) = &self.notice
             && self.placed.toasts.supersedes(notice.said())
         {
             self.notice = None;

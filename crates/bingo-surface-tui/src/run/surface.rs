@@ -163,7 +163,7 @@ pub(super) fn resumed(run: &mut Run) {
     let now = run.now().instant;
     if let Some(title) = &run.session.tree.root().summary.title {
         let said = bingo_sdk::toast::Say::ok(format!("resumed · {title}"));
-        run.ui.tell(said, now);
+        run.ui.arrive(said, now);
     }
 }
 
