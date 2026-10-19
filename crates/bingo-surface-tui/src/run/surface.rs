@@ -108,7 +108,11 @@ fn focus(run: &mut Run, args: &Value) {
 pub(super) fn restore_prompt(run: &mut Run, text: Option<String>) {
     if let Some(text) = text {
         let now = run.now();
-        crate::composer::fill::fill(&mut run.ui, crate::composer::fill::Fill { text }, now);
+        crate::composer::fill::fill(
+            &mut run.ui,
+            crate::composer::fill::Fill { text, say: None },
+            now,
+        );
     }
 }
 

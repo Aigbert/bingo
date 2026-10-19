@@ -862,10 +862,19 @@ pub(crate) fn typed_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Ve
 /// `delivery` is the whole of the difference between the two keys that send:
 /// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
 fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect> {
+    if let Some(said) = crate::posting::refused(tree.viewed(), ui.composer.text()) {
+        ui.tell(said, now.instant);
+        return Vec::new();
+    }
     let text = ui.composer.take();
     ui.history.remember(&text);
     ui.edited();
-    send(ui, tree, now, text, |text| own_line(text, delivery))
+    let told = crate::posting::told(tree, &text);
+    let effects = send(ui, tree, now, text, |text| own_line(text, delivery));
+    if let Some(said) = told {
+        ui.tell(said, now.instant);
+    }
+    effects
 }
 
 /// The pictures — the tokens the line still names and the `@word`s in it —

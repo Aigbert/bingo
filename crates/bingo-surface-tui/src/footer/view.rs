@@ -26,7 +26,7 @@ pub fn is_room(state: &SessionState) -> bool {
 }
 
 fn room(state: &SessionState, faces: &Faces) -> Vec<Span<'static>> {
-    if state.closed {
+    if bingo_collab::room::closed_of(state) {
         return vec![
             Span::styled(theme::glyphs::get("sep"), ink("faint")),
             Span::styled("closed", ink("dim")),

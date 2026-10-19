@@ -6,10 +6,14 @@ use serde::Deserialize;
 
 use crate::{clock::Now, focus::Focus, ui::Ui};
 
-/// `{"name":"Composer","args":{"text":…}}`: text the person finishes and sends.
+/// `{"name":"Composer","args":{"text":…,"say":…}}`: text the person finishes
+/// and sends, and what they are told about finishing it (`/seat ` and
+/// `seat who?`).
 #[derive(Debug, Deserialize)]
 pub struct Fill {
     pub text: String,
+    #[serde(default)]
+    pub say: Option<bingo_sdk::toast::Say>,
 }
 
 /// A draft the person is writing is never overwritten: the fill is refused
@@ -24,6 +28,9 @@ pub fn fill(ui: &mut Ui, fill: Fill, now: Now) {
     match ui.focus {
         Focus::Layer(_) => ui.focus.close(now.instant),
         _ => ui.focus = Focus::Composer,
+    }
+    if let Some(said) = fill.say {
+        ui.tell(said, now.instant);
     }
 }
 

@@ -95,6 +95,7 @@ mod pictures;
 mod pill;
 mod plugins;
 mod pointer;
+mod posting;
 mod preview;
 mod pulled;
 mod queue_rows;

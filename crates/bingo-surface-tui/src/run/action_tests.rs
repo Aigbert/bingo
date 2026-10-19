@@ -354,6 +354,23 @@ async fn a_surface_action_prefills_the_composer_without_submitting() {
 }
 
 #[tokio::test]
+async fn a_composer_action_can_say_what_the_words_are_for() {
+    let now = still(scene().1);
+    let session = Arc::new(TestSession::default());
+    let mut run = tests::idle_in(state(), session.clone(), now.instant);
+    surface::receipt(
+        &mut run,
+        &json!({"surface":{"name":"Composer","args":{"text":"/seat ","say":{"parts":["seat who?","scout, ada"]}}}}),
+    );
+    assert_eq!(run.ui.composer.text(), "/seat ");
+    assert_eq!(
+        run.ui.notice().unwrap().plain().unwrap().text,
+        "seat who? · scout, ada"
+    );
+    assert!(session.submissions().is_empty());
+}
+
+#[tokio::test]
 async fn a_composer_action_preserves_an_existing_draft_and_explains_why() {
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());

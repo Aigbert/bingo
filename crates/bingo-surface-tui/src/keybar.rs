@@ -85,7 +85,7 @@ fn away(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
     if state.busy() {
         pairs.push(KeyPair::new("ctrl+c", "stop"));
     }
-    pairs.push(if room && !state.closed {
+    pairs.push(if room && !bingo_collab::room::closed_of(state) {
         KeyPair::new("@", "call on")
     } else {
         KeyPair::new("/", "commands")
@@ -192,7 +192,7 @@ fn composer_props(
 fn placeholder(state: &bingo_sdk::SessionState) -> String {
     let name = crate::tree::name(state);
     if state.summary.driver == bingo_sdk::Driver::Log {
-        return if state.closed {
+        return if bingo_collab::room::closed_of(state) {
             "This room is closed".into()
         } else {
             format!("Post to {name}, @ to call on someone")
