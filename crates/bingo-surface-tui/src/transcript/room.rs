@@ -113,31 +113,33 @@ fn sep() -> Span<'static> {
     )
 }
 
-/// Who is writing an answer the room is owed, a blank row above: a member
-/// called on, still owing, whose own session runs a turn.
+/// Who is writing an answer the room is owed: a member called on, still
+/// owing, whose own session runs a turn.
 pub fn writers(rows: &Rows<'_>) -> Drawing {
     let mut out = Drawing::default();
-    let mut named: Vec<String> = Vec::new();
-    for mention in bingo_collab::owed::of_state(rows.state) {
-        let Some(name) = mention.owed_by.chased() else {
-            continue;
-        };
-        if named
-            .iter()
-            .any(|held| bingo_collab::name::same(held, name))
-            || !rows.faces.works(name)
-        {
-            continue;
-        }
-        named.push(name.to_owned());
+    for name in writing(rows.state, &rows.faces) {
         let voice = Voice {
-            name,
-            ink: rows.faces.who(name),
+            name: &name,
+            ink: rows.faces.who(&name),
         };
-        if out.lines.is_empty() {
-            out.lines.push(Line::default());
-        }
         out.append(post::writing(&voice, rows.now));
     }
     out
+}
+
+/// The names writing in a room, in the order the room called on them.
+pub fn writing(state: &bingo_sdk::SessionState, faces: &crate::face::Faces) -> Vec<String> {
+    let mut named: Vec<String> = Vec::new();
+    for mention in bingo_collab::owed::of_state(state) {
+        let Some(name) = mention.owed_by.chased() else {
+            continue;
+        };
+        let held = named
+            .iter()
+            .any(|held| bingo_collab::name::same(held, name));
+        if !held && faces.works(name) {
+            named.push(name.to_owned());
+        }
+    }
+    named
 }

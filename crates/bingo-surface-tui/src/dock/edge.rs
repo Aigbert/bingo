@@ -35,6 +35,9 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
             now.motion.then_some(now.instant + clock::FRAME),
         );
     }
+    if let Some(drawing) = written_in(tree, width, now) {
+        return drawing;
+    }
     if let Some(turn) = &state.turn {
         if turn.retrying.is_some() {
             return Drawing::still(vec![super::line(
@@ -86,6 +89,26 @@ fn cautioned(open: &bingo_sdk::Interaction) -> bool {
             ..
         }
     )
+}
+
+/// Someone writing in the room on view runs the comet in their ink, from
+/// when their turn began (`edgeLine`'s `typing`).
+fn written_in(tree: &Tree, width: usize, now: Now) -> Option<Drawing> {
+    let state = tree.viewed();
+    if state.summary.driver != bingo_sdk::Driver::Log {
+        return None;
+    }
+    let faces = crate::face::Faces::of(tree);
+    let name = crate::transcript::room::writing(state, &faces)
+        .into_iter()
+        .next()?;
+    let turn = tree.state(&faces.teammate(&name)?.id)?.turn.as_ref()?;
+    Some(comet(
+        width,
+        now.past(turn.started_at),
+        faces.who(&name),
+        now,
+    ))
 }
 
 /// Walking into a session flashes the edge in that session's ink, until

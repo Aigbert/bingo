@@ -21,7 +21,7 @@ pub use history::History;
 mod components;
 /// Someone's words under their name.
 pub(crate) mod post;
-mod room;
+pub mod room;
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
 mod said;
