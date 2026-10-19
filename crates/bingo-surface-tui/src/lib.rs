@@ -152,12 +152,6 @@ pub use theme::PROBE_THROUGH;
 /// The surface id, and the origin every input it submits carries.
 pub const SURFACE_ID: &str = "tui";
 
-/// An action pressed here and signed with this surface.
-#[cfg(test)]
-pub(crate) fn acted(action: bingo_sdk::Action) -> bingo_sdk::Input {
-    bingo_sdk::Input::action(action, bingo_sdk::Origin::surface(SURFACE_ID))
-}
-
 /// Who signs a press on a drawing the kernel pulled for this surface. Each
 /// handler in it was held to the link that drew it when the answer was taken,
 /// so a `<plugin>:ui` press reaches only its drawer and is the person's;
@@ -261,7 +255,7 @@ fn entering(e: std::io::Error) -> KernelError {
 pub(crate) static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.surface.tui",
     version: env!("CARGO_PKG_VERSION"),
-    uses: &[],
+    uses: &[bingo_services::checkpoints::CAPABILITY],
     provides: &["surface:tui", "service:bingo.surface.tui.pages"],
     requires: &[],
     config: Some(ConfigClaim {
@@ -303,6 +297,12 @@ impl Plugin for TuiPlugin {
         registrar.add(guide::contribution(registrar));
         Ok(())
     }
+}
+
+/// An action pressed here and signed with this surface.
+#[cfg(test)]
+pub(crate) fn acted(action: bingo_sdk::Action) -> bingo_sdk::Input {
+    bingo_sdk::Input::action(action, bingo_sdk::Origin::surface(SURFACE_ID))
 }
 
 #[cfg(test)]

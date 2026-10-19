@@ -77,3 +77,37 @@ fn band_lines(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::Rect) -> 
         })
         .collect()
 }
+
+#[test]
+fn m198_rewind_full_frame() {
+    let capture = Capture::load("rewind");
+    capture.render(|| {
+        let (state, mut ui) = fixture(&capture);
+        let touched = bingo_services::checkpoints::Touched {
+            files: [
+                "crates/bingo-core/src/session/queue.rs",
+                "crates/bingo-core/tests/queue_steer.rs",
+            ]
+            .into_iter()
+            .map(|path| bingo_services::checkpoints::File {
+                path: path.into(),
+                changed: true,
+                fate: bingo_services::checkpoints::Fate::Restored,
+            })
+            .collect(),
+            shell_calls: 2,
+        };
+        let card = crate::rewind::Rewind {
+            selected: None,
+            touched: bingo_sdk::transcript::turns(&state.transcript)
+                .iter()
+                .map(|turn| (turn.id.clone(), Some(touched.clone())))
+                .collect(),
+            ..Default::default()
+        };
+        ui.focus
+            .show(crate::ui::Open::Rewind(card), capture.now().instant);
+        let screen = drawn(100, 32, &solo(&state), &mut ui, capture.now());
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
+}

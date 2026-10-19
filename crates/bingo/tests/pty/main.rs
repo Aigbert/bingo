@@ -616,10 +616,9 @@ fn every_frame_is_written_inside_a_synchronized_update() {
 
 /// `esc esc` on an empty composer lists the turns, and `⏎` goes back to one:
 /// the file the turn wrote is gone again and the transcript says what it
-/// dropped (M67, ADR-0045). The picker itself is M11e's and unchanged — what
-/// is new is that a `rewind` is in the catalogue for it to offer.
+/// dropped (M67, ADR-0045). The sheet commits directly on Enter (M198).
 #[test]
-fn esc_twice_confirms_then_rewinds_the_turn_and_file() {
+fn esc_twice_opens_the_sheet_then_enter_rewinds_the_turn_and_file() {
     let mut terminal = Terminal::opened(
         &["--allowed-tools", "Write"],
         WRITES_A_NOTE,
@@ -636,12 +635,10 @@ fn esc_twice_confirms_then_rewinds_the_turn_and_file() {
     terminal.send(b"\x1b");
     std::thread::sleep(BETWEEN_KEYS);
     terminal.send(b"\x1b");
-    terminal.wait_for("Rewind to");
+    terminal.wait_for("to just before a prompt");
+    assert!(note.is_file(), "opening the sheet leaves files alone");
     terminal.send(b"\r");
-    terminal.wait_for("rewind to turn 1");
-    assert!(note.is_file(), "preview leaves files alone");
-    terminal.send(b"\r");
-    terminal.wait_for("rewound,");
+    terminal.wait_for("rewound · 1 file restored");
 
     assert!(
         !note.exists(),

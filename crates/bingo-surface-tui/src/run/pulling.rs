@@ -1,6 +1,7 @@
 use super::*;
 
 pub(super) fn sync(run: &mut Run, screen: &mut dyn Screen, now: Now) -> Result<(), KernelError> {
+    rewind_files(run);
     let state = run.session.tree.viewed();
     run.ui.sync_panes(state);
     if run.ui.sync_toasts(state, now) && !run.ui.focused {
@@ -150,6 +151,61 @@ fn resume_request(
         props.insert("selected".into(), selected.into());
     }
     request
+}
+
+fn rewind_files(run: &mut Run) {
+    let Some(service) = bingo_services::checkpoints::find(&run.host) else {
+        return;
+    };
+    let Some(Open::Rewind(card)) = run.ui.focus.open_mut() else {
+        return;
+    };
+    let session = run.session.tree.view().clone();
+    let turns = bingo_sdk::transcript::turns(&run.session.tree.viewed().transcript);
+    let missing = turns
+        .into_iter()
+        .filter_map(|turn| {
+            if card.touched.contains_key(&turn.id) {
+                return None;
+            }
+            card.touched.insert(turn.id.clone(), None);
+            Some(turn.id)
+        })
+        .collect::<Vec<_>>();
+    let request = card.request.clone();
+    for turn in missing {
+        let request = request.clone();
+        let (service, session) = (service.clone(), session.clone());
+        run.spawn(async move {
+            let touched = service.touched(&session, &turn).await.ok().flatten();
+            Ok(Reply::RewindFiles(TurnFiles {
+                request,
+                session,
+                turn,
+                touched,
+            }))
+        });
+    }
+}
+
+/// What one turn of the rewind card changed, as the checkpoints owner told
+/// it for the card that asked.
+pub(super) struct TurnFiles {
+    pub(super) request: IntentId,
+    pub(super) session: SessionId,
+    pub(super) turn: bingo_sdk::TurnId,
+    pub(super) touched: Option<bingo_services::checkpoints::Touched>,
+}
+
+/// A turn's files land on the card only while that card is still the one
+/// open over the session that asked.
+pub(super) fn turn_files(run: &mut Run, files: TurnFiles) {
+    if &files.session == run.session.tree.view()
+        && let Some(Open::Rewind(card)) = run.ui.focus.open_mut()
+        && card.request == files.request
+    {
+        card.touched.insert(files.turn, files.touched);
+    }
 }
 
 #[cfg(test)]

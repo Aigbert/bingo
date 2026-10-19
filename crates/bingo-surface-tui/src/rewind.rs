@@ -11,24 +11,24 @@
 //! ADR-0045) and the chord is live; nothing here changed for it, which was
 //! the point of asking the catalogue rather than assuming.
 
-use bingo_sdk::CommandSpec;
-use ratatui::text::{Line, Span};
-
-use crate::{theme, window};
-
-/// The command a chosen row runs.
+use bingo_sdk::{CommandSpec, TurnId, View, pick, sheet::Sheet};
+use std::collections::BTreeMap;
 pub const COMMAND: &str = "rewind";
-
-/// How many turns the card shows at once: the same eight rows the `/` menu
-/// offers. A longer list is windowed under the cursor, not cut off at eight.
-const ROWS: usize = 8;
-
-/// The card's own state. Which turns it lists is read from the session.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Rewind {
-    pub selected: usize,
+    pub request: bingo_sdk::IntentId,
+    pub selected: Option<TurnId>,
+    pub touched: BTreeMap<TurnId, Option<bingo_services::checkpoints::Touched>>,
 }
-
+impl Default for Rewind {
+    fn default() -> Self {
+        Self {
+            request: bingo_sdk::IntentId::mint(),
+            selected: None,
+            touched: BTreeMap::new(),
+        }
+    }
+}
 pub use bingo_sdk::transcript::Turn;
 /// Whether this session has a `/rewind` to run. Nothing is offered that could
 /// not be done.
@@ -43,57 +43,49 @@ pub fn line(turn: &Turn) -> String {
     format!("/{COMMAND} {}", turn.id.as_str())
 }
 
-/// The card: a title, because unlike the switcher's its rows do not say what
-/// they are, then one row per turn with what it dropped. `room` is what the
-/// card has to draw in; the turns take [`ROWS`] of what is left under the
-/// title, and window themselves when there are more of them than that.
-pub fn lines(turns: &[Turn], selected: usize, room: usize) -> Vec<Line<'static>> {
-    let mut out = vec![Line::from(Span::styled(
-        "Rewind to".to_string(),
-        theme::text().patch(theme::bold()),
-    ))];
+pub fn sheet(turns: &[Turn], card: &Rewind, width: u16, height: u16) -> View {
+    let selected = card
+        .selected
+        .as_ref()
+        .or_else(|| turns.last().map(|t| &t.id));
     let rows = turns
         .iter()
         .rev()
-        .enumerate()
-        .map(|(at, turn)| row(turn, at == selected))
+        .map(|turn| {
+            let name = if selected == Some(&turn.id) {
+                pick::text(turn.label(), "fg")
+            } else {
+                pick::text(turn.label(), "muted")
+            };
+            let mut row = pick::Row::new(turn.id.as_str(), name);
+            if let Some(Some(touched)) = card.touched.get(&turn.id) {
+                let count = touched.files.iter().filter(|file| file.changed).count();
+                row.right = Some(pick::text(
+                    if count == 0 {
+                        "no files".into()
+                    } else {
+                        format!("{count} {} back", if count == 1 { "file" } else { "files" })
+                    },
+                    "dim",
+                ));
+            }
+            row
+        })
         .collect();
-    out.extend(window::around(
+    Sheet {
+        head: "Rewind".into(),
+        fact: Some(pick::text("to just before a prompt", "dim")),
+        top: vec![
+            pick::text("the conversation and the files both go back", "dim"),
+            pick::text("", "dim"),
+        ],
         rows,
-        selected,
-        room.saturating_sub(out.len()).min(ROWS),
-    ));
-    out
-}
-
-/// One turn as the card draws it: what was asked, and what going back to it
-/// would take with it.
-fn row(turn: &Turn, focused: bool) -> Line<'static> {
-    let style = match focused {
-        true => theme::text(),
-        false => theme::dim(),
-    };
-    Line::from(vec![
-        theme::cursor_span(focused),
-        Span::styled(turn.label(), style),
-        Span::styled(dropped(turn.items()), theme::dim()),
-    ])
-}
-
-/// What going back to a turn would take with it.
-fn dropped(items: usize) -> String {
-    match items {
-        1 => " · 1 item".to_string(),
-        many => format!(" · {many} items"),
+        selected: selected.map(ToString::to_string),
+        foot: vec![],
+        pick: true,
     }
+    .with_limit(width, height, 8, crate::theme::glyphs::set())
 }
-
-/// How many rows the card can be walked through: every turn there is. The
-/// card windows them (§3), so the walk is no longer stopped at what fits.
-pub fn rows(turns: &[Turn]) -> usize {
-    turns.len()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,20 +135,23 @@ mod tests {
     }
 
     #[test]
-    fn the_card_marks_the_row_the_keyboard_is_on() {
+    fn rewind_uses_the_shared_builder_and_keeps_the_selected_turn() {
         let turns = turns(&transcript().transcript);
-        let drawn: Vec<String> = lines(&turns, 1, 20)
-            .iter()
-            .map(|line| line.to_string())
-            .collect();
-        assert_eq!(
-            drawn,
-            vec![
-                "Rewind to".to_string(),
-                "  write me a note · 1 item".to_string(),
-                "❯ what is in this workspace? · 2 items".to_string(),
-            ],
+        let card = Rewind {
+            selected: Some(TurnId::from_raw("trn_1")),
+            ..Default::default()
+        };
+        let view = sheet(&turns, &card, 100, 18);
+        assert!(
+            view.fold()
+                .contains("the conversation and the files both go back")
         );
+        assert!(
+            serde_json::to_string(&view)
+                .unwrap()
+                .contains("\"ground\":\"pick\"")
+        );
+        assert!(!view.fold().contains("no files"));
     }
 
     /// Data-driven, both ways: a session whose catalogue has a `rewind` is

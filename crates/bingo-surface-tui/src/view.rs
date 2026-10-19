@@ -15,8 +15,8 @@ use crate::frame::{self, Demand, Regions};
 use crate::tree::{self, Tree};
 use crate::ui::{Card, Open, Ui};
 use crate::{
-    activity, composer as prompt, dialog, graphics, layers, mentions, pager, pill, rewind, search,
-    select, theme, transcript, views, window, wrap,
+    activity, composer as prompt, dialog, graphics, layers, mentions, pager, pill, search, select,
+    theme, transcript, views, window, wrap,
 };
 
 /// How tall the composer box may grow before it scrolls internally.
@@ -279,6 +279,7 @@ fn layer(
         | Open::Keys(_)
         | Open::Mode(_)
         | Open::Result { .. }
+        | Open::Rewind(_)
         | Open::Sessions(_)
         | Open::Plugins(_) => {}
         Open::Browse(_) => {
@@ -302,16 +303,6 @@ fn layer(
         // Drawn under the box, in its own rows (ADR-0095 §1).
         Open::Palette(_) => {}
         Open::Pager(open) => paged(tree, frame, above, open, reveal, tools),
-        // Rewind shares the space above the input box.
-        Open::Rewind(card) => over(
-            frame,
-            above,
-            rewind::lines(
-                &bingo_sdk::transcript::turns(&tree.viewed().transcript),
-                card.selected,
-                usize::from(above.height),
-            ),
-        ),
     }
 }
 

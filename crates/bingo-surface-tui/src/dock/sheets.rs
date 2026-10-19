@@ -27,6 +27,12 @@ fn native(
     }
     let view = match ui.focus.open() {
         Open::Result { .. } => return super::result::draw(ui, frame, area.width, cap, now),
+        Open::Rewind(card) => crate::rewind::sheet(
+            &bingo_sdk::transcript::turns(&tree.viewed().transcript),
+            card,
+            area.width,
+            cap,
+        ),
         Open::Keys(selected) => crate::keys::sheet::sheet(selected.clone(), area.width, cap),
         Open::Sessions(_) => {
             return Some(crate::sessions::draw(ui, tree, frame, area.width, cap, now));
@@ -152,8 +158,23 @@ fn render_native(
     ))
 }
 
-pub fn clicked(_: &mut Ui, _: &Tree, _: &bingo_sdk::Action, _: Now) -> Vec<crate::effect::Effect> {
-    vec![]
+pub fn clicked(
+    ui: &mut Ui,
+    tree: &Tree,
+    action: &bingo_sdk::Action,
+    now: Now,
+) -> Vec<crate::effect::Effect> {
+    let Some(bingo_sdk::sheet::Press::Pick(id)) = bingo_sdk::sheet::pressed(&action.args) else {
+        return vec![];
+    };
+    match ui.focus.open_mut() {
+        Some(Open::Rewind(card)) => card.selected = Some(bingo_sdk::TurnId::from_raw(id)),
+        _ => return vec![],
+    }
+    match ui.focus.open() {
+        Open::Rewind(_) => crate::input::select_rewind(ui, tree, now),
+        _ => vec![],
+    }
 }
 
 pub fn targets(frame: &mut Layout, view: &bingo_sdk::View, width: u16) {
@@ -171,7 +192,47 @@ mod tests {
         sheet::Sheet,
         slot::{self, Slot},
     };
-
+    #[test]
+    fn a_click_chooses_the_visible_rewind_row_including_its_empty_cells() {
+        let (mut state, _) = crate::test_support::ember::story::scene("done");
+        let (mut ui, now) = scene();
+        let now = still(now);
+        ui.focus.show(Open::Rewind(Default::default()), now.instant);
+        draw_sized(100, 32, &state, &mut ui, now);
+        let target = ui
+            .shown
+            .sheet_actions
+            .iter()
+            .find(|target| {
+                target.area.x == 70 && target.item.action.args["value"]["pick"] == "ember-0"
+            })
+            .unwrap();
+        let mouse = crossterm::event::MouseEvent {
+            kind: crossterm::event::MouseEventKind::Down(crossterm::event::MouseButton::Left),
+            column: target.area.x,
+            row: target.area.y,
+            modifiers: crossterm::event::KeyModifiers::NONE,
+        };
+        let effects = crate::pointer::on_mouse(&mut ui, &solo(&state), mouse, now);
+        assert!(
+            matches!(&effects[..], [crate::effect::Effect::Submit(bingo_sdk::Input::Text { text,.. })] if text == "/rewind ember-0")
+        );
+        state.apply(&frame(
+            state.seq.0 + 1,
+            bingo_sdk::Event::InteractionOpened {
+                interaction: question(false, false),
+            },
+        ));
+        ui.focus = crate::focus::Focus::Composer;
+        assert!(
+            !crate::pointer::on_mouse(&mut ui, &solo(&state), mouse, now)
+                .iter()
+                .any(|effect| matches!(
+                    effect,
+                    crate::effect::Effect::Submit(bingo_sdk::Input::Text { .. })
+                ))
+        );
+    }
     #[test]
     fn a_dock_sheet_takes_stream_rows_and_preserves_the_draft() {
         let (mut ui, now) = scene();

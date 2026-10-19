@@ -1,8 +1,4 @@
-//! What a list a cursor walks draws when it has more rows than room (§3): the
-//! run around the row the keyboard is on, and a `…` at each end it cut. One
-//! scene per picker with the cursor on the last row, and one with it in the
-//! middle — the mark is on the screen in every one of them, which is the whole
-//! of what the bug was about.
+//! Rewind uses the shared sheet window; ask options keep their older cut marks.
 
 use super::*;
 
@@ -44,7 +40,14 @@ fn crowded_rewind(selected: usize) -> (bingo_sdk::SessionState, Ui, Now) {
         })
         .collect();
     let (mut ui, now) = scene();
-    shown(&mut ui, Open::Rewind(Rewind { selected }), now);
+    shown(
+        &mut ui,
+        Open::Rewind(Rewind {
+            selected: Some(TurnId::from_raw(format!("trn_{}", 14 - selected))),
+            ..Default::default()
+        }),
+        now,
+    );
     (state, ui, now)
 }
 
@@ -52,14 +55,22 @@ fn crowded_rewind(selected: usize) -> (bingo_sdk::SessionState, Ui, Now) {
 fn the_rewind_card_scrolls_under_the_row_the_keyboard_is_on() {
     let (state, mut ui, now) = crowded_rewind(13);
     let screen = shot("rewind_end", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("turn 01"), "{screen}");
-    assert_eq!(cuts(&screen), 1);
-    assert!(screen.contains("Rewind to"), "the title stays: {screen}");
+    assert!(
+        screen
+            .lines()
+            .any(|row| row.contains('▎') && row.contains("turn 01"))
+    );
+    assert!(screen.contains("7 of 14"));
+    assert!(screen.contains("Rewind"), "the title stays: {screen}");
 
     let (state, mut ui, now) = crowded_rewind(6);
     let screen = shot("rewind_middle", &solo(&state), &mut ui, now);
-    assert!(marked(&screen).contains("turn 08"), "{screen}");
-    assert_eq!(cuts(&screen), 2);
+    assert!(
+        screen
+            .lines()
+            .any(|row| row.contains('▎') && row.contains("turn 08"))
+    );
+    assert!(screen.contains("7 of 14"));
 }
 
 /// A question with a dozen options, each with a description: a card with more

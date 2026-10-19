@@ -59,3 +59,51 @@ fn result_scrolling_counts_wrapped_rows_and_preserves_the_view() {
         matches!(run.ui.focus.open(), Open::Result { view: kept, at: 24, .. } if kept == &view)
     );
 }
+
+#[test]
+fn rewind_counts_belong_only_to_the_opening_that_requested_them() {
+    let now = still(scene().1);
+    let mut run = tests::idle(now.instant);
+    let first = crate::rewind::Rewind::default();
+    let request = first.request.clone();
+    run.ui.focus.show(Open::Rewind(first), now.instant);
+    run.ui.focus.close(now.instant);
+    let second = crate::rewind::Rewind::default();
+    let current = second.request.clone();
+    run.ui.focus.show(Open::Rewind(second), now.instant);
+    let turn = bingo_sdk::TurnId::from_raw("old-turn");
+    let session = run.session.tree.view().clone();
+    run.reply(
+        Reply::RewindFiles(super::pulling::TurnFiles {
+            request,
+            session: session.clone(),
+            turn: turn.clone(),
+            touched: None,
+        }),
+        &mut None,
+    );
+    let Open::Rewind(card) = run.ui.focus.open() else {
+        panic!("rewind")
+    };
+    assert!(card.touched.is_empty());
+    run.reply(
+        Reply::RewindFiles(super::pulling::TurnFiles {
+            request: current,
+            session,
+            turn: turn.clone(),
+            touched: None,
+        }),
+        &mut None,
+    );
+    let Open::Rewind(card) = run.ui.focus.open() else {
+        panic!("rewind")
+    };
+    assert_eq!(card.touched.get(&turn), Some(&None));
+    let view = crate::rewind::sheet(
+        &bingo_sdk::transcript::turns(&run.session.tree.viewed().transcript),
+        card,
+        80,
+        20,
+    );
+    assert!(!view.fold().contains("no files"));
+}

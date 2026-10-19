@@ -761,7 +761,7 @@ fn the_rewind_picker() {
     shown(
         &mut ui,
         Open::Rewind(crate::rewind::Rewind {
-            selected: 1,
+            selected: Some(TurnId::from_raw("trn_1")),
             ..Default::default()
         }),
         now,

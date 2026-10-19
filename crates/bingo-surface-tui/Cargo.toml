@@ -15,6 +15,7 @@ workspace = true
 bingo-collab.workspace = true
 bingo-http.workspace = true
 bingo-sdk.workspace = true
+bingo-services.workspace = true
 tokio.workspace = true
 futures.workspace = true
 async-trait.workspace = true
@@ -86,7 +87,6 @@ bingo-mod-hello.workspace = true
 bingo-mod-palette.workspace = true
 bingo-mod-sessions.workspace = true
 bingo-mod-browse.workspace = true
-bingo-services.workspace = true
 bingo-mod-models.workspace = true
 # The built-in owner of a turn's rows, answering in the marks it is handed.
 bingo-mod-ledger.workspace = true

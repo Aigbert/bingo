@@ -636,32 +636,53 @@ fn twice(ui: &mut Ui, now: Now) {
 /// The rewind card answers its own keys, as every list does.
 fn rewind_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     let turns = bingo_sdk::transcript::turns(&tree.viewed().transcript);
-    let rows = rewind::rows(&turns);
     let Some(Open::Rewind(card)) = ui.focus.open_mut() else {
-        return Vec::new();
+        return vec![];
     };
     match key.code {
-        KeyCode::Up => card.selected = card.selected.saturating_sub(1),
-        KeyCode::Down => card.selected = (card.selected + 1).min(rows.saturating_sub(1)),
-        KeyCode::Esc => ui.focus.close(now.instant),
-        KeyCode::Enter => {
-            let selected = turns.iter().rev().nth(card.selected).map(|t| t.id.clone());
-            let chosen = turns.iter().rev().nth(card.selected).map(rewind::line);
-            if crate::browse::offered(ui, tree) {
-                if tree.viewed().busy() {
-                    ui.notify(Level::Warn, crate::browse::BUSY, now.instant);
-                }
-                crate::browse::open(ui, tree, selected, true, now);
-                return Vec::new();
-            }
-            ui.focus.close(now.instant);
-            return chosen
-                .map(|line| vec![Effect::Submit(Input::text(line, crate::origin()))])
-                .unwrap_or_default();
+        KeyCode::Up | KeyCode::Down => {
+            let rows = turns
+                .iter()
+                .rev()
+                .map(|turn| {
+                    bingo_sdk::pick::Row::new(turn.id.as_str(), bingo_sdk::pick::text("", "fg"))
+                })
+                .collect::<Vec<_>>();
+            card.selected = bingo_sdk::pick::moved(
+                &rows,
+                card.selected.as_ref().map(|id| id.as_str()),
+                key.code == KeyCode::Down,
+            )
+            .map(bingo_sdk::TurnId::from_raw);
         }
+        KeyCode::Esc => ui.focus.close(now.instant),
+        KeyCode::Enter => return select_rewind(ui, tree, now),
         _ => {}
     }
-    Vec::new()
+    vec![]
+}
+
+pub(crate) fn select_rewind(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    let Open::Rewind(card) = ui.focus.open() else {
+        return vec![];
+    };
+    let turns = bingo_sdk::transcript::turns(&tree.viewed().transcript);
+    let chosen = turns
+        .iter()
+        .rev()
+        .find(|turn| Some(&turn.id) == card.selected.as_ref())
+        .or_else(|| turns.last())
+        .map(rewind::line);
+    ui.focus.close(now.instant);
+    let Some(line) = chosen else {
+        return vec![];
+    };
+    let mut effects = Vec::new();
+    if tree.viewed().busy() {
+        effects.push(Effect::Interrupt);
+    }
+    effects.push(Effect::Submit(Input::text(line, crate::origin())));
+    effects
 }
 
 /// A run owns the keyboard while it is being drawn: the arrows take its far
@@ -1238,7 +1259,9 @@ mod tests {
             "the first one arms it and closes nothing"
         );
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(matches!(ui.focus.open(), Open::Rewind(card) if card.selected == 0));
+        assert!(
+            matches!(ui.focus.open(), Open::Rewind(card) if card.selected.is_none() && card.touched.is_empty())
+        );
 
         on_key(&mut ui, &tree, key(KeyCode::Down), now);
         let effects = on_key(&mut ui, &tree, key(KeyCode::Enter), now);

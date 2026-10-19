@@ -196,7 +196,7 @@ fn busy_notices(ui: &Ui) -> usize {
 }
 
 #[tokio::test]
-async fn busy_card_refuses_preview_without_reading_files() {
+async fn busy_rewind_sheet_interrupts_then_submits_without_preview() {
     let fixture = Fixture::new();
     let (mut state, mut ui, now) = setup(&fixture);
     ui.catalogs.commands.push(crate::commands::entry(
@@ -208,13 +208,12 @@ async fn busy_card_refuses_preview_without_reading_files() {
     state.apply(&frame(1, started("running")));
     ui.focus
         .show(Open::Rewind(crate::rewind::Rewind::default()), now.instant);
-    crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Enter), now);
-    assert_eq!(busy_notices(&ui), 1);
-    let screen = fixture.paint(&mut ui, &state, now, 80, 24).await;
-    assert!(!screen.contains("rewind to turn"));
+    let effects = crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Enter), now);
+    assert!(
+        matches!(&effects[..], [Effect::Interrupt, Effect::Submit(Input::Text { text, .. })] if text.starts_with("/rewind "))
+    );
     assert_eq!(fixture.calls.load(Ordering::SeqCst), 0);
-    assert!(!super::super::opened(&ui).unwrap().confirm);
-    assert_eq!(busy_notices(&ui), 1);
+    assert!(!crate::browse::active(&ui));
 }
 
 #[tokio::test]

@@ -326,7 +326,7 @@ fn opener_uses_catalogue_and_disabled_falls_back_to_line_search() {
 }
 
 #[tokio::test]
-async fn double_escape_card_confirms_and_disabled_card_submits_directly() {
+async fn double_escape_sheet_submits_directly_with_or_without_browse() {
     for enabled in [true, false] {
         let fixture = Fixture::new();
         let (mut state, mut ui, now) = setup(&fixture);
@@ -344,19 +344,10 @@ async fn double_escape_card_confirms_and_disabled_card_submits_directly() {
         }
         assert!(matches!(ui.focus.open(), Open::Rewind(_)));
         let effects = crate::input::on_key(&mut ui, &solo(&state), key(KeyCode::Enter), now);
-        if enabled {
-            assert!(active(&ui));
-            assert!(
-                fixture
-                    .paint(&mut ui, &state, now, 80, 24)
-                    .await
-                    .contains("Bash calls")
-            );
-        } else {
-            assert!(
-                matches!(&effects[0], Effect::Submit(Input::Text { text, .. }) if text == "/rewind t2")
-            );
-        }
+        assert!(!active(&ui));
+        assert!(
+            matches!(&effects[0], Effect::Submit(Input::Text { text, .. }) if text == "/rewind t2")
+        );
     }
 }
 

@@ -74,6 +74,7 @@ pub(crate) type Keys = Pin<Box<dyn Stream<Item = Term> + Send>>;
 
 /// The results of the host calls the loop spawns.
 enum Reply {
+    RewindFiles(pulling::TurnFiles),
     Rendered(u64, crate::pulled::Key, Box<bingo_sdk::View>),
     Attached(Box<Attachment>),
     Sessions(String, Vec<SessionSummary>),
@@ -923,6 +924,7 @@ impl Run {
 
     fn reply(&mut self, reply: Reply, events: &mut Option<FrameStream>) {
         match reply {
+            Reply::RewindFiles(files) => pulling::turn_files(self, files),
             Reply::Rendered(epoch, key, view) => site_lifecycle::rendered(self, epoch, key, *view),
             Reply::Sessions(request, rows) => sessions::fill(self, &request, rows),
             Reply::Attached(attachment) => self.attach(*attachment, events),
