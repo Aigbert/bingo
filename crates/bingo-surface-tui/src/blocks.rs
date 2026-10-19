@@ -357,9 +357,15 @@ impl Blocks {
         let tail = transcript::closing(state, rows);
         self.tail = tail.lines;
         // While a turn runs, the tail is its live row, which hangs under the
-        // item being written; only a finished turn's closing stands apart.
-        // Set beside `tail` so one `measure` never sees the two disagree.
-        self.tail_gap = state.turn.is_none();
+        // item being written; a failure hangs under its turn as well, the way
+        // the prototype's `errorLines` follow the turn's last row. Any other
+        // closing of a finished turn stands apart. Set beside `tail` so one
+        // `measure` never sees the two disagree.
+        self.tail_gap = state.turn.is_none()
+            && !matches!(
+                state.last_status(),
+                Some(bingo_sdk::TurnStatus::Failed { .. })
+            );
         self.tail_next = tail.next;
         self.height = self.measure();
         self.height
@@ -1067,7 +1073,8 @@ mod tests {
         let mut blocks = cache();
         let plain = sync(&mut blocks, &state, 60);
         let failed = sync(&mut blocks, &with_failure, 60);
-        assert_eq!(failed, plain + 2);
+        // The failure hangs under its turn with no blank between.
+        assert_eq!(failed, plain + 1);
         assert!(blocks.tail(1)[0].contains("boom"), "{:?}", blocks.tail(1));
     }
 
