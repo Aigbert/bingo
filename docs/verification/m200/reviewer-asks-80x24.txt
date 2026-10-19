@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+
+
+   send scout to find the callers
+   @ scout   find every caller of drain()                              started
+
+   Scout is done.
+
+▍  send reviewer to run the tests
+   ◌ reviewer  run the queue tests
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Steer, or queue what comes next
+
+   ◆ reviewer needs you · fake-1                      ctrl+g answer   esc stop

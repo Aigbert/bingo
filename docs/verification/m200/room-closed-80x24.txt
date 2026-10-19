@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+   ── #design ────────────────────────────────────────────────────────────────
+
+   ── reviewer joined ────────────────────────────────────────────────────────
+
+   you        @reviewer  does the comment match the code?
+
+▎  reviewer   The comment matches the code.
+
+   ── reviewer left ──────────────────────────────────────────────────────────
+
+   ── closed · settled ───────────────────────────────────────────────────────
+
+
+   ▍This room is closed
+
+   #design · closed                                      esc back   / commands

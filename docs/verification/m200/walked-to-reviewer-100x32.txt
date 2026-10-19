@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  bingo  run the queue tests
+   ◆ run     echo queue-tests-pass                                                       needs you
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Run this command?   in $TMPDIR/m200-drive-XXXXXXXX/cwd
+
+     $ echo queue-tests-pass
+
+ ▎ Yes
+   Yes, allow echo for this session
+   No, and tell it why
+   Change it first
+
+   reviewer · fake-1                                              ↑↓ choose   ⏎ confirm   esc back

@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+   ── #design ────────────────────────────────────────────────────────────────
+
+   ── reviewer joined ────────────────────────────────────────────────────────
+
+   you        @reviewer  does the comment match the code?
+
+▎  reviewer   The comment matches the code.
+
+   ── reviewer left ──────────────────────────────────────────────────────────
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Post to #design, @ to call on someone
+
+   #design                                                esc back   @ call on
