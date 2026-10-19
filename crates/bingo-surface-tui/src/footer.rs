@@ -325,4 +325,4 @@ pub(crate) fn session_facts(
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

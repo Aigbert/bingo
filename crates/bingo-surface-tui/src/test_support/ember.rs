@@ -9,6 +9,8 @@ pub mod answers;
 mod compare;
 mod parse;
 pub mod story;
+#[cfg(test)]
+mod sweep;
 pub mod world;
 
 /// The private clock origin in prototype/p8-page.js (snapshot and capture).

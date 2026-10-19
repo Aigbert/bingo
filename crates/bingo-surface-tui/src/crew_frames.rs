@@ -306,8 +306,21 @@ fn chord_key(chord: &str) -> KeyEvent {
     }
 }
 
-#[test]
-fn m200_room_frame_follows_the_prototype() {
+/// The capture `name` driven by the prototype's keys, compared full frame.
+pub(crate) fn full_frame(name: &str) {
+    match name {
+        "room" => room_frame(),
+        "room-mention" | "room-answered" | "room-home" => room_keys(name, &[]),
+        "room-waiting" => room_keys(name, &[(26, 14)]),
+        "crew" | "small-crew" => crew_still(name),
+        "agent" => agent_still(),
+        "crew-reviewer" | "crew-allowed" | "crew-home" => crew_frame(name, false),
+        "agent-reviewer" | "agent-allowed" | "agent-home" => crew_frame(name, true),
+        _ => panic!("{name} is not a crew capture"),
+    }
+}
+
+fn room_frame() {
     let capture = Capture::load("room");
     capture.render(|| {
         let mut drive = Drive::new(room_world(), &capture);
@@ -317,43 +330,31 @@ fn m200_room_frame_follows_the_prototype() {
     });
 }
 
-#[test]
-fn m200_room_frames_follow_the_prototype_keys() {
-    for (name, spinners) in [
-        ("room-mention", vec![]),
-        ("room-waiting", vec![(26, 14)]),
-        ("room-answered", vec![]),
-        ("room-home", vec![]),
-    ] {
-        let capture = Capture::load(name).spinners(&spinners);
-        capture.render(|| {
-            let mut drive = Drive::new(room_world(), &capture);
-            drive.show(&world::id("design"));
-            drive.play(&capture);
-            assert_eq!(drive.t, capture.entry.moment_ms, "{name}");
-            drive.shot(&capture);
-        });
-    }
+fn room_keys(name: &str, spinners: &[(u16, u16)]) {
+    let capture = Capture::load(name).spinners(spinners);
+    capture.render(|| {
+        let mut drive = Drive::new(room_world(), &capture);
+        drive.show(&world::id("design"));
+        drive.play(&capture);
+        assert_eq!(drive.t, capture.entry.moment_ms, "{name}");
+        drive.shot(&capture);
+    });
 }
 
-#[test]
-fn m200_crew_frames_follow_the_prototype() {
-    for name in ["crew", "small-crew"] {
-        let capture = Capture::load(name);
-        capture.render(|| {
-            let mut world = World::accepting_edits();
-            world.design_room();
-            let beats = crew_beats(&world);
-            let mut drive = Drive::new(world, &capture);
-            drive.script(beats);
-            drive.wait(capture.entry.moment_ms);
-            drive.shot(&capture);
-        });
-    }
+fn crew_still(name: &str) {
+    let capture = Capture::load(name);
+    capture.render(|| {
+        let mut world = World::accepting_edits();
+        world.design_room();
+        let beats = crew_beats(&world);
+        let mut drive = Drive::new(world, &capture);
+        drive.script(beats);
+        drive.wait(capture.entry.moment_ms);
+        drive.shot(&capture);
+    });
 }
 
-#[test]
-fn m200_agent_frame_follows_the_prototype() {
+fn agent_still() {
     let capture = Capture::load("agent").spinners(&[(26, 3)]);
     capture.render(|| {
         let mut world = World::accepting_edits();
@@ -392,18 +393,4 @@ fn crew_frame(name: &str, agent: bool) {
         assert_eq!(drive.t, capture.entry.moment_ms, "{name}");
         drive.shot(&capture);
     });
-}
-
-#[test]
-fn m200_crew_frames_follow_the_prototype_keys() {
-    for name in ["crew-reviewer", "crew-allowed", "crew-home"] {
-        crew_frame(name, false);
-    }
-}
-
-#[test]
-fn m200_agent_frames_follow_the_prototype_keys() {
-    for name in ["agent-reviewer", "agent-allowed", "agent-home"] {
-        crew_frame(name, true);
-    }
 }

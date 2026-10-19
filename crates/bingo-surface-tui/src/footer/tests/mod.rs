@@ -470,36 +470,26 @@ fn needs_you_calls_the_main_session_bingo_in_glow() {
     );
 }
 
-#[test]
-fn ember_full_frames_match_the_prototype() {
-    for name in [
-        "live",
-        "done",
-        "ascii-live",
-        "ascii-done",
-        "reduced-live",
-        "small-done",
-        "mode",
-        "mode-later",
-    ] {
-        let capture = Capture::load(name).spinners(if matches!(name, "live" | "ascii-live") {
-            &[(25, 3)]
-        } else {
-            &[]
-        });
-        let (state, mut ui) = full_fixture(&capture);
-        capture.render(|| {
-            let size = capture.size();
-            let screen = drawn(
-                size.width,
-                size.height,
-                &solo(&state),
-                &mut ui,
-                capture.now(),
-            );
-            assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
-        });
-    }
+/// The capture `name`, its session folded from the prototype's story,
+/// compared full frame.
+pub(crate) fn full_frame(name: &str) {
+    let capture = Capture::load(name).spinners(if matches!(name, "live" | "ascii-live") {
+        &[(25, 3)]
+    } else {
+        &[]
+    });
+    let (state, mut ui) = full_fixture(&capture);
+    capture.render(|| {
+        let size = capture.size();
+        let screen = drawn(
+            size.width,
+            size.height,
+            &solo(&state),
+            &mut ui,
+            capture.now(),
+        );
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
 }
 
 fn full_fixture(capture: &Capture) -> (SessionState, Ui) {

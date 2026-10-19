@@ -377,39 +377,22 @@ fn background(scene: &mut Scene, source: &Value) {
     }
 }
 
-#[test]
-fn edges_full_frames_match_the_prototype() {
-    for name in [
-        "welcome",
-        "welcome-recent",
-        "welcome-sent",
-        "exit-back",
-        "retry",
-        "retry-recovered",
-        "context",
-        "context-compacted",
-        "background",
-        "background-notified",
-        "narrow",
-        "signedout",
-        "signedout-login",
-        "wake",
-        "wake-later",
-    ] {
-        let spinners: &[(u16, u16)] = match name {
-            "welcome-sent" => &[(25, 3)],
-            "retry" | "retry-recovered" => &[(26, 3)],
-            "narrow" => &[(17, 3)],
-            "signedout-login" => &[(29, 3)],
-            _ => &[],
-        };
-        let capture = Capture::load(name).spinners(spinners);
-        capture.render(|| {
-            tokio::runtime::Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .unwrap()
-                .block_on(draw(&capture))
-        });
-    }
+/// The edge capture `name`, its keys typed through the terminal, compared
+/// full frame.
+pub(crate) fn full_frame(name: &str) {
+    let spinners: &[(u16, u16)] = match name {
+        "welcome-sent" => &[(25, 3)],
+        "retry" | "retry-recovered" => &[(26, 3)],
+        "narrow" => &[(17, 3)],
+        "signedout-login" => &[(29, 3)],
+        _ => &[],
+    };
+    let capture = Capture::load(name).spinners(spinners);
+    capture.render(|| {
+        tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap()
+            .block_on(draw(&capture))
+    });
 }

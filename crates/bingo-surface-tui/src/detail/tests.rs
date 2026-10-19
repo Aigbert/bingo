@@ -50,46 +50,35 @@ fn setup(name: &str, state: &SessionState, ui: &mut Ui, now: &mut Now) {
     }
 }
 
-#[test]
-fn m195_full_frames_follow_the_prototype_keys() {
-    for name in [
-        "done-detail",
-        "done-well",
-        "done-folded",
-        "ledger",
-        "ledger-up",
-        "find",
-        "find-up",
-        "find-back",
-    ] {
-        let capture = Capture::load(name);
-        capture.render(|| {
-            let (state, mut ui) = fixture();
-            let mut now = Capture::load("done").now();
-            setup(name, &state, &mut ui, &mut now);
-            // Scene setup precedes the capture's private clock and key sequence.
-            now = Capture::load("done").now();
-            for action in &capture.entry.after {
-                if let Some(ms) = action.as_i64() {
-                    now = later(now, ms);
-                } else if let Some(chord) = action.as_str().filter(|s| !s.starts_with("shot:")) {
-                    let event = match chord {
-                        "ctrl+o" => ctrl('o'),
-                        "up" => key(KeyCode::Up),
-                        "down" => key(KeyCode::Down),
-                        "enter" => key(KeyCode::Enter),
-                        "esc" => key(KeyCode::Esc),
-                        _ => panic!("{chord}"),
-                    };
-                    press(&state, &mut ui, &mut now, event);
-                }
-                drawn(100, 32, &solo(&state), &mut ui, now);
+/// The capture `name` after the prototype's keys, compared full frame.
+pub(crate) fn full_frame(name: &str) {
+    let capture = Capture::load(name);
+    capture.render(|| {
+        let (state, mut ui) = fixture();
+        let mut now = Capture::load("done").now();
+        setup(name, &state, &mut ui, &mut now);
+        // Scene setup precedes the capture's private clock and key sequence.
+        now = Capture::load("done").now();
+        for action in &capture.entry.after {
+            if let Some(ms) = action.as_i64() {
+                now = later(now, ms);
+            } else if let Some(chord) = action.as_str().filter(|s| !s.starts_with("shot:")) {
+                let event = match chord {
+                    "ctrl+o" => ctrl('o'),
+                    "up" => key(KeyCode::Up),
+                    "down" => key(KeyCode::Down),
+                    "enter" => key(KeyCode::Enter),
+                    "esc" => key(KeyCode::Esc),
+                    _ => panic!("{chord}"),
+                };
+                press(&state, &mut ui, &mut now, event);
             }
-            now.wall = capture.now().wall;
-            let screen = drawn(100, 32, &solo(&state), &mut ui, now);
-            ember::assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
-        });
-    }
+            drawn(100, 32, &solo(&state), &mut ui, now);
+        }
+        now.wall = capture.now().wall;
+        let screen = drawn(100, 32, &solo(&state), &mut ui, now);
+        ember::assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
 }
 
 #[test]

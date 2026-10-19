@@ -148,9 +148,32 @@ pub fn print(lines: &[Line<'static>]) -> std::io::Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::test_support::*;
+
+    /// `exit` holds the shell after bingo left it: the receipt's three rows
+    /// are bingo's, every other row is the shell's prompt and is not drawn.
+    pub(crate) fn full_frame(name: &str) {
+        use crate::test_support::ember::{Capture, assert_cells};
+        use ratatui::{buffer::Buffer, layout::Rect, widgets::Widget};
+        let capture = Capture::load(name);
+        let (mut state, _) = crate::test_support::ember::story::scene("done");
+        state.summary.id = bingo_sdk::SessionId::from_raw("ses_01JB7Y2K9QH4X3V8M6N5P2R1TC");
+        state.summary.title = Some("steer 吞掉排队消息".into());
+        let started = state.transcript.items()[0].started_at;
+        let facts = super::facts(
+            &state,
+            started + jiff::SignedDuration::from_mins(166),
+            &crate::tool_rows::Looks::of(&crate::test_support::ember::story::catalogue()),
+        );
+        capture.render(|| {
+            let width = capture.size().width;
+            let mut buffer = Buffer::empty(Rect::new(0, 0, width, 3));
+            ratatui::widgets::Paragraph::new(lines(&facts)).render(buffer.area, &mut buffer);
+            assert_cells(&capture, &buffer, (2..5, 0..width), 0);
+        });
+    }
     #[test]
     fn receipt_rows_are_exact_and_empty_sessions_leave_nothing() {
         let facts = ReceiptFacts {

@@ -142,4 +142,4 @@ pub fn top(ui: &Ui, frame: &crate::layout::Layout, height: usize) -> usize {
 }
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

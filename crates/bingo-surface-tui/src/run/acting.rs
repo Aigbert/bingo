@@ -19,6 +19,7 @@ mod setup;
 mod sheets;
 mod timeline;
 
+pub(crate) use edges::full_frame as edge_frame;
 pub(crate) use sheets::draw as draw_sheet;
 
 const QUEUED: &str = "做完以后更新一下 CHANGELOG";
