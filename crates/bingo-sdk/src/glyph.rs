@@ -61,9 +61,53 @@ glyphs! {
     (Spin, "spin", "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏", "-\\|/"),
     (Heavy, "heavy", "━", "="),
 }
+/// Key glyphs and the words an ASCII terminal spells them with, longest first.
+pub const KEY_WORDS: &[(&str, &str)] = &[
+    ("pgup pgdn", "pgup/pgdn"),
+    ("⇧⏎", "shift+enter"),
+    ("⇧tab", "shift+tab"),
+    ("⏎", "enter"),
+    ("↑↓", "up/down"),
+    ("←→", "left/right"),
+    ("↑", "up"),
+    ("↓", "down"),
+    ("⌫", "backspace"),
+];
+
+/// Key text as the glyph set spells it: glyphs stay glyphs in unicode and
+/// become words in ASCII.
+pub fn key_text(text: &str, set: GlyphSet) -> String {
+    if set.is_unicode() {
+        return text.to_string();
+    }
+    KEY_WORDS
+        .iter()
+        .fold(text.to_string(), |text, (from, to)| text.replace(from, to))
+}
+
+/// One chord as it is bound (`shift+tab`), as the glyph set draws it.
+pub fn chord(bound: &str, set: GlyphSet) -> String {
+    let glyph = KEY_WORDS
+        .iter()
+        .find(|(_, words)| *words == bound)
+        .map_or(bound, |(glyph, _)| glyph);
+    key_text(glyph, set)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn keys_are_glyphs_in_unicode_and_words_in_ascii() {
+        assert!(KEY_WORDS.iter().all(|(_, words)| words.is_ascii()));
+        assert_eq!(chord("shift+tab", GlyphSet::Unicode), "⇧tab");
+        assert_eq!(chord("shift+tab", GlyphSet::Ascii), "shift+tab");
+        assert_eq!(chord("alt+m", GlyphSet::Unicode), "alt+m");
+        assert_eq!(
+            key_text("⇧⏎ ⇧tab ⏎ ↑↓ ←→ ↑ ↓ ⌫", GlyphSet::Ascii),
+            "shift+enter shift+tab enter up/down left/right up down backspace"
+        );
+    }
     #[test]
     fn every_glyph_has_an_ascii_twin() {
         for glyph in Glyph::ALL {

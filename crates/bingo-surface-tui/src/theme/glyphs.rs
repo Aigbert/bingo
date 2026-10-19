@@ -129,17 +129,6 @@ pub const ASCII: Glyphs = Glyphs {
     },
 };
 
-pub const KEYA: &[(&str, &str)] = &[
-    ("pgup pgdn", "pgup/pgdn"),
-    ("⇧⏎", "shift+enter"),
-    ("⇧tab", "shift+tab"),
-    ("⏎", "enter"),
-    ("↑↓", "up/down"),
-    ("←→", "left/right"),
-    ("↑", "up"),
-    ("↓", "down"),
-    ("⌫", "backspace"),
-];
 pub fn set() -> bingo_sdk::glyph::GlyphSet {
     if super::glyphs() == &ASCII {
         bingo_sdk::glyph::GlyphSet::Ascii
@@ -152,19 +141,11 @@ pub fn get(name: &str) -> &'static str {
 }
 
 pub fn chord(ascii: &str) -> String {
-    let glyph = KEYA
-        .iter()
-        .find(|(_, key)| *key == ascii)
-        .map_or(ascii, |(glyph, _)| glyph);
-    key_text(glyph)
+    bingo_sdk::glyph::chord(ascii, set())
 }
 
 pub fn key_text(text: &str) -> String {
-    if super::glyphs() != &ASCII {
-        return text.to_string();
-    }
-    KEYA.iter()
-        .fold(text.to_string(), |text, (from, to)| text.replace(from, to))
+    bingo_sdk::glyph::key_text(text, set())
 }
 
 #[cfg(test)]
@@ -190,7 +171,6 @@ mod tests {
             }
         }
         assert_eq!(Glyph::Arrow.spell(GlyphSet::Ascii), "->");
-        assert!(KEYA.iter().all(|(_, text)| text.is_ascii()));
         super::super::with(crate::painted::ascii(), || {
             assert_eq!(
                 key_text("⇧⏎ ⇧tab ⏎ ↑↓ ←→ ↑ ↓ ⌫"),
