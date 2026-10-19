@@ -15,6 +15,17 @@ use super::Reply;
 /// This build's version, which is what a release is tagged.
 const CURRENT: &str = env!("CARGO_PKG_VERSION");
 
+/// The check came back. The box says it where the box is still on screen;
+/// where it has scrolled away, the status line says it once instead.
+pub(super) fn told(run: &mut super::Run, version: String) {
+    if run.ui.shown.top > 0 {
+        let parts = vec![format!("↑ v{version} is out").into(), "bingo update".into()];
+        run.ui
+            .notify_parts(bingo_sdk::Level::Info, parts, run.now().instant);
+    }
+    run.ui.welcome.update = Some(version);
+}
+
 /// Ask, off the loop's thread, and mail back a version worth saying.
 pub(super) fn spawn(replies: mpsc::Sender<Reply>, data_dir: PathBuf) {
     tokio::spawn(async move {

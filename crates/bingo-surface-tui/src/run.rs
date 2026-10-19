@@ -104,6 +104,8 @@ enum Reply {
     /// is a note about a race and not a refusal of anything.
     Withdrawn(IntentId, Box<Result<Input, KernelError>>),
     Stopped(SessionId, Vec<(IntentId, Result<Input, KernelError>)>),
+    /// What git says of the files, for the `@` list's opening that asked.
+    Changes(u64, crate::git_changes::Changes),
     Failed(KernelError),
 }
 
@@ -904,16 +906,6 @@ impl Run {
         updates::spawn(self.replies.clone(), self.data_dir.clone());
     }
 
-    /// The check came back. The box says it where the box is still on screen;
-    /// where it has scrolled away, the status line says it once instead.
-    fn told_of(&mut self, version: String) {
-        if self.ui.shown.top > 0 {
-            let parts = vec![format!("↑ v{version} is out").into(), "bingo update".into()];
-            self.ui.notify_parts(Level::Info, parts, self.now().instant);
-        }
-        self.ui.welcome.update = Some(version);
-    }
-
     fn spawn(&self, call: impl Future<Output = Result<Reply, KernelError>> + Send + 'static) {
         let replies = self.replies.clone();
         tokio::spawn(async move {
@@ -949,9 +941,10 @@ impl Run {
             Reply::Mentioned(waiting) => self.mentioned(*waiting),
             Reply::Linked(answer) => self.ui.linked.answered(*answer),
             Reply::Fitted(fitted) => self.ui.decoded.answered(*fitted),
-            Reply::Update(version) => self.told_of(version),
+            Reply::Update(version) => updates::told(self, version),
             Reply::Withdrawn(intent, taken) => withdraw::took(self, intent, *taken),
             Reply::Stopped(session, taken) => withdraw::stopped(self, session, taken),
+            Reply::Changes(opening, changes) => self.ui.files.answered(opening, changes),
             Reply::Failed(error) => {
                 self.ui.opening = false;
                 self.ui

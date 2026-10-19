@@ -15,11 +15,11 @@ use crate::clock::Now;
 use crate::commands::{self, Local};
 use crate::effect::Effect;
 use crate::keys;
-use crate::mentions;
 use crate::rewind::{self, Rewind};
 use crate::tree::Tree;
 use crate::ui::{Menu, Open, Ui};
 use crate::views;
+use crate::{complete, mention_list};
 
 #[cfg(test)]
 mod acting_tests;
@@ -177,7 +177,7 @@ fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effec
 /// rungs here are the dropdown, the running turn and the card ring.
 fn tabbed(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     let at = keys::Tabbed {
-        dropdown: !suggestions(ui, tree).is_empty(),
+        dropdown: !mention_list::offered(ui, tree).is_empty(),
         busy: tree.viewed().busy(),
         typing: !ui.composer.text().trim().is_empty(),
         focusable: !row_actions(tree.viewed()).is_empty()
@@ -363,17 +363,6 @@ fn fire(ui: &mut Ui, tree: &Tree, key: char) -> Option<Vec<Effect>> {
     Some(vec![Effect::Submit(crate::pressed(plugin, action))])
 }
 
-/// The directory a session's `@` mentions are read from.
-fn cwd(tree: &Tree) -> &str {
-    &tree.viewed().summary.cwd
-}
-
-/// What the dropdown is offering for the line being typed: the one question
-/// every key that the dropdown owns asks, over the session on the screen.
-fn suggestions(ui: &Ui, tree: &Tree) -> Vec<commands::Suggestion> {
-    ui.suggestions(cwd(tree), &mentions::targets(tree))
-}
-
 /// A bracketed paste lands verbatim wherever the caret is.
 pub fn on_paste(ui: &mut Ui, text: &str) {
     if ui.dialog.current().is_some() && !ui.dialog.aside {
@@ -482,7 +471,7 @@ fn open(ui: &Ui, tree: &Tree, now: Now) -> keys::Open {
         // One layer is open at a time, whichever form it takes.
         sheet: owner == crate::focus::Owner::Layer && !matches!(ui.focus.open(), Open::Reader(_)),
         card: tree.open_interaction().is_some(),
-        dropdown: !suggestions(ui, tree).is_empty(),
+        dropdown: mention_list::query(ui).is_some(),
         pane: owner == crate::focus::Owner::Pane && tree.open_interaction().is_none(),
         search: owner == crate::focus::Owner::Search && tree.open_interaction().is_none(),
         busy: tree.viewed().busy(),
@@ -703,40 +692,27 @@ fn focused_line(ui: &Ui) -> usize {
         .unwrap_or(painted.top)
 }
 
-/// The dropdown owns the arrows and the enter key while it is open; `tab` is
-/// answered before this, by the one table of it ([`tabbed`]).
+/// The `@` list owns the arrows and the enter key while it offers anything;
+/// `tab` is answered before this, by the one table of it ([`tabbed`]).
 fn menu(ui: &mut Ui, tree: &Tree, key: KeyEvent) -> Option<Vec<Effect>> {
-    let rows = suggestions(ui, tree);
-    if rows.is_empty() {
+    let offered = mention_list::offered(ui, tree).len();
+    if offered == 0 {
         return None;
     }
     match key.code {
         KeyCode::Up => ui.menu.selected = ui.menu.selected.saturating_sub(1),
-        KeyCode::Down => ui.menu.selected = (ui.menu.selected + 1).min(rows.len() - 1),
-        // Enter completes only while there is something left to complete; a
-        // name already typed in full is meant to run.
-        KeyCode::Enter if adds_something(ui, tree) => return Some(accept(ui, tree)),
-        KeyCode::Enter => {
-            ui.menu.dismissed = true;
-            return None;
-        }
+        KeyCode::Down => ui.menu.selected = (ui.menu.selected + 1).min(offered - 1),
+        KeyCode::Enter => return Some(accept(ui, tree)),
         _ => return None,
     }
     Some(Vec::new())
 }
 
-fn adds_something(ui: &Ui, tree: &Tree) -> bool {
-    chosen(ui, tree).is_some_and(|row| row.value.trim_end() != ui.composer.text().trim_end())
-}
-
-/// The row the dropdown's cursor is on.
-fn chosen(ui: &Ui, tree: &Tree) -> Option<commands::Suggestion> {
-    ui.selected_suggestion(cwd(tree), &mentions::targets(tree))
-}
-
+/// The chosen entry replaces the half-typed mention, with a space after it.
 fn accept(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
-    if let Some(chosen) = chosen(ui, tree) {
-        ui.composer.set(&chosen.value);
+    if let Some(chosen) = mention_list::chosen(ui, tree) {
+        let line = complete::completed(ui.composer.text(), chosen.entry.text());
+        ui.composer.set(&line);
     }
     ui.edited();
     Vec::new()
@@ -1045,16 +1021,16 @@ mod tests {
         let (mut ui, now) = scene();
         write(&mut ui, &state, "@Car", now);
         assert_eq!(
-            ui.suggestions(&state.summary.cwd, &[])
+            mention_list::offered(&ui, &tree)
                 .iter()
-                .map(|row| row.label.clone())
+                .map(|offer| offer.entry.text().to_owned())
                 .collect::<Vec<_>>(),
-            vec!["@Cargo.toml".to_string()],
+            vec!["Cargo.toml".to_string()],
         );
         on_key(&mut ui, &tree, key(KeyCode::Enter), now);
         assert_eq!(ui.composer.text(), "@Cargo.toml ");
         assert!(
-            ui.suggestions(&state.summary.cwd, &[]).is_empty(),
+            mention_list::offered(&ui, &tree).is_empty(),
             "a finished mention offers nothing more"
         );
     }
@@ -1067,12 +1043,14 @@ mod tests {
         let tree = solo(&state);
         let (mut ui, now) = scene();
         write(&mut ui, &state, "look at @shot.png", now);
+        let inserted = on_key(&mut ui, &tree, key(KeyCode::Enter), now);
+        assert!(inserted.is_empty(), "the first ⏎ inserts the mention");
         let effects = on_key(&mut ui, &tree, key(KeyCode::Enter), now);
         assert_eq!(
             effects,
             vec![Effect::Submit(Input::Text {
                 headline: None,
-                text: "look at @shot.png".into(),
+                text: "look at @shot.png ".into(),
                 images: Vec::new(),
                 origin: crate::origin(),
                 delivery: Delivery::Wake,

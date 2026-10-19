@@ -1,6 +1,6 @@
 //! The rows of a list that fit around the row its cursor is on.
 //!
-//! Every list a person walks — the `/` menu, the `ctrl+g` switcher, the resume
+//! Every list a person walks — the `ctrl+g` switcher, the resume
 //! and rewind pickers, other pickers — is longer than the room it is
 //! drawn in sooner or later. What it shows then is a window: a run of its rows
 //! with the cursor inside it, and a `…` line wherever the list goes on past an
@@ -27,13 +27,6 @@ pub struct Window {
     pub run: Range<usize>,
     pub above: bool,
     pub below: bool,
-}
-
-/// The rows that fit around the one the cursor is on, the list flowing under
-/// it in both directions.
-pub fn around(lines: Vec<Line<'static>>, selected: usize, rows: usize) -> Vec<Line<'static>> {
-    let at = window(lines.len(), selected, rows);
-    framed(lines, at)
 }
 
 /// The same window over a list whose rows are more than lines — a card's row
@@ -85,19 +78,6 @@ fn placed(len: usize, start: usize, cursor: usize, rows: usize) -> Window {
     }
 }
 
-/// The lines a window draws: its run, with a `…` at each end it cut.
-fn framed(lines: Vec<Line<'static>>, at: Window) -> Vec<Line<'static>> {
-    let mut out = Vec::with_capacity(lines.len().min(at.run.len() + 2));
-    if at.above {
-        out.push(cut());
-    }
-    out.extend(lines.into_iter().skip(at.run.start).take(at.run.len()));
-    if at.below {
-        out.push(cut());
-    }
-    out
-}
-
 /// What says the list goes on past this end: the strip's own mark (§3), in the
 /// column a row's text sits in.
 pub fn cut() -> Line<'static> {
@@ -117,8 +97,21 @@ mod tests {
         (0..len).map(|i| Line::from(i.to_string())).collect()
     }
 
+    /// The lines a window draws: its run, with a `…` at each end it cut.
+    fn framed(lines: Vec<Line<'static>>, at: Window) -> Vec<Line<'static>> {
+        let mut out = Vec::new();
+        if at.above {
+            out.push(cut());
+        }
+        out.extend(lines.into_iter().skip(at.run.start).take(at.run.len()));
+        if at.below {
+            out.push(cut());
+        }
+        out
+    }
+
     fn drawn(len: usize, selected: usize, rows_of_room: usize) -> Vec<String> {
-        around(rows(len), selected, rows_of_room)
+        framed(rows(len), of(len, selected, rows_of_room))
             .iter()
             .map(ToString::to_string)
             .collect()

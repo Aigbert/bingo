@@ -15,17 +15,29 @@
 //! yet is offered all the same — the debt it opens is chased when somebody
 //! does.
 
+use bingo_collab::lifecycle::Lifecycle;
 use bingo_sdk::{Driver, SessionId, SessionState};
 
 use crate::seats;
-use crate::tree::Tree;
+use crate::tree::{self, Tree};
 
-/// The names the `@` dropdown offers beside the paths, in the order the tree
-/// and the roster list them.
-pub fn targets(tree: &Tree) -> Vec<String> {
+/// Someone an `@` reaches: a teammate by name, with what it is doing where
+/// the tree holds it, or the room word for everyone seated.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Target {
+    Agent {
+        name: String,
+        state: Option<Lifecycle>,
+    },
+    Everyone,
+}
+
+/// Who the `@` list offers beside the paths, in the order the tree and the
+/// roster list them.
+pub fn targets(tree: &Tree) -> Vec<Target> {
     let viewed = tree.viewed();
     match viewed.summary.driver {
-        Driver::Log => roster(viewed),
+        Driver::Log => roster(tree, viewed),
         Driver::Model => agents(tree, &viewed.summary.id),
     }
 }
@@ -37,11 +49,16 @@ pub fn targets(tree: &Tree) -> Vec<String> {
 /// arrive — a room is a child like any other — but a room is somewhere a person
 /// posts rather than somebody they write to, and its own view, where the
 /// composer says so, is one keystroke away.
-fn agents(tree: &Tree, session: &SessionId) -> Vec<String> {
+fn agents(tree: &Tree, session: &SessionId) -> Vec<Target> {
     tree.sessions()
         .filter(|state| child_of(state, session))
         .filter(|state| state.summary.driver != Driver::Log)
-        .filter_map(|state| state.summary.title.clone())
+        .filter_map(|state| {
+            state.summary.title.clone().map(|name| Target::Agent {
+                name,
+                state: Lifecycle::of_state(state),
+            })
+        })
         .collect()
 }
 
@@ -56,19 +73,30 @@ fn child_of(state: &SessionState, session: &SessionId) -> bool {
 }
 
 /// The word a post uses for everyone in the room but whoever wrote it
-/// (ADR-0022 §1). It leads the roster because a word nobody offers is a word
-/// nobody finds.
+/// (ADR-0022 §1).
 const EVERYONE: &str = "all";
 
-/// Who a post in this room may name: the word for all of them, then the seats
-/// on its roster, less the holder — which is the person typing and not
-/// somebody to write to.
-fn roster(room: &SessionState) -> Vec<String> {
+/// Who a post in this room may name: the seats on its roster, less the
+/// holder — which is the person typing and not somebody to write to — then
+/// the word for all of them.
+fn roster(tree: &Tree, room: &SessionState) -> Vec<Target> {
     let seated = seated(room);
-    match offers_everyone(&seated) {
-        true => [vec![EVERYONE.to_string()], seated].concat(),
-        false => seated,
-    }
+    let everyone = offers_everyone(&seated).then_some(Target::Everyone);
+    seated
+        .into_iter()
+        .map(|name| Target::Agent {
+            state: held(tree, &name).and_then(Lifecycle::of_state),
+            name,
+        })
+        .chain(everyone)
+        .collect()
+}
+
+/// The session that holds a seat, where this attachment carries it.
+fn held<'a>(tree: &'a Tree, name: &str) -> Option<&'a SessionState> {
+    tree.sessions()
+        .filter(|state| state.summary.driver != Driver::Log)
+        .find(|state| bingo_collab::name::same(&tree::name(state), name))
 }
 
 /// The seats a post may name one by one.
@@ -94,6 +122,16 @@ mod tests {
     use super::*;
     use crate::test_support::*;
 
+    fn names(tree: &Tree) -> Vec<String> {
+        targets(tree)
+            .iter()
+            .map(|target| match target {
+                Target::Agent { name, .. } => name.clone(),
+                Target::Everyone => EVERYONE.to_owned(),
+            })
+            .collect()
+    }
+
     /// A root with two agents under it and a room seating them both.
     fn team() -> Tree {
         folded_tree(vec![
@@ -115,7 +153,7 @@ mod tests {
     /// mean, so it is not offered there.
     #[test]
     fn a_session_offers_the_agents_under_it_and_not_the_room_beside_them() {
-        assert_eq!(targets(&team()), vec!["reviewer", "watcher"]);
+        assert_eq!(names(&team()), vec!["reviewer", "watcher"]);
     }
 
     /// A child of a child is not this session's to address: the redirect hook
@@ -125,20 +163,20 @@ mod tests {
         let mut tree = team();
         tree.show(&child_id());
         assert_eq!(
-            targets(&tree),
+            names(&tree),
             Vec::<String>::new(),
             "the reviewer started nobody"
         );
     }
 
     /// A room offers its roster instead: a mention in a post names a seat, and
-    /// the holder is the person writing it. The word for all of them leads,
-    /// which is how a person meets it.
+    /// the holder is the person writing it. The word for all of them follows.
     #[test]
-    fn a_room_offers_all_then_its_seats_without_the_holder() {
+    fn a_room_offers_its_seats_without_the_holder_then_all() {
         let mut tree = team();
         tree.show(&log_id());
-        assert_eq!(targets(&tree), vec!["all", "reviewer", "watcher"]);
+        assert_eq!(names(&tree), vec!["reviewer", "watcher", "all"]);
+        assert_eq!(targets(&tree)[2], Target::Everyone);
     }
 
     /// A room that seats somebody called `all` spends the word on them, and
@@ -157,7 +195,8 @@ mod tests {
             ),
         ]);
         tree.show(&log_id());
-        assert_eq!(targets(&tree), vec!["reviewer", "all"]);
+        assert_eq!(names(&tree), vec!["reviewer", "all"]);
+        assert!(matches!(targets(&tree)[1], Target::Agent { .. }));
     }
 
     /// A name nobody holds yet is on the roster and is offered: mentioning it
@@ -176,7 +215,7 @@ mod tests {
             ),
         ]);
         tree.show(&log_id());
-        assert_eq!(targets(&tree), vec!["all", "nobody-yet"]);
+        assert_eq!(names(&tree), vec!["nobody-yet", "all"]);
     }
 
     /// A room whose journal carries no roster this surface recognises seats
@@ -186,6 +225,6 @@ mod tests {
     fn a_room_with_no_roster_offers_no_name() {
         let mut tree = folded_tree(vec![log_frame(1, log_announced("#design"))]);
         tree.show(&log_id());
-        assert_eq!(targets(&tree), Vec::<String>::new());
+        assert_eq!(names(&tree), Vec::<String>::new());
     }
 }

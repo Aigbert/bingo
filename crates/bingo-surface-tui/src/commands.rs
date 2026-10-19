@@ -4,8 +4,6 @@
 
 use bingo_sdk::{ArgSpec, CatalogEntry, CommandSpec};
 
-use crate::matching;
-
 /// A command the surface owns. Nothing here reaches the kernel.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Local {
@@ -112,105 +110,11 @@ pub fn split(line: &str) -> Option<(&str, &str)> {
     })
 }
 
-/// Which run of the dropdown a row belongs to. The runs are told apart by a
-/// label above each of them only while there is another beside it, so a list offering one kind of thing
-/// wears no label at all.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Group {
-    /// A `/` command, or a value for one: the only run its dropdown has.
-    Commands,
-    /// A session an `@` can reach ([`crate::mentions`]).
-    Agents,
-    /// A path under the session's own directory ([`crate::complete`]).
-    Files,
-}
-
-impl Group {
-    /// What a run is called, where there is another beside it.
-    pub fn label(self) -> &'static str {
-        match self {
-            Group::Commands => "Commands",
-            Group::Agents => "Agents",
-            Group::Files => "Files",
-        }
-    }
-}
-
-/// One row of the dropdown: what it shows, the line it completes to, and which
-/// run of the list it is in.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Suggestion {
-    /// The whole composer line this row completes to.
-    pub value: String,
-    pub label: String,
-    pub hint: String,
-    pub group: Group,
-}
-
-/// The dropdown for the line being typed: command names while the caret is
-/// still in the name, the values its spec lists once the command is known.
-pub fn suggestions(line: &str, specs: &[CommandSpec]) -> Vec<Suggestion> {
-    let Some(rest) = line.strip_prefix('/') else {
-        return Vec::new();
-    };
-    match rest.split_once(char::is_whitespace) {
-        None => rank(rest, specs),
-        Some(_) => Vec::new(),
-    }
-}
-
-/// The commands that match, best first: [`crate::matching`]'s order, which is
-/// the one every list in this surface is narrowed by. A command is offered once
-/// however many of its spellings match, under the one that matched best.
-fn rank(partial: &str, specs: &[CommandSpec]) -> Vec<Suggestion> {
-    let spelled = spellings(specs);
-    let mut offered: Vec<&str> = Vec::new();
-    let mut rows = Vec::new();
-    for (name, spec) in matching::rank(partial, &spelled, |(name, _)| name.as_str()) {
-        if offered.contains(&spec.name.as_str()) {
-            continue;
-        }
-        offered.push(&spec.name);
-        rows.push(named(name, spec));
-    }
-    rows
-}
-
-/// Every way a command may be typed — its own name, then each of its aliases —
-/// beside the command it names, so one ranking sees all of them.
-fn spellings(specs: &[CommandSpec]) -> Vec<(String, &CommandSpec)> {
-    specs
-        .iter()
-        .filter(|spec| !spec.hidden)
-        .flat_map(|spec| {
-            std::iter::once(&spec.name)
-                .chain(spec.aliases.iter())
-                .map(move |name| (name.clone(), spec))
-        })
-        .collect()
-}
-
-/// One row of the `/` menu: the spelling that matched, and what it does.
-fn named(name: &str, _spec: &CommandSpec) -> Suggestion {
-    Suggestion {
-        value: format!("/{name} "),
-        label: format!("/{name}"),
-        hint: String::new(),
-        group: Group::Commands,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     #[test]
-    fn fallback_lists_names_only_and_never_hidden_commands() {
-        let mut specs = local_specs();
-        specs.push(CommandSpec::ui("hidden"));
-        let rows = suggestions("/", &specs);
-        assert_eq!(rows.len(), 2);
-        assert!(rows.iter().all(|row| row.hint.is_empty()));
-        assert!(suggestions("/clear anything", &specs).is_empty());
+    fn the_local_commands_are_the_surfaces_own() {
         assert_eq!(local("/quit"), Some(Local::Exit));
         assert_eq!(local("/help"), None);
         assert_eq!(local("/resume"), None);

@@ -37,7 +37,6 @@ unicode-segmentation.workspace = true
 base64.workspace = true
 syntect.workspace = true
 two-face.workspace = true
-nucleo-matcher.workspace = true
 terminal-colorsaurus.workspace = true
 ignore.workspace = true
 # A picture the terminal can draw: whatever a person or a tool handed over,
@@ -55,6 +54,9 @@ bingo-update.workspace = true
 # no crate.
 reqwest.workspace = true
 thiserror.workspace = true
+# The `@` list's one `git status`, a child killed with its tree when the read
+# is dropped (M196). A library already in the workspace; it costs no crate.
+bingo-process.workspace = true
 
 # `O_NONBLOCK` for the graphics probe's own handle on the terminal, and
 # nothing else: a constant, no call and no `unsafe`. Already in the tree

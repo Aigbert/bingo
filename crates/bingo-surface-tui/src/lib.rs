@@ -69,6 +69,7 @@ mod fold;
 mod footer;
 mod form;
 mod frame;
+mod git_changes;
 mod graphics;
 /// What this surface says about itself, as a page a model may read.
 pub mod guide;
@@ -83,7 +84,7 @@ mod layers;
 mod layout;
 mod lifecycle;
 mod markdown;
-mod matching;
+mod mention_list;
 mod mentions;
 mod mode;
 /// The opening (M149): the wordmark arriving, out of the motions the

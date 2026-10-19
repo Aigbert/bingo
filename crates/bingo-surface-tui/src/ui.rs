@@ -10,8 +10,7 @@ use std::time::{Duration, Instant};
 use bingo_sdk::{CommandSpec, Level, Tone, View, view::TextChild};
 
 use crate::clock::{FRAME, Now};
-use crate::commands::{self, Suggestion};
-use crate::complete;
+use crate::commands;
 use crate::fold::Folds;
 use crate::graphics::{Decoded, Linked};
 use crate::layers::{self, Reveal};
@@ -327,15 +326,8 @@ pub struct Ui {
     /// fold and the scroll, and read once at the start: it is a fact about
     /// this machine, not about the conversation.
     pub measure: Option<usize>,
-    /// The paths the `@` dropdown ranks, walked when the first one asks.
-    files: Files,
-}
-
-/// One reading of a directory, kept until the session's own directory changes.
-#[derive(Debug, Default)]
-struct Files {
-    cwd: String,
-    paths: Vec<String>,
+    /// The paths the `@` list ranks, walked when the first one asks.
+    pub files: crate::mention_list::Files,
 }
 
 impl Ui {
@@ -360,7 +352,7 @@ impl Ui {
             linked: Linked::default(),
             welcome: crate::welcome::Details::default(),
             measure: None,
-            files: Files::default(),
+            files: Default::default(),
         }
     }
 
@@ -504,63 +496,10 @@ impl Ui {
         all
     }
 
-    /// The dropdown's rows for the line being typed: a `/` command, or an `@`
-    /// mention — the names `mentions` says this session can reach, then the
-    /// paths under its own directory. Empty means no dropdown.
-    ///
-    /// Who can be reached is the tree's to say ([`crate::mentions`]), so it is
-    /// handed in rather than read here: what is the surface's own is the caret
-    /// and the memo of the walk, and neither of those is the tree.
-    pub fn suggestions(&self, cwd: &str, mentions: &[String]) -> Vec<Suggestion> {
-        if self.menu.dismissed || crate::palette::active(self) || crate::sessions::active(self) {
-            return Vec::new();
-        }
-        let line = self.composer.text();
-        match complete::mention(line) {
-            Some(partial) => self.mentioned(cwd, partial, line, mentions),
-            None => {
-                let mut offered = commands::local_specs();
-                offered.extend(
-                    self.catalogs
-                        .commands
-                        .iter()
-                        .filter(|entry| entry.meta["foldedInto"].as_str().is_none())
-                        .filter_map(|entry| serde_json::from_value(entry.meta.clone()).ok()),
-                );
-                commands::suggestions(line, &offered)
-            }
-        }
-    }
-
     /// Read directory names before entering the pure layout pass or answering a key.
     pub fn prepare(&mut self, cwd: &str) {
-        if complete::mention(self.composer.text()).is_some() && self.files.cwd != cwd {
-            self.files = Files {
-                cwd: cwd.to_string(),
-                paths: complete::walk(std::path::Path::new(cwd)),
-            };
-        }
-    }
-
-    fn mentioned(
-        &self,
-        cwd: &str,
-        partial: &str,
-        line: &str,
-        mentions: &[String],
-    ) -> Vec<Suggestion> {
-        let paths = if self.files.cwd == cwd {
-            self.files.paths.as_slice()
-        } else {
-            &[]
-        };
-        complete::offered(line, partial, mentions, paths)
-    }
-
-    pub fn selected_suggestion(&self, cwd: &str, mentions: &[String]) -> Option<Suggestion> {
-        let rows = self.suggestions(cwd, mentions);
-        rows.get(self.menu.selected.min(rows.len().saturating_sub(1)))
-            .cloned()
+        let line = self.composer.text().to_owned();
+        self.files.prepare(&line, cwd);
     }
 
     /// The composer changed: the dropdown reopens and the history walk ends.
@@ -813,16 +752,5 @@ mod tests {
         ui.armed = Some(now);
         assert!(ui.exit_armed(now + Duration::from_millis(1499)));
         assert!(!ui.exit_armed(now + EXIT_WINDOW));
-    }
-
-    #[test]
-    fn dismissing_the_dropdown_hides_it_until_the_next_edit() {
-        let mut ui = ui();
-        ui.composer.insert("/cle");
-        assert!(!ui.suggestions("/tmp/project", &[]).is_empty());
-        ui.menu.dismissed = true;
-        assert!(ui.suggestions("/tmp/project", &[]).is_empty());
-        ui.edited();
-        assert!(!ui.suggestions("/tmp/project", &[]).is_empty());
     }
 }

@@ -755,8 +755,8 @@ fn the_rewind_picker() {
     both("rewind_picker", &solo(&state), &mut ui, now);
 }
 
-/// `@` in the composer: the paths under the session's own directory, on the
-/// same dropdown the `/` menu rides (design §4).
+/// `@` in the composer: the paths under the session's own directory, listed
+/// over the input where the queue sits.
 #[test]
 fn the_at_completion_dropdown() {
     let dir = tempfile::tempdir().expect("a directory");
@@ -773,8 +773,7 @@ fn the_at_completion_dropdown() {
 }
 
 /// The same `@`, where the session has agents under it: the names it can reach
-/// lead, the paths follow, and the two runs are told apart by a label the way
-/// the roster tells its own apart (§3).
+/// lead in their own ink, the paths follow.
 #[test]
 fn the_at_completion_dropdown_with_agents_to_reach() {
     let dir = tempfile::tempdir().expect("a directory");
@@ -793,10 +792,9 @@ fn the_at_completion_dropdown_with_agents_to_reach() {
         crate::input::on_key(&mut ui, &tree, typed(c), now);
     }
     let screen = draw_tree(80, 24, &tree, &mut ui, now);
-    assert!(screen.contains("Agents"), "{screen}");
-    assert!(screen.contains("@reviewer"), "{screen}");
-    assert!(screen.contains("Files"), "{screen}");
-    assert!(screen.contains("@src/reader.rs"), "{screen}");
+    let reviewer = screen.find("reviewer").expect("the teammate is listed");
+    let reader = screen.find("src/reader.rs").expect("the file is listed");
+    assert!(reviewer < reader, "{screen}");
     directory_dropdowns("at_dropdown_agents", &tree, &mut ui, now);
 }
 

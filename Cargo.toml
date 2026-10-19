@@ -183,9 +183,6 @@ syntect = { version = "5.3", default-features = false, features = [
 two-face = { version = "0.5", default-features = false, features = [
   "syntect-fancy",
 ] }
-# M11e: the `@` completion's ranking. `unicode-segmentation` is already in the
-# tree for the composer's graphemes, so this is one crate and an edge.
-nucleo-matcher = "0.3"
 # M11e: the terminal's own background, read once at start (OSC 10/11), so the
 # truecolor palette can be the one a person's terminal is already wearing.
 terminal-colorsaurus = "1.0"

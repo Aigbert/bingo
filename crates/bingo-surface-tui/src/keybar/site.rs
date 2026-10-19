@@ -8,6 +8,11 @@ pub fn hints(state: &SessionState, ui: &Ui, frame: &Layout) -> Option<SiteHints>
     if let Some(hints) = sheet_hints(ui) {
         return Some(hints);
     }
+    if crate::mention_list::query(ui).is_some() {
+        return Some(SiteHints::new(
+            crate::mention_list::HINTS.map(|(key, action)| KeyPair::new(key, action)),
+        ));
+    }
     if matches!(ui.focus, Focus::Detail(_)) {
         return Some(SiteHints::new([
             KeyPair::new("↑↓", "step"),

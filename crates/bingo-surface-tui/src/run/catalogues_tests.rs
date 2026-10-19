@@ -296,13 +296,6 @@ async fn a_disabled_panel_restores_its_folded_names_on_the_next_palette_open() {
     });
     run.host = host.handle();
     fetch_all(&mut run).await;
-    run.ui.composer.set("/a");
-    assert!(
-        run.ui
-            .suggestions("/tmp", &[])
-            .iter()
-            .all(|row| row.label != "/agents")
-    );
     let fixture = crate::palette::tests::Fixture::new();
     crate::palette::open(
         &mut run.ui,
@@ -320,13 +313,6 @@ async fn a_disabled_panel_restores_its_folded_names_on_the_next_palette_open() {
     run.replies = tx;
     changed(&mut run, CatalogKind::Commands);
     run.reply(replies.recv().await.unwrap(), &mut None);
-    run.ui.composer.set("/a");
-    assert!(
-        run.ui
-            .suggestions("/tmp", &[])
-            .iter()
-            .any(|row| row.label == "/agents")
-    );
     crate::palette::open(
         &mut run.ui,
         bingo_sdk::component::PaletteOpen::Commands,

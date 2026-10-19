@@ -102,6 +102,7 @@ pub(super) fn paint(
     let (width, height) = screen.size();
     pulling::sync(run, screen, now)?;
     run.ui.prepare(&run.session.tree.viewed().summary.cwd);
+    read_changes(run);
     let previous = std::mem::take(&mut run.ui.shown);
     let mut layout = crate::layout::layout(
         previous,
@@ -205,6 +206,16 @@ pub(super) fn turn_files(run: &mut Run, files: TurnFiles) {
         && card.request == files.request
     {
         card.touched.insert(files.turn, files.touched);
+    }
+}
+
+/// The `@` list opened: read git's word on its files off this thread.
+fn read_changes(run: &mut Run) {
+    if let Some((opening, cwd)) = run.ui.files.ask() {
+        run.spawn(async move {
+            let changes = crate::git_changes::read(cwd, crate::git_changes::DEADLINE).await;
+            Ok(super::Reply::Changes(opening, changes))
+        });
     }
 }
 
