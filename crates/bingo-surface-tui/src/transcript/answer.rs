@@ -38,16 +38,21 @@ pub fn finish(
     width: usize,
     now: Now,
     live: bool,
+    accent: &str,
 ) {
     if status == ItemStatus::Running && !live {
         return;
     }
     let streaming = status == ItemStatus::Running;
     if streaming && now.motion {
-        wet(lines);
+        wet(lines, accent);
     }
     let (suffix, ink, gap) = match status {
-        ItemStatus::Running => (theme::glyphs::get("caret").to_owned(), theme::glow(), 0),
+        ItemStatus::Running => (
+            theme::glyphs::get("caret").to_owned(),
+            crate::face::style(accent),
+            0,
+        ),
         ItemStatus::Interrupted => (
             format!("{} stopped", theme::glyphs::get("minus")),
             theme::dim(),
@@ -69,7 +74,11 @@ pub fn finish(
     }
 }
 
-fn wet(lines: &mut [Line<'static>]) {
+/// The last ten cells dry from the view's accent into their own ink.
+fn wet(lines: &mut [Line<'static>], accent: &str) {
+    let wet = theme::palette()
+        .named(accent)
+        .unwrap_or(theme::palette().glow());
     let mut left = 10;
     for line in lines.iter_mut().rev() {
         let mut spans = Vec::new();
@@ -79,7 +88,7 @@ fn wet(lines: &mut [Line<'static>]) {
                 if left > 0 {
                     let ink = theme::ink::foreground(style.fg, theme::palette());
                     style = style.patch(theme::literal(theme::ink::mix(
-                        theme::palette().glow(),
+                        wet,
                         ink,
                         (10 - left) as f64 / 10.0,
                     )));
@@ -118,11 +127,12 @@ mod tests {
             4,
             crate::test_support::still(now),
             true,
+            "glow",
         );
         assert_eq!(rows[0].spans[0].style, theme::text());
         assert_eq!(rows[1].to_string(), theme::glyphs::get("caret"));
         let mut rows = vec![Line::from("full")];
-        finish(&mut rows, ItemStatus::Interrupted, 10, now, false);
+        finish(&mut rows, ItemStatus::Interrupted, 10, now, false, "glow");
         assert_eq!(
             rows[1].to_string(),
             format!("{} stopped", theme::glyphs::get("minus"))

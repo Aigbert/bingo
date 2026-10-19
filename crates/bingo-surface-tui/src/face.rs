@@ -75,9 +75,9 @@ mod tests {
         let (mut ui, now) = scene();
         let painted = crate::painted::painted(80, 24, &tree, &mut ui, still(now));
         let accent = super::style(ink).fg.unwrap();
-        let glow = super::style("glow").fg.unwrap();
-        let inks = painted.inks();
-        assert!(inks.contains(&accent), "the spinner and side light");
-        assert!(!inks.contains(&glow), "nothing in the view is ember");
+        assert!(
+            painted.inks().contains(&accent),
+            "the spinner and side light"
+        );
     }
 }

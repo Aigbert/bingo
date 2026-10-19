@@ -650,7 +650,14 @@ fn assistant(text: &str, status: ItemStatus, fold: Fold, rows: &Rows<'_>, arrivi
     let width = rows.measured().saturating_sub(5).min(100);
     let source = answer::closed(text, status);
     let mut written = markdown::mentioned(&source, width, rows.faces.names());
-    answer::finish(&mut written.lines, status, width, rows.now, arriving);
+    answer::finish(
+        &mut written.lines,
+        status,
+        width,
+        rows.now,
+        arriving,
+        rows.accent(),
+    );
     let body = pictured::in_the_words(written.lines, &written.images, fold, rows);
     Block {
         lines: body

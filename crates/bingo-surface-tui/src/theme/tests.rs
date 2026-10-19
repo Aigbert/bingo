@@ -236,14 +236,7 @@ fn every_token_is_spent_where_the_design_says() {
                 "views/badge.rs",
             ],
         ),
-        (
-            "glow",
-            &[
-                "transcript/answer.rs",
-                "transcript/band.rs",
-                "transcript/ran.rs",
-            ],
-        ),
+        ("glow", &["transcript/band.rs", "transcript/ran.rs"]),
         (
             "good",
             &[
