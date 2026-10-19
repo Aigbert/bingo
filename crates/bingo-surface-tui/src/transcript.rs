@@ -19,6 +19,7 @@ mod answer;
 mod history;
 pub use history::History;
 mod components;
+mod hired;
 /// Someone's words under their name.
 pub(crate) mod post;
 pub mod room;
@@ -845,12 +846,12 @@ fn calls(item: &Item, tool: &str) -> bool {
 }
 
 /// What opens a session's stream before anything was said in it: a room's
-/// head. It belongs to no item, as the closing does.
+/// head, or a teammate's role. It belongs to no item, as the closing does.
 pub fn opening(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
     if state.summary.driver == bingo_sdk::Driver::Log {
         return room::head(rows);
     }
-    crate::views::Drawing::default()
+    hired::head(rows)
 }
 
 /// What stands under the last turn once it is over and nothing runs: why it

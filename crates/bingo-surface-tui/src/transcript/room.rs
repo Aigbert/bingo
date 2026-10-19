@@ -106,7 +106,7 @@ fn closed(why: Option<&str>) -> Line<'static> {
     Line::from(label)
 }
 
-fn sep() -> Span<'static> {
+pub(super) fn sep() -> Span<'static> {
     Span::styled(
         theme::glyphs::get("sep"),
         theme::foreground("faint").unwrap_or_default(),
