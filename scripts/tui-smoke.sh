@@ -234,11 +234,11 @@ for _ in 1 2 3 4 5 6 7 8 9 10; do mouse 64 10 5; done
 vanish ' line 80'
 finish
 
-step 'ctrl+f browses full blocks and esc gives the composer back'
+step '/browse reads full blocks and esc gives the composer back'
 start "$(long_reply)"
 keys 'say a lot' Enter
 await ' line 80'
-keys C-f
+keys '/browse' Enter
 await 'browse · turn'
 keys 'line 42'
 await 'line 42'
@@ -254,38 +254,29 @@ keys 'smoke-ready'
 await 'smoke-ready▍'
 finish
 
-step 'ctrl+f remains line search with Browse disabled'
+step 'ctrl+f finds drawn cells with Browse disabled'
 printf '[update]\ncheck = false\n[enabledPlugins]\n"bingo.mod.browse" = false\n' >"$WORK/home/.bingo/settings.toml"
 start "$(long_reply)"
 keys 'say a lot' Enter
 await ' line 80'
-keys C-f 'line 79' Enter
-await '1/1'
+keys C-f 'line 79'
+await '1 of 1'
 vanish 'browse · turn'
 keys Escape
 finish
 printf '[update]\ncheck = false\n' >"$WORK/home/.bingo/settings.toml"
 
-step 'a focused block opens whole in the pager and gives the frame back'
-start "$(long_reply)"
-keys 'say a lot' Enter
-await ' line 80'
-# A click takes the block; the frame it is answered against is the last one
-# drawn, so the drive waits for it before pressing anything.
-mouse 0 10 5
-sleep 0.5
+step 'detail opens a read well in place and gives the input back'
+printf 'first\nsecond\nthird\n' >"$WORK/cwd/detail.txt"
+start '{"responses":[{"steps":[{"toolCall":{"name":"Read","input":{"file_path":"detail.txt","offset":2}}}]},{"steps":[{"text":"Read finished."}]}]}'
+keys 'read the file' Enter
+await 'Read finished.'
+keys C-o
+await 'step'
 keys Enter
-await 'j/k scroll'
-keys 'G'
-await ' line 80'
-keys '/'
-keys 'line 42'
-await '/line 42'
-keys Enter
-await 'n/N match'
+await '2   second'
 keys Escape
-keys Escape
-vanish 'j/k scroll'
+vanish '2   second'
 await 'fake-1'
 finish
 
@@ -379,6 +370,8 @@ keys 'look at it' Enter
 await '¶ read    shot.png'
 await 'That is the picture.'
 keys C-o
+await 'esc close'
+keys Enter
 await '[image: image/png]'
 await 'That is the picture.'
 if pane | grep -qE '_Ga=|10eeee'; then
@@ -398,6 +391,8 @@ keys 'look at it' Enter
 await '¶ read    shot.png'
 await 'That is the picture.'
 keys C-o
+await 'esc close'
+keys Enter
 await '[image: image/png]'
 finish
 

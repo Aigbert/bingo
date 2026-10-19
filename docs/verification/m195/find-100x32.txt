@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Read, edit, and print the source lines.
+   ¶ read    note.txt                                                                     30 lines
+   ± edit    note.txt                                                               +1 −1 · bypass
+   $ run     printf 'command line 1\ncommand line 2\ncommand line 3\ncommand line 4\…  ok · bypass
+
+   Detail drive finished. Find source or revised.
+
+
+   find  source▍                                                                            2 of 2
+
+   fake-1 · bypass                                                 ↑↓ matches   ⏎ jump   esc close

@@ -1,0 +1,24 @@
+
+
+
+▍  Read, edit, and print the source lines.
+   ¶ read    note.txt                                                 30 lines
+   ± edit    note.txt                                           +1 −1 · bypass
+
+          9   source line 9
+         10   source line 10
+         11   source line 11
+         12 − source line 12
+         12 + revised line 12
+         13   source line 13
+         14   source line 14
+         15   source line 15
+
+   $ run     printf 'command line 1\ncommand line 2\ncommand lin…  ok · bypass
+
+   Detail drive finished. Find source or revised.
+
+
+    Reply, or / for commands
+
+   fake-1 · bypass                                ↑↓ step   ⏎ open   esc close
