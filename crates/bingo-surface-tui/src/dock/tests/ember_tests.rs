@@ -41,16 +41,30 @@ pub(super) fn show(state: &mut SessionState, ui: &mut crate::ui::Ui, owner: &str
     ui.sync_panes(state);
 }
 
-
-
-
-
-
-
-
-
-
-
+#[test]
+fn m198_keys_closed_full_frame() {
+    let capture = Capture::load("keys-closed");
+    capture.render(|| {
+        let (state, mut ui) = fixture(&capture);
+        let size = capture.size();
+        ui.focus
+            .show(crate::ui::Open::Keys(None), capture.now().instant);
+        crate::input::on_key(
+            &mut ui,
+            &solo(&state),
+            key(crossterm::event::KeyCode::Esc),
+            capture.now(),
+        );
+        let screen = drawn(
+            size.width,
+            size.height,
+            &solo(&state),
+            &mut ui,
+            capture.now(),
+        );
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
+}
 
 fn band_lines(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::Rect) -> Vec<String> {
     (area.y..area.bottom())
@@ -63,7 +77,3 @@ fn band_lines(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::Rect) -> 
         })
         .collect()
 }
-
-
-
-

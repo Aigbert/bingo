@@ -31,6 +31,10 @@ pub struct Opened {
     pub fallback_at: Option<usize>,
 }
 pub fn open(ui: &mut Ui, first: PaletteOpen, now: Now) -> Vec<Effect> {
+    if first == PaletteOpen::Keys {
+        ui.focus.show(Open::Keys(None), now.instant);
+        return vec![];
+    }
     let draft = ui.composer.take();
     ui.composer.set(if first == PaletteOpen::Commands {
         "/"
@@ -357,7 +361,6 @@ pub fn command(ui: &mut Ui, line: &str, now: Now) -> Option<Vec<Effect>> {
             );
             Some(vec![])
         }
-        "help" => Some(open(ui, PaletteOpen::Keys, now)),
         "resume" if args.is_empty() => Some(open(ui, PaletteOpen::Sessions, now)),
         "resume" => Some(vec![Effect::Open(SessionSelector::ById {
             id: SessionId::from_raw(args),

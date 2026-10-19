@@ -230,7 +230,6 @@ async fn prototype_scenarios_at_both_sizes() {
     for (width, height) in [(108, 30), (80, 24)] {
         for (name, first, query) in [
             ("commands", PaletteOpen::Commands, "/"),
-            ("keys", PaletteOpen::Keys, ""),
             ("sessions", PaletteOpen::Sessions, ""),
             ("mo", PaletteOpen::Commands, "/mo"),
             ("think", PaletteOpen::Commands, "/think "),
@@ -362,10 +361,14 @@ fn help_resume_and_shift_tab_keep_their_own_routes() {
             name: "help".into(),
             ..crate::commands::local_specs()[0].clone()
         }));
-    for (key, line) in [(typed('?'), "/help"), (ctrl('r'), "/resume")] {
-        let effects = crate::input::on_key(&mut ui, &tree, key, now);
-        assert_eq!(effects[0], Effect::Run(line.into()));
-    }
+    assert_eq!(
+        crate::input::on_key(&mut ui, &tree, typed('?'), now),
+        vec![Effect::Run("/help".into())]
+    );
+    assert!(crate::palette::command(&mut ui, "/help", now).is_none());
+    crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
+    let effects = crate::input::on_key(&mut ui, &tree, ctrl('r'), now);
+    assert_eq!(effects[0], Effect::Run("/resume".into()));
     crate::input::on_key(
         &mut ui,
         &tree,
@@ -460,19 +463,13 @@ async fn tab_does_not_run_arguments_and_escape_leaves_free_text_at_once() {
     assert_eq!(ui.composer.text(), "/");
 }
 
-#[tokio::test]
-async fn choosing_the_mode_key_replays_shift_tab_after_closing() {
-    let fixture = Fixture::new();
-    let (state, mut ui, now) = setup();
-    open(&mut ui, PaletteOpen::Keys, now);
-    fixture.paint(&mut ui, &state, now, 80, 24).await;
-    let effects = fixture
-        .press(&mut ui, &state, key(KeyCode::Enter), now)
-        .await;
-    assert!(!active(&ui));
-    assert!(
-        matches!(&effects[0], Effect::CycleMode(Input::Text { text, .. }) if text.starts_with("/permission "))
-    );
+#[test]
+fn the_keys_door_opens_the_native_sheet_and_preserves_the_draft() {
+    let (_, mut ui, now) = setup();
+    ui.composer.set("draft");
+    assert!(open(&mut ui, PaletteOpen::Keys, now).is_empty());
+    assert!(matches!(ui.focus.open(), Open::Keys(_)));
+    assert_eq!(ui.composer.text(), "draft");
 }
 
 #[test]
@@ -482,45 +479,40 @@ fn ctrl_p_is_unbound_and_absent_from_the_palette_keys() {
     assert!(!active(&ui));
     open(&mut ui, PaletteOpen::Keys, now);
     draw_sized(80, 24, &state, &mut ui, now);
-    let props = &ui
-        .shown
-        .pulls
-        .iter()
-        .find(|key| key.request.component == render::Component::Palette)
-        .unwrap()
-        .request
-        .props;
-    assert!(props["keyHints"].get("ctrl+p").is_none());
-    assert!(props["bindings"].get("ctrl+p").is_none());
+    assert!(matches!(ui.focus.open(), Open::Keys(_)));
+    assert!(
+        !crate::keys::BINDINGS
+            .iter()
+            .any(|binding| binding.keys == "ctrl+p")
+    );
     let escape = crate::keys::BINDINGS
         .iter()
         .find(|binding| binding.keys == "esc")
         .unwrap();
-    assert_eq!(
-        escape.description,
-        crate::keys::ESCAPES
-            .iter()
-            .map(|(_, word)| *word)
-            .collect::<Vec<_>>()
-            .join(" → ")
+    assert!(
+        crate::keys::sheet::sheet(None, 100, 40)
+            .fold()
+            .contains(escape.description)
     );
 }
 
 #[test]
-fn disabled_palette_keeps_help_and_resume_in_the_client() {
+fn disabled_palette_keeps_resume_and_submits_help_to_its_command() {
     let (mut state, mut ui, now) = setup();
     state.config.kernel =
         json!({"enabledPlugins":{bingo_mod_palette::Palette.manifest().id:false}});
     ui.catalogs.commands.clear();
     let tree = solo(&state);
-    for opener in [typed('?'), ctrl('r')] {
-        assert_eq!(
-            crate::input::on_key(&mut ui, &tree, opener, now),
-            vec![Effect::ListStored]
-        );
-        assert!(active(&ui));
-        close(&mut ui, now);
-    }
+    assert_eq!(
+        crate::input::on_key(&mut ui, &tree, typed('?'), now),
+        vec![Effect::Run("/help".into())]
+    );
+    assert_eq!(
+        crate::input::on_key(&mut ui, &tree, ctrl('r'), now),
+        vec![Effect::ListStored]
+    );
+    assert!(active(&ui));
+    close(&mut ui, now);
     assert_eq!(
         crate::input::command_line(&mut ui, &tree, now, "/resume".into()),
         vec![Effect::ListStored]
@@ -549,7 +541,7 @@ fn a_trust_line_nobody_vouched_for_stays_unsent() {
         ] {
             let (state, mut ui, now) = setup();
             ui.composer.set("/mcp approve local");
-            open(&mut ui, PaletteOpen::Keys, now);
+            open(&mut ui, PaletteOpen::Commands, now);
             let action = Action {
                 name: "surface:palette".into(),
                 args: json!({"handler":request(&ui).unwrap(),"value":value}),
@@ -607,13 +599,10 @@ async fn pending_queries_keep_the_accepted_drawing_and_its_height() {
 }
 
 #[tokio::test]
-async fn bare_permission_and_rename_enter_draw_their_inline_arguments() {
+async fn bare_rename_enter_draws_its_inline_arguments() {
     let fixture = Fixture::new();
     let (state, mut ui, now) = setup();
-    for (name, offered) in [
-        ("permission", "acceptEdits"),
-        ("rename", "a name for this session"),
-    ] {
+    for (name, offered) in [("rename", "a name for this session")] {
         open(&mut ui, PaletteOpen::Commands, now);
         ui.composer.set(&format!("/{name}"));
         fixture.paint(&mut ui, &state, now, 80, 24).await;

@@ -298,14 +298,14 @@ keys Enter
 await '@Cargo.toml ▍'
 finish
 
-step 'the keys palette opens on ? and closes on esc'
+step 'the keys sheet opens on ? and closes on esc'
 start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '?'
-# The palette takes the KeyBar's row while open: wait for its own words.
-await 'keys, in this list'
+# The sheet takes the composer's place while open: wait for its own head.
+await '/help lists every command'
 keys Escape
 await 'fake-1'
-vanish 'keys, in this list'
+vanish '/help lists every command'
 finish
 
 step 'ctrl+r opens the session palette and esc closes it'

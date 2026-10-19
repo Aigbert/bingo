@@ -87,3 +87,7 @@ mod tests {
         assert!(growth.next(later(now, 154)).is_none());
     }
 }
+
+#[cfg(test)]
+#[path = "dock/tests/ember_tests.rs"]
+mod ember_tests;

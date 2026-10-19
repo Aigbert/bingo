@@ -63,6 +63,9 @@ pub fn hints(state: &SessionState, ui: &Ui, frame: &Layout) -> Option<SiteHints>
         })
 }
 fn sheet_hints(ui: &Ui) -> Option<SiteHints> {
+    if ui.focus.showing() && matches!(ui.focus.open(), crate::ui::Open::Keys(_)) {
+        return Some(SiteHints::new([KeyPair::new("esc", "close")]));
+    }
     if ui.focus.showing() {
         let pairs: Option<Vec<bingo_sdk::component::KeyPair>> = match ui.focus.open() {
             _ => None,

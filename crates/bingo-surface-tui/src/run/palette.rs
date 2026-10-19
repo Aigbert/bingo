@@ -45,6 +45,13 @@ pub(super) fn surface_action(run: &mut Run, action: bingo_sdk::Action) {
             id: SessionId::from_raw(id),
         })]);
     } else if let Ok(first) = serde_json::from_value(action.args["open"].clone()) {
+        if first == bingo_sdk::component::PaletteOpen::Sessions
+            && crate::sessions::exists(run.session.tree.viewed())
+        {
+            let effects = crate::sessions::open(&mut run.ui, now);
+            run.apply(effects);
+            return;
+        }
         let effects = crate::palette::open(&mut run.ui, first, now);
         run.apply(effects);
     }

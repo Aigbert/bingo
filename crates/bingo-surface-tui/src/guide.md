@@ -30,6 +30,7 @@ context from 70%, active agents and shells, with the available keys on the right
   for after the running turn, else move the ring to the next placed row that answers
   keys. `⏎` while a turn runs *steers* it — the turn absorbs the line at its
   next barrier — and `tab` *queues*; the box says so.
+- `up` — on an empty box, edit the newest line you queued.
 - `up/down` — your own prompt history, at the first and last line of the box.
   `down` keeps the history gesture; `ctrl+r` opens sessions in the palette.
   `ctrl+g` returns to a pending ask.
@@ -160,3 +161,6 @@ compaction leaves the model unchanged. Switching to a model without image
 input keeps pictures in the transcript and warns that the model cannot see them.
 
 For instance settings and credential rules, see `/guide tui-providers`.
+
+`?` or `/help` opens the keys sheet. `alt+m` opens models and `alt+t` changes effort.
+`ctrl+v` pastes an image from the clipboard.

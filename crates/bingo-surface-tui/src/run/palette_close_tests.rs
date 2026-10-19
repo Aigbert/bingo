@@ -54,7 +54,7 @@ async fn ctrl_c_preserves_the_draft_and_retires_the_mod_cursor_in_the_run_loop()
         let mut run = tests::idle_in(state, session.clone(), now.instant);
         let fixture = Fixture::new();
         run.ui.composer.set("keep this draft");
-        crate::palette::open(&mut run.ui, PaletteOpen::Keys, now);
+        crate::palette::open(&mut run.ui, PaletteOpen::Commands, now);
         let opening = run.ui.focus.open().clone();
         let first = selected(&mut run, &fixture, now).await;
         run.terminal_event(Term::Key(key(crossterm::event::KeyCode::Down)));
@@ -81,7 +81,7 @@ async fn a_palette_render_finishing_after_ctrl_c_is_retired() {
     let session = Arc::new(TestSession::default());
     let mut run = tests::idle_in(state, session.clone(), now.instant);
     let fixture = Fixture::new();
-    crate::palette::open(&mut run.ui, PaletteOpen::Keys, now);
+    crate::palette::open(&mut run.ui, PaletteOpen::Commands, now);
     selected(&mut run, &fixture, now).await;
     let key = run
         .ui
@@ -114,7 +114,7 @@ async fn palette_retirement_targets_each_drawing_even_with_a_redraw_pending() {
     state.config.kernel["render"] = serde_json::json!({"Palette":[{}]});
     let session = Arc::new(TestSession::default());
     let mut run = tests::idle_in(state, session.clone(), now.instant);
-    crate::palette::open(&mut run.ui, PaletteOpen::Keys, now);
+    crate::palette::open(&mut run.ui, PaletteOpen::Commands, now);
     draw_tree(80, 24, &run.session.tree, &mut run.ui, now);
     let mut pending = run
         .ui

@@ -80,7 +80,7 @@ fn a_session_list_reply_belongs_only_to_its_opening() {
 #[tokio::test]
 async fn the_top_palette_owns_keys_when_an_ask_arrives_after_idle() {
     let now = still(scene().1);
-    for first in [PaletteOpen::Commands, PaletteOpen::Keys] {
+    for first in [PaletteOpen::Commands, PaletteOpen::Sessions] {
         for ask in [question(false, true), permission(None, None)] {
             for pressed in [typed('x'), key(KeyCode::Enter), key(KeyCode::Esc)] {
                 let mut state = state();
@@ -370,4 +370,38 @@ async fn an_applied_plugins_reload_refreshes_the_waiting_count() {
     let screen = draw_tree(120, 40, &run.session.tree, &mut run.ui, now);
     assert!(screen.contains("fake-1"), "{screen}");
     assert_eq!(run.ui.catalogs.plugins.len(), 1);
+}
+
+#[tokio::test]
+async fn help_and_question_mark_follow_the_commands_keys_outcome() {
+    for question in [false, true] {
+        let now = still(scene().1);
+        let home = tempfile::tempdir().unwrap();
+        let session = Arc::new(TestSession::default());
+        let mut run = tests::idle_in(state(), session.clone(), now.instant);
+        run.data_dir = home.path().to_path_buf();
+        run.ui.catalogs.commands.push(CatalogEntry {
+            id: "help".into(),
+            label: "help".into(),
+            meta: json!({"name":"help","hint":"keys","family":"session","args":{"kind":"none"}}),
+        });
+        if question {
+            run.terminal_event(Term::Key(typed('?')));
+        } else {
+            run.ui.composer.set("/help");
+            run.terminal_event(Term::Key(key(KeyCode::Enter)));
+        }
+        let submissions = session.submissions();
+        let (intent, Input::Text { text, .. }) = &submissions[0] else {
+            panic!("help must reach its command");
+        };
+        assert_eq!(text, "/help");
+        run.ack(
+            intent,
+            &IntentOutcome::Applied {
+                result: json!({"surface":{"name":"Palette","args":{"open":"keys"}}}),
+            },
+        );
+        assert!(matches!(run.ui.focus.open(), Open::Keys(_)));
+    }
 }

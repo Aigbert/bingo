@@ -2,130 +2,240 @@
 //! key can never be documented in one place and bound in another.
 
 pub mod commands;
+pub mod sheet;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Group {
+    Write,
+    Working,
+    LookBack,
+    Switch,
+}
+impl Group {
+    pub const ALL: [Self; 4] = [Self::Write, Self::Working, Self::LookBack, Self::Switch];
+    pub fn words(self) -> &'static str {
+        match self {
+            Self::Write => "write",
+            Self::Working => "while it works",
+            Self::LookBack => "look back",
+            Self::Switch => "switch",
+        }
+    }
+}
 
 pub struct Binding {
     /// The chord, lowercase and `+`-joined; ` · ` separates alternatives.
     pub keys: &'static str,
     pub description: &'static str,
+    pub group: Option<Group>,
+    /// The same chord's words while a turn is running.
+    pub working: Option<&'static str>,
 }
 
-/// In the order the panel lists them.
+/// Prototype order; editing-only bindings stay available to the guide.
 pub const BINDINGS: &[Binding] = &[
     Binding {
-        keys: "ctrl+f",
-        description: "line search / browse",
-    },
-    Binding {
-        keys: "/",
-        description: "commands, in this list",
-    },
-    Binding {
         keys: "enter",
-        description: "send · open focused block",
+        description: "send",
+        group: Some(Group::Write),
+        working: Some("steer at the next step"),
     },
     Binding {
         keys: "shift+enter",
-        description: "newline (ctrl+j · alt+enter · \\ enter)",
+        description: "new line",
+        group: Some(Group::Write),
+        working: None,
     },
     Binding {
-        // The stack of [`ESCAPES`], in the order it is obeyed; a test holds
-        // the two together.
+        keys: "/",
+        description: "commands and skills",
+        group: Some(Group::Write),
+        working: None,
+    },
+    Binding {
+        keys: "@",
+        description: "files and agents",
+        group: Some(Group::Write),
+        working: None,
+    },
+    Binding {
+        keys: "!",
+        description: "run a shell command",
+        group: Some(Group::Write),
+        working: None,
+    },
+    Binding {
+        keys: "ctrl+v",
+        description: "paste an image",
+        group: Some(Group::Write),
+        working: None,
+    },
+    Binding {
+        // TABS owns completion, queuing and focus precedence.
+        keys: "tab",
+        description: "queue for after",
+        group: Some(Group::Working),
+        working: None,
+    },
+    Binding {
+        // The composer owns which queued line comes back on an empty box.
+        keys: "up",
+        description: "edit what you queued",
+        group: Some(Group::Working),
+        working: None,
+    },
+    Binding {
+        // ESCAPES owns the close order; this row names its running-turn action.
         keys: "esc",
-        description: "sheet → card → dropdown → pane → search → interrupt → clear → latest → back → rewind → arm rewind",
+        description: "stop the turn",
+        group: Some(Group::Working),
+        working: None,
+    },
+    Binding {
+        keys: "ctrl+b",
+        description: "send the command to the background",
+        group: Some(Group::Working),
+        working: None,
+    },
+    Binding {
+        keys: "ctrl+o",
+        description: "details of the last turn",
+        group: Some(Group::LookBack),
+        working: None,
+    },
+    Binding {
+        keys: "ctrl+f",
+        description: "find in the conversation",
+        group: Some(Group::LookBack),
+        working: None,
+    },
+    Binding {
+        keys: "pgup/pgdn",
+        description: "scroll",
+        group: Some(Group::LookBack),
+        working: None,
+    },
+    Binding {
+        keys: "end",
+        description: "back to the latest",
+        group: Some(Group::LookBack),
+        working: None,
     },
     Binding {
         keys: "esc esc",
-        description: "rewind to an earlier turn",
+        description: "rewind",
+        group: Some(Group::LookBack),
+        working: None,
+    },
+    Binding {
+        keys: "shift+tab",
+        description: "permission mode",
+        group: Some(Group::Switch),
+        working: None,
+    },
+    Binding {
+        keys: "alt+m",
+        description: "model",
+        group: Some(Group::Switch),
+        working: None,
+    },
+    Binding {
+        keys: "alt+t",
+        description: "effort",
+        group: Some(Group::Switch),
+        working: None,
+    },
+    Binding {
+        keys: "ctrl+r",
+        description: "sessions",
+        group: Some(Group::Switch),
+        working: None,
+    },
+    Binding {
+        keys: "ctrl+t",
+        description: "tasks",
+        group: Some(Group::Switch),
+        working: None,
     },
     Binding {
         keys: "ctrl+c",
-        description: "stop · clear · twice exits",
+        description: "stop, twice to quit",
+        group: Some(Group::Switch),
+        working: None,
     },
     Binding {
         keys: "ctrl+d",
         description: "exit on an empty input",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "up/down",
         description: "history at first/last input line",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "down",
         description: "next history entry",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "ctrl+a/e",
         description: "line start/end (home · end)",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "alt+b/f",
         description: "move one word",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "ctrl+w/u/k",
         description: "delete word · to start · to end",
+        group: None,
+        working: None,
     },
     Binding {
-        keys: "pgup/pgdn",
-        description: "scroll the transcript",
-    },
-    Binding {
-        // One gesture on one row (M92): the sheet does not scroll and this
-        // table already fills eighty by twenty-four, so a row added is a row
-        // pushed off. The key and the drag draw the same run — cells of the
-        // whole transcript, reaching what has scrolled away — and the page
-        // says what holding it past an edge does.
+        // The key and drag select the same transcript cells, including scrolled rows (M92).
         keys: "v · drag",
         description: "select; arrows/drag extend; y/ctrl+c/release copy",
-    },
-    Binding {
-        keys: "ctrl+r",
-        description: "sessions, in this list",
-    },
-    Binding {
-        keys: "ctrl+t",
-        description: "tasks band on and off",
-    },
-    Binding {
-        // The stack of [`TABS`], in the order it is obeyed; a test holds the
-        // two together.
-        keys: "tab",
-        description: "complete → queue → next row",
-    },
-    Binding {
-        keys: "shift+tab",
-        description: "cycle permission mode",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "1-9 · y/a/n",
         description: "answer the open dialog",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "ctrl+e",
         description: "expand preview",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "alt+p",
         description: "cycle pane place",
+        group: None,
+        working: None,
     },
     Binding {
-        keys: "ctrl+o",
-        description: "expand result · then all",
-    },
-    Binding {
-        keys: "ctrl+b",
-        description: "background running command",
-    },
-    Binding {
-        // Mouse reporting has to reach us for this to happen at all: inside
-        // tmux it wants `set -g mouse on`, and without it a click is the
-        // multiplexer's own (M56).
+        // Inside tmux, mouse reporting needs `set -g mouse on`; otherwise tmux owns the click (M56).
         keys: "click",
         description: "a picture · open it",
+        group: None,
+        working: None,
     },
     Binding {
         keys: "?",
         description: "keys, in this list",
+        group: None,
+        working: None,
     },
 ];
 
@@ -456,20 +566,16 @@ mod tests {
         assert_eq!(escape(Open::default()), None, "and nothing to close");
     }
 
-    /// The order `tab` is obeyed in is the order the help prints, because
-    /// there is only one of it.
+    /// The keys sheet reads its words from the binding table.
     #[test]
-    fn the_help_prints_the_tab_stack() {
-        let stack = TABS
-            .iter()
-            .map(|(_, word)| *word)
-            .collect::<Vec<_>>()
-            .join(" → ");
+    fn the_keys_sheet_prints_the_tab_binding() {
         let tab = BINDINGS
             .iter()
             .find(|binding| binding.keys == "tab")
-            .expect("a row for tab");
-        assert_eq!(tab.description, stack);
+            .expect("tab binding");
+        let view = sheet::sheet(None, 100, 40).fold();
+        assert!(view.contains(tab.description));
+        assert!(view.contains(tab.group.unwrap().words()));
     }
 
     /// The three cases the risk register named: the dropdown still completes,
