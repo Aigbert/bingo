@@ -32,7 +32,9 @@ fn echo_server() -> PathBuf {
     let Some(profile) = test.parent().and_then(Path::parent) else {
         panic!("a test binary lives at target/<profile>/deps/<test>");
     };
-    let server = profile.join("examples").join("echo_server");
+    let server = profile
+        .join("examples")
+        .join(format!("echo_server{}", std::env::consts::EXE_SUFFIX));
     assert!(
         server.exists(),
         "cargo test builds this crate's examples; {} is missing",
