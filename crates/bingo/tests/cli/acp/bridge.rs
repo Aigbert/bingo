@@ -374,7 +374,7 @@ fn a_tool_a_plugin_registered_reaches_the_bridge_with_no_edit_here() {
             "capabilities": { "resume": true },
             "mcp": true,
             "turns": [{
-                "mcpUntil": "plugin__wordcount__count",
+                "mcpList": true,
                 "updates": [chunk("Listed.")],
                 "stopReason": "end_turn"
             }]
@@ -386,8 +386,11 @@ fn a_tool_a_plugin_registered_reaches_the_bridge_with_no_edit_here() {
         std::fs::copy(wordcount().join(file), installed.join(file)).unwrap();
     }
 
-    let out = adapter.turn("what have you got");
-    assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
+    let mut host = stream_json::Host::start(&mut adapter.driven("agent"));
+    started(&mut host, "wordcount");
+    host.prompt("what have you got");
+    let ended = host.finish();
+    assert_eq!(ended.code, Some(0), "stderr: {}", ended.err);
     let offered = offered(&adapter);
     assert!(
         offered
@@ -440,6 +443,22 @@ fn dialled(host: &mut stream_json::Host, server: &str) {
     }
 }
 
+/// Wait until a plugin's process has answered its handshake, for the reason
+/// [`dialled`] waits on a server. Boot waits for a handshake, but one that
+/// failed and is tried again lands after the turn has taken its offer.
+fn started(host: &mut stream_json::Host, plugin: &str) {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        host.prompt("/plugins");
+        let table = answered(host.until_event("intentAck"));
+        if cell(&table, plugin, 2).as_deref() == Some("on") {
+            return;
+        }
+        assert!(Instant::now() < deadline, "{plugin} never started: {table}");
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
 /// What a `/command` inside the run answered with.
 fn answered(ack: Value) -> Value {
     let frame: Frame = serde_json::from_value(ack).expect("an intentAck frame");
@@ -455,18 +474,26 @@ fn answered(ack: Value) -> Value {
 /// Whether `/mcp`'s table says this server is up. Its columns are the server,
 /// its state and how many tools it brought.
 fn connected(answered: &Value, server: &str) -> bool {
+    cell(answered, server, 1).as_deref() == Some("connected")
+}
+
+/// One cell of the row a command's table keys by `key`: from its view, or
+/// from the text a run without views was answered with.
+fn cell(answered: &Value, key: &str, column: usize) -> Option<String> {
     if let Ok(bingo_sdk::View::Table { rows, .. }) =
         serde_json::from_value(answered["view"].clone())
     {
-        return rows.iter().any(|row| {
-            row.first().map(String::as_str) == Some(server)
-                && row.get(1).map(String::as_str) == Some("connected")
-        });
+        return rows
+            .into_iter()
+            .find(|row| row.first().map(String::as_str) == Some(key))
+            .and_then(|row| row.get(column).cloned());
     }
-    answered["message"].as_str().is_some_and(|table| {
-        table.lines().any(|line| {
+    answered["message"].as_str().and_then(|table| {
+        table.lines().find_map(|line| {
             let cells = line.split('|').map(str::trim).collect::<Vec<_>>();
-            cells.get(1) == Some(&server) && cells.get(2) == Some(&"connected")
+            (cells.get(1) == Some(&key))
+                .then(|| cells.get(column + 1).map(|cell| cell.to_string()))
+                .flatten()
         })
     })
 }
