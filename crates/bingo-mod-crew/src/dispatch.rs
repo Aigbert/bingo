@@ -4,7 +4,7 @@ pub async fn model(cx: &CommandContext, id: &SessionId) -> Result<CommandOutcome
     let mut attached = crate::live::attach(&cx.host, id).await?;
     let intent = IntentId::mint();
     let mut origin = Origin::surface(format!("plugin:{}", crate::ID));
-    origin.render_surface = Some(render::SurfaceName::Terminal);
+    origin.render_surface = cx.surface;
     attached.handle.submit(
         intent.clone(),
         Input::action(

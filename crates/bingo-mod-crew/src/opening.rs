@@ -40,10 +40,7 @@ impl Interceptor for Opening {
             serde_json::from_value(input.clone()).map_err(crate::error)?;
         if run.name != self.name
             || !run.args.trim().is_empty()
-            || !matches!(
-                run.surface,
-                Some(render::SurfaceName::Terminal | render::SurfaceName::Desktop)
-            )
+            || !run.surface.is_some_and(render::SurfaceName::shows_sheets)
         {
             return next.run(input).await;
         }

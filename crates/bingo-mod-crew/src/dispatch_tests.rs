@@ -51,7 +51,7 @@ async fn the_child_receives_a_signed_action_with_render_metadata() {
         }
     });
     let cx = CommandContext {
-        surface: None,
+        surface: Some(render::SurfaceName::Desktop),
         session: SessionId::from_raw("ses_parent"),
         cwd: "/unused".into(),
         host: host.handle(),
@@ -74,5 +74,5 @@ async fn the_child_receives_a_signed_action_with_render_metadata() {
     assert_eq!(action.name, "model");
     assert_eq!(action.args, serde_json::json!(""));
     assert_eq!(origin.surface, "plugin:bingo.mod.crew");
-    assert_eq!(origin.render_surface, Some(render::SurfaceName::Terminal));
+    assert_eq!(origin.render_surface, Some(render::SurfaceName::Desktop));
 }
