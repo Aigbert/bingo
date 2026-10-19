@@ -105,6 +105,11 @@ is in the one that stands, which is the person's lever and no agent's — with
 `name:120` for a seat's patience and `name:0` for a live one. `/room close
 design` ends a room of the person's own.
 
+Inside a room, `/seat <name>`, `/unseat <name>` and `/close <why>` change the
+room on screen, and the palette lists them only there while the room is open.
+Each without its word writes itself back into the composer and says what it
+needs: the names free to seat, the names seated, or a reason.
+
 ## `.bingo/team.json`
 
 A project's `rooms` declares rooms that are seated when the person's own

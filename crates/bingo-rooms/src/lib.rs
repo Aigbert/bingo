@@ -45,6 +45,7 @@ mod deadline;
 mod door;
 mod ear;
 pub mod guide;
+mod here;
 mod hook;
 mod listen;
 mod mentions;
@@ -75,6 +76,7 @@ use bingo_sdk::{
 
 pub use command::RoomCommand;
 pub use ear::{Ear, Listener, Seat};
+pub use here::{FAMILY as HERE_FAMILY, HereCommand, Verb};
 pub use hook::RoomsHook;
 pub use listen::ListenTool;
 pub use reader::Reader;
@@ -99,6 +101,9 @@ static MANIFEST: PluginManifest = PluginManifest {
     ],
     provides: &[
         "command:room",
+        "command:seat",
+        "command:unseat",
+        "command:close",
         "hook:rooms",
         "tool:OpenRoom",
         "tool:Seat",
@@ -143,6 +148,11 @@ impl Plugin for RoomsPlugin {
         registrar.add(Contribution::Command(
             Arc::new(RoomCommand) as Arc<dyn Command>
         ));
+        for verb in [Verb::Seat, Verb::Unseat, Verb::Close] {
+            registrar.add(Contribution::Command(
+                Arc::new(HereCommand(verb)) as Arc<dyn Command>
+            ));
+        }
         registrar.add(Contribution::Hook(self.hook.clone() as Arc<dyn Hook>));
         registrar.add(Contribution::Tool(Arc::new(OpenRoomTool) as Arc<dyn Tool>));
         registrar.add(Contribution::Tool(Arc::new(SeatTool) as Arc<dyn Tool>));
@@ -218,6 +228,9 @@ mod plugin_tests {
             MANIFEST.provides,
             [
                 "command:room",
+                "command:seat",
+                "command:unseat",
+                "command:close",
                 "hook:rooms",
                 "tool:OpenRoom",
                 "tool:Seat",
@@ -248,14 +261,19 @@ mod plugin_tests {
         let contributions = registrar.into_contributions();
         assert_eq!(contributions.len(), MANIFEST.provides.len());
         assert!(matches!(&contributions[0], Contribution::Command(c) if c.spec().name == "room"));
-        assert!(matches!(&contributions[1], Contribution::Hook(h) if h.id() == "rooms"));
-        assert!(matches!(&contributions[2], Contribution::Tool(t) if t.spec().name == "OpenRoom"));
-        assert!(matches!(&contributions[3], Contribution::Tool(t) if t.spec().name == "Seat"));
-        assert!(matches!(&contributions[4], Contribution::Tool(t) if t.spec().name == "Unseat"));
-        assert!(matches!(&contributions[5], Contribution::Tool(t) if t.spec().name == "CloseRoom"));
-        assert!(matches!(&contributions[6], Contribution::Tool(t) if t.spec().name == "Listen"));
-        assert!(matches!(&contributions[7], Contribution::Context(c) if c.id() == "rooms"));
-        match &contributions[10] {
+        for (at, name) in [(1, "seat"), (2, "unseat"), (3, "close")] {
+            assert!(
+                matches!(&contributions[at], Contribution::Command(c) if c.spec().name == name)
+            );
+        }
+        assert!(matches!(&contributions[4], Contribution::Hook(h) if h.id() == "rooms"));
+        assert!(matches!(&contributions[5], Contribution::Tool(t) if t.spec().name == "OpenRoom"));
+        assert!(matches!(&contributions[6], Contribution::Tool(t) if t.spec().name == "Seat"));
+        assert!(matches!(&contributions[7], Contribution::Tool(t) if t.spec().name == "Unseat"));
+        assert!(matches!(&contributions[8], Contribution::Tool(t) if t.spec().name == "CloseRoom"));
+        assert!(matches!(&contributions[9], Contribution::Tool(t) if t.spec().name == "Listen"));
+        assert!(matches!(&contributions[10], Contribution::Context(c) if c.id() == "rooms"));
+        match &contributions[13] {
             Contribution::Service { key, wire, .. } => {
                 assert_eq!(key, bingo_sdk::Pages::key(MANIFEST.id).name());
                 assert!(wire.is_none(), "a page is read in process");
