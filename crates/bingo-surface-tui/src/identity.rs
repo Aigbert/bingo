@@ -12,12 +12,6 @@ fn ember_palette() {
 }
 
 #[test]
-fn caret_glyphs() {
-    assert_eq!(theme::mark(), "▍");
-    theme::with(crate::painted::ascii(), || assert_eq!(theme::mark(), "|"));
-}
-
-#[test]
 fn opening_props_carry_the_session_identity() {
     let state = state();
     let folds = Default::default();

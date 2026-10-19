@@ -1,8 +1,10 @@
 ---
 source: crates/bingo-surface-tui/src/view.rs
-assertion_line: 1446
+assertion_line: 1326
 expression: screen
 ---
+"                                                                                "
+"                                                                                "
 "                                                                                "
 "                                                                                "
 "                                                                                "
@@ -21,8 +23,6 @@ expression: screen
 "▍  have it reviewed                                                             "
 "   • spawnagent  review the diff                                                "
 "                                                                                "
-"                                                                                "
-" ▍ Waiting for 1 background agent to finish                                     "
 "                                                                                "
 "   ▍Reply, or / for commands                                                    "
 "                                                                                "

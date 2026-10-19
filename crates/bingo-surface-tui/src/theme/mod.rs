@@ -302,18 +302,6 @@ pub fn attention(now: crate::clock::Now) -> Style {
     }
 }
 
-/// A notice arriving and leaving: the words' own weight at both edges of its
-/// life, its own level's colour while it is there to be read. `dim` is a
-/// weight and not a hue since M73, so there is nothing left to mix through —
-/// the notice is dim until it has arrived, as it has always been on the eight.
-#[cfg(test)]
-pub fn fading(level: bingo_sdk::Level, t: f32) -> Style {
-    match t >= 1.0 {
-        true => self::level(level),
-        false => dim(),
-    }
-}
-
 /// The light that crosses a tool's name as its answer lands: `good` at the
 /// crest and the row's own weight where it has passed. The bullet is what
 /// says the call finished; this says only how fresh that is (§6), so a name
@@ -337,18 +325,6 @@ pub fn cooling(t: f32) -> Style {
     match current().colors {
         Colors::Plain => Style::new(),
         _ => two_ways(t, bad(), text()),
-    }
-}
-
-/// The context notice warming from the words' own weight towards `bad` as the
-/// window fills. It starts where secondary text does, which is a weight and
-/// no colour at all (M73), so the notice takes `bad` at [`SETTLES`] rather
-/// than creeping towards it through a grey.
-#[cfg(test)]
-pub fn warming(t: f32) -> Style {
-    match current().colors {
-        Colors::Plain => Style::new(),
-        _ => two_ways(t, dim(), bad()),
     }
 }
 
@@ -460,7 +436,7 @@ pub fn spendable() -> std::collections::HashSet<Color> {
             out.insert(colour);
         }
     };
-    for style in [presence(), glow(), good(), bad(), mode(), ash()] {
+    for style in [presence(), glow(), good(), bad(), mode(), ash(), dim()] {
         keep(style);
     }
     for index in 0..6 {
@@ -473,7 +449,6 @@ pub fn spendable() -> std::collections::HashSet<Color> {
             comet(t),
             landing(t),
             cooling(t),
-            warming(t),
             blended("glow", "coal", f64::from(t)).unwrap_or_default(),
             blended("glow", "good", f64::from(t)).unwrap_or_default(),
             blended("glow", "fg", f64::from(t)).unwrap_or_default(),
@@ -482,13 +457,13 @@ pub fn spendable() -> std::collections::HashSet<Color> {
         ] {
             keep(style);
         }
-        for level in [
-            bingo_sdk::Level::Info,
-            bingo_sdk::Level::Warn,
-            bingo_sdk::Level::Error,
-        ] {
-            keep(fading(level, t));
-        }
+    }
+    for level in [
+        bingo_sdk::Level::Info,
+        bingo_sdk::Level::Warn,
+        bingo_sdk::Level::Error,
+    ] {
+        keep(self::level(level));
     }
     out
 }
@@ -606,14 +581,9 @@ pub fn border() -> border::Set<'static> {
     glyphs().border
 }
 
-/// bingo's voice, at work or at rest.
-pub fn mark() -> &'static str {
-    glyphs().mark[0]
-}
-
 /// The narrower caret while a thought is being had.
 pub fn thinking() -> &'static str {
-    glyphs().mark[1]
+    glyphs().thinking
 }
 
 #[cfg(test)]

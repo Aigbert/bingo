@@ -270,8 +270,6 @@ fn every_token_is_spent_where_the_design_says() {
         ("comet", &["embers.rs"]),
         ("landing", &["transcript.rs"]),
         ("cooling", &["transcript.rs"]),
-        ("fading", &[]),
-        ("warming", &[]),
         ("ink", &["highlight.rs"]),
     ];
     for (token, files) in allowed {
@@ -526,7 +524,6 @@ fn the_ascii_table_spells_every_glyph_in_one_cell() {
         assert_eq!(cursor(), ">");
         assert_eq!(todo(false), "-");
         assert_eq!(todo(true), "x");
-        assert_eq!(mark(), "|");
         assert_eq!(thinking(), "|");
         assert_eq!(border().top_left, "+");
         assert_eq!(ellipsis(), "...");
@@ -564,8 +561,7 @@ fn a_mark_in_the_bullets_place_is_the_bullets_width() {
 }
 
 #[test]
-fn the_voice_has_a_speaking_and_a_thinking_caret() {
-    assert_eq!(mark(), "▍");
+fn a_thought_has_the_narrower_caret() {
     assert_eq!(thinking(), "▏");
 }
 
@@ -582,8 +578,6 @@ fn a_ramp_the_eight_colours_cannot_draw_takes_its_two_ends() {
     assert_eq!(pulse(1.0), glow());
     assert_eq!(comet(0.0), glow());
     assert_eq!(comet(1.0), text());
-    assert_eq!(warming(0.0), dim());
-    assert_eq!(warming(1.0), bad());
 }
 
 #[test]
@@ -612,20 +606,7 @@ fn a_ramp_towards_the_ink_ends_on_the_terminals_own() {
         assert_eq!(self::cooling(1.0), text());
         assert_eq!(landing(1.0), good().patch(bold()));
         assert_eq!(landing(0.1), bold());
-        assert_eq!(warming(0.0), dim());
-        assert_eq!(warming(1.0), bad());
     });
-}
-
-#[test]
-fn a_notice_arrives_out_of_dim_and_leaves_into_it() {
-    let level = bingo_sdk::Level::Error;
-    for look in [dark(), ascii()] {
-        with(look, || {
-            assert_eq!(fading(level, 0.0), dim());
-            assert_eq!(fading(level, 1.0), bad());
-        });
-    }
 }
 
 /// The two tokens the terminal owns: no look, and no answer about the
@@ -652,10 +633,9 @@ fn body_ink_is_terminal_owned_and_dim_uses_ember_or_a_modifier() {
 #[test]
 fn nothing_that_moves_spends_a_colour_under_no_colour() {
     with(no_colour(), || {
-        for style in [pulse(1.0), comet(0.0), warming(1.0)] {
+        for style in [pulse(1.0), comet(0.0)] {
             assert_eq!(style, Style::new());
         }
-        assert_eq!(fading(bingo_sdk::Level::Error, 1.0), Style::new());
     });
 }
 

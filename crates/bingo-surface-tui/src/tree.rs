@@ -186,12 +186,6 @@ impl Tree {
     }
 }
 
-/// What a counted session is doing.
-pub enum Wants {
-    Attention,
-    Running,
-}
-
 /// Which sessions a count is over. One count with a scope rather than two
 /// counts: what "somebody else is at it" means depends on who is asking.
 #[derive(Clone, Copy)]
@@ -206,24 +200,13 @@ pub enum Scope<'a> {
     Under(&'a SessionId),
 }
 
-/// How many of them there are, and nothing at all where there are none. The
-/// one reading of "somebody else is at it": the footer counts it and the
-/// activity row says it in words (M82), so the two can
-/// never disagree about a session they both count.
-pub fn count(tree: &Tree, wants: Wants, scope: Scope<'_>) -> Option<usize> {
-    let n = matching(tree, wants, scope).len();
-    (n > 0).then_some(n)
-}
-
-pub fn matching<'a>(tree: &'a Tree, wants: Wants, scope: Scope<'_>) -> Vec<Row<'a>> {
+/// The sessions in a scope that wait on a person.
+pub fn asking_you<'a>(tree: &'a Tree, scope: Scope<'_>) -> Vec<Row<'a>> {
     let within = covered(tree, scope);
     tree.rows()
         .into_iter()
         .filter(|row| within.contains(&row.session))
-        .filter(|row| match wants {
-            Wants::Attention => row.attention,
-            Wants::Running => row.status == Some(Lifecycle::Working),
-        })
+        .filter(|row| row.attention)
         .collect()
 }
 
@@ -607,12 +590,10 @@ mod tests {
         );
     }
 
-    /// One count, two senses (M82). The status line asks about every session
-    /// but the one on screen; the activity row asks only about what hangs
-    /// under it, however deep — a child looking up at a running parent is
-    /// waiting on nothing of its own, and the row must not say that it is.
+    /// One scope, two senses (M82). `Others` is every session but the one on
+    /// screen; `Under` is what hangs under a session, however deep.
     #[test]
-    fn a_count_is_scoped_to_who_is_asking() {
+    fn a_scope_covers_what_it_names() {
         let mut tree = Tree::new(state());
         tree.fold.apply(&frame(1, started("trn_1")));
         tree.fold.apply(&child_frame(1, announced("reviewer")));
@@ -635,23 +616,23 @@ mod tests {
         tree.show(&child_id());
 
         assert_eq!(
-            count(&tree, Wants::Running, Scope::Others),
-            Some(2),
+            covered(&tree, Scope::Others).len(),
+            2,
             "the running root and the running grandchild, neither in view"
         );
         assert_eq!(
-            count(&tree, Wants::Running, Scope::Under(&child_id())),
-            Some(1),
+            covered(&tree, Scope::Under(&child_id())).len(),
+            1,
             "the grandchild alone hangs under the child; the root is above it"
         );
         assert_eq!(
-            count(&tree, Wants::Running, Scope::Under(tree.root_id())),
-            Some(2),
+            covered(&tree, Scope::Under(tree.root_id())).len(),
+            2,
             "and both hang under the root, however deep"
         );
         assert_eq!(
-            count(&tree, Wants::Running, Scope::Under(&agent_id(3))),
-            None,
+            covered(&tree, Scope::Under(&agent_id(3))).len(),
+            0,
             "nothing hangs under the deepest one, and a session is never \
              under itself"
         );

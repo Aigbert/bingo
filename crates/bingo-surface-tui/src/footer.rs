@@ -199,8 +199,7 @@ fn crew(tree: &Tree, now: Now) -> Drawing {
     }
 }
 fn needs_you(tree: &Tree) -> Drawing {
-    use crate::tree::{Scope, Wants};
-    let rows = crate::tree::matching(tree, Wants::Attention, Scope::Others);
+    let rows = crate::tree::asking_you(tree, crate::tree::Scope::Others);
     let count = rows.len();
     if count == 0 {
         return Drawing::default();

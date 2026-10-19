@@ -1169,7 +1169,7 @@ mod tests {
     fn a_steer_in_flight_asks_the_frame_for_no_row_at_all() {
         let (ui, now) = scene();
         let rows = |entries: &[(&str, &str, bool)]| {
-            activity::lines(
+            activity::components(
                 &solo(&folded(vec![
                     frame(1, started("trn_1")),
                     queue_frame(2, entries),
@@ -1178,6 +1178,7 @@ mod tests {
                 80,
                 now,
             )
+            .lines
             .len()
         };
         assert_eq!(rows(&[("room", "the build is green", true)]), 0);

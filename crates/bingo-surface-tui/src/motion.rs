@@ -130,54 +130,6 @@ fn the_input_box_glows_on_the_same_breath_and_is_dim_when_idle() {
     });
 }
 
-/// The wait row has no turn to read a pace from, so it takes the one that
-/// already means the waiting is somebody else's (M82) — and the box stays
-/// dim, because nothing is arriving *here*.
-#[test]
-fn the_wait_breathes_at_the_pace_a_tool_holds_a_turn_and_leaves_the_box_dim() {
-    let (mut ui, now) = scene();
-    let at = later(now, 250);
-    let tree = waited_on(1);
-    crate::theme::with(crate::painted::truecolor(), || {
-        let view = bingo_sdk::View::Text {
-            children: vec![bingo_sdk::view::TextChild::String(format!(
-                " {} ",
-                theme::mark()
-            ))],
-            style: bingo_sdk::view::TextStyle {
-                color: Some("presence".into()),
-                motion: Some(Box::new(bingo_sdk::view::TextMotion::Breathe {
-                    with: "dim".into(),
-                    period_ms: 2200,
-                    depth: 1.0,
-                })),
-                ..Default::default()
-            },
-        };
-        let expected = crate::views::marked(&view, 80, &crate::views::Marks::at(at));
-        let row = crate::activity::components(&tree, &ui, 80, at);
-        let ink = row
-            .lines
-            .iter()
-            .find(|line| line.to_string().contains("Waiting for"))
-            .unwrap()
-            .spans[0]
-            .style;
-        assert_eq!(ink, expected.lines[0].spans[0].style);
-        assert_eq!(row.next, expected.next);
-        assert!(
-            crate::activity::components(&tree, &ui, 80, still(at))
-                .next
-                .is_none()
-        );
-    });
-    assert_eq!(
-        composer_style(&tree, &mut ui, still(at)),
-        theme::as_drawn(theme::glow().patch(crate::dock::ground())),
-        "the idle prompt keeps its glow"
-    );
-}
-
 #[test]
 fn nothing_of_the_presence_is_on_screen_while_no_turn_runs() {
     let (mut ui, now) = mid_turn();

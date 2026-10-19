@@ -1,5 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens/teams.rs
+assertion_line: 310
 expression: wide
 ---
 "                                                                                                                                                                "
@@ -27,10 +28,10 @@ expression: wide
 "                                                                                                                                                                "
 "                                                                                                                                                                "
 "                                                                                                                                                                "
+"                                                                                                                                                                "
+"                                                                                                                                                                "
 "▍  what is in this workspace?                                                                                                                                   "
 "                                                                                                                                                                "
-"                                                                                                                                                                "
-" ▍ Waiting for 1 background agent to finish                                                                                                                     "
 "                                                                                                                                                                "
 " ▎ ● project       idle · what is in this workspace?                                                                                                  this one  "
 "   ●~ reviewer     working · in #design · 3 unread · live                                                                                 owes an answer · 22m  "

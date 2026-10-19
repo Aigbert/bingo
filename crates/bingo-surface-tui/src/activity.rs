@@ -1,25 +1,23 @@
-//! Background waits and plugin activity placements; queue rows live in `queue_rows`.
+//! Embers above the dock and plugin activity placements; queue rows live in `queue_rows`.
 use ratatui::text::{Line, Span};
 
 use crate::clock::Now;
 use crate::layout::grid;
-use crate::tree::{self, Scope, Tree, Wants};
+use crate::tree::Tree;
 use crate::ui::Ui;
 use crate::{theme, views};
 
-/// Background waits and embers above the dock.
-/// The stream owns the live turn's row.
+/// Embers above the dock. The stream owns the live turn's row, and agents at
+/// work while the session is idle are the footer's lamps.
 pub(crate) fn components(tree: &Tree, ui: &Ui, width: usize, now: Now) -> views::Drawing {
     crate::layout::count::band(2);
-    let state = tree.viewed();
-    let mut out = waiting(tree, width, now);
-    let embers = ui.embers.drawing(state, now, width, !ui.scroll.following());
-    out.next = out.next.into_iter().chain(embers.next).min();
-    if !out.lines.is_empty() || !embers.lines.is_empty() {
-        out.lines
-            .insert(0, embers.lines.into_iter().next().unwrap_or_default());
+    let embers = ui
+        .embers
+        .drawing(tree.viewed(), now, width, !ui.scroll.following());
+    views::Drawing {
+        lines: embers.lines.into_iter().take(1).collect(),
+        next: embers.next,
     }
-    out
 }
 
 /// A wait and the plugin placements that accompany it. Queued input is separate.
@@ -114,54 +112,11 @@ fn activity_node(node: &bingo_sdk::TreeNode, width: usize) -> Line<'static> {
     Line::from(spans)
 }
 
-/// Background agents can still be working after the viewed turn has ended.
-fn waiting(tree: &Tree, width: usize, now: Now) -> views::Drawing {
-    let viewed = tree.viewed();
-    if viewed.busy() {
-        return Default::default();
-    }
-    let Some(running) = tree::count(tree, Wants::Running, Scope::Under(&viewed.summary.id)) else {
-        return Default::default();
-    };
-    let view = bingo_sdk::View::Text {
-        children: vec![bingo_sdk::view::TextChild::String(format!(
-            " {} ",
-            theme::mark()
-        ))],
-        style: bingo_sdk::view::TextStyle {
-            color: Some("presence".into()),
-            motion: Some(Box::new(bingo_sdk::view::TextMotion::Breathe {
-                with: "dim".into(),
-                period_ms: 2200,
-                depth: 1.0,
-            })),
-            ..Default::default()
-        },
-    };
-    views::marked(&view, width, &views::Marks::at(now)).map_lines(|mut lines| {
-        if let Some(line) = lines.first_mut() {
-            line.spans
-                .push(Span::styled(waiting_for(running), theme::text()));
-        }
-        lines
-    })
-}
-
-/// The row's words, in the number of agents there are.
-fn waiting_for(running: usize) -> String {
-    format!(
-        "Waiting for {running} background agent{} to finish",
-        if running == 1 { "" } else { "s" }
-    )
-}
-
-#[cfg(test)]
-pub(crate) fn lines(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Vec<Line<'static>> {
-    components(tree, ui, width, now).lines
-}
-
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use crate::test_support::*;
+
     #[test]
     fn tokens_do_not_compete_with_the_activity_clock() {
         let state = folded(vec![
@@ -184,97 +139,6 @@ mod tests {
         assert!(screen.contains("working"), "{screen}");
         assert!(!screen.contains("0.0k"), "{screen}");
     }
-
-    use super::*;
-    use crate::test_support::*;
-
-    /// The band's one row, as the terminal drew it, without the quotes a test
-    /// backend prints around each row or the padding it is drawn into.
-    fn row(tree: &Tree, now: Now) -> String {
-        let (mut ui, _) = scene();
-        draw_tree(80, 24, tree, &mut ui, now)
-            .lines()
-            .find(|line| line.contains("Waiting for"))
-            .map(|line| line.trim_matches('"').trim_end().to_string())
-            .unwrap_or_default()
-    }
-
-    /// What an idle session says while the agents it started are still at
-    /// work, counted the way a person counts (M82).
-    #[test]
-    fn a_session_idle_over_running_agents_says_how_many_it_waits_for() {
-        let (_, now) = scene();
-        let one = row(&waited_on(1), now);
-        assert!(
-            one.ends_with("Waiting for 1 background agent to finish"),
-            "{one}"
-        );
-        let two = row(&waited_on(2), now);
-        assert!(
-            two.ends_with("Waiting for 2 background agents to finish"),
-            "{two}"
-        );
-    }
-
-    /// The wait is not a turn, so it wears none of a turn's furniture — every
-    /// piece of which rides in the row's one pair of parentheses.
-    #[test]
-    fn the_wait_carries_no_key_no_clock_and_no_token_count() {
-        let (_, now) = scene();
-        let drawn = row(&waited_on(1), now);
-        assert!(!drawn.contains('('), "{drawn}");
-    }
-
-    /// Nothing at work, nothing to wait for: an agent that has finished is
-    /// not waited on, and a session with none never was.
-    #[test]
-    fn a_session_with_no_agent_at_work_says_nothing_at_all() {
-        let (_, now) = scene();
-        assert_eq!(row(&waited_on(0), now), "");
-        let mut done = waited_on(1);
-        done.fold.apply(&agent_frame(
-            2,
-            3,
-            completed("trn_9", bingo_sdk::TurnStatus::Completed),
-        ));
-        assert_eq!(row(&done, now), "");
-    }
-
-    /// The row counts what hangs under this session, not everything else
-    /// that is running: a child looking up at a running parent is waiting on
-    /// nothing of its own. The crew strip likewise names only descendants.
-    #[test]
-    fn a_child_under_a_running_root_is_not_waiting_on_an_agent() {
-        let (mut ui, now) = scene();
-        let mut tree = folded_tree(vec![
-            frame(1, started("trn_1")),
-            child_frame(1, announced("reviewer")),
-        ]);
-        tree.show(&child_id());
-        assert_eq!(row(&tree, now), "");
-        let drawn = draw_tree(80, 24, &tree, &mut ui, now);
-        assert!(!drawn.contains("running"), "{drawn}");
-    }
-
-    /// The wake that ends the wait opens a turn, and the turn's own row is
-    /// what the band then says: one row's slot either way (§3).
-    #[test]
-    fn a_turn_on_the_viewed_session_takes_the_row_back_from_the_wait() {
-        let (mut ui, now) = scene();
-        let mut woken = waited_on(1);
-        woken.fold.apply(&frame(2, started("trn_1")));
-        let at = later(now, 1_600);
-        assert_eq!(row(&woken, at), "");
-        let drawn = draw_tree(80, 24, &woken, &mut ui, at);
-        assert!(!drawn.contains("Waiting for"), "{drawn}");
-        assert!(drawn.contains("working"), "{drawn}");
-    }
-}
-
-#[cfg(test)]
-mod ember_tests {
-    use super::*;
-    use crate::test_support::*;
 
     #[test]
     fn embers_keep_their_row_and_deadline_without_a_dock_spinner() {

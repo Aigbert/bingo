@@ -17,10 +17,10 @@ pub struct Glyphs {
     /// Where typing lands, in a row the terminal's own cursor is not parked
     /// on — a query line.
     pub caret: &'static str,
-    /// bingo speaking and thinking, respectively.
-    pub mark: [&'static str; 2],
+    /// The narrower caret while a thought is being had.
+    pub thinking: &'static str,
     /// A box a person ticks: `[0]` open, `[1]` done. One field because it is
-    /// one fact in two states, as the marks are one voice in two states.
+    /// one fact in two states.
     pub todo: [&'static str; 2],
     /// A task on the session's list, by where it stands: `[0]` still to do,
     /// `[1]` being done, `[2]` done — Claude Code's own three (M74), which
@@ -63,7 +63,7 @@ pub const UNICODE: Glyphs = Glyphs {
     user: "›",
     cursor: "❯",
     caret: "▌",
-    mark: ["▍", "▏"],
+    thinking: "▏",
     todo: ["☐", "☒"],
     task: ["◻", "◼", "✔"],
     tick: "✔",
@@ -98,7 +98,7 @@ pub const ASCII: Glyphs = Glyphs {
     user: ">",
     cursor: ">",
     caret: "|",
-    mark: ["|", "|"],
+    thinking: "|",
     todo: ["-", "x"],
     // Still to do, being done — the bullet, because it is the one the model
     // is on — and done.
