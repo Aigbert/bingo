@@ -112,9 +112,35 @@ pub fn bold(value: impl Into<String>, ink: &str) -> View {
     }
     view
 }
+/// `word` with the characters a query matched (`hits`) bold in `hit` and
+/// the rest in the ink `ink` gives their index, so a list can dim a path's
+/// folders.
+pub fn marked<'a>(word: &str, hits: &[usize], hit: &str, ink: impl Fn(usize) -> &'a str) -> View {
+    let mut runs: Vec<(String, Option<&str>)> = Vec::new();
+    for (at, c) in word.chars().enumerate() {
+        let look = if hits.contains(&at) {
+            None
+        } else {
+            Some(ink(at))
+        };
+        match runs.last_mut() {
+            Some((run, last)) if *last == look => run.push(c),
+            _ => runs.push((c.to_string(), look)),
+        }
+    }
+    line(runs.into_iter().map(|(run, look)| match look {
+        Some(ink) => text(run, ink),
+        None => bold(run, hit),
+    }))
+}
+
 /// Width in terminal cells of a styled run.
 pub fn width(view: &View) -> usize {
-    view.fold().width()
+    cells(&view.fold())
+}
+/// Width in terminal cells of plain text.
+pub fn cells(text: &str) -> usize {
+    text.width()
 }
 
 /// Pad one styled run to a terminal-cell column without flattening its ink.
@@ -161,6 +187,41 @@ mod tests {
         assert_eq!(list_window(20, 19, 8), 12..20);
         assert_eq!(list_window(0, 9, 8), 0..0);
         assert_eq!(list_window(2, 99, 8), 0..2);
+    }
+    #[test]
+    fn marked_runs_put_hits_in_bold_and_keep_each_ink() {
+        let view = marked("src/queue.rs", &[4, 5], "glow", |at| {
+            if at < 4 { "dim" } else { "fg" }
+        });
+        let View::Text { children, .. } = view else {
+            panic!("a line")
+        };
+        let runs = children
+            .iter()
+            .map(|child| match child {
+                TextChild::Node(node) => match node.as_ref() {
+                    View::Text { children, style } => (
+                        View::Text {
+                            children: children.clone(),
+                            style: style.clone(),
+                        }
+                        .fold(),
+                        style.color.clone().unwrap_or_default(),
+                        style.bold == Some(true),
+                    ),
+                    _ => panic!("a run"),
+                },
+                TextChild::String(_) => panic!("a node"),
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            runs,
+            [
+                ("src/".into(), "dim".into(), false),
+                ("qu".into(), "glow".into(), true),
+                ("eue.rs".into(), "fg".into(), false),
+            ]
+        );
     }
     #[test]
     fn counts_name_visible_rows_and_selection_survives_reordering() {
