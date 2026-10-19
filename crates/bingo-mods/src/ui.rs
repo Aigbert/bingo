@@ -200,6 +200,7 @@ async fn open(
         request_id: input.id.clone(),
         props: input.props,
         viewport: Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: 0,
             rows: 0,

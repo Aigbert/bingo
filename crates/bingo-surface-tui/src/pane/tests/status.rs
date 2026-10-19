@@ -170,6 +170,7 @@ fn bingo_mod_status_slot() -> serde_json::Value {
                     request_id: "status".into(),
                     props: json!({}),
                     viewport: render::Viewport {
+                        glyphs: Default::default(),
                         place: None,
                         columns: 0,
                         rows: 0,

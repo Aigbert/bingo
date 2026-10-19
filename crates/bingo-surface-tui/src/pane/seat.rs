@@ -105,6 +105,7 @@ fn fits(seating: &Seating, pane: &Pane, place: Place, wanted: &[Pane]) -> Option
             };
             (rect.width >= columns.0 && rect.height >= rows.0).then_some(rect)
         }
+        Place::Dock => None,
         _ => None,
     }
 }

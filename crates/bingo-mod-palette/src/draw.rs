@@ -229,6 +229,7 @@ mod chrome_tests {
         let props = crate::keys::review_tests::props();
         let (groups, selected) = groups(&props, &[], &Default::default());
         let viewport = render::Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: 80,
             rows: 20,

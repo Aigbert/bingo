@@ -316,6 +316,7 @@ async fn queued_actions_do_not_block_first_pane_or_status_drawings() {
                 surface: SurfaceName::Terminal,
                 props: json!({}),
                 viewport: Viewport {
+                    glyphs: Default::default(),
                     place: None,
                     columns: 80,
                     rows: 8,

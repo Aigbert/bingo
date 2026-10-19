@@ -299,6 +299,7 @@ async fn palette_request(host: &Host, attachment: &Attachment) -> render::Render
         surface: render::SurfaceName::Terminal,
         props: serde_json::to_value(props).unwrap(),
         viewport: render::Viewport {
+            glyphs: Default::default(),
             columns: 80,
             rows: 12,
             place: None,
@@ -480,6 +481,7 @@ async fn outside_mod_wraps_the_plugins_site_and_disabled_commands_keep_tables() 
                 surface: render::SurfaceName::Terminal,
                 props: serde_json::to_value(props).unwrap(),
                 viewport: render::Viewport {
+                    glyphs: Default::default(),
                     place: None,
                     columns: 108,
                     rows: 18,

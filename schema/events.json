@@ -250,6 +250,9 @@
           "Viewport": {
             "type": "object",
             "properties": {
+              "glyphs": {
+                "$ref": "#/$defs/GlyphSet"
+              },
               "place": {
                 "description": "Where a pane sits, when the site is a pane.",
                 "anyOf": [
@@ -281,8 +284,15 @@
               "rows"
             ]
           },
+          "GlyphSet": {
+            "type": "string",
+            "enum": [
+              "unicode",
+              "ascii"
+            ]
+          },
           "PanePlace": {
-            "description": "Where a pane sits: `'above'` the prompt, at the `'side'`, as an\n`'overlay'` floating over the screen, or at a fixed `{rect}`.",
+            "description": "Where a pane sits: `'above'` the prompt, at the `'side'`, as an\n`'overlay'` floating over the screen, in the `'dock'`, or at a fixed `{rect}`.",
             "oneOf": [
               {
                 "type": "string",
@@ -291,6 +301,11 @@
                   "side",
                   "overlay"
                 ]
+              },
+              {
+                "description": "Replace the composer in the dock; floating anchors remain independent.",
+                "type": "string",
+                "const": "dock"
               },
               {
                 "type": "object",
@@ -1449,6 +1464,28 @@
                   "from",
                   "atMs",
                   "ms"
+                ]
+              },
+              {
+                "description": "A wall-clock duration, including under reduced motion. Children are the\nfallback and reserve its right-aligned width on older readers.",
+                "type": "object",
+                "properties": {
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "prefix": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "countdown"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "atMs",
+                  "prefix"
                 ]
               }
             ]
@@ -4096,6 +4133,28 @@
                   "from",
                   "atMs",
                   "ms"
+                ]
+              },
+              {
+                "description": "A wall-clock duration, including under reduced motion. Children are the\nfallback and reserve its right-aligned width on older readers.",
+                "type": "object",
+                "properties": {
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "prefix": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "countdown"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "atMs",
+                  "prefix"
                 ]
               }
             ]
@@ -8968,6 +9027,28 @@
                   "atMs",
                   "ms"
                 ]
+              },
+              {
+                "description": "A wall-clock duration, including under reduced motion. Children are the\nfallback and reserve its right-aligned width on older readers.",
+                "type": "object",
+                "properties": {
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "prefix": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "countdown"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "atMs",
+                  "prefix"
+                ]
               }
             ]
           },
@@ -12825,6 +12906,28 @@
                   "from",
                   "atMs",
                   "ms"
+                ]
+              },
+              {
+                "description": "A wall-clock duration, including under reduced motion. Children are the\nfallback and reserve its right-aligned width on older readers.",
+                "type": "object",
+                "properties": {
+                  "atMs": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "prefix": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "const": "countdown"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "atMs",
+                  "prefix"
                 ]
               }
             ]

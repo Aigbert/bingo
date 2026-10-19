@@ -380,6 +380,7 @@ pub(crate) mod review_tests {
             selected,
             "opening",
             &render::Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 80,
                 rows: 10,

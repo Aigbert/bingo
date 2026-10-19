@@ -152,10 +152,12 @@ impl Rect {
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "PanePlace")]
 /// Where a pane sits: `'above'` the prompt, at the `'side'`, as an
-/// `'overlay'` floating over the screen, or at a fixed `{rect}`.
+/// `'overlay'` floating over the screen, in the `'dock'`, or at a fixed `{rect}`.
 pub enum Place {
     #[default]
     Above,
+    /// Replace the composer in the dock; floating anchors remain independent.
+    Dock,
     Side,
     Overlay,
     Rect(Rect),

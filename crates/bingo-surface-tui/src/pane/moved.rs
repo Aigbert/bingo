@@ -7,6 +7,7 @@ use bingo_sdk::{SessionState, slot::Place};
 pub fn label(place: Place) -> &'static str {
     match place {
         Place::Above => "above ▾",
+        Place::Dock => "dock",
         Place::Side => "side ▾",
         Place::Overlay => "overlay ▾",
         Place::Rect(_) => "own place ▾",

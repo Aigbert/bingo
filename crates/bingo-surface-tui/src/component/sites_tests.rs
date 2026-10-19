@@ -580,6 +580,7 @@ fn placed_site(component: Component) -> bingo_sdk::SessionState {
                         surface: SurfaceName::Terminal,
                         props: json!({}),
                         viewport: Viewport {
+                            glyphs: Default::default(),
                             place: None,
                             columns: 0,
                             rows: 0,

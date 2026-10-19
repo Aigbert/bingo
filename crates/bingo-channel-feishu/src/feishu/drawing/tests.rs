@@ -16,6 +16,7 @@ fn answer() -> Drawing {
             surface: SurfaceName::Chat,
             props: json!({"text":"engine","isFirstOfReply":true}),
             viewport: Viewport {
+                glyphs: Default::default(),
                 columns: 0,
                 rows: 0,
                 place: None,

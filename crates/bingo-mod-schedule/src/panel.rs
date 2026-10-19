@@ -85,6 +85,7 @@ fn slot() -> Value {
                     request_id: REQUEST.into(),
                     props: json!({"owner":ID}),
                     viewport: render::Viewport {
+                        glyphs: Default::default(),
                         columns: 0,
                         rows: 0,
                         place: None,

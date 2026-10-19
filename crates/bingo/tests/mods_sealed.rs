@@ -43,6 +43,7 @@ async fn fixture_mods_preserve_the_sealed_contract_on_every_surface() {
                 })
                 .value(),
                 viewport: Viewport {
+                    glyphs: Default::default(),
                     place: None,
                     columns: 80,
                     rows: 24,

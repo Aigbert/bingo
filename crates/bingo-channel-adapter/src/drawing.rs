@@ -90,6 +90,7 @@ mod tests {
                 surface: SurfaceName::Chat,
                 props: json!({"text":"own","command":null}),
                 viewport: Viewport {
+                    glyphs: Default::default(),
                     columns: 0,
                     rows: 0,
                     place: None,

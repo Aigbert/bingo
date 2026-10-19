@@ -105,6 +105,7 @@ async fn panel(host: &bingo_core::Host, attachment: &Attachment) -> View {
             surface: render::SurfaceName::Terminal,
             props: serde_json::to_value(props).unwrap(),
             viewport: render::Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 108,
                 rows: 19,

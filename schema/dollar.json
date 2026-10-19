@@ -1307,6 +1307,28 @@
             "ms"
           ],
           "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "atMs": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "prefix": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "countdown"
+            }
+          },
+          "required": [
+            "kind",
+            "atMs",
+            "prefix"
+          ],
+          "description": "A wall-clock duration, including under reduced motion. Children are the\nfallback and reserve its right-aligned width on older readers."
         }
       ],
       "description": "Declarative motion on the surface clock, with a reduced-motion still form."

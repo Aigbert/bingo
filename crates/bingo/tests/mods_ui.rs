@@ -62,6 +62,7 @@ async fn a_pulled_counter_invalidates_and_renders_after_a_press() {
         surface: SurfaceName::Terminal,
         props: serde_json::json!({}),
         viewport: Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: 80,
             rows: 8,
@@ -142,6 +143,7 @@ async fn assert_seated_viewports(
     for (place, columns, rows) in [(slot::Place::Side, 64, 43), (slot::Place::Above, 100, 9)] {
         let mut seated = request.clone();
         seated.viewport = Viewport {
+            glyphs: Default::default(),
             place: Some(place),
             columns,
             rows,
@@ -173,6 +175,7 @@ async fn edit_and_close(
                 surface: SurfaceName::Terminal,
                 props: serde_json::json!({}),
                 viewport: Viewport {
+                    glyphs: Default::default(),
                     place: None,
                     columns: 80,
                     rows: 8,
@@ -293,6 +296,7 @@ async fn a_corner_declares_a_rect_and_fills_its_received_viewport() {
         })
     ));
     request.viewport = Viewport {
+        glyphs: Default::default(),
         place: Some(place),
         columns: 48,
         rows: 9,
@@ -369,6 +373,7 @@ async fn unrelated_pane_mods_pass_through_each_others_handlers_without_notices()
         surface: SurfaceName::Terminal,
         props: serde_json::json!({}),
         viewport: Viewport {
+            glyphs: Default::default(),
             place: Some(slot::Place::Side),
             columns: 64,
             rows: 43,

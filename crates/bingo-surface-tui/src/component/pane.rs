@@ -13,6 +13,7 @@ pub fn props(
         body_columns: seat.area.width,
         placement: match seat.place {
             bingo_sdk::slot::Place::Above => "above",
+            bingo_sdk::slot::Place::Dock => "dock",
             bingo_sdk::slot::Place::Side => "side",
             bingo_sdk::slot::Place::Overlay => "overlay",
             bingo_sdk::slot::Place::Rect(_) => "rect",

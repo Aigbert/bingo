@@ -24,6 +24,7 @@ async fn draw(host: &impl HostApi, session: &SessionId) -> View {
             surface: render::SurfaceName::Terminal,
             props: json!({}),
             viewport: render::Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 108,
                 rows: 18,

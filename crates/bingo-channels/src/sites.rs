@@ -15,6 +15,7 @@ pub fn request(
         surface: SurfaceName::Chat,
         props: props.value(),
         viewport: Viewport {
+            glyphs: Default::default(),
             columns: 0,
             rows: 0,
             place: None,

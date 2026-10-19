@@ -870,7 +870,7 @@ export type Target = { "field": string; "reads": Reads; [key: string]: unknown; 
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; } | { "atMs": number; "kind": "countdown"; "prefix": string; [key: string]: unknown; });
 export type Timer = {
   "callback": string;
   /** Milliseconds. */

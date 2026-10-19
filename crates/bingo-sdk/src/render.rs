@@ -64,6 +64,8 @@ impl SurfaceName {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Viewport {
+    #[serde(default, skip_serializing_if = "crate::glyph::GlyphSet::is_unicode")]
+    pub glyphs: crate::glyph::GlyphSet,
     /// Where a pane sits, when the site is a pane.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub place: Option<crate::slot::Place>,

@@ -508,6 +508,7 @@ export type Frame = {
   "ts": string;
   [key: string]: unknown;
 };
+export type GlyphSet = ("unicode" | "ascii");
 export type Headline = {
   /** Each part is one line of inline Markdown. */
   "parts": Array<string>;
@@ -946,9 +947,9 @@ export type PaletteProps = {
 export type PaletteSession = { "attention"?: (string | null); "detail": string; "id": SessionId; "label": string; [key: string]: unknown; };
 /**
  * Where a pane sits: `'above'` the prompt, at the `'side'`, as an
- * `'overlay'` floating over the screen, or at a fixed `{rect}`.
+ * `'overlay'` floating over the screen, in the `'dock'`, or at a fixed `{rect}`.
  */
-export type PanePlace = (("above" | "side" | "overlay") | { "rect": Rect; });
+export type PanePlace = (("above" | "side" | "overlay") | "dock" | { "rect": Rect; });
 export type PaneProps = { "bodyColumns": number; "hints"?: (SiteHints | null); "isFocused": boolean; "placement": string; "scroll": SiteScroll; "title": string; "view": SiteView; [key: string]: unknown; };
 /** A pane's height and width; each defaults when left out. */
 export type PaneSize = {
@@ -1381,7 +1382,7 @@ export type Target = { "field": string; "reads": Reads; [key: string]: unknown; 
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; } | { "atMs": number; "kind": "countdown"; "prefix": string; [key: string]: unknown; });
 export type Tier = ("tighten" | "rewrite" | "full");
 /** The catalogue's baseline: only a trusted read-only tool is a lookup. */
 export type Tier2 = ("lookup" | "change");
@@ -1757,6 +1758,7 @@ export type View = ({
 export type Viewport = {
   /** Width in cells. */
   "columns": number;
+  "glyphs"?: GlyphSet;
   /** Where a pane sits, when the site is a pane. */
   "place"?: (PanePlace | null);
   /** Height in cells. */

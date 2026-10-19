@@ -81,6 +81,7 @@ mod tests {
             surface: SurfaceName::Terminal,
             props: serde_json::json!({}),
             viewport: Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 80,
                 rows: 8,

@@ -70,6 +70,7 @@ pub fn slot() -> Value {
                     request_id: REQUEST.into(),
                     props: json!({}),
                     viewport: render::Viewport {
+                        glyphs: Default::default(),
                         place: None,
                         columns: 0,
                         rows: 0,

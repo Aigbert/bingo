@@ -28,6 +28,7 @@ pub async fn publish(
         request_id: picker.id.clone(),
         props: serde_json::to_value(picker.props()).map_err(crate::error)?,
         viewport: render::Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: 108,
             rows: 18,

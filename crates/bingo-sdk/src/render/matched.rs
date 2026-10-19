@@ -36,6 +36,7 @@ mod tests {
             surface: SurfaceName::Terminal,
             props: json!({"tool":"sample","input":{}}),
             viewport: Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 80,
                 rows: 8,

@@ -126,6 +126,7 @@ pub fn key(
         surface: SurfaceName::Terminal,
         props: props.value(),
         viewport: Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: width,
             rows,

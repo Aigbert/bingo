@@ -37,6 +37,7 @@ fn request(component: Component, id: &str, props: serde_json::Value) -> RenderRe
         surface: SurfaceName::Terminal,
         props,
         viewport: Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: 80,
             rows: 8,

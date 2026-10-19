@@ -25,6 +25,7 @@ fn request() -> RenderRequest {
         surface: SurfaceName::Terminal,
         props: json!({"owner":"bingo.mod.schedule"}),
         viewport: Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: 108,
             rows: 20,

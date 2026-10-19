@@ -214,6 +214,7 @@ mod tests {
             surface: SurfaceName::Terminal,
             props: serde_json::json!({}),
             viewport: Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 0,
                 rows: 0,
@@ -265,6 +266,7 @@ mod pane_tests {
             surface: SurfaceName::Terminal,
             props: serde_json::json!({}),
             viewport: Viewport {
+                glyphs: Default::default(),
                 place: Some(Place::Side),
                 columns: 64,
                 rows: 20,
@@ -308,6 +310,7 @@ mod lifecycle_tests {
             surface: SurfaceName::Terminal,
             props: serde_json::json!({}),
             viewport: Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 80,
                 rows: 12,
@@ -333,6 +336,7 @@ mod lifecycle_tests {
                 surface: SurfaceName::Terminal,
                 props: serde_json::json!({}),
                 viewport: Viewport {
+                    glyphs: Default::default(),
                     columns: 80,
                     rows: 8,
                     place: None,
@@ -366,6 +370,7 @@ mod revalidation_tests {
             surface: SurfaceName::Terminal,
             props: serde_json::json!({}),
             viewport: Viewport {
+                glyphs: Default::default(),
                 columns: 80,
                 rows: 12,
                 place: None,

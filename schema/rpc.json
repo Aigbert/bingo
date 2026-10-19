@@ -2115,6 +2115,13 @@
         }
       }
     },
+    "GlyphSet": {
+      "type": "string",
+      "enum": [
+        "unicode",
+        "ascii"
+      ]
+    },
     "HeadField": {
       "type": "string",
       "enum": [
@@ -4098,6 +4105,11 @@
           ]
         },
         {
+          "type": "string",
+          "const": "dock",
+          "description": "Replace the composer in the dock; floating anchors remain independent."
+        },
+        {
           "type": "object",
           "properties": {
             "rect": {
@@ -4110,7 +4122,7 @@
           "additionalProperties": false
         }
       ],
-      "description": "Where a pane sits: `'above'` the prompt, at the `'side'`, as an\n`'overlay'` floating over the screen, or at a fixed `{rect}`."
+      "description": "Where a pane sits: `'above'` the prompt, at the `'side'`, as an\n`'overlay'` floating over the screen, in the `'dock'`, or at a fixed `{rect}`."
     },
     "PaneProps": {
       "type": "object",
@@ -6791,6 +6803,28 @@
             "ms"
           ],
           "description": "Blend from `from` to the text ink. An absent curve advances linearly;\n`easeOut` slows cubically into the final ink."
+        },
+        {
+          "type": "object",
+          "properties": {
+            "atMs": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "prefix": {
+              "type": "string"
+            },
+            "kind": {
+              "type": "string",
+              "const": "countdown"
+            }
+          },
+          "required": [
+            "kind",
+            "atMs",
+            "prefix"
+          ],
+          "description": "A wall-clock duration, including under reduced motion. Children are the\nfallback and reserve its right-aligned width on older readers."
         }
       ],
       "description": "Declarative motion on the surface clock, with a reduced-motion still form."
@@ -8259,6 +8293,9 @@
     "Viewport": {
       "type": "object",
       "properties": {
+        "glyphs": {
+          "$ref": "#/$defs/GlyphSet"
+        },
         "place": {
           "anyOf": [
             {

@@ -262,6 +262,7 @@ fn a_filtered_picker_reflows_its_cursor_when_the_pane_shrinks() {
         surface: render::SurfaceName::Terminal,
         props: json!(picker.props),
         viewport: render::Viewport {
+            glyphs: Default::default(),
             columns: 108,
             rows: 18,
             place: None,

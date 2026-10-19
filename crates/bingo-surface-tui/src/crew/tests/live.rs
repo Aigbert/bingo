@@ -38,6 +38,7 @@ async fn drawing(host: &bingo_core::Host, session: &SessionId) -> View {
             surface: render::SurfaceName::Terminal,
             props: json!({}),
             viewport: render::Viewport {
+                glyphs: Default::default(),
                 place: None,
                 columns: 108,
                 rows: 18,

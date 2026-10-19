@@ -60,6 +60,7 @@ export namespace UiRenderInput {
 // Generated from JSON Schema. Do not edit.
 export type Anchor = ("topLeft" | "topRight" | "bottomLeft" | "bottomRight" | "center");
 export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plugins" | "Palette" | "Sessions" | "Status" | "Question" | "UserMessage" | "AssistantMessage" | "ToolUse" | "ToolResult" | "ToolGroup" | "ToolProgress" | "CommandOutput" | "Spinner" | "TurnDuration" | "InfoNotice" | "SessionMode" | "PromptHint" | "AbovePrompt" | "Pane" | "Permission" | "SignIn" | "Reasoning" | "Compaction" | "Rewind" | "Interruption" | "QuestionAnswer" | "PermissionReceipt" | "Asset" | "ShellRun" | "Action" | "SessionStatus" | "Toast" | "Welcome" | "Ledger");
+export type GlyphSet = ("unicode" | "ascii");
 /**
  * A length: a number of terminal cells, or a share of the screen written as
  * a percentage string such as `'40%'`.
@@ -67,9 +68,9 @@ export type Component = ("KeyBar" | "Composer" | "ModelPicker" | "Browse" | "Plu
 export type Length = (number | string);
 /**
  * Where a pane sits: `'above'` the prompt, at the `'side'`, as an
- * `'overlay'` floating over the screen, or at a fixed `{rect}`.
+ * `'overlay'` floating over the screen, in the `'dock'`, or at a fixed `{rect}`.
  */
-export type PanePlace = (("above" | "side" | "overlay") | { "rect": Rect; });
+export type PanePlace = (("above" | "side" | "overlay") | "dock" | { "rect": Rect; });
 /**
  * A fixed rectangle: `width` by `height`, offset by `x` and `y` from
  * `anchor`, a corner or the `center` (`topLeft` unless given).
@@ -79,6 +80,7 @@ export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 export type Viewport = {
   /** Width in cells. */
   "columns": number;
+  "glyphs"?: GlyphSet;
   /** Where a pane sits, when the site is a pane. */
   "place"?: (PanePlace | null);
   /** Height in cells. */
@@ -134,7 +136,7 @@ export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<K
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | unknown);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; } | { "atMs": number; "kind": "countdown"; "prefix": string; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 export type TreeNode = { "badge"?: (string | null); "children"?: Array<TreeNode>; "label": string; "tone"?: Tone; [key: string]: unknown; };
@@ -695,7 +697,7 @@ export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<K
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; } | { "atMs": number; "kind": "countdown"; "prefix": string; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /**
@@ -1476,7 +1478,7 @@ export type Target = { "field": string; "reads": Reads; [key: string]: unknown; 
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; } | { "atMs": number; "kind": "countdown"; "prefix": string; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /** How a tool reads on a surface; never sent to a model. */
@@ -2330,7 +2332,7 @@ export type SurfaceName = ("terminal" | "desktop" | "text" | "chat");
 /** A text child preserves the style of its nested Text node. */
 export type TextChild = (string | View);
 /** Declarative motion on the surface clock, with a reduced-motion still form. */
-export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; });
+export type TextMotion = ({ "depth": number; "kind": "breathe"; "periodMs": number; "with": string; [key: string]: unknown; } | { "kind": "spin"; [key: string]: unknown; } | { "kind": "shimmer"; [key: string]: unknown; } | { "atMs": number; "curve"?: (FadeCurve | null); "from": string; "kind": "fade"; "ms": number; [key: string]: unknown; } | { "atMs": number; "kind": "countdown"; "prefix": string; [key: string]: unknown; });
 /** The one styling hook a plugin has; the surface owns the colour. */
 export type Tone = (("neutral" | "good" | "bad") | "attention");
 /**

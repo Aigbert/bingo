@@ -13,6 +13,7 @@ fn request(state: &SessionState) -> RenderRequest {
         surface: SurfaceName::Terminal,
         props: json!(component::StatusProps::from(state)),
         viewport: Viewport {
+            glyphs: Default::default(),
             place: None,
             columns: 108,
             rows: 14,
