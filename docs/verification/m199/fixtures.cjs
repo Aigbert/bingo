@@ -16,11 +16,12 @@ const ITEM = {step: ['k','at','end','st','add','del','res','tail','tool','arg']}
 const item = data => pick(data, ITEM[data.k] || PLAIN);
 const turn = t => Object.assign(pick(t, ['kind','t0','prompt','state','endAt']), {items: t.items.map(item)},
  t.reply ? {reply: pick(t.reply, ['at','blocks','revealed'])} : {}, t.retry ? {retry: pick(t.retry, ['at','until','n'])} : {},
+ t.error ? {error: pick(t.error, ['msg','code'])} : {},
  t.chips && t.chips.length ? {chips: t.chips} : {});
 const curate = (scene, state) => Object.assign({title: state.title, log: state.log.filter(t => t.kind === 'turn').map(turn)},
  scene === 'background' ? {jobs: state.jobs.map(() => ({}))} : {});
 const fixtures = {};
-for (const name of ['welcome','welcome-recent','welcome-sent','exit-back','retry','retry-recovered','context','context-compacted','background','background-notified','narrow']) {
+for (const name of ['welcome','welcome-recent','welcome-sent','exit-back','retry','retry-recovered','context','context-compacted','background','background-notified','narrow','signedout','signedout-login','wake','wake-later']) {
  const entry = index.find(x=>x.file===name);
  const seq = [...(entry.after || [entry.t]), 'shot'];
  const shot = vm.runInContext(`capture(${JSON.stringify(entry.scene)},${JSON.stringify(entry.size)},${JSON.stringify(seq)},{}).at(-1)`,context);

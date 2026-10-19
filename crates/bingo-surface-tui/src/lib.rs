@@ -111,6 +111,7 @@ mod sessions;
 /// What a person may set about this surface: the measure prose is drawn to,
 /// and the check the welcome box says the answer to.
 pub mod settings;
+mod sign_in;
 /// A running step's spinner (M185).
 mod spinner;
 /// The shells the session has running in the background (M75): a word under

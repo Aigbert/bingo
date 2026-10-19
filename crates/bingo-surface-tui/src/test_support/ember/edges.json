@@ -1165,5 +1165,457 @@
         ]
       }
     ]
+  },
+  "signedout": {
+    "title": "steer 吞掉排队消息",
+    "log": [
+      {
+        "kind": "turn",
+        "t0": 0,
+        "prompt": "看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉",
+        "state": "done",
+        "endAt": 4160,
+        "items": [
+          {
+            "k": "think",
+            "at": 0,
+            "text": "steer 和 queue 是两条路：steer 在下一步落地，queue 等这一轮结束。吞消息多半出在两条路交汇的地方。"
+          },
+          {
+            "k": "narr",
+            "at": 1450,
+            "text": "先看 queue.rs，再看谁在调用 drain() 和 reset()。"
+          },
+          {
+            "k": "step",
+            "at": 1500,
+            "end": 1750,
+            "st": "ok",
+            "res": "214 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/session/queue.rs"
+          },
+          {
+            "k": "step",
+            "at": 1850,
+            "end": 2050,
+            "st": "ok",
+            "res": "9 hits in 3 files",
+            "tail": [],
+            "tool": "grep",
+            "arg": "drain|reset"
+          },
+          {
+            "k": "step",
+            "at": 2150,
+            "end": 2450,
+            "st": "ok",
+            "res": "486 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/turn/loop.rs"
+          }
+        ],
+        "reply": {
+          "at": 2600,
+          "blocks": [
+            {
+              "p": "问题不在 `drain()`，在 `reset()`：每一轮开始时，它把 `queue` 整个清空了。"
+            },
+            {
+              "code": "pub fn reset(&mut self) {\n    self.queue.clear();   // 排着的消息在这里丢了\n    self.steer = None;\n}",
+              "lang": "rust"
+            },
+            {
+              "p": "你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 `reset()` 把还没发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "turn",
+        "t0": 10000000,
+        "prompt": "修好它，加一个回归测试",
+        "state": "failed",
+        "endAt": 10000500,
+        "items": [],
+        "error": {
+          "msg": "the token expired",
+          "code": "AUTH_REQUIRED"
+        }
+      }
+    ]
+  },
+  "signedout-login": {
+    "title": "steer 吞掉排队消息",
+    "log": [
+      {
+        "kind": "turn",
+        "t0": 0,
+        "prompt": "看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉",
+        "state": "done",
+        "endAt": 4160,
+        "items": [
+          {
+            "k": "think",
+            "at": 0,
+            "text": "steer 和 queue 是两条路：steer 在下一步落地，queue 等这一轮结束。吞消息多半出在两条路交汇的地方。"
+          },
+          {
+            "k": "narr",
+            "at": 1450,
+            "text": "先看 queue.rs，再看谁在调用 drain() 和 reset()。"
+          },
+          {
+            "k": "step",
+            "at": 1500,
+            "end": 1750,
+            "st": "ok",
+            "res": "214 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/session/queue.rs"
+          },
+          {
+            "k": "step",
+            "at": 1850,
+            "end": 2050,
+            "st": "ok",
+            "res": "9 hits in 3 files",
+            "tail": [],
+            "tool": "grep",
+            "arg": "drain|reset"
+          },
+          {
+            "k": "step",
+            "at": 2150,
+            "end": 2450,
+            "st": "ok",
+            "res": "486 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/turn/loop.rs"
+          }
+        ],
+        "reply": {
+          "at": 2600,
+          "blocks": [
+            {
+              "p": "问题不在 `drain()`，在 `reset()`：每一轮开始时，它把 `queue` 整个清空了。"
+            },
+            {
+              "code": "pub fn reset(&mut self) {\n    self.queue.clear();   // 排着的消息在这里丢了\n    self.steer = None;\n}",
+              "lang": "rust"
+            },
+            {
+              "p": "你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 `reset()` 把还没发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "turn",
+        "t0": 10000000,
+        "prompt": "修好它，加一个回归测试",
+        "state": "failed",
+        "endAt": 10000500,
+        "items": [],
+        "error": {
+          "msg": "the token expired",
+          "code": "AUTH_REQUIRED"
+        }
+      }
+    ]
+  },
+  "wake": {
+    "title": "steer 吞掉排队消息",
+    "log": [
+      {
+        "kind": "turn",
+        "t0": 0,
+        "prompt": "看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉",
+        "state": "done",
+        "endAt": 4160,
+        "items": [
+          {
+            "k": "think",
+            "at": 0,
+            "text": "steer 和 queue 是两条路：steer 在下一步落地，queue 等这一轮结束。吞消息多半出在两条路交汇的地方。"
+          },
+          {
+            "k": "narr",
+            "at": 1450,
+            "text": "先看 queue.rs，再看谁在调用 drain() 和 reset()。"
+          },
+          {
+            "k": "step",
+            "at": 1500,
+            "end": 1750,
+            "st": "ok",
+            "res": "214 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/session/queue.rs"
+          },
+          {
+            "k": "step",
+            "at": 1850,
+            "end": 2050,
+            "st": "ok",
+            "res": "9 hits in 3 files",
+            "tail": [],
+            "tool": "grep",
+            "arg": "drain|reset"
+          },
+          {
+            "k": "step",
+            "at": 2150,
+            "end": 2450,
+            "st": "ok",
+            "res": "486 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/turn/loop.rs"
+          }
+        ],
+        "reply": {
+          "at": 2600,
+          "blocks": [
+            {
+              "p": "问题不在 `drain()`，在 `reset()`：每一轮开始时，它把 `queue` 整个清空了。"
+            },
+            {
+              "code": "pub fn reset(&mut self) {\n    self.queue.clear();   // 排着的消息在这里丢了\n    self.steer = None;\n}",
+              "lang": "rust"
+            },
+            {
+              "p": "你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 `reset()` 把还没发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "turn",
+        "t0": 0,
+        "prompt": "盯一下 CI，过了告诉我",
+        "state": "done",
+        "endAt": 2180,
+        "items": [
+          {
+            "k": "step",
+            "at": 0,
+            "end": 1500,
+            "st": "ok",
+            "res": "still running",
+            "tail": [
+              "✓ fmt",
+              "✓ clippy",
+              "✓ test (ubuntu)",
+              "✓ test (macos)",
+              "* test (windows)   7/12"
+            ],
+            "tool": "bash",
+            "arg": "gh run watch --exit-status"
+          },
+          {
+            "k": "step",
+            "at": 1600,
+            "end": 1700,
+            "st": "ok",
+            "res": "set",
+            "tail": [],
+            "tool": "wake",
+            "arg": "in 5m"
+          }
+        ],
+        "reply": {
+          "at": 1800,
+          "blocks": [
+            {
+              "p": "Linux 和 macOS 都过了，Windows 还在跑（7/12）。我 5 分钟后醒来再看一眼，过了就告诉你。"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "turn",
+        "t0": 10005000,
+        "prompt": "再看一眼 CI，过了就告诉我",
+        "state": "done",
+        "endAt": 10006460,
+        "items": [
+          {
+            "k": "step",
+            "at": 10005000,
+            "end": 10006100,
+            "st": "ok",
+            "res": "passed",
+            "tail": [
+              "✓ fmt",
+              "✓ clippy",
+              "✓ test (ubuntu)",
+              "✓ test (macos)",
+              "✓ test (windows)"
+            ],
+            "tool": "bash",
+            "arg": "gh run watch --exit-status"
+          }
+        ],
+        "reply": {
+          "at": 10006300,
+          "blocks": [
+            {
+              "p": "CI 全绿了，Windows 也过了。可以合了。"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "wake-later": {
+    "title": "steer 吞掉排队消息",
+    "log": [
+      {
+        "kind": "turn",
+        "t0": 0,
+        "prompt": "看一下 session/queue.rs 里的 steer 逻辑，为什么排队的消息有时候会被吞掉",
+        "state": "done",
+        "endAt": 4160,
+        "items": [
+          {
+            "k": "think",
+            "at": 0,
+            "text": "steer 和 queue 是两条路：steer 在下一步落地，queue 等这一轮结束。吞消息多半出在两条路交汇的地方。"
+          },
+          {
+            "k": "narr",
+            "at": 1450,
+            "text": "先看 queue.rs，再看谁在调用 drain() 和 reset()。"
+          },
+          {
+            "k": "step",
+            "at": 1500,
+            "end": 1750,
+            "st": "ok",
+            "res": "214 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/session/queue.rs"
+          },
+          {
+            "k": "step",
+            "at": 1850,
+            "end": 2050,
+            "st": "ok",
+            "res": "9 hits in 3 files",
+            "tail": [],
+            "tool": "grep",
+            "arg": "drain|reset"
+          },
+          {
+            "k": "step",
+            "at": 2150,
+            "end": 2450,
+            "st": "ok",
+            "res": "486 lines",
+            "tail": [],
+            "tool": "read",
+            "arg": "crates/bingo-core/src/turn/loop.rs"
+          }
+        ],
+        "reply": {
+          "at": 2600,
+          "blocks": [
+            {
+              "p": "问题不在 `drain()`，在 `reset()`：每一轮开始时，它把 `queue` 整个清空了。"
+            },
+            {
+              "code": "pub fn reset(&mut self) {\n    self.queue.clear();   // 排着的消息在这里丢了\n    self.steer = None;\n}",
+              "lang": "rust"
+            },
+            {
+              "p": "你先插了一句（steer），又排了一句（queue）：steer 让这一轮提前收尾，下一轮开始时 `reset()` 把还没发出去的那句一起清掉了。所以只有「插话之后紧跟着排队」才会丢。"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "turn",
+        "t0": 0,
+        "prompt": "盯一下 CI，过了告诉我",
+        "state": "done",
+        "endAt": 2180,
+        "items": [
+          {
+            "k": "step",
+            "at": 0,
+            "end": 1500,
+            "st": "ok",
+            "res": "still running",
+            "tail": [
+              "✓ fmt",
+              "✓ clippy",
+              "✓ test (ubuntu)",
+              "✓ test (macos)",
+              "* test (windows)   7/12"
+            ],
+            "tool": "bash",
+            "arg": "gh run watch --exit-status"
+          },
+          {
+            "k": "step",
+            "at": 1600,
+            "end": 1700,
+            "st": "ok",
+            "res": "set",
+            "tail": [],
+            "tool": "wake",
+            "arg": "in 5m"
+          }
+        ],
+        "reply": {
+          "at": 1800,
+          "blocks": [
+            {
+              "p": "Linux 和 macOS 都过了，Windows 还在跑（7/12）。我 5 分钟后醒来再看一眼，过了就告诉你。"
+            }
+          ]
+        }
+      },
+      {
+        "kind": "turn",
+        "t0": 10005000,
+        "prompt": "再看一眼 CI，过了就告诉我",
+        "state": "done",
+        "endAt": 10006460,
+        "items": [
+          {
+            "k": "step",
+            "at": 10005000,
+            "end": 10006100,
+            "st": "ok",
+            "res": "passed",
+            "tail": [
+              "✓ fmt",
+              "✓ clippy",
+              "✓ test (ubuntu)",
+              "✓ test (macos)",
+              "✓ test (windows)"
+            ],
+            "tool": "bash",
+            "arg": "gh run watch --exit-status"
+          }
+        ],
+        "reply": {
+          "at": 10006300,
+          "blocks": [
+            {
+              "p": "CI 全绿了，Windows 也过了。可以合了。"
+            }
+          ]
+        }
+      }
+    ]
   }
 }

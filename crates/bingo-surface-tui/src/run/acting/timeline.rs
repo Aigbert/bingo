@@ -79,6 +79,8 @@ pub(super) fn submitted(scene: &mut Scene) {
         };
         if text.starts_with('!') {
             timeline::shell(scene, intent, text);
+        } else if text.starts_with('/') {
+            timeline::command(scene, text);
         } else if scene.run.session.tree.viewed().busy() {
             scene.revision += 1;
             scene.emit_all(answers::queued(
@@ -139,6 +141,32 @@ pub(super) fn shell(scene: &mut Scene, intent: IntentId, text: &str) {
     scene
         .timeline
         .push((at - CLOCK_ORIGIN_MS, Answer::Frame(Box::new(ack))));
+}
+
+/// The kernel's answer to a command the scene types: `/login` asks for a device code.
+fn command(scene: &mut Scene, text: &str) {
+    assert_eq!(text, "/login", "acting answers only /login");
+    let interaction = bingo_sdk::Interaction {
+        id: bingo_sdk::InteractionId::from_raw("login"),
+        session: scene.run.session.tree.root_id().clone(),
+        turn: None,
+        item: None,
+        opened_at: scene.run.now().wall,
+        guard_until: None,
+        expires_at: None,
+        kind: bingo_sdk::InteractionKind::Login {
+            provider: "anthropic".into(),
+            flow: bingo_sdk::LoginFlow::Device {
+                url: "console.anthropic.com/device".into(),
+                code: "WDJB-MJHT".into(),
+            },
+        },
+        answers: vec![bingo_sdk::AnswerSpec::Cancel],
+    };
+    scene.timeline.push((
+        scene.elapsed(),
+        Answer::Frame(Box::new(Event::InteractionOpened { interaction })),
+    ));
 }
 
 pub(super) fn land(scene: &mut Scene, id: &str, prompt: &str) {

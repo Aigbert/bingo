@@ -10,7 +10,17 @@ use std::time::Duration;
 
 pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
     let state = tree.viewed();
-    if !state.interactions.is_empty() {
+    // A device code waits on the browser, not on an answer typed here: its
+    // sheet is the whole signal, so the edge keeps its quiet.
+    if state.interactions.iter().any(|open| {
+        !matches!(
+            open.kind,
+            bingo_sdk::InteractionKind::Login {
+                flow: bingo_sdk::LoginFlow::Device { .. },
+                ..
+            }
+        )
+    }) {
         let ink = theme::blended(
             "amberGlow",
             "you",

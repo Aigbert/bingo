@@ -180,19 +180,28 @@ pub fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
         );
     }
     fold_reply(state, &id, turn);
-    let status = match turn["state"].as_str().unwrap() {
-        "done" => Some(TurnStatus::Completed),
-        "stopped" => Some(TurnStatus::Interrupted {
-            reason: bingo_sdk::InterruptReason::UserCancel,
-        }),
-        _ => None,
-    };
-    if let Some(status) = status {
+    if let Some(status) = status(turn) {
         emit(
             state,
             turn["endAt"].as_f64().unwrap() as i64,
             completed(&id, status),
         );
+    }
+}
+
+fn status(turn: &Value) -> Option<TurnStatus> {
+    match turn["state"].as_str().unwrap() {
+        "done" => Some(TurnStatus::Completed),
+        "stopped" => Some(TurnStatus::Interrupted {
+            reason: bingo_sdk::InterruptReason::UserCancel,
+        }),
+        "failed" => Some(TurnStatus::Failed {
+            error: bingo_sdk::KernelError::new(
+                serde_json::from_value(turn["error"]["code"].clone()).unwrap(),
+                turn["error"]["msg"].as_str().unwrap(),
+            ),
+        }),
+        _ => None,
     }
 }
 
@@ -431,10 +440,10 @@ pub fn provider_events(n: usize, turn: &Value) -> Vec<(i64, Event)> {
             event,
         ));
     }
-    if turn["state"] == "done" {
+    if let Some(status) = status(turn).filter(|_| turn["state"] != "stopped") {
         events.push((
             turn["endAt"].as_f64().unwrap() as i64,
-            completed(&id, TurnStatus::Completed),
+            completed(&id, status),
         ));
     }
     events.sort_by_key(|(at, _)| *at);

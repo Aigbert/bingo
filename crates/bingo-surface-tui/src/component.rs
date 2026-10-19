@@ -11,6 +11,7 @@ pub mod pane;
 pub mod question;
 mod retry;
 pub mod sealed;
+pub mod signed_out;
 pub mod welcome;
 
 #[cfg(test)]

@@ -906,6 +906,9 @@ pub(crate) fn component_closing(
     let bingo_sdk::component::Props::InfoNotice(props) = props else {
         return Vec::new();
     };
+    if props.command.as_deref() == Some(crate::component::signed_out::COMMAND) {
+        return crate::component::signed_out::lines(state, &props.text, width);
+    }
     let head = match state.last_status() {
         Some(bingo_sdk::TurnStatus::Failed { error }) => {
             error.code.as_str().to_lowercase().replace('_', " ")

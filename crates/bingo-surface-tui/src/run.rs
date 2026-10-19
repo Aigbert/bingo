@@ -32,6 +32,7 @@ mod pulling;
 mod sessions;
 /// The pictures a frame drew, on their way to the terminal.
 mod showing;
+mod signed_in;
 mod site_keys;
 mod site_lifecycle;
 /// A line on its way out of the composer, and the pictures it named.
@@ -657,6 +658,7 @@ impl Run {
             IntentOutcome::Applied { result } => {
                 surface::receipt(self, result);
                 surface::result_sheet(self, &submission, result);
+                signed_in::after(self, &submission, result);
                 if matches!(submission, Submission::Mode(_)) {
                     self.ui.notify_mode(self.now().instant);
                 }

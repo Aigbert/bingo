@@ -261,7 +261,7 @@ fn layers(
             ),
             None => layer(tree, ui, frame, above, now),
         },
-        None if !crate::ask::drawing::inline(tree, ui) => {
+        None if !crate::ask::drawing::inline(tree, ui) && !crate::sign_in::docked(tree, ui) => {
             card(tree, ui, frame, regions, now, tools)
         }
         None => {}

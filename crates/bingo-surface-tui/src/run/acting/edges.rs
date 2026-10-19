@@ -54,6 +54,11 @@ async fn welcome(scene: &mut Scene, capture: &Capture) {
             ..Default::default()
         },
     });
+    follow(scene, capture).await;
+}
+
+/// The capture's `after` steps, typed and waited through the terminal.
+async fn follow(scene: &mut Scene, capture: &Capture) {
     for step in &capture.entry.after {
         if let Some(wait) = step.as_i64() {
             timeline::advance(scene, scene.elapsed() + wait).await;
@@ -64,6 +69,33 @@ async fn welcome(scene: &mut Scene, capture: &Capture) {
             timeline::advance(scene, scene.elapsed() + 60).await;
         }
         pull(scene, capture).await;
+    }
+}
+
+/// The second prompt is typed and sent; the provider refuses it as signed out.
+async fn signed_out(scene: &mut Scene, capture: &Capture) {
+    let mut summary = scene.run.session.tree.root().summary.clone();
+    summary.provider = Some("anthropic".into());
+    scene.emit(Event::SessionUpdated { summary });
+    scene.run.ui.catalogs.commands = crate::commands::entries(vec![command("login")]);
+    let prompt = scene.turns[1]["prompt"].as_str().unwrap().to_owned();
+    scene.text(&prompt, false).await;
+    scene.key(timeline::key("enter")).await;
+    follow(scene, capture).await;
+    timeline::advance(scene, capture.entry.moment_ms).await;
+}
+
+fn command(name: &str) -> bingo_sdk::CommandSpec {
+    bingo_sdk::CommandSpec {
+        name: name.into(),
+        aliases: vec![],
+        hint: String::new(),
+        args: bingo_sdk::ArgSpec::None,
+        instant: false,
+        family: "kernel".into(),
+        opens: false,
+        keys: vec![],
+        hidden: false,
     }
 }
 
@@ -115,6 +147,10 @@ pub(super) async fn draw(capture: &Capture) {
     } else {
         if capture.entry.scene == "background" {
             background_start(&mut scene).await;
+        } else if capture.entry.scene == "signedout" {
+            let turns = scene.turns.clone();
+            fold(&mut scene, &turns[..1]);
+            signed_out(&mut scene, capture).await;
         } else {
             let turns = scene.turns.clone();
             fold(&mut scene, &turns);
@@ -205,17 +241,7 @@ async fn context(scene: &mut Scene, capture: &Capture) {
         }),
     });
     if capture.entry.file.ends_with("compacted") {
-        scene.run.ui.catalogs.commands = crate::commands::entries(vec![bingo_sdk::CommandSpec {
-            name: "compact".into(),
-            aliases: vec![],
-            hint: String::new(),
-            args: bingo_sdk::ArgSpec::None,
-            instant: false,
-            family: "kernel".into(),
-            opens: false,
-            keys: vec![],
-            hidden: false,
-        }]);
+        scene.run.ui.catalogs.commands = crate::commands::entries(vec![command("compact")]);
         scene.text("/compact", false).await;
         scene
             .run
@@ -332,11 +358,14 @@ fn edges_full_frames_match_the_prototype() {
         "background",
         "background-notified",
         "narrow",
+        "signedout",
+        "signedout-login",
     ] {
         let spinners: &[(u16, u16)] = match name {
             "welcome-sent" => &[(25, 3)],
             "retry" | "retry-recovered" => &[(26, 3)],
             "narrow" => &[(17, 3)],
+            "signedout-login" => &[(29, 3)],
             _ => &[],
         };
         let capture = Capture::load(name).spinners(spinners);

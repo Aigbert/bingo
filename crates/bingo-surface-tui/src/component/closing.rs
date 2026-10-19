@@ -6,7 +6,9 @@ pub fn props(state: &SessionState) -> Vec<Props> {
         return Vec::new();
     }
     let mut out = Vec::new();
-    if let Some(TurnStatus::Failed { error }) = state.last_status() {
+    if let Some(props) = super::signed_out::props(state) {
+        out.push(props);
+    } else if let Some(TurnStatus::Failed { error }) = state.last_status() {
         out.push(Props::InfoNotice(InfoNoticeProps {
             text: error.message.clone(),
             command: None,

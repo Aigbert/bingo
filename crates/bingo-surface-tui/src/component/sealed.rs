@@ -127,6 +127,10 @@ impl Site<'_> {
     }
 
     fn own(&self, props: &Props, width: usize) -> Rows {
+        // A docked sign-in seals the sheet a person would otherwise see.
+        if let Some(rows) = self.sheet(width, self.room) {
+            return rows;
+        }
         let mut interaction = self.interaction.clone();
         if let InteractionKind::Permission { preview, .. } = &mut interaction.kind {
             *preview = None;
@@ -158,16 +162,26 @@ impl Site<'_> {
             .collect()
     }
 
+    /// The device code's sheet, the rows a docked sign-in shows.
+    fn sheet(&self, width: usize, room: usize) -> Option<Rows> {
+        let view = crate::sign_in::sheet(&self.interaction.kind, width as u16, room as u16)?;
+        let drawn = views::marked(&view, width, &views::Marks::at(self.now));
+        Some(drawn.lines.into_iter().map(|line| (line, None)).collect())
+    }
+
     fn fallback(&self) -> Drawing {
-        let mut rows = dialog::rows(
-            &self.ui.dialog,
-            self.interaction,
-            self.agent,
-            &self.state.summary.cwd,
-            self.width,
-            self.room,
-            self.tools,
-        );
+        let room = self.room.saturating_sub(1);
+        let mut rows = self.sheet(self.width, room).unwrap_or_else(|| {
+            dialog::rows(
+                &self.ui.dialog,
+                self.interaction,
+                self.agent,
+                &self.state.summary.cwd,
+                self.width,
+                self.room,
+                self.tools,
+            )
+        });
         rows.push((
             Line::from("mod drawing cannot show the sealed card whole; showing host card"),
             None,
