@@ -92,6 +92,8 @@ Then every one of the 105 captures passes, and what the old look left behind is 
 - `crates/bingo-sdk/src/state.rs` (the retry fold).
 - `crates/bingo-schedule` (the wake fact), `crates/bingo-tool-bash/src/jobs.rs` (the job
   notice), and `crates/bingo` (`--resume`'s toast).
+- Assigned subset: SDK props/metadata, core compaction recording, context location facts,
+  mod-sessions recent lookup, TUI edge modules and PTY/capture/drive tests; no dependency added.
 
 ## Exit criteria
 
@@ -119,3 +121,30 @@ Sign-in flows other than the device code; changing how compaction works; schedul
   lines. They print only when stdout is a terminal.
 - **The sweep finds a regression late.** Its owner fixes it, never the sweep, and the fix is
   merged before the sweep is ticked.
+- **Welcome ownership (ADR-0086), decided.** The drawing stays the surface's `Engine` answer (the
+  motion needs cells View lacks); mod-sessions supplies recent sessions through `WelcomeProps`;
+  an outside mod replaces the whole welcome through the `Welcome` site.
+
+## Verified
+Scope: bricks 1, 2, 3, 5, 6. Evidence in `docs/verification/m199/checks.txt`.
+- [x] Full frames — `edges_full_frames_match_the_prototype ... ok`: welcome, welcome-recent,
+  welcome-sent, exit-back, retry, retry-recovered, context, context-compacted, background,
+  background-notified, narrow. Signed-out and wake captures are bricks 4 and 7.
+- [x] `exit` — `exit_receipt_matches_the_prototype_rows_byte_for_byte ... ok`; pty `21 passed`.
+- [ ] Sweep — brick 8, after M198 and M200.
+- [x] Retry fold — `retry_fold_retains_the_wait_and_its_frame_clock`, `an_old_retry_journal_and…`,
+  `deltas_on_an_item_from_before_the_retry_keep_the_row ... ok`.
+- [x] Compaction window — a typed `window` on `ItemBody::Compaction`:
+  `compactions_keep_their_window_and_old_cuts_parse_without_one ... ok`; schema regenerated.
+- [x] Welcome site — `a_link_answering_the_welcome_site_replaces_the_drawing ... ok`.
+- [x] Gates — fmt 0; check, clippy `Finished`; `cargo test --workspace --locked --no-fail-fast`
+  `6614 passed; 0 failed` after reruns (see checks.txt); discipline ok; budget `423 (max 423)`,
+  `budget ok`; deny `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] Commits build — `rebase -x 'cargo fmt … && cargo check …' acb299e0`: `Successfully rebased`.
+- [x] Drive — `python3 docs/verification/m199/drive.py`: `PASS 100x32`, `PASS 80x24`, both
+  `CLEAN`; `scripts/tui-smoke.sh`: `tui-smoke ok`.
+- [ ] Windows — sdk, core, context, mod-sessions exit 0; surface-tui and bin owed to CI
+  (aws-lc-sys: `stdlib.h`/`windows.h` not found).
+- Prototype wins: retry-recovered at 4700 ms shows another retry; no edited files at zero.
+- The pty receipt test waits on the drawn transcript, not the resume toast: the toast's 2.4 s
+  hold starts at attach, and a loaded machine can spend it before the first paint.
