@@ -173,7 +173,7 @@ fn strip_scopes_overflows_finishes_and_clicks() {
     );
     tree.show(&child_id());
     assert!(
-        crate::crew::active(&tree).is_empty(),
+        crate::footer::active(&tree).is_empty(),
         "neither parent nor siblings belong to this strip"
     );
 }

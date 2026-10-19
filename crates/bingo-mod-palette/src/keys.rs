@@ -596,9 +596,9 @@ mod fold_tests {
         props.open = component::PaletteOpen::Commands;
         props.query = query.into();
         props.commands = [
-            ("crew", None),
-            ("agents", Some("crew")),
-            ("room", Some("crew")),
+            ("agents", None),
+            ("crew", Some("agents")),
+            ("room", None),
             ("permission", None),
             ("rename", None),
         ]
@@ -630,16 +630,10 @@ mod fold_tests {
 
     #[test]
     fn a_fully_typed_folded_name_dispatches_its_original_command() {
-        for line in [
-            "/agents",
-            "/room",
-            "/rooms",
-            "/agents stop scout",
-            "/room close design",
-        ] {
+        for line in ["/crew", "/agents stop scout"] {
             assert_eq!(enter(line), json!({"run":line}));
         }
-        assert_eq!(enter("/agen"), json!({"edit":"/crew "}));
+        assert_eq!(enter("/cre"), json!({"edit":"/agents "}));
     }
 
     #[test]

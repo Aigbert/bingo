@@ -1,30 +1,22 @@
-use crate::state::Tab;
+//! Bare `/agents` in a surface that shows sheets opens the crew sheet; its
+//! plain table stays the fallback, and every other caller keeps it.
 use bingo_sdk::*;
 use serde_json::{Value, json};
 
-pub const FOLDED: [(&str, Tab); 5] = [
-    ("agents", Tab::Agents),
-    ("tasks", Tab::Tasks),
-    ("room", Tab::Rooms),
-    ("rooms", Tab::Rooms),
-    ("team", Tab::Team),
-];
+/// The command whose bare form opens the sheet.
+pub const OPENS: &str = "agents";
 
-pub struct Opening {
-    pub shared: crate::Shared,
-    pub name: &'static str,
-    pub tab: Tab,
-}
+pub struct Opening(pub crate::Shared);
 
 #[async_trait::async_trait]
 impl Interceptor for Opening {
     fn id(&self) -> &str {
-        self.name
+        OPENS
     }
 
     fn matcher(&self) -> LinkMatcher {
         LinkMatcher {
-            prefilter: json!({"command":self.name,"args":""}),
+            prefilter: json!({"command":OPENS,"args":""}),
             ..LinkMatcher::at(catalogue::COMMAND_RUN)
         }
     }
@@ -38,7 +30,7 @@ impl Interceptor for Opening {
     ) -> Result<Value, KernelError> {
         let run: catalogue::CommandRun =
             serde_json::from_value(input.clone()).map_err(crate::error)?;
-        if run.name != self.name
+        if run.name != OPENS
             || !run.args.trim().is_empty()
             || !run.surface.is_some_and(render::SurfaceName::shows_sheets)
         {
@@ -50,8 +42,7 @@ impl Interceptor for Opening {
             Ok(CommandOutcome::Applied { message }) => message,
             _ => return Ok(plain),
         };
-        let outcome =
-            crate::command::open(&self.shared, &cx.host, &cx.session, self.tab, fallback).await?;
+        let outcome = crate::command::open(&self.0, &cx.host, &cx.session, fallback).await?;
         serde_json::to_value(outcome).map_err(crate::error)
     }
 }

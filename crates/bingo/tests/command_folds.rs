@@ -11,43 +11,51 @@ struct Fold {
     into: &'static str,
     names: &'static [&'static str],
     owns_command: bool,
+    /// The owner registers the folded names itself, so they leave with it.
+    owns_names: bool,
 }
 const FOLDS: &[Fold] = &[
     Fold {
         owner: "bingo.mod.crew",
-        into: "crew",
-        names: &["agents", "tasks", "room", "team"],
-        owns_command: true,
+        into: "agents",
+        names: &["crew"],
+        owns_command: false,
+        owns_names: true,
     },
     Fold {
         owner: "bingo.mod.browse",
         into: "browse",
         names: &["rewind"],
         owns_command: true,
+        owns_names: false,
     },
     Fold {
         owner: "bingo.mod.memory",
         into: "memory",
         names: &["experience"],
         owns_command: false,
+        owns_names: false,
     },
     Fold {
         owner: "bingo.mod.schedule",
         into: "schedule",
         names: &["wake"],
         owns_command: false,
+        owns_names: false,
     },
     Fold {
         owner: "bingo.mod.models",
         into: "model",
         names: &["models", "provider"],
         owns_command: false,
+        owns_names: false,
     },
     Fold {
         owner: "bingo.mod.plugins",
         into: "plugins",
         names: &["mcp"],
         owns_command: false,
+        owns_names: false,
     },
 ];
 
@@ -79,6 +87,10 @@ fn check(catalog: &Catalog, disabled: Option<&str>) {
             fold.into
         );
         for name in fold.names {
+            if fold.owns_names && Some(fold.owner) == disabled {
+                assert!(catalog.entries.iter().all(|entry| entry.id != *name));
+                continue;
+            }
             let entry = catalog
                 .entries
                 .iter()

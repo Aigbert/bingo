@@ -1,4 +1,4 @@
-use crate::{opening::Opening, state::Tab};
+use crate::opening::Opening;
 use bingo_sdk::*;
 use serde_json::{Value, json};
 
@@ -26,116 +26,89 @@ fn fallback() -> CommandOutcome {
     }
 }
 
+async fn opened(input: Value, plain: CommandOutcome) -> (Value, crate::Shared, testing::TestHost) {
+    let (host, cx) = context();
+    let shared = crate::Shared::default();
+    let answer = Opening(shared.clone())
+        .chain(
+            catalogue::COMMAND_RUN,
+            &cx,
+            input,
+            Next::new(move |_| {
+                let plain = plain.clone();
+                Box::pin(async move { Ok(json!(plain)) })
+            }),
+        )
+        .await
+        .unwrap();
+    (answer, shared, host)
+}
+
 #[tokio::test]
-async fn every_bare_folded_name_opens_its_tab_and_preserves_the_text_view() {
-    for (name, tab) in crate::opening::FOLDED {
-        for surface in ["terminal", "desktop"] {
-            let (_, cx) = context();
-            let shared = crate::Shared::default();
-            let answer = Opening {
-                shared: shared.clone(),
-                name,
-                tab,
-            }
-            .chain(
-                catalogue::COMMAND_RUN,
-                &cx,
-                json!({"command":name,"args":"","surface":surface}),
-                Next::new(|_| Box::pin(async { Ok(json!(fallback())) })),
-            )
-            .await
-            .unwrap();
-            let CommandOutcome::Surface {
-                action,
-                fallback: text,
-            } = serde_json::from_value(answer).unwrap()
-            else {
-                panic!("the bare command opens crew");
-            };
-            assert_eq!(action.name, "Pane");
-            assert_eq!(action.args, json!({"plugin":crate::ID,"id":"crew"}));
-            let CommandOutcome::View { view } = fallback() else {
-                unreachable!()
-            };
-            assert_eq!(text, Some(view.fold_markdown()));
-            assert_eq!(shared.lock().unwrap()[&cx.session].tab, tab);
-        }
+async fn bare_agents_opens_the_sheet_and_keeps_the_table_as_text() {
+    for surface in ["terminal", "desktop"] {
+        let (answer, shared, _) = opened(
+            json!({"command":"agents","args":"","surface":surface}),
+            fallback(),
+        )
+        .await;
+        let CommandOutcome::Surface {
+            action,
+            fallback: text,
+        } = serde_json::from_value(answer).unwrap()
+        else {
+            panic!("bare /agents opens the crew sheet");
+        };
+        assert_eq!(action.name, "Pane");
+        assert_eq!(action.args, json!({"plugin":crate::ID,"id":"crew"}));
+        let CommandOutcome::View { view } = fallback() else {
+            unreachable!()
+        };
+        assert_eq!(text, Some(view.fold_markdown()));
+        assert!(
+            shared
+                .lock()
+                .unwrap()
+                .contains_key(&SessionId::from_raw("ses_parent"))
+        );
     }
 }
 
 #[tokio::test]
-async fn an_empty_roster_opens_its_tab_and_preserves_the_plain_message() {
-    let (_, cx) = context();
-    let shared = crate::Shared::default();
-    let answer = Opening {
-        shared: shared.clone(),
-        name: "agents",
-        tab: Tab::Agents,
-    }
-    .chain(
-        catalogue::COMMAND_RUN,
-        &cx,
-        json!({"command":"agents","args":"","surface":"terminal"}),
-        Next::new(|_| {
-            Box::pin(async {
-                Ok(json!(CommandOutcome::Applied {
-                    message: Some("no agents are running in this session".into()),
-                }))
-            })
-        }),
-    )
-    .await
-    .unwrap();
-    let CommandOutcome::Surface { action, fallback } = serde_json::from_value(answer).unwrap()
-    else {
-        panic!("an empty roster still opens crew");
+async fn an_empty_roster_still_opens_and_preserves_the_plain_message() {
+    let message = CommandOutcome::Applied {
+        message: Some("no agents are running in this session".into()),
     };
-    assert_eq!(action.name, "Pane");
+    let (answer, _, _) = opened(
+        json!({"command":"agents","args":"","surface":"terminal"}),
+        message,
+    )
+    .await;
+    let CommandOutcome::Surface { fallback, .. } = serde_json::from_value(answer).unwrap() else {
+        panic!("an empty roster still opens the sheet");
+    };
     assert_eq!(
         fallback.as_deref(),
         Some("no agents are running in this session")
     );
-    assert_eq!(shared.lock().unwrap()[&cx.session].tab, Tab::Agents);
 }
 
 #[tokio::test]
-async fn arguments_and_nonvisual_callers_keep_the_original_command() {
-    for (name, tab) in crate::opening::FOLDED {
-        for input in [
-            json!({"command":name,"args":"stop x","surface":"terminal"}),
-            json!({"command":name,"args":""}),
-            json!({"command":name,"args":"","surface":"text"}),
-        ] {
-            let (host, cx) = context();
-            let shared = crate::Shared::default();
-            let wanted = input.clone();
-            let answer = Opening {
-                shared: shared.clone(),
-                name,
-                tab,
-            }
-            .chain(
-                catalogue::COMMAND_RUN,
-                &cx,
-                input,
-                Next::new(move |seen| {
-                    Box::pin(async move {
-                        assert_eq!(seen, wanted);
-                        Ok(json!(fallback()))
-                    })
-                }),
-            )
-            .await
-            .unwrap();
-            assert_eq!(answer, json!(fallback()));
-            assert!(shared.lock().unwrap().is_empty());
-            assert!(host.calls().is_empty());
-        }
+async fn arguments_and_nonvisual_callers_keep_the_plain_command() {
+    for input in [
+        json!({"command":"agents","args":"stop x","surface":"terminal"}),
+        json!({"command":"agents","args":""}),
+        json!({"command":"agents","args":"","surface":"text"}),
+    ] {
+        let (answer, shared, host) = opened(input, fallback()).await;
+        assert_eq!(answer, json!(fallback()));
+        assert!(shared.lock().unwrap().is_empty());
+        assert!(host.calls().is_empty());
     }
 }
 
 #[tokio::test]
-async fn crew_arguments_select_each_tab_and_refuse_unknown_tabs() {
+async fn crew_opens_the_sheet_and_takes_no_words() {
     let (_, hook) = context();
     let cx = CommandContext {
         surface: None,
@@ -146,40 +119,28 @@ async fn crew_arguments_select_each_tab_and_refuse_unknown_tabs() {
     };
     let shared = crate::Shared::default();
     let command = crate::command::Open(shared.clone());
-    for (args, tab) in
-        std::iter::once(("", Tab::Agents)).chain(Tab::ALL.into_iter().map(|tab| (tab.label(), tab)))
-    {
-        command.run(args, &cx).await.unwrap();
-        assert_eq!(shared.lock().unwrap()[&cx.session].tab, tab);
-    }
-    assert!(command.run("unknown", &cx).await.is_err());
-    let ArgSpec::Words { values, .. } = command.spec().args else {
-        panic!("crew offers its tabs inline");
+    let CommandOutcome::Surface { action, .. } = command.run("", &cx).await.unwrap() else {
+        panic!("/crew opens the sheet");
     };
-    assert_eq!(values, ["agents", "rooms", "tasks", "team"]);
+    assert_eq!(action.name, "Pane");
+    assert!(shared.lock().unwrap().contains_key(&cx.session));
+    assert_eq!(command.spec().args, ArgSpec::None);
+    assert!(command.spec().keys.is_empty());
 }
 
 #[test]
-fn crew_registers_its_fold_alongside_its_openers() {
-    let mut registrar = Registrar::new(
-        crate::ID,
-        Value::Null,
-        Env::rooted("/unused"),
-        Default::default(),
-    );
-    crate::Crew::default().register(&mut registrar).unwrap();
-    let folds: Vec<_> = registrar
-        .into_contributions()
-        .into_iter()
-        .filter_map(|entry| {
-            if let Contribution::CommandFold(fold) = entry {
-                Some(fold)
-            } else {
-                None
-            }
-        })
-        .collect();
-    assert_eq!(folds.len(), 1);
-    assert_eq!(folds[0].into, "crew");
-    assert_eq!(folds[0].names, ["agents", "tasks", "room", "rooms", "team"]);
+fn a_sheet_redraws_for_the_sessions_it_watches() {
+    use std::collections::BTreeSet;
+    let watching = BTreeSet::from([SessionId::from_raw("ses_scout")]);
+    let started = |session: &str| -> Frame {
+        serde_json::from_value(json!({
+            "seq": 1,
+            "ts": "2026-10-19T00:00:00Z",
+            "session": session,
+            "event": {"type":"turnStarted","turn":"trn_1","inputs":[],"origin":"submit"},
+        }))
+        .unwrap()
+    };
+    assert!(crate::refresh::relevant(&watching, &started("ses_scout")));
+    assert!(!crate::refresh::relevant(&watching, &started("ses_other")));
 }

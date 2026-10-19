@@ -141,8 +141,24 @@ fn context(state: &bingo_sdk::SessionState) -> Drawing {
         ink(if share >= 0.8 { "amber" } else { "muted" }),
     ))])
 }
+/// The working or asking descendants of the session on screen, in tree order.
+pub(crate) fn active(tree: &Tree) -> Vec<&bingo_sdk::SessionState> {
+    let under = crate::tree::covered(tree, crate::tree::Scope::Under(tree.view()));
+    tree.sessions()
+        .filter(|state| under.contains(&&state.summary.id))
+        .filter(|state| {
+            matches!(
+                bingo_collab::lifecycle::Lifecycle::of_state(state),
+                Some(
+                    bingo_collab::lifecycle::Lifecycle::Working
+                        | bingo_collab::lifecycle::Lifecycle::Asking
+                )
+            )
+        })
+        .collect()
+}
 fn crew(tree: &Tree, now: Now) -> Drawing {
-    let agents: Vec<_> = crate::crew::active(tree)
+    let agents: Vec<_> = active(tree)
         .into_iter()
         .filter(|s| s.busy() && s.interactions.is_empty())
         .collect();

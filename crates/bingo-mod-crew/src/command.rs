@@ -1,3 +1,5 @@
+//! `/crew`, and the sheet it opens in the dock. The sheet keeps only its
+//! picked identity, carried in its own props.
 use bingo_sdk::*;
 use serde_json::{Value, json};
 pub struct Open(pub crate::Shared);
@@ -7,37 +9,21 @@ impl Command for Open {
         CommandSpec {
             name: "crew".into(),
             aliases: vec![],
-            hint: "agents, rooms, tasks and team in one panel".into(),
-            args: ArgSpec::Words {
-                values: crate::state::Tab::ALL
-                    .into_iter()
-                    .map(|tab| tab.label().into())
-                    .collect(),
-                labels: Default::default(),
-                then: None,
-                alone: vec![],
-                person: vec![],
-            },
+            hint: "teammates and rooms, by who needs you".into(),
+            args: ArgSpec::None,
             instant: true,
             family: "terminal".into(),
             hidden: false,
             opens: true,
-            keys: vec!["ctrl+n".into()],
+            keys: vec![],
         }
     }
-    async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
-        let tab = if args.trim().is_empty() {
-            crate::state::Tab::default()
-        } else {
-            crate::state::Tab::parse(args.trim())
-                .ok_or_else(|| crate::error("Use /crew [agents|rooms|tasks|team]."))?
-        };
+    async fn run(&self, _: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         open(
             &self.0,
             &cx.host,
             &cx.session,
-            tab,
-            Some("Use /agents, /room, /tasks and /team for the plain tables.".into()),
+            Some("Use /agents and /room for the plain tables.".into()),
         )
         .await
     }
@@ -47,20 +33,13 @@ pub async fn open(
     shared: &crate::Shared,
     host: &HostHandle,
     session: &SessionId,
-    tab: crate::state::Tab,
     fallback: Option<String>,
 ) -> Result<CommandOutcome, KernelError> {
-    shared.lock().map_err(crate::error)?.insert(
-        session.clone(),
-        crate::state::Panel {
-            tab,
-            ..Default::default()
-        },
-    );
-    host.signal(session, crate::ID, crate::REQUEST, slot())
-        .await?;
-    host.invalidate(session, vec![crate::REQUEST.into()])
-        .await?;
+    shared
+        .lock()
+        .map_err(crate::error)?
+        .insert(session.clone(), Default::default());
+    publish(host, session, None).await?;
     Ok(CommandOutcome::Surface {
         action: Action {
             name: "Pane".into(),
@@ -69,27 +48,36 @@ pub async fn open(
         fallback,
     })
 }
-pub fn slot() -> Value {
-    let mut size = slot::PaneSize::from_rows(18);
-    size.rows.max = slot::Length::Percent(80);
-    size.columns.ideal = slot::Length::Percent(100);
+
+/// Place the sheet in the dock, picking `selected`, and draw it again.
+pub async fn publish(
+    host: &HostHandle,
+    session: &SessionId,
+    selected: Option<String>,
+) -> Result<(), KernelError> {
+    host.signal(session, crate::ID, crate::REQUEST, slot(selected))
+        .await?;
+    host.invalidate(session, vec![crate::REQUEST.into()]).await
+}
+
+pub fn slot(selected: Option<String>) -> Value {
     slot::with(
         json!({}),
         [slot::Slot::Pane {
             hints: None,
             id: crate::REQUEST.into(),
-            title: "crew".into(),
-            focus: false,
-            close_on_escape: false,
+            title: String::new(),
+            focus: true,
+            close_on_escape: true,
             hold_toasts: false,
             asked: true,
-            place: slot::above(),
-            size,
+            place: vec![slot::Place::Dock],
+            size: slot::PaneSize::from_rows(12),
             view: slot::Shown::Pull {
                 request: render::PullRequest {
                     component: render::Component::Pane,
                     request_id: crate::REQUEST.into(),
-                    props: json!({}),
+                    props: json!({"owner":crate::ID,"selected":selected}),
                     viewport: render::Viewport {
                         glyphs: Default::default(),
                         place: None,
@@ -101,9 +89,13 @@ pub fn slot() -> Value {
         }],
     )
 }
-pub async fn close(cx: &CommandContext, shared: &crate::Shared) -> Result<(), KernelError> {
-    shared.lock().map_err(crate::error)?.remove(&cx.session);
-    cx.host
-        .signal(&cx.session, crate::ID, crate::REQUEST, Value::Null)
+
+pub async fn close(
+    host: &HostHandle,
+    session: &SessionId,
+    shared: &crate::Shared,
+) -> Result<(), KernelError> {
+    shared.lock().map_err(crate::error)?.remove(session);
+    host.signal(session, crate::ID, crate::REQUEST, Value::Null)
         .await
 }

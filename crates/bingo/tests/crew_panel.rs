@@ -1,4 +1,5 @@
-//! Crew exercises the same remote pane and command protocol as other clients.
+//! The crew sheet exercises the same remote pane and command protocol as
+//! other clients.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 use crate::support;
 use bingo_sdk::*;
@@ -22,7 +23,7 @@ async fn draw(host: &impl HostApi, session: &SessionId) -> View {
             component: render::Component::Pane,
             request_id: "crew".into(),
             surface: render::SurfaceName::Terminal,
-            props: json!({}),
+            props: json!({"owner":"bingo.mod.crew","selected":null}),
             viewport: render::Viewport {
                 glyphs: Default::default(),
                 place: None,
@@ -44,7 +45,9 @@ async fn key(host: &impl HostApi, session: &mut Attachment, key: &str) -> Value 
         .unwrap()
         .with_value(json!({"key":key}))
         .unwrap();
-    assert_eq!(action.name, CommandSpec::ui_name("bingo.mod.crew"));
+    press(session, action).await
+}
+async fn press(session: &mut Attachment, action: Action) -> Value {
     let intent = IntentId::mint();
     session.handle.submit(
         intent.clone(),
@@ -79,81 +82,7 @@ async fn child(
     .await
     .unwrap()
 }
-async fn has_session(host: &impl HostApi, id: &SessionId) -> bool {
-    host.sessions(SessionFilter::default())
-        .await
-        .unwrap()
-        .iter()
-        .any(|summary| &summary.id == id)
-}
-async fn confirmed_dismissal(host: &impl HostApi, root: &mut Attachment, child: &SessionId) {
-    command(root, "/crew").await;
-    key(host, root, "x").await;
-    assert!(
-        draw(host, &root.session)
-            .await
-            .fold()
-            .contains("delete its journal?")
-    );
-    assert!(has_session(host, child).await);
-    key(host, root, "esc").await;
-    assert!(has_session(host, child).await);
-    assert!(
-        !draw(host, &root.session)
-            .await
-            .fold()
-            .contains("delete its journal?")
-    );
-    key(host, root, "x").await;
-    key(host, root, "enter").await;
-    assert!(!has_session(host, child).await);
-    assert!(
-        draw(host, &root.session)
-            .await
-            .fold()
-            .contains("No agents here yet.")
-    );
-}
-#[tokio::test(flavor = "multi_thread")]
-async fn crew_stops_prefills_ticks_and_closes_through_minted_keys() {
-    let mut server =
-        Server::spawn(r#"{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"Reviewed"}]}]}"#);
-    let host = ready(&mut server).await;
-    let mut root = host
-        .open(create(server.cwd()), who(), OpenOptions::default())
-        .await
-        .unwrap();
-    let mut child = child(&host, &root, &server.cwd(), "reviewer").await;
-    command(&mut root, "/tasks add Review the cut @reviewer").await;
-    command(&mut root, "/rooms design reviewer").await;
-    let intent = IntentId::mint();
-    child.handle.submit(
-        intent.clone(),
-        Input::text("Review the cut", Origin::surface("tui")),
-    );
-    assert!(matches!(
-        ack_for(&mut child, &intent).await,
-        IntentOutcome::TurnStarted { .. }
-    ));
-    let opened = command(&mut root, "/crew").await;
-    assert_eq!(opened["result"]["surface"]["name"], "Pane");
-    assert!(draw(&host, &root.session).await.fold().contains("reviewer"));
-    stop_and_follow(&host, &mut root).await;
-    let fill = key(&host, &mut root, "m").await;
-    assert_eq!(
-        fill["result"]["surface"],
-        json!({"name":"Composer","args":{"text":"/agents reopen reviewer "}})
-    );
-    assert!(fill["result"].get("view").is_none());
-    model_picker(&host, &mut root, &child.session).await;
-    command(&mut root, "/crew").await;
-    key(&host, &mut root, "]").await;
-    assert!(draw(&host, &root.session).await.fold().contains("#design"));
-    key(&host, &mut root, "]").await;
-    key(&host, &mut root, " ").await;
-    assert!(draw(&host, &root.session).await.fold().contains("☑ #1"));
-    key(&host, &mut root, "esc").await;
-    confirmed_dismissal(&host, &mut root, &child.session).await;
+async fn finish(host: &bingo_surface_rpc::RemoteKernel, server: &mut Server) {
     host.shutdown().await.unwrap();
     assert!(
         tokio::time::timeout(LIMIT, server.child.wait())
@@ -163,8 +92,111 @@ async fn crew_stops_prefills_ticks_and_closes_through_minted_keys() {
             .success()
     );
 }
+async fn plain(root: &mut Attachment, line: &str) -> Value {
+    let intent = IntentId::mint();
+    root.handle.submit(
+        intent.clone(),
+        Input::text(line, Origin::surface("rpc").on(render::SurfaceName::Text)),
+    );
+    serde_json::to_value(ack_for(root, &intent).await).unwrap()
+}
+fn crew_pane(root: &Attachment) -> bool {
+    slot::placed(&root.snapshot).iter().any(|placed| {
+        placed.plugin == "bingo.mod.crew"
+            && matches!(&placed.slot, slot::Slot::Pane { id, .. } if id == "crew")
+    })
+}
+async fn working(child: &mut Attachment) {
+    let intent = IntentId::mint();
+    child.handle.submit(
+        intent.clone(),
+        Input::text("Review the cut", Origin::surface("tui")),
+    );
+    assert!(matches!(
+        ack_for(child, &intent).await,
+        IntentOutcome::TurnStarted { .. }
+    ));
+}
+async fn room_id(host: &impl HostApi, root: &Attachment) -> SessionId {
+    host.sessions(SessionFilter {
+        parent: Some(root.session.clone()),
+        ..Default::default()
+    })
+    .await
+    .unwrap()
+    .into_iter()
+    .find(|summary| summary.title.as_deref() == Some("#design"))
+    .unwrap()
+    .id
+}
 #[tokio::test(flavor = "multi_thread")]
-async fn disabled_crew_retains_tables_and_no_key() {
+async fn agents_opens_the_sheet_which_walks_in_and_mentions() {
+    let mut server =
+        Server::spawn(r#"{"responses":[{"steps":[{"delay":{"ms":60000}},{"text":"Reviewed"}]}]}"#);
+    let host = ready(&mut server).await;
+    let mut root = host
+        .open(create(server.cwd()), who(), OpenOptions::default())
+        .await
+        .unwrap();
+    let empty = command(&mut root, "/agents").await;
+    assert_eq!(empty["result"]["surface"]["name"], "Pane", "{empty}");
+    assert!(
+        draw(&host, &root.session)
+            .await
+            .fold()
+            .contains("no teammates or rooms yet")
+    );
+    let mut reviewer = child(&host, &root, &server.cwd(), "reviewer").await;
+    command(&mut root, "/rooms design reviewer").await;
+    working(&mut reviewer).await;
+    let sheet = draw(&host, &root.session).await.fold();
+    assert!(
+        sheet.contains("Crew") && sheet.contains("1 working"),
+        "{sheet}"
+    );
+    assert!(
+        sheet.contains("Review the cut") && sheet.contains("#design"),
+        "{sheet}"
+    );
+    let mention = key(&host, &mut root, "tab").await;
+    assert_eq!(
+        mention["result"]["surface"],
+        json!({"name":"Composer","args":{"text":"@reviewer "}})
+    );
+    assert!(!crew_pane(&root));
+    assert_eq!(
+        command(&mut root, "/crew").await["result"]["surface"]["name"],
+        "Pane"
+    );
+    assert!(crew_pane(&root));
+    key(&host, &mut root, "down").await;
+    let room = room_id(&host, &root).await;
+    let walked = key_at(&host, &mut root, room.clone(), "enter").await;
+    assert_eq!(
+        walked["result"]["surface"],
+        json!({"name":"View","args":{"view":room}})
+    );
+    let text = plain(&mut root, "/agents").await;
+    assert!(text["result"]["view"].is_object(), "{text}");
+    assert!(text["result"].get("surface").is_none());
+    finish(&host, &mut server).await;
+}
+/// A press as the drawing that picked `selected` carries it.
+async fn key_at(
+    host: &impl HostApi,
+    session: &mut Attachment,
+    selected: SessionId,
+    key: &str,
+) -> Value {
+    let View::Box { layout, .. } = draw(host, &session.session).await else {
+        panic!("crew sheet")
+    };
+    let mut action = layout.on_key.unwrap();
+    action.args["selected"] = json!(selected);
+    press(session, action.with_value(json!({"key":key})).unwrap()).await
+}
+#[tokio::test(flavor = "multi_thread")]
+async fn disabled_crew_keeps_the_plain_agents_table() {
     let home = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
     std::fs::write(
@@ -180,94 +212,13 @@ async fn disabled_crew_retains_tables_and_no_key() {
         .unwrap();
     let catalog = host.catalog(CatalogKind::Commands).await.unwrap();
     assert!(!catalog.entries.iter().any(|e| e.id == "crew"));
-    for name in ["agents", "room", "tasks", "team"] {
-        let entry = catalog
-            .entries
-            .iter()
-            .find(|entry| entry.id == name)
-            .unwrap();
-        assert!(entry.meta.get("foldedInto").is_none());
-    }
-    for line in ["/agents", "/room", "/rooms", "/tasks", "/team"] {
+    for line in ["/agents", "/room"] {
         let receipt = command(&mut root, line).await;
         assert_eq!(receipt["kind"], "applied", "{line}: {receipt}");
-        if line == "/tasks" {
-            assert_eq!(
-                receipt["result"]["surface"]["args"]["plugin"],
-                "bingo.tasks"
-            );
-            continue;
-        }
-        if line == "/agents" {
-            assert_eq!(
-                receipt["result"]["message"],
-                "no agents are running in this session"
-            );
-        } else {
-            assert!(receipt["result"].get("view").is_some(), "{line}: {receipt}");
-        }
         assert!(
             receipt["result"].get("surface").is_none(),
             "{line}: {receipt}"
         );
     }
-    host.shutdown().await.unwrap();
-    assert!(
-        tokio::time::timeout(LIMIT, server.child.wait())
-            .await
-            .unwrap()
-            .unwrap()
-            .success()
-    );
+    finish(&host, &mut server).await;
 }
-
-async fn stop_and_follow(host: &impl HostApi, root: &mut Attachment) {
-    key(host, root, "s").await;
-    assert!(
-        draw(host, &root.session)
-            .await
-            .fold()
-            .contains("Stop reviewer?")
-    );
-    key(host, root, "esc").await;
-    let view = draw(host, &root.session).await.fold();
-    assert!(!view.contains("Stop reviewer?"));
-    assert!(view.contains("working"), "{view}");
-    key(host, root, "s").await;
-    let stopped = key(host, root, "enter").await;
-    assert!(
-        stopped["result"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("stopped"),
-        "{stopped}"
-    );
-    tokio::time::timeout(LIMIT, async {
-        loop {
-            if draw(host, &root.session).await.fold().contains("■ stopped") {
-                break;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .unwrap();
-}
-
-async fn model_picker(host: &impl HostApi, root: &mut Attachment, child: &SessionId) {
-    command(root, "/crew").await;
-    key(host, root, "right").await;
-    let picker = key(host, root, "enter").await;
-    assert_eq!(picker["result"]["surface"]["name"], "Pane");
-    assert_eq!(
-        picker["result"]["surface"]["args"]["plugin"],
-        "bingo.mod.models"
-    );
-    assert_eq!(picker["result"]["surface"]["args"]["view"], json!(child));
-}
-
-#[path = "crew_panel/actions.rs"]
-mod actions;
-
-#[path = "crew_panel/folds.rs"]
-mod folds;

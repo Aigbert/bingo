@@ -1,14 +1,14 @@
-//! The crew's view, composed only from shared services and session frames.
+//! The crew sheet: teammates and rooms by who needs you, composed only from
+//! shared services and session frames.
 mod actions;
-pub mod cards;
 mod command;
-mod dispatch;
 pub mod draw;
 mod guide;
 pub mod keys;
 mod lifecycle;
-mod live;
+mod look;
 mod opening;
+mod read;
 mod refresh;
 pub mod rows;
 pub mod state;
@@ -17,12 +17,14 @@ use bingo_sdk::{
     Registrar, SessionId, plugin,
 };
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     sync::{Arc, Mutex},
 };
 const ID: &str = "bingo.mod.crew";
 const REQUEST: &str = "crew";
-type Shared = Arc<Mutex<BTreeMap<SessionId, state::Panel>>>;
+/// Each open sheet, by the session it opened in, with the sessions whose
+/// changes redraw it.
+type Shared = Arc<Mutex<BTreeMap<SessionId, BTreeSet<SessionId>>>>;
 #[derive(Default)]
 pub struct Crew {
     shared: Shared,
@@ -33,7 +35,6 @@ static MANIFEST: PluginManifest = PluginManifest {
     uses: &[
         bingo_services::agents_control::CAPABILITY,
         bingo_services::rooms_control::CAPABILITY,
-        bingo_services::tasks_write::CAPABILITY,
     ],
     requires: &[],
     provides: &[
@@ -56,23 +57,14 @@ impl Plugin for Crew {
             self.shared.clone(),
         ))));
         registrar.add(Contribution::CommandFold(CommandFold {
-            into: "crew".into(),
-            names: opening::FOLDED
-                .into_iter()
-                .map(|(name, _)| name.into())
-                .collect(),
+            into: opening::OPENS.into(),
+            names: vec!["crew".into()],
         }));
-        for (name, tab) in opening::FOLDED {
-            registrar.add(Contribution::Interceptor {
-                placement: plugin::Placement::Builtin,
-                external: None,
-                link: Arc::new(opening::Opening {
-                    shared: self.shared.clone(),
-                    name,
-                    tab,
-                }),
-            });
-        }
+        registrar.add(Contribution::Interceptor {
+            placement: plugin::Placement::Builtin,
+            external: None,
+            link: Arc::new(opening::Opening(self.shared.clone())),
+        });
         registrar.add(Contribution::Interceptor {
             placement: plugin::Placement::Builtin,
             external: None,
@@ -103,18 +95,6 @@ impl Plugin for Crew {
 fn error(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::InvalidInput, error.to_string())
 }
-#[cfg(test)]
-mod keys_tests;
-
-#[cfg(test)]
-mod cards_tests;
-
-#[cfg(test)]
-mod live_tests;
-
-#[cfg(test)]
-mod dispatch_tests;
-
 #[cfg(test)]
 mod opening_tests;
 

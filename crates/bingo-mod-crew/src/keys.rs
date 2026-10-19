@@ -1,107 +1,107 @@
-use crate::state::{Confirmation, Panel, Rows, Tab};
-use bingo_sdk::SessionId;
-use bingo_services::tasks_write::Status;
-#[derive(Debug, PartialEq)]
+//! What a press on the crew sheet does (`SHEETS.crew.key`, `.enter`): move,
+//! walk into the picked row, or close and write `@name ` for a teammate.
+use crate::state::Entry;
+use bingo_sdk::{SessionId, sheet::Press};
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum Operation {
     Close,
-    Tab,
-    Move(bool),
-    Model,
-    View(SessionId),
-    Pick(SessionId),
-    Stop(String),
-    Dismiss(String),
-    Fill(String),
-    Confirm(Confirmation),
-    CloseRoom(String),
-    Tick(u64, Status),
+    /// Pick another row, by its identity.
+    Move(Option<String>),
+    /// Close the sheet and show this session.
+    Walk(SessionId),
+    /// Close the sheet and write this into the composer.
+    Mention(String),
     None,
 }
-pub fn operation(panel: &Panel, rows: &Rows, key: &str) -> Operation {
-    if key == "esc" {
-        return Operation::Close;
-    }
-    if let Some(name) = &panel.confirm {
-        return if key == "enter" {
-            match name {
-                Confirmation::Stop(name) => Operation::Stop(name.clone()),
-                Confirmation::Dismiss(name) => Operation::Dismiss(name.clone()),
-                Confirmation::CloseRoom(name) => Operation::CloseRoom(name.clone()),
+
+/// `selected` is the identity the drawing that took the press had picked; a
+/// row that is gone falls back to the first, as a sheet's pick does.
+pub fn operation(entries: &[Entry], selected: Option<&str>, press: &Press) -> Operation {
+    let at = |id: Option<&str>| {
+        id.and_then(|id| entries.iter().position(|entry| entry.id().as_str() == id))
+            .unwrap_or(0)
+    };
+    let picked = entries.get(at(selected));
+    match press {
+        Press::Pick(id) => entries
+            .iter()
+            .find(|entry| entry.id().as_str() == id)
+            .map_or(Operation::None, |entry| Operation::Walk(entry.id().clone())),
+        Press::Key(key) => match key.as_str() {
+            "esc" | "ctrl+c" => Operation::Close,
+            "up" | "down" => {
+                let at = at(selected);
+                let to = if key == "down" {
+                    (at + 1).min(entries.len().saturating_sub(1))
+                } else {
+                    at.saturating_sub(1)
+                };
+                Operation::Move(entries.get(to).map(|entry| entry.id().to_string()))
             }
-        } else {
+            "enter" => picked.map_or(Operation::None, |entry| Operation::Walk(entry.id().clone())),
+            "tab" => picked
+                .and_then(Entry::mate)
+                .map_or(Operation::None, |mate| {
+                    Operation::Mention(format!("@{} ", mate.name))
+                }),
+            _ => Operation::None,
+        },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::state::{
+        Need, ordered,
+        tests::{mate, place},
+    };
+
+    fn sheet() -> Vec<Entry> {
+        ordered(
+            vec![mate("scout", Need::Working), mate("ada", Need::Idle)],
+            vec![place("design")],
+        )
+    }
+
+    fn key(key: &str) -> Press {
+        Press::Key(key.into())
+    }
+
+    #[test]
+    fn arrows_move_and_enter_or_a_click_walks_in() {
+        let entries = sheet();
+        assert_eq!(
+            operation(&entries, Some("ses_scout"), &key("down")),
+            Operation::Move(Some("ses_ada".into()))
+        );
+        assert_eq!(
+            operation(&entries, Some("ses_design"), &key("enter")),
+            Operation::Walk(SessionId::from_raw("ses_design"))
+        );
+        assert_eq!(
+            operation(&entries, None, &Press::Pick("ses_ada".into())),
+            Operation::Walk(SessionId::from_raw("ses_ada"))
+        );
+        assert_eq!(
+            operation(&entries, None, &Press::Pick("ses_gone".into())),
             Operation::None
-        };
+        );
+        assert_eq!(operation(&entries, None, &key("esc")), Operation::Close);
     }
-    match key {
-        "]" => return Operation::Tab,
-        "up" => return Operation::Move(false),
-        "down" => return Operation::Move(true),
-        _ => {}
-    }
-    match panel.tab {
-        Tab::Agents => agent(panel, rows, key),
-        Tab::Rooms => room(panel, rows, key),
-        Tab::Tasks => task(panel, rows, key),
-        Tab::Team => Operation::None,
-    }
-}
-fn agent(panel: &Panel, rows: &Rows, key: &str) -> Operation {
-    let Some(row) = rows.agents.as_ref().and_then(|r| r.get(panel.selected)) else {
-        return Operation::None;
-    };
-    match key {
-        "left" | "right" => Operation::Model,
-        "enter" if panel.model => Operation::Pick(row.summary.id.clone()),
-        "enter" => Operation::View(row.summary.id.clone()),
-        "s" => Operation::Confirm(Confirmation::Stop(
-            bingo_collab::name::of_session(&row.summary).into(),
-        )),
-        "x" => Operation::Confirm(Confirmation::Dismiss(
-            bingo_collab::name::of_session(&row.summary).into(),
-        )),
-        "m" => {
-            let live = panel.follow.as_ref().and_then(|f| f.state.lock().ok());
-            let stopped = crate::cards::activity(row, live.as_deref())
-                == Some(bingo_collab::lifecycle::Lifecycle::Stopped);
-            Operation::Fill(format!(
-                "/agents {} {} ",
-                if stopped { "reopen" } else { "message" },
-                bingo_collab::name::of_session(&row.summary)
-            ))
-        }
-        _ => Operation::None,
-    }
-}
-fn room(panel: &Panel, rows: &Rows, key: &str) -> Operation {
-    let Some(row) = rows.rooms.as_ref().and_then(|r| r.get(panel.selected)) else {
-        return Operation::None;
-    };
-    match key {
-        "enter" => Operation::View(row.id.clone()),
-        "p" => Operation::Fill(format!("/rooms purpose {} ", row.name)),
-        "a" => Operation::Fill(format!("/rooms seat {} ", row.name)),
-        "u" => Operation::Fill(format!("/rooms unseat {} ", row.name)),
-        "c" => Operation::Confirm(Confirmation::CloseRoom(row.name.clone())),
-        _ => Operation::None,
-    }
-}
-fn task(panel: &Panel, rows: &Rows, key: &str) -> Operation {
-    if key == "+" || key == "shift++" {
-        return Operation::Fill("/tasks add ".into());
-    }
-    let Some(row) = rows.tasks.as_ref().and_then(|r| r.get(panel.selected)) else {
-        return Operation::None;
-    };
-    match key {
-        " " | "space" => Operation::Tick(
-            row.id,
-            if row.status == Status::Completed {
-                Status::Pending
-            } else {
-                Status::Completed
-            },
-        ),
-        "o" => Operation::Fill(format!("/tasks assign {} ", row.id)),
-        _ => Operation::None,
+
+    #[test]
+    fn tab_mentions_a_teammate_and_never_a_room() {
+        let entries = sheet();
+        assert_eq!(
+            operation(&entries, Some("ses_ada"), &key("tab")),
+            Operation::Mention("@ada ".into())
+        );
+        assert_eq!(
+            operation(&entries, Some("ses_design"), &key("tab")),
+            Operation::None
+        );
+        assert_eq!(operation(&[], None, &key("enter")), Operation::None);
     }
 }
