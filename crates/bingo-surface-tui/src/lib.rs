@@ -99,6 +99,7 @@ mod pointer;
 mod preview;
 mod pulled;
 mod queue_rows;
+mod receipt;
 mod render;
 mod rewind;
 mod run;
@@ -230,21 +231,16 @@ impl Surface for TuiSurface {
         // The terminal goes back whether the loop ended or failed.
         let _ = screen.leave();
         let ended = ended?;
-        if print {
-            // The alternate screen took the conversation with it; this puts
-            // the last screenful of it back where the shell can see it.
-            for line in ended.screen {
-                println!("{line}");
+        if std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+            if print {
+                for line in ended.screen {
+                    println!("{line}");
+                }
             }
-            println!("{}", way_back(&ended.session));
+            receipt::print(&ended.receipt).map_err(entering)?;
         }
         Ok(ended.exit)
     }
-}
-
-/// The line under the last screenful: how to reopen the session just left.
-fn way_back(session: &bingo_sdk::SessionId) -> String {
-    format!("\nResume this session with:\n  bingo --resume {session}")
 }
 
 fn entering(e: std::io::Error) -> KernelError {

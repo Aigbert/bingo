@@ -29,6 +29,7 @@ mod home;
 mod isolated;
 
 mod look;
+mod receipt;
 
 /// Only a unix terminal is asked about pictures (the surface's
 /// `terminal::probe::exchange`), so on Windows no answer is ever read, no
@@ -282,6 +283,16 @@ impl Terminal {
     }
 
     fn under(extra: &[&str], script_text: &str, answers: Answers, ground: Ground) -> Terminal {
+        Self::under_seeded(extra, script_text, answers, ground, None)
+    }
+
+    fn under_seeded(
+        extra: &[&str],
+        script_text: &str,
+        answers: Answers,
+        ground: Ground,
+        seed: Option<fn(&std::path::Path)>,
+    ) -> Terminal {
         let home = tempfile::tempdir().unwrap();
         let script = home.path().join("script.json");
         std::fs::write(&script, script_text).unwrap();
@@ -295,6 +306,9 @@ impl Terminal {
         )
         .unwrap();
 
+        if let Some(seed) = seed {
+            seed(home.path());
+        }
         let pty = native_pty_system()
             .openpty(PtySize {
                 rows: ROWS,
@@ -530,7 +544,7 @@ fn leaving_prints_the_last_screenful_into_the_shells_own_screen() {
         "the furniture does not:\n{shell}"
     );
     assert!(
-        shell.contains("Resume this session with:") && shell.contains("bingo --resume "),
+        shell.contains("resume with bingo --resume ") && shell.contains("bingo --resume "),
         "and the way back in is the last thing said:\n{shell}"
     );
 }
@@ -556,15 +570,25 @@ fn a_bang_line_runs_the_shell_and_leaves_its_output_in_the_transcript() {
 }
 
 #[test]
-fn no_print_on_exit_leaves_the_shell_as_it_was() {
+fn no_print_on_exit_leaves_only_the_receipt() {
     let shell = one_turn_then_leave(&["--no-print-on-exit"]);
     assert!(
         !shell.contains("Hello from the pty."),
         "nothing was printed back:\n{shell}"
     );
-    assert!(
-        shell.trim().is_empty(),
-        "the screen is the shell's own:\n{shell}"
+    let rows: Vec<_> = shell.lines().filter(|row| !row.is_empty()).collect();
+    assert_eq!(rows.len(), 3, "{shell}");
+    assert_eq!(rows[0].as_bytes(), "● bingo · say hello".as_bytes());
+    let duration = rows[1].strip_prefix("  1 turn · ").expect("turn count");
+    assert!(duration.ends_with('s'), "{shell}");
+    assert!(duration[..duration.len() - 1].parse::<u64>().is_ok());
+    let id = rows[2]
+        .strip_prefix("  resume with bingo --resume ")
+        .expect("resume command");
+    assert!(id.starts_with("ses_"));
+    assert_eq!(
+        rows[2].as_bytes(),
+        format!("  resume with bingo --resume {id}").as_bytes()
     );
 }
 

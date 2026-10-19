@@ -24,6 +24,8 @@ mod interactions;
 mod look;
 /// What the run has to say the moment it opens.
 mod notices;
+/// The opening: whether it plays, and when it started (M70, M72).
+mod opening;
 mod palette;
 #[path = "run/pulling.rs"]
 mod pulling;
@@ -228,7 +230,7 @@ pub(crate) fn identity() -> ClientIdentity {
 pub(crate) struct Farewell {
     pub exit: Exit,
     pub screen: Vec<String>,
-    pub session: SessionId,
+    pub receipt: Vec<ratatui::text::Line<'static>>,
 }
 
 pub(crate) async fn drive(
@@ -318,6 +320,7 @@ async fn attach(
 ) -> Result<(Run, Option<FrameStream>), KernelError> {
     let bootstrap = matches!(opts.selector, SessionSelector::Create { .. })
         && opts.prompt.as_deref() == Some("/sessions");
+    let resumed = !matches!(opts.selector, SessionSelector::Create { .. });
     let attachment = host
         .open(opts.selector, identity(), OpenOptions::with_children())
         .await?;
@@ -352,6 +355,7 @@ async fn attach(
         exit: None,
     };
     run.session.bootstrap = bootstrap;
+    opening::arrived(&mut run, resumed);
     run.ui.catalogs.current = host
         .service(&bingo_sdk::command::COMMAND_CATALOG)
         .map(crate::palette::Current);
@@ -449,11 +453,12 @@ impl Run {
         self.paint(screen, Wake::Frame, now)?;
         showing::forget(self, screen)?;
         let root = self.session.tree.root_id().clone();
+        let receipt = opening::receipt(self, now, screen.size().0).await;
         let _ = self.host.close(&root, CloseReason::Client).await;
         Ok(Farewell {
+            receipt,
             exit,
             screen: self.farewell(screen.size().1),
-            session: root,
         })
     }
 
@@ -1334,7 +1339,7 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn an_idle_surface_draws_nothing_at_all() {
+    async fn an_idle_surface_draws_only_the_welcomes_declared_motion() {
         let mut harness = Harness::new();
         harness.recorder.motion = Some(true);
         let (host, _) = TestHost::with(vec![]);
@@ -1352,14 +1357,27 @@ mod tests {
         .expect("the loop ran");
         for painted in &harness.recorder.painted_at {
             let age = painted.duration_since(began);
-            assert!(
-                !(Duration::from_secs(10) < age && age < Duration::from_secs(60)),
-                "idle frame at {age:?}"
-            );
-            assert!(
-                !(Duration::from_secs(70) < age && age < Duration::from_secs(120)),
-                "idle frame after key at {age:?}"
-            );
+            assert!(age < Duration::from_secs(130), "{age:?}");
+        }
+        let motion_frames = harness
+            .recorder
+            .painted_at
+            .iter()
+            .filter(|at| {
+                let age = at.duration_since(began);
+                Duration::from_secs(11) < age && age < Duration::from_secs(59)
+            })
+            .count();
+        assert!(
+            (1000..1600).contains(&motion_frames),
+            "welcome wakes only on its frame deadline: {motion_frames}"
+        );
+        for pair in harness.recorder.painted_at.windows(2) {
+            if pair[0].duration_since(began) > Duration::from_secs(11)
+                && pair[1].duration_since(began) < Duration::from_secs(59)
+            {
+                assert!(pair[1].duration_since(pair[0]) >= crate::clock::FRAME);
+            }
         }
         assert!(
             harness.recorder.painted_at.iter().any(|at| {

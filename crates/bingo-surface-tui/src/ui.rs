@@ -410,7 +410,7 @@ impl Ui {
     }
 
     /// A newer notice replaces the old one; nothing waits to be said later.
-    fn say(&mut self, message: Message, hold: Duration, now: Instant) {
+    pub(crate) fn say(&mut self, message: Message, hold: Duration, now: Instant) {
         self.placed.toasts.discard();
         self.notice = Some(Notice {
             kind: NoticeKind::Message(message),
