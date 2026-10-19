@@ -6,6 +6,7 @@ pub mod groups;
 mod guide;
 mod keys;
 mod opening;
+mod receipts;
 pub mod trust;
 pub mod verbs;
 use bingo_sdk::*;
@@ -49,6 +50,7 @@ impl Plugin for Plugins {
         for link in [
             Arc::new(opening::Opening("plugins")) as Arc<dyn Interceptor>,
             Arc::new(opening::Opening("mcp")),
+            Arc::new(receipts::Receipts),
             Arc::new(draw::Drawing(state)),
         ] {
             registrar.add(Contribution::Interceptor {

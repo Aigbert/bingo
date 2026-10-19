@@ -34,7 +34,7 @@ fn quiet(key: &'static str, verb: Verb) -> Binding {
 }
 /// The verb a pressed key names in a table, nothing for a key it lacks.
 pub fn pressed(bindings: Vec<Binding>, key: &str) -> Verb {
-    let key = if key == " " { "space" } else { key };
+    let key = bingo_sdk::keys::normalize(key);
     bindings
         .into_iter()
         .find(|binding| binding.key == key)
@@ -90,9 +90,9 @@ pub fn plugin_keys(p: &CatalogEntry) -> Vec<Binding> {
 }
 fn explain(status: &PluginState) -> &'static str {
     if matches!(status, PluginState::Failed { .. }) {
-        "r reloads it; the error is on the card"
+        "/plugins reload retries loading it"
     } else {
-        "space switches it; t changes its trust"
+        "space switches it; /plugins trust changes its trust"
     }
 }
 fn switch(p: &CatalogEntry, status: &PluginState) -> Binding {

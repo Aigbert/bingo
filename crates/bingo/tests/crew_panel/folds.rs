@@ -142,7 +142,10 @@ async fn disable_crew(host: &impl HostApi, root: &mut Attachment) {
     assert!(crew_pane(root));
     let disabled = command(root, "/plugins disable bingo.mod.crew").await;
     assert_eq!(disabled["kind"], "applied", "{disabled}");
-    assert_eq!(disabled["result"]["message"], "bingo.mod.crew is off now.");
+    assert_eq!(
+        disabled["result"]["message"],
+        "bingo.mod.crew off · from the next turn"
+    );
     assert!(!root.snapshot.signals.contains_key("bingo.mod.crew"));
     assert!(!crew_pane(root));
     crew_marks(&host.catalog(CatalogKind::Commands).await.unwrap(), false);
@@ -158,7 +161,10 @@ async fn disable_crew(host: &impl HostApi, root: &mut Attachment) {
     assert!(receipt["result"].get("surface").is_none());
     let enabled = command(root, "/plugins enable bingo.mod.crew").await;
     assert_eq!(enabled["kind"], "applied", "{enabled}");
-    assert_eq!(enabled["result"]["message"], "bingo.mod.crew is on now.");
+    assert_eq!(
+        enabled["result"]["message"],
+        "bingo.mod.crew on · from the next turn"
+    );
     crew_marks(&host.catalog(CatalogKind::Commands).await.unwrap(), true);
     crew_marks(
         &host

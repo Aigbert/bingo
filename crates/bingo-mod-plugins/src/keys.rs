@@ -14,7 +14,9 @@ impl Command for Handler {
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let args: Value = serde_json::from_str(args).map_err(crate::error)?;
         let request = args["handler"].as_str().unwrap_or_default();
-        let key = args["value"]["key"].as_str().unwrap_or_default();
+        let Some(press) = sheet::pressed(&args) else {
+            return Ok(CommandOutcome::Handled { handled: false });
+        };
         if args["event"] != "press" {
             return Ok(CommandOutcome::Handled { handled: false });
         }
@@ -26,9 +28,10 @@ impl Command for Handler {
         let at = Press {
             session: &cx.session,
             request,
-            key,
+            press: &press,
             row: args["row"].as_str(),
             vouched: render::vouched(),
+            review_ready: args["reviewReady"] == true,
         };
         let value = self.press(&at, &props, &servers)?;
         cx.host
@@ -50,9 +53,10 @@ impl Command for Handler {
 pub(crate) struct Press<'a> {
     pub session: &'a SessionId,
     pub request: &'a str,
-    pub key: &'a str,
+    pub press: &'a sheet::Press,
     pub row: Option<&'a str>,
     pub vouched: bool,
+    pub review_ready: bool,
 }
 impl Handler {
     pub(crate) fn press(
@@ -64,7 +68,12 @@ impl Handler {
         if !at.vouched {
             return Ok(unvouched());
         }
-        let key = at.key;
+        let key = at.press.key().unwrap_or("enter");
+        if at.press.picked().is_none()
+            && !matches!(key, "up" | "down" | "enter" | "space" | "esc" | "ctrl+c")
+        {
+            return Ok(json!({}));
+        }
         let mut state = self.0.lock().map_err(crate::error)?;
         let identity = (at.session.clone(), at.request.into());
         let cursor = state.entry(identity.clone()).or_default();
@@ -82,6 +91,29 @@ impl Handler {
         };
         if !matches!(key, "up" | "down") && at.row != Some(row.key.as_str()) {
             return Ok(stale());
+        }
+        let (key, row) = if let Some(id) = at.press.picked() {
+            let Some(picked) = groups
+                .iter()
+                .flat_map(|group| &group.rows)
+                .find(|row| row.key == id)
+                .cloned()
+            else {
+                return Ok(stale());
+            };
+            if cursor.selected != id {
+                cursor.trust = None;
+                cursor.reviewing = false;
+            }
+            cursor.selected = id.into();
+            ("enter", picked)
+        } else {
+            (key, row)
+        };
+        if (cursor.trust.is_some() || cursor.reviewing) && key == "enter" && !at.review_ready {
+            return Ok(
+                json!({"message":"the full review does not fit; enlarge the terminal before approving"}),
+            );
         }
         if cursor.trust.is_some() {
             return Ok(trusting(cursor, &row.kind, props, key));
@@ -146,18 +178,13 @@ fn operation(verb: Verb) -> Value {
 }
 
 fn navigate(cursor: &mut crate::Cursor, groups: &[groups::Group], key: &str) {
-    let rows = groups.iter().flat_map(|g| &g.rows).collect::<Vec<_>>();
-    let at = rows
+    let rows = groups
         .iter()
-        .position(|r| r.key == cursor.selected)
-        .unwrap_or(0);
-    let at = if key == "up" {
-        at.saturating_sub(1)
-    } else {
-        (at + 1).min(rows.len().saturating_sub(1))
-    };
-    if let Some(row) = rows.get(at) {
-        cursor.selected = row.key.clone();
+        .flat_map(|g| &g.rows)
+        .map(|row| pick::Row::new(&row.key, pick::text("", "fg")))
+        .collect::<Vec<_>>();
+    if let Some(id) = pick::moved(&rows, Some(&cursor.selected), key == "down") {
+        cursor.selected = id;
     }
     cursor.reviewing = false;
 }

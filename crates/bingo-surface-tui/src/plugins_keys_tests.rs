@@ -117,7 +117,7 @@ async fn panel(host: &bingo_core::Host, attachment: &Attachment) -> View {
 }
 async fn key(host: &bingo_core::Host, attachment: &mut Attachment, key: &str) -> serde_json::Value {
     let view = panel(host, attachment).await;
-    assert!(backend(view.clone()).contains("one list"));
+    assert!(backend(view.clone()).contains("Plugins"));
     let View::Box { layout, .. } = view else {
         panic!("panel")
     };
@@ -127,6 +127,27 @@ async fn key(host: &bingo_core::Host, attachment: &mut Attachment, key: &str) ->
         panic!("handled")
     };
     result["surface"]["args"]["value"].clone()
+}
+async fn select(host: &bingo_core::Host, attachment: &mut Attachment, id: &str) {
+    for _ in 0..32 {
+        let View::Box { layout, .. } = panel(host, attachment).await else {
+            panic!("sheet")
+        };
+        if layout.on_key.as_ref().unwrap().args["row"] == id {
+            return;
+        }
+        key(host, attachment, "up").await;
+    }
+    for _ in 0..32 {
+        let View::Box { layout, .. } = panel(host, attachment).await else {
+            panic!("sheet")
+        };
+        if layout.on_key.as_ref().unwrap().args["row"] == id {
+            return;
+        }
+        key(host, attachment, "down").await;
+    }
+    panic!("missing row {id}");
 }
 #[tokio::test]
 async fn panel_keys_drive_live_switches_pending_tools_and_needed_refusal() {
@@ -172,13 +193,10 @@ async fn panel_keys_drive_live_switches_pending_tools_and_needed_refusal() {
             matches!(result,IntentOutcome::Applied{ref result} if result["message"].as_str().unwrap().contains(expected)),
             "{result:?}"
         );
-        assert!(
-            backend(panel(&host, &attachment).await).contains(if name == "drawing" {
-                "○ off"
-            } else {
-                "off at next start"
-            })
-        );
+        let plugins = host.catalog(CatalogKind::Plugins).await.unwrap().entries;
+        let entry = plugins.iter().find(|entry| entry.id == name).unwrap();
+        assert!(!bingo_mod_plugins::groups::state(entry).unwrap().is_on() || name == "tooling");
+        assert!(backend(panel(&host, &attachment).await).contains(name));
         key(&host, &mut attachment, "down").await;
     }
     let refused = key(&host, &mut attachment, "space").await;
@@ -290,8 +308,6 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
         key(&host, &mut attachment, "enter").await["run"],
         "/plugins approve plugins:demo full"
     );
-    key(&host, &mut attachment, "down").await;
-    key(&host, &mut attachment, "down").await;
     for (status, verb) in [
         (Status::Connected { tools: 1 }, "tools"),
         (Status::NeedsAuth { why: "401".into() }, "login"),
@@ -306,6 +322,7 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
     ] {
         let waiting = matches!(status, Status::Waiting { .. });
         row.lock().unwrap().status = status;
+        select(&host, &mut attachment, "m:local").await;
         if waiting {
             for key_name in ["space", "r", "enter"] {
                 let reviewed = key(&host, &mut attachment, key_name).await;
@@ -324,7 +341,7 @@ async fn painted_keys_confirm_full_twice_and_dispatch_each_server_state() {
     }
     row.lock().unwrap().status = Status::SigningIn;
     let refused = key(&host, &mut attachment, "r").await;
-    assert!(refused["message"].as_str().unwrap().contains("wait"));
+    assert!(refused.get("message").is_none());
     assert!(refused.get("run").is_none());
     host.shutdown().await;
 }
@@ -358,11 +375,12 @@ async fn a_key_outrunning_the_redraw_acts_on_nothing() {
     let (host, mut attachment) = facts_scene(home.path(), row).await;
     key(&host, &mut attachment, "down").await;
     let seen = panel(&host, &attachment).await;
-    assert!(backend(seen.clone()).contains("❯  ▸ 2 built in"));
+    assert!(backend(seen.clone()).contains("▎"));
     key(&host, &mut attachment, "down").await;
     let stale = key_on(&seen, &mut attachment, "enter").await;
     assert!(stale.get("run").is_none(), "{stale}");
     assert!(stale["message"].as_str().unwrap().contains("changed"));
+    select(&host, &mut attachment, "m:local").await;
     assert_eq!(
         key(&host, &mut attachment, "enter").await["run"],
         "/mcp enable local"
@@ -391,7 +409,7 @@ async fn a_key_moves_the_cursor_of_the_session_it_came_from() {
     let IntentOutcome::Applied { .. } = submit(&mut attachment, crate::acted(action)).await else {
         panic!("handled")
     };
-    assert!(backend(panel(&host, &attachment).await).contains("❯  ▸ 2 built in"));
+    assert!(backend(panel(&host, &attachment).await).contains("▎"));
     host.shutdown().await;
 }
 
@@ -623,7 +641,7 @@ async fn an_answer_a_link_swapped_is_not_vouched_for() {
         .await
         .unwrap();
     let drawn = panel(&host, &attachment).await;
-    assert!(backend(drawn.clone()).contains("one list"));
+    assert!(backend(drawn.clone()).contains("Plugins"));
     let swapped = ack_on(&drawn, &mut attachment, "enter").await;
     assert_eq!(
         swapped["surface"]["args"]["value"]["run"], "/plugins trust swap full",
@@ -738,13 +756,7 @@ async fn a_press_a_link_respelled_changes_nothing() {
         )
         .await
         .unwrap();
-    for _ in 0..8 {
-        if backend(panel(&host, &attachment).await).contains("❯ ◌ local") {
-            break;
-        }
-        key(&host, &mut attachment, "down").await;
-    }
-    assert!(backend(panel(&host, &attachment).await).contains("❯ ◌ local"));
+    select(&host, &mut attachment, "m:local").await;
     let respelled = key(&host, &mut attachment, "space").await;
     assert!(respelled.get("run").is_none(), "{respelled}");
     assert!(

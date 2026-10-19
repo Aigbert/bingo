@@ -37,38 +37,32 @@ pub fn groups(
     servers: &[ServerRow],
     expanded: bool,
 ) -> Vec<Group> {
-    let mut groups = vec![];
-    if open == PluginsOpen::Mcp {
-        groups.push(server_group(servers));
-    }
-    for (project, title, hint) in [
-        (false, "plugins · yours", "~/.bingo/plugins"),
-        (true, "plugins · this project", ".bingo/plugins"),
-    ] {
-        let rows = plugins
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| {
-                !builtin(p)
-                    && !p.id.starts_with("mcp:")
-                    && (p.meta["origin"] == "project") == project
-            })
-            .map(|(i, p)| plugin_row(i, p, plugins))
-            .collect::<Vec<_>>();
-        if !rows.is_empty() {
-            groups.push(Group {
-                name: title,
-                hint,
-                rows,
-            });
-        }
-    }
-    groups.push(builtin_group(plugins, expanded));
-    if open != PluginsOpen::Mcp {
-        groups.push(server_group(servers));
-    }
-    groups
+    let _ = (open, expanded);
+    let mut rows = plugins
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| !p.id.starts_with("mcp:"))
+        .map(|(i, p)| plugin_row(i, p, plugins))
+        .collect::<Vec<_>>();
+    rows.extend(server_group(servers).rows);
+    rows.sort_by_key(|r| match r.kind {
+        Kind::Plugin(i) => !matches!(
+            state(&plugins[i]),
+            Some(PluginState::Failed { .. } | PluginState::Waiting { .. })
+        ),
+        Kind::Server(i) => !matches!(
+            servers[i].status,
+            Status::Failed { .. } | Status::NeedsAuth { .. } | Status::Waiting { .. }
+        ),
+        Kind::Builtins => true,
+    });
+    vec![Group {
+        name: "plugins",
+        hint: "",
+        rows,
+    }]
 }
+
 fn plugin_row(index: usize, p: &CatalogEntry, plugins: &[CatalogEntry]) -> Row {
     let (glyph, tag) = match state(p) {
         Some(state) => (glyph(&state), tag(&state, p, plugins)),
@@ -174,57 +168,4 @@ pub fn selected<'a>(groups: &'a [Group], cursor: &mut crate::Cursor) -> Option<&
         cursor.selected = row.key.clone();
     }
     Some(row)
-}
-
-fn builtin_group(plugins: &[CatalogEntry], expanded: bool) -> Group {
-    let builtins = plugins
-        .iter()
-        .enumerate()
-        .filter(|(_, p)| builtin(p))
-        .collect::<Vec<_>>();
-    let off = builtins
-        .iter()
-        .filter(|(_, p)| !matches!(state(p), Some(PluginState::On)))
-        .count();
-    let under = builtins
-        .iter()
-        .filter(|(_, p)| crate::chain::drawn_over(p, plugins).is_some())
-        .count();
-    let tag = format!(
-        "{}{}",
-        if off == 0 {
-            "all on".into()
-        } else {
-            format!("{off} off")
-        },
-        if under > 0 {
-            format!(" · {under} drawn over")
-        } else {
-            String::new()
-        }
-    );
-    let mut rows = if expanded {
-        builtins
-            .iter()
-            .map(|(i, p)| plugin_row(*i, p, plugins))
-            .collect()
-    } else {
-        vec![]
-    };
-    rows.push(Row {
-        key: "builtins".into(),
-        label: if expanded {
-            "▴ fold".into()
-        } else {
-            format!("▸ {} built in", builtins.len())
-        },
-        glyph: "",
-        tag,
-        kind: Kind::Builtins,
-    });
-    Group {
-        name: "plugins · built in",
-        hint: "compiled into bingo",
-        rows,
-    }
 }

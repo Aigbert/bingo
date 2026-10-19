@@ -13,23 +13,15 @@ fn fixture() -> (Vec<CatalogEntry>, Vec<ServerRow>) {
 fn groups_keep_the_opener_first_and_cursor_on_its_name() {
     let (plugins, mut servers) = fixture();
     let groups = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, false);
-    assert_eq!(
-        groups.iter().map(|g| g.name).collect::<Vec<_>>(),
-        [
-            "plugins · yours",
-            "plugins · this project",
-            "plugins · built in",
-            "MCP servers"
-        ]
-    );
-    assert_eq!(groups[1].rows[0].tag, "waits for your yes");
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].rows[0].label, "weather");
     let mut cursor = Cursor {
         selected: "m:linear".into(),
         ..Default::default()
     };
     servers.reverse();
     let groups = groups::groups(component::PluginsOpen::Mcp, &plugins, &servers, false);
-    assert_eq!(groups[0].name, "MCP servers");
+    assert_eq!(groups[0].name, "plugins");
     assert_eq!(
         groups::selected(&groups, &mut cursor).unwrap().label,
         "linear"
@@ -48,8 +40,16 @@ fn mcp_opens_with_its_first_server_selected_before_builtins() {
             args: json!({}),
         },
     };
-    draw::tree(&props, &servers, &mut cursor, "mcp", 108, 20);
-    assert_eq!(cursor.selected, format!("m:{}", servers[0].name));
+    draw::tree(
+        &props,
+        &servers,
+        &mut cursor,
+        "mcp",
+        108,
+        20,
+        Default::default(),
+    );
+    assert_eq!(cursor.selected, "p:weather");
 }
 #[test]
 fn every_server_primary_action_is_a_command_and_reconnect_is_guarded() {
@@ -172,8 +172,19 @@ fn handlers_retire_the_opening_and_return_only_command_lines() {
         },
     };
     let state = Shared::default();
+    state.lock().unwrap().insert(
+        (props.session.clone(), "a".into()),
+        Cursor {
+            selected: "p:my-picker".into(),
+            ..Default::default()
+        },
+    );
     assert_eq!(
         press(&state, "a", "space", &props, &servers),
+        json!({"run":"/plugins disable my-picker"})
+    );
+    assert_eq!(
+        press(&state, "a", " ", &props, &servers),
         json!({"run":"/plugins disable my-picker"})
     );
     assert_eq!(
@@ -263,7 +274,7 @@ fn the_footer_names_exactly_the_keys_that_act() {
         tables.push(verbs::server_keys(&servers[0], true));
     }
     for table in tables {
-        let footer = draw::footer(&table, "close");
+        let footer = footer(&table, "close");
         for binding in &table {
             let named = binding.hint.is_some();
             let quiet = matches!(binding.verb, verbs::Verb::Message(_) | verbs::Verb::None);
@@ -276,7 +287,7 @@ fn the_footer_names_exactly_the_keys_that_act() {
 fn a_waiting_server_starts_nothing_until_a_second_enter() {
     let (_, mut servers) = fixture();
     servers[0].status = Status::Waiting { changed: false };
-    let footer = draw::footer(&verbs::server_keys(&servers[0], false), "close");
+    let footer = footer(&verbs::server_keys(&servers[0], false), "close");
     assert_eq!(footer, " ↑↓ pick · ⏎ review · esc close");
     for key in ["space", " ", "r"] {
         assert!(matches!(
@@ -312,6 +323,13 @@ fn approving_a_server_shows_what_it_runs_and_moving_forgets_it() {
         },
     };
     let state = Shared::default();
+    state.lock().unwrap().insert(
+        (props.session.clone(), "a".into()),
+        Cursor {
+            selected: "m:github".into(),
+            ..Default::default()
+        },
+    );
     let press = |key| press(&state, "a", key, &props, &servers);
     assert!(press("space")["message"].is_string());
     assert_eq!(press("enter"), json!({}));
@@ -389,7 +407,9 @@ fn drawn_row(
     let cursor = guard
         .entry((props.session.clone(), request.into()))
         .or_default();
-    let View::Box { layout, .. } = draw::tree(props, servers, cursor, request, 108, 30) else {
+    let View::Box { layout, .. } =
+        draw::tree(props, servers, cursor, request, 108, 30, Default::default())
+    else {
         panic!("panel")
     };
     layout.on_key.unwrap().args["row"].as_str().unwrap().into()
@@ -405,9 +425,10 @@ fn pressed_on(
     let at = keys::Press {
         session: &props.session,
         request,
-        key,
+        press: &bingo_sdk::sheet::Press::Key(bingo_sdk::keys::normalize(key).into()),
         row,
         vouched: true,
+        review_ready: true,
     };
     keys::Handler(state.clone())
         .press(&at, props, servers)
@@ -418,8 +439,8 @@ fn pressed_on(
 /// since, or the row that drawing showed is gone, it acts on nothing.
 #[test]
 fn a_key_from_a_stale_drawing_acts_on_nothing() {
-    let (plugins, mut servers) = fixture();
-    let props = component::PluginsProps {
+    let (plugins, servers) = fixture();
+    let mut props = component::PluginsProps {
         open: component::PluginsOpen::Mcp,
         session: SessionId::from_raw("s"),
         plugins,
@@ -430,7 +451,7 @@ fn a_key_from_a_stale_drawing_acts_on_nothing() {
     };
     let state = Shared::default();
     let seen = drawn_row(&state, "a", &props, &servers);
-    assert_eq!(seen, "m:github");
+    assert_eq!(seen, "p:weather");
     assert_eq!(
         pressed_on(&state, "a", "down", Some(&seen), &props, &servers),
         json!({})
@@ -446,18 +467,18 @@ fn a_key_from_a_stale_drawing_acts_on_nothing() {
             .is_none()
     );
     let linear = drawn_row(&state, "a", &props, &servers);
-    assert_eq!(linear, "m:linear");
-    servers.retain(|s| s.name != "linear");
+    assert_eq!(linear, "p:plugins:demo-lint");
+    props.plugins.retain(|p| p.id != "plugins:demo-lint");
     let gone = pressed_on(&state, "a", "space", Some(&linear), &props, &servers);
     assert!(gone.get("run").is_none(), "{gone}");
     assert_eq!(
         state.lock().unwrap()[&(props.session.clone(), "a".to_string())].selected,
-        "m:github",
+        "p:weather",
         "a vanished row resets the cursor to the first"
     );
     assert_eq!(
         press(&state, "a", "space", &props, &servers),
-        json!({"run":"/mcp disable github"})
+        json!({"run":"/plugins enable weather"})
     );
 }
 
@@ -506,39 +527,30 @@ fn drawn_at(
         selected: row.into(),
         ..Default::default()
     };
-    let view = draw::tree(props, servers, &mut cursor, "a", width, height);
+    let view = draw::tree(
+        props,
+        servers,
+        &mut cursor,
+        "a",
+        width,
+        height,
+        Default::default(),
+    );
     bingo_sdk::testing::assert_separate_hints(&view);
     lines(&view)
 }
 
 #[test]
-fn error_lines_stay_inside_the_card_and_are_cut_at_its_edge() {
-    let (mut plugins, servers) = fixture();
-    plugins[1].meta["state"]["why"] = json!(format!("{}\n  second line", "x".repeat(200)));
-    for (width, height) in [(80, 24), (108, 30)] {
-        let drawn = drawn_at(
-            &props_of(plugins.clone()),
-            &servers,
-            "p:weather",
-            width,
-            height,
-        );
-        let red = drawn
-            .iter()
-            .filter(|(text, color)| color.as_deref() == Some("red") && !text.contains('✗'))
-            .map(|(text, _)| text)
-            .collect::<Vec<_>>();
-        assert_eq!(red.len(), 2, "{red:?}");
-        assert!(red.iter().all(|text| text.starts_with(' ')));
-        assert!(red[0].ends_with('…'));
-        let card = if width < 100 {
-            width
-        } else {
-            width - width * 56 / 108 - 1
-        };
-        assert_eq!(red[0].chars().count(), usize::from(card));
-        assert_eq!(red[1], "   second line");
-    }
+fn errors_use_amber_and_leave_multiline_details_out_of_the_row() {
+    let (plugins, servers) = fixture();
+    let props = props_of(plugins);
+    let drawn = drawn_at(&props, &servers, "p:weather", 100, 18);
+    let errors = drawn
+        .iter()
+        .filter(|(_, ink)| ink.as_deref() == Some("amber"))
+        .collect::<Vec<_>>();
+    assert!(!errors.is_empty());
+    assert!(errors.iter().all(|(text, _)| !text.contains('\n')));
 }
 
 #[test]
@@ -546,19 +558,9 @@ fn a_long_list_says_how_many_rows_it_hides() {
     let (plugins, servers) = fixture();
     let props = props_of(plugins);
     let drawn = drawn_at(&props, &servers, "p:my-picker", 80, 24);
-    assert!(
-        drawn
-            .iter()
-            .any(|(text, _)| text.trim_start().starts_with('↓') && text.ends_with("more")),
-        "{drawn:?}"
-    );
+    assert!(drawn.iter().any(|(text, _)| text == "8 of 11"), "{drawn:?}");
     let drawn = drawn_at(&props, &servers, "m:figma", 80, 24);
-    assert!(
-        drawn
-            .iter()
-            .any(|(text, _)| text.trim_start().starts_with('↑') && text.ends_with("above")),
-        "{drawn:?}"
-    );
+    assert!(drawn.iter().any(|(text, _)| text == "8 of 11"), "{drawn:?}");
 }
 
 #[test]
@@ -666,7 +668,11 @@ fn a_state_this_build_cannot_read_is_unknown() {
     let (mut plugins, servers) = fixture();
     plugins[0].meta["state"] = json!({"kind":"hibernating"});
     let groups = groups::groups(component::PluginsOpen::Plugins, &plugins, &servers, false);
-    let row = &groups[0].rows[0];
+    let row = groups[0]
+        .rows
+        .iter()
+        .find(|r| r.key == "p:my-picker")
+        .unwrap();
     assert_eq!((row.glyph, row.tag.as_str()), ("?", "unknown"));
     let card = cards::plugin_card(&plugins[0], &plugins, None);
     assert!(card.iter().any(|f| f.text.ends_with("? unknown")));
@@ -700,7 +706,22 @@ fn only_a_built_in_that_draws_a_site_falls_back_to_the_plain_drawing() {
 
 #[test]
 fn one_server_is_counted_as_one() {
-    assert_eq!(crate::draw::counted(1, "MCP server"), "1 MCP server");
-    assert_eq!(crate::draw::counted(2, "plugin"), "2 plugins");
-    assert_eq!(crate::draw::counted(0, "plugin"), "0 plugins");
+    assert_eq!(counted(1, "MCP server"), "1 MCP server");
+    assert_eq!(counted(2, "plugin"), "2 plugins");
+    assert_eq!(counted(0, "plugin"), "0 plugins");
+}
+
+fn footer(bindings: &[crate::verbs::Binding], esc: &str) -> String {
+    let mut words = vec!["↑↓ pick".to_string()];
+    words.extend(bindings.iter().filter_map(|b| {
+        b.hint
+            .as_ref()
+            .map(|hint| format!("{} {hint}", if b.key == "enter" { "⏎" } else { b.key }))
+    }));
+    words.push(format!("esc {esc}"));
+    format!(" {}", words.join(" · "))
+}
+
+fn counted(n: usize, noun: &str) -> String {
+    format!("{n} {noun}{}", if n == 1 { "" } else { "s" })
 }

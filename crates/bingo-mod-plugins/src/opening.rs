@@ -23,20 +23,19 @@ impl Interceptor for Opening {
         value: Value,
         next: Next<'_, Value, Value>,
     ) -> Result<Value, KernelError> {
-        let command = value["command"].as_str().unwrap_or_default();
-        if !opens(&value) {
+        let run: catalogue::CommandRun =
+            serde_json::from_value(value.clone()).map_err(crate::error)?;
+        if !opens(&run) {
             return next.run(value).await;
         }
-        let open = command.to_string();
+        let open = run.name;
         opened(&open, next.run(value).await?)
     }
 }
-fn opens(value: &Value) -> bool {
-    matches!(value["command"].as_str(), Some("plugins" | "mcp"))
-        && value["args"]
-            .as_str()
-            .is_some_and(|args| args.trim().is_empty())
-        && value["surface"] == "terminal"
+fn opens(run: &catalogue::CommandRun) -> bool {
+    matches!(run.name.as_str(), "plugins" | "mcp")
+        && run.args.trim().is_empty()
+        && run.surface.is_some_and(render::SurfaceName::shows_sheets)
 }
 fn opened(open: &str, plain: Value) -> Result<Value, KernelError> {
     let reply: catalogue::CommandReply = serde_json::from_value(plain).map_err(crate::error)?;
@@ -63,6 +62,7 @@ mod tests {
     fn bare_mcp_opens_the_mcp_group_and_keeps_its_text() {
         for (args, surface, expected) in [
             ("", Some("terminal"), true),
+            ("", Some("desktop"), true),
             ("  ", Some("terminal"), true),
             ("tools server", Some("terminal"), false),
             ("", Some("text"), false),
@@ -70,7 +70,10 @@ mod tests {
             ("", None, false),
         ] {
             assert_eq!(
-                opens(&json!({"command":"mcp","args":args,"surface":surface})),
+                opens(
+                    &serde_json::from_value(json!({"command":"mcp","args":args,"surface":surface}))
+                        .unwrap()
+                ),
                 expected
             );
         }

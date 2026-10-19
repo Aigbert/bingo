@@ -74,6 +74,9 @@ pub fn draw(
     if let Some(key) = key {
         frame.pulls.push(key);
     }
+    if let Some(view) = answer {
+        crate::dock::sheets::targets(frame, view, width);
+    }
     let drawing = crate::component::draw_marked(
         &props,
         answer,

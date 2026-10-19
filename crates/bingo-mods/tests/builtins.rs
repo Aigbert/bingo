@@ -496,7 +496,8 @@ async fn outside_mod_wraps_the_plugins_site_and_disabled_commands_keep_tables() 
         "{}",
         tree.fold()
     );
-    assert!(tree.fold().contains("one list"));
+    assert!(tree.fold().contains("Plugins"));
+    assert!(tree.fold().contains("bingo.mod.models"), "{}", tree.fold());
     let opened = command(
         &mut attachment,
         Input::text(
@@ -695,5 +696,38 @@ async fn opening_checks_an_unchecked_provider_once_and_refreshes_the_tree() {
             .iter()
             .any(|m| m.id == "counted/one")
     );
+    host.shutdown().await;
+}
+
+#[tokio::test]
+async fn deeply_wrapped_views_resolve_on_the_embedded_runtime() {
+    let home = tempfile::tempdir().unwrap();
+    let source = r#"export function register(on) {
+        on('ui.render',{component:'Plugins'},async ($,e,next)=>{
+            let tree=await next(e);
+            const onKey=tree.onKey;
+            delete tree.onKey;
+            for(let i=0;i<48;i++) tree=h('Box',{},tree);
+            return h('Box',{onKey},h('Text',{},'deep outside wrapper'),tree);
+        });
+    }"#;
+    let (host, attachment) = start(home.path(), Some(source), false).await;
+    let tree = host
+        .render(
+            &attachment.session,
+            serde_json::from_value(json!({
+                "component":"Plugins","requestId":"deep","surface":"terminal",
+                "viewport":{"columns":100,"rows":18},
+                "props":{"open":"plugins","session":attachment.session,"plugins":[{
+                    "id":"deep-row","label":"deep inner row","meta":{"state":{"kind":"on"}}
+                }],"action":{"name":"surface:plugins","args":{}}}
+            }))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let words = tree.fold();
+    assert!(words.contains("deep outside wrapper"), "{words}");
+    assert!(words.contains("deep-row"), "{words}");
     host.shutdown().await;
 }
