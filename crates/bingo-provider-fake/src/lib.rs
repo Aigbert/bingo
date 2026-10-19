@@ -21,8 +21,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use bingo_sdk::{
     CancellationToken, ContentPart, EndpointCapabilities, FinishReason, ModelEvent, ModelInfo,
-    ModelRequest, ModelStream, Plugin, PluginError, PluginManifest, Provider, ProviderError,
-    Registrar, Role, UnifiedFinish, Usage,
+    ModelRequest, ModelStream, Plugin, PluginError, PluginManifest, Prompter, Provider,
+    ProviderError, Registrar, Role, UnifiedFinish, Usage,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -46,6 +46,17 @@ pub struct Script {
     /// are never spent on one.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub side: Vec<Response>,
+    /// How `/login` goes; without one the fake has no sign-in, as before.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub login: Option<Login>,
+}
+
+/// A scripted sign-in: the flow a person is shown, approved on its own after
+/// a while unless the person cancels first.
+#[derive(schemars::JsonSchema, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Login {
+    pub flow: bingo_sdk::LoginFlow,
+    pub approve_after_ms: u64,
 }
 
 /// One provider response: what a single `stream()` call yields.
@@ -137,6 +148,7 @@ impl Script {
                 when: None,
             }],
             side: Vec::new(),
+            login: None,
         }
     }
 
@@ -162,6 +174,7 @@ impl Script {
                 },
             ],
             side: Vec::new(),
+            login: None,
         }
     }
 
@@ -246,6 +259,7 @@ pub struct FakeProvider {
     /// response the conversation was going to need.
     side: Deck,
     requests: Mutex<Vec<ModelRequest>>,
+    login: Option<Login>,
 }
 
 impl FakeProvider {
@@ -254,6 +268,7 @@ impl FakeProvider {
             conversation: Deck::new(script.responses),
             side: Deck::new(script.side),
             requests: Mutex::new(Vec::new()),
+            login: script.login,
         }
     }
 
@@ -601,6 +616,32 @@ impl Provider for FakeProvider {
         }
     }
 
+    async fn login(
+        &self,
+        prompter: Arc<dyn Prompter>,
+        _method: Option<bingo_sdk::LoginMethod>,
+    ) -> Result<String, ProviderError> {
+        let Some(login) = self.login.clone() else {
+            return Err(ProviderError::Unsupported {
+                message: "login".into(),
+            });
+        };
+        let asked = prompter.ask(
+            bingo_sdk::InteractionKind::Login {
+                provider: self.id().into(),
+                flow: login.flow,
+            },
+            vec![bingo_sdk::AnswerSpec::Cancel],
+        );
+        tokio::select! {
+            biased;
+            _ = asked => Err(ProviderError::Auth { message: "sign-in cancelled".into() }),
+            _ = tokio::time::sleep(Duration::from_millis(login.approve_after_ms)) => {
+                Ok(format!("Signed in to {}.", self.id()))
+            }
+        }
+    }
+
     async fn stream(
         &self,
         request: ModelRequest,
@@ -719,6 +760,8 @@ mod side_tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         let mut side = ModelRequest {
             model: FAKE_MODEL.into(),
@@ -804,6 +847,7 @@ mod addressed_tests {
         Script {
             responses,
             side: Vec::new(),
+            login: None,
         }
     }
 
@@ -936,6 +980,7 @@ mod addressed_tests {
                 addressed("what did we learn", "a fact"),
                 addressed("what is it called", "a name"),
             ],
+            login: None,
         });
         let mut asks = request("what is it called?");
         let mut about = serde_json::Map::new();
@@ -943,6 +988,33 @@ mod addressed_tests {
         asks.provider_options.insert("bingo".into(), about);
 
         assert_eq!(answer(&provider, asks).await.0, "a name");
+    }
+
+    /// A script without `login` parses as before; one with it names the flow
+    /// and the wait, in the wire's own spelling of a login flow.
+    #[test]
+    fn login_is_optional_in_the_script_schema() {
+        let plain = Script::from_json(r#"{"responses":[]}"#).expect("parses");
+        assert_eq!(plain.login, None);
+        assert!(
+            !serde_json::to_string(&plain)
+                .expect("serialize")
+                .contains("login")
+        );
+        let scripted = Script::from_json(
+            r#"{"responses":[],"login":{"flow":{"kind":"device","url":"u","code":"C"},"approve_after_ms":5}}"#,
+        )
+        .expect("a script with `login` parses");
+        assert_eq!(
+            scripted.login,
+            Some(Login {
+                flow: bingo_sdk::LoginFlow::Device {
+                    url: "u".into(),
+                    code: "C".into()
+                },
+                approve_after_ms: 5,
+            })
+        );
     }
 
     /// The field is optional: a script written before `when` existed parses
@@ -1007,6 +1079,8 @@ mod tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         assert_eq!(
             events(drain(&provider, "hi").await),
@@ -1092,6 +1166,8 @@ mod tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         let last = events(drain(&provider, "hi").await).pop().expect("finish");
         assert!(matches!(
@@ -1123,6 +1199,8 @@ mod tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         let items = drain(&provider, "hi").await;
         let last = items.last().expect("an item");
@@ -1151,6 +1229,8 @@ mod tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         let kinds = events(drain(&provider, "hi").await);
         assert!(matches!(kinds[2], ModelEvent::ReasoningStart { .. }));
@@ -1189,6 +1269,8 @@ mod tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         let started = tokio::time::Instant::now();
         drain(&provider, "hi").await;
@@ -1211,6 +1293,8 @@ mod tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         let started = tokio::time::Instant::now();
         let stream = provider
@@ -1230,6 +1314,8 @@ mod tests {
             }],
 
             side: Vec::new(),
+
+            login: None,
         });
         let cancel = CancellationToken::new();
         let mut stream = provider
@@ -1361,6 +1447,8 @@ mod tests {
             ],
 
             side: Vec::new(),
+
+            login: None,
         };
         let json = serde_json::to_string(&script).expect("serialize");
         assert_eq!(Script::from_json(&json).expect("parse"), script);
@@ -1406,5 +1494,54 @@ mod tests {
         assert!(matches!(contributions[0], Contribution::Provider(_)));
         assert_eq!(plugin.manifest().provides, &["provider:fake"]);
         assert_eq!(plugin.provider().id(), "fake");
+    }
+
+    /// A person who answers at once, or never.
+    struct Person(Option<bingo_sdk::Answer>);
+
+    #[async_trait]
+    impl Prompter for Person {
+        async fn ask(
+            &self,
+            kind: bingo_sdk::InteractionKind,
+            _answers: Vec<bingo_sdk::AnswerSpec>,
+        ) -> Result<bingo_sdk::Answer, bingo_sdk::KernelError> {
+            assert!(matches!(kind, bingo_sdk::InteractionKind::Login { .. }));
+            match self.0.clone() {
+                Some(answer) => Ok(answer),
+                None => std::future::pending().await,
+            }
+        }
+    }
+
+    fn signing() -> FakeProvider {
+        FakeProvider::new(Script {
+            login: Some(Login {
+                flow: bingo_sdk::LoginFlow::Device {
+                    url: "u".into(),
+                    code: "C".into(),
+                },
+                approve_after_ms: 3_600,
+            }),
+            ..Script::default()
+        })
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_scripted_sign_in_is_approved_after_its_wait() {
+        let receipt = signing().login(Arc::new(Person(None)), None).await;
+        assert_eq!(receipt.expect("approved"), "Signed in to fake.");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_cancelled_sign_in_fails_and_an_unscripted_one_is_unsupported() {
+        let cancelled = signing()
+            .login(Arc::new(Person(Some(bingo_sdk::Answer::Cancel))), None)
+            .await;
+        assert!(matches!(cancelled, Err(ProviderError::Auth { .. })));
+        let plain = FakeProvider::new(Script::default())
+            .login(Arc::new(Person(None)), None)
+            .await;
+        assert!(matches!(plain, Err(ProviderError::Unsupported { .. })));
     }
 }
