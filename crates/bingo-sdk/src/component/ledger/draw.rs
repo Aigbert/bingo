@@ -15,15 +15,32 @@ impl Step {
 
     /// A row in the shared view vocabulary; motion belongs to the surface clock.
     pub fn drawing(&self, marks: &Marks, width: usize) -> View {
+        self.laid(marks, width, None)
+    }
+
+    /// The same row with its mark, spinner and verb in one voice's ink, for a
+    /// step that belongs to someone with a colour of their own.
+    pub fn drawing_in(&self, marks: &Marks, width: usize, ink: &str) -> View {
+        self.laid(marks, width, Some(ink))
+    }
+
+    fn laid(&self, marks: &Marks, width: usize, accent: Option<&str>) -> View {
         let ascii = marks.asked.is_ascii();
         let right = self.right(ascii);
         let right_width: usize = right.iter().map(|(text, _)| text.width()).sum();
         let ax = self.target_column();
         let available =
             width.saturating_sub(ax + 2 + if right.is_empty() { 0 } else { right_width + 2 });
-        let mut children = vec![TextChild::String("   ".into()), self.mark_node(marks)];
+        let mut children = vec![
+            TextChild::String("   ".into()),
+            self.mark_node(marks, accent),
+        ];
         children.push(TextChild::String(" ".into()));
-        children.push(node(&self.verb, self.verb_ink(), None));
+        let verb_ink = match accent {
+            Some(ink) if self.state != StepState::Failed => ink,
+            _ => self.verb_ink(),
+        };
+        children.push(node(&self.verb, verb_ink, None));
         children.push(TextChild::String(
             " ".repeat(ax.saturating_sub(5 + self.verb.width())),
         ));
@@ -49,9 +66,13 @@ impl Step {
         matches!(self.state, StepState::Stopped | StepState::Skipped)
     }
 
-    fn mark_node(&self, marks: &Marks) -> TextChild {
+    fn mark_node(&self, marks: &Marks, accent: Option<&str>) -> TextChild {
         let (glyph, ink, motion) = match self.state {
-            StepState::Running => (self.mark.to_string(), "glow", Some(TextMotion::Spin)),
+            StepState::Running => (
+                self.mark.to_string(),
+                accent.unwrap_or("glow"),
+                Some(TextMotion::Spin),
+            ),
             StepState::Asked => (
                 marks.asked.clone(),
                 "amberGlow",
@@ -66,6 +87,8 @@ impl Step {
                     "bad"
                 } else if self.quiet() {
                     "faint"
+                } else if let Some(ink) = accent {
+                    ink
                 } else if self.tier == Tier::Lookup {
                     "muted"
                 } else {

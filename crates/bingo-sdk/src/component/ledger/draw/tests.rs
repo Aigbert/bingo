@@ -132,3 +132,24 @@ fn outcomes_answers_and_reasons_keep_their_order_without_a_leading_separator() {
     assert!(row.ends_with("accept edits"));
     assert!(!row.contains('·'));
 }
+
+#[test]
+fn a_voiced_row_draws_its_mark_spinner_and_verb_in_that_ink() {
+    for (state, mark, verb) in [
+        (StepState::Running, "crew1", "crew1"),
+        (StepState::Done, "crew1", "crew1"),
+        (StepState::Failed, "bad", "bad"),
+        (StepState::Skipped, "faint", "crew1"),
+        (StepState::Asked, "amberGlow", "crew1"),
+    ] {
+        let view = step(state).drawing_in(&marks(), 60, "crew1");
+        let value = serde_json::to_value(&view).unwrap();
+        assert_eq!(value["children"][1]["color"], mark, "{state:?}");
+        assert_eq!(value["children"][3]["color"], verb, "{state:?}");
+        assert_eq!(
+            view.fold(),
+            step(state).drawing(&marks(), 60).fold(),
+            "the voice changes inks, never cells"
+        );
+    }
+}
