@@ -139,8 +139,10 @@ Round 3 details, audits, re-pins and departures: [round 3](../verification/m202/
 - [x] Kernel stamps, held receipts/stops and recovery: core `713 passed; 0 failed`.
 - [x] Reached rows/crew: TUI `1431 passed`, crew `28 passed`; no snapshot changed.
 - [x] `bash docs/verification/m202/drive.sh`: 100×32/80×24 passed; `scripts/tui-smoke.sh`: `tui-smoke ok`.
-- [x] fmt/check/clippy/test/discipline/budget/deny: all passed; workspace `6567 passed`.
+- [x] fmt/check/clippy/test/discipline/budget/deny: all passed; workspace `6569 passed` (round 4).
 - [x] Windows sdk/core/crew passed; TUI and other native stops are named in round 3.
-- [x] Per-commit workspace checks: 37 passed, folded helper Clippy passed, HEAD unchanged.
+- [x] Round-4 proof: 36 commits pass fmt/check/Clippy; 18 workspace suites pass (one isolated retry).
+- Proven HEAD `4aa72371b6b13f3055f13be3b35a7e7b04ea17fb` unchanged; final count 37 including records.
+- Round-4 fixes, Windows stops, retries, history and per-commit table: [round 4](../verification/m202/round-4.md).
 - Departures: box optional output for enum size; RPC schema generator.
 - Tool-host/judge waits and mid-call recovery timing remain follow-ups; old unstamped stops hide.
