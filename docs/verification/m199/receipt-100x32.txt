@@ -1,0 +1,32 @@
+s.json to <drive>/home/.bingo/settings.
+toml; the original is <drive>/home/.bin
+go/settings.json.bak
+▍  first edge
+
+   First answer.
+● bingo · first edge
+  1 turn · 0s
+  resume with bingo --resume ses_01M597F10PT3KZ694VTX6GRGJ7
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 0, Mon Oct 19 12:42:08 2026)

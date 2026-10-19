@@ -1,0 +1,32 @@
+   Context answer 1.
+
+   keep context 2
+
+   Context answer 2.
+
+   keep context 3
+
+   Context answer 3.
+
+   keep context 4
+
+   Context answer 4.
+
+   keep context 5
+
+   Context answer 5.
+
+   keep context 6
+
+   Context answer 6.
+
+   keep context 7
+
+   Context answer 7.
+
+   ── compacted · context 0% → 0% ────────────────────────────────────────────────────────────────
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands
+
+   compacting the conversation                                ctrl+o details   / commands   ? keys

@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+
+   run a background shell
+   $ run     sleep 3; echo background-done                       in background
+
+   The shell is running independently.
+
+   ── ✓ sleep 3; echo background-done finished in the background · ok ────────
+
+   The background result arrived.
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands
+
+   ✓ background job finished · ok         ctrl+o details   / commands   ? keys

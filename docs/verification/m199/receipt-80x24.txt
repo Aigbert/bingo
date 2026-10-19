@@ -1,0 +1,24 @@
+/home/.bingo/settings.json to /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/m
+199-drive-928ip1kp/home/.bingo/settings.toml; the original is /var/folders/5d/yl
+kbk1nx6mvgq8zgnsjf8lwr0000gn/T/m199-drive-928ip1kp/home/.bingo/settings.json.bak
+▍  first edge
+
+   First answer.
+● bingo · first edge
+  1 turn · 0s
+  resume with bingo --resume ses_01M597FEM8RZAG5SG4A0RKG29D
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Pane is dead (status 0, Mon Oct 19 12:42:22 2026)

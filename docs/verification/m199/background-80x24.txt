@@ -1,0 +1,24 @@
+
+                                      ⠂
+              ⠂      ▀
+              ⠂▀▀⠐⠂█ ⠐ █▀⠐⠂▀█ ⠂⠐▀⠐⠂⠐  ⠂
+              █⠐⠂⠐▄⠐ ⠐ ⠐    ⠂ █⠐⠂⠐▄⠐  ▍
+                              ⠂⠐▄⠐⠂⠐  ⠂
+
+              ⠂⠐k⠐⠂⠐ ⠐ ⠐ef⠂⠐lt
+              /v⠂⠐⠂…⠂⠐⠂m⠂⠐⠂-⠂⠐⠂v⠂⠐⠂2⠂⠐⠂1⠂⠐⠂c⠂⠐
+
+              ⠂e⠂⠐⠂t
+              ⠂⠐⠂p ⠐⠂n⠂⠐⠂t ⠐                                    ⠂⠐
+              ⠂et⠐⠂ t⠐⠂s ⠐⠂⠐e                                   2⠐
+              t⠐⠂⠐ ⠐⠂⠐s⠐⠂⠐                                      ⠂⠐
+
+▍  run a background shell
+   $ run     sleep 3; echo background-done                       in background
+
+   The shell is running independently.
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands
+
+   backgrounding it                       ctrl+o details   / commands   ? keys
