@@ -42,6 +42,13 @@ pub fn who(name: &str, home: &str, rows: &[SessionSummary]) -> &'static str {
     }
 }
 
+/// The accent a session's own view wears: a teammate's ink inside its
+/// session, ember (`glow`) at home, in a room and anywhere else.
+pub fn accent(id: &SessionId, home: &str, rows: &[SessionSummary]) -> &'static str {
+    let ink = ink(id, home, rows);
+    if CREW.contains(&ink) { ink } else { "glow" }
+}
+
 /// The teammate of the home tree that signs with `name`: a session the home
 /// started that is not a room.
 pub fn teammate<'a>(

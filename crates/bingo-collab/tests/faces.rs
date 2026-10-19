@@ -43,6 +43,15 @@ fn ordered_teammates_keep_their_inks_across_roster_order_and_storage() {
                 "{name} is a teammate exactly when it wears a crew ink"
             );
         }
+        for row in &rows {
+            let teammate =
+                bingo_collab::face::teammate(bingo_collab::name::of_session(row), &home, &rows);
+            let expected = match teammate {
+                Some(_) => bingo_collab::face::ink(&row.id, &home, &rows),
+                None => "glow",
+            };
+            assert_eq!(bingo_collab::face::accent(&row.id, &home, &rows), expected);
+        }
         rows.reverse();
         for (name, ink) in case["expected"].as_object().unwrap() {
             assert_eq!(
