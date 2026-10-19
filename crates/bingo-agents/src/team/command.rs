@@ -132,7 +132,8 @@ mod tests {
         };
         let text = bingo_sdk::view::text_children(&spans);
         assert_eq!(text.lines().count(), 1, "{text}");
-        assert!(text.contains(".bingo/team.json"), "{text}");
+        let file = std::path::Path::new(".bingo").join("team.json");
+        assert!(text.contains(&file.display().to_string()), "{text}");
     }
 
     #[test]

@@ -377,10 +377,15 @@ mod tests {
             1,
             "a picture joins the ask, it does not land on disk"
         );
-        let shown = fetched.lines.join("\n").replace(
-            dir.path().to_str().expect("a utf-8 temporary directory"),
-            "<attachments>",
-        );
+        // One snapshot for every platform: the separator is the host's own.
+        let shown = fetched
+            .lines
+            .join("\n")
+            .replace(
+                dir.path().to_str().expect("a utf-8 temporary directory"),
+                "<attachments>",
+            )
+            .replace(std::path::MAIN_SEPARATOR, "/");
         insta::assert_snapshot!("feishu-attachments", shown);
         for line in &fetched.lines {
             let at = pointed_at(line);

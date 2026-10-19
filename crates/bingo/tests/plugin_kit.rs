@@ -616,8 +616,11 @@ fn types_lay_the_reference_and_examples_that_validate_and_pass() {
     assert!(reference.contains("### `tool.call`") && reference.contains("### `$.ui`"));
     for name in ["tool-call", "band", "pane", "ts-status"] {
         let example = plugin.join(".bingo/examples").join(name);
+        let manifest = Path::new("examples").join(name).join("plugin.json");
         assert!(
-            written.contains(&format!("examples/{name}/plugin.json")),
+            written
+                .lines()
+                .any(|line| Path::new(line).ends_with(&manifest)),
             "{written}"
         );
         success(&run(home.path(), "validate", &example));

@@ -21,7 +21,7 @@ async fn repository_sign_in_names_destination_before_any_credential() {
         let home = tempfile::tempdir().unwrap();
         let root = home.path().join("project");
         std::fs::create_dir_all(root.join(".bingo")).unwrap();
-        let file = root.join(".bingo/settings.toml");
+        let file = root.join(".bingo").join("settings.toml");
         let field = if family == "codex" {
             "issuer"
         } else {

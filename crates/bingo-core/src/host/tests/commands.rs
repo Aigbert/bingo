@@ -686,7 +686,7 @@ async fn project_switch_override_keeps_the_effective_wish_and_names_its_file() {
     for on in [true, false] {
         let home = tempfile::tempdir().unwrap();
         let project = tempfile::tempdir().unwrap();
-        let path = project.path().join(".bingo/settings.toml");
+        let path = project.path().join(".bingo").join("settings.toml");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, format!("[enabledPlugins]\nwordcount = {on}\n")).unwrap();
         let env = env_in(home.path());

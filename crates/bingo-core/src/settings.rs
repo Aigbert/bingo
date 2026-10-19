@@ -528,7 +528,7 @@ mod tests {
         let layers = load(&env, &cwd, Some(&extra)).unwrap();
         let models: Vec<_> = layers.iter().map(|l| l.value["model"].clone()).collect();
         assert_eq!(models, vec![json!("user"), json!("local"), json!("extra")]);
-        assert!(layers[0].source.ends_with("config/settings.toml"));
+        assert!(Path::new(&layers[0].source).ends_with(Path::new("config").join("settings.toml")));
     }
 
     /// ADR-0058 §1: JSON stays a format bingo reads, and the two spellings of
