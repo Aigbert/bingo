@@ -12,9 +12,9 @@ use std::path::Path;
 use async_trait::async_trait;
 use bingo_sdk::{
     Attachment, CatalogKind, Delivery, Driver, Effort, ErrorCode, HostHandle, Input, IntentId,
-    KernelError, OpenOptions, ParentLink, SessionId, SessionSelector, SessionSpec, SessionSummary,
-    Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec, ToolTraits,
-    input_schema,
+    KernelError, OpenOptions, ParentLink, Reads, SessionId, SessionSelector, SessionSpec,
+    SessionSummary, Subject, Tool, ToolContext, ToolError, ToolLook, ToolOutput, ToolSpec,
+    ToolTraits, input_schema,
 };
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -419,7 +419,7 @@ fn seated(name: &str, session: &SessionId) -> String {
 impl Tool for SpawnAgentTool {
     fn spec(&self) -> ToolSpec {
         ToolSpec {
-            look: Some(ToolLook::new('@', "spawn")),
+            look: Some(ToolLook::new('@', "spawn").target("prompt", Reads::Text)),
             name: SPAWN_AGENT.into(),
             description: DESCRIPTION.into(),
             input_schema: input_schema::<SpawnArgs>(),

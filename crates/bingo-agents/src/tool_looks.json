@@ -1,7 +1,12 @@
 {
   "SendMessage": {
     "mark": "@",
-    "verb": "send"
+    "verb": "send",
+    "target": {
+      "field": "text",
+      "reads": "text"
+    },
+    "who": "to"
   },
   "StopAgent": {
     "mark": "@",
@@ -17,7 +22,11 @@
   },
   "SpawnAgent": {
     "mark": "@",
-    "verb": "spawn"
+    "verb": "spawn",
+    "target": {
+      "field": "prompt",
+      "reads": "text"
+    }
   },
   "SetThinking": {
     "mark": "@",
