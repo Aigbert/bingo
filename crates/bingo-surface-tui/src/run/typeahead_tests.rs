@@ -206,7 +206,6 @@ async fn keys_typed_before_a_dialog_opened_are_never_entered_into_it() {
         type_burst(&mut run, "\nya");
         let (enter, _) = unanswered(&session, &[]).unwrap();
         assert_eq!(run.typeahead.len(), 2, "y and a wait behind the enter");
-        run.ui.last_typed = Some(now.wall - std::time::Duration::from_secs(2));
         run.session
             .tree
             .fold
@@ -215,7 +214,7 @@ async fn keys_typed_before_a_dialog_opened_are_never_entered_into_it() {
             .tree
             .fold
             .apply(&child_frame(2, opened(ask.clone())));
-        interactions::refocus_at(&mut run, now.wall);
+        interactions::refocus(&mut run);
         let handler = crate::palette::request(&run.ui).unwrap().to_owned();
         let result = json!({"surface":{"name":"surface:palette","args":{"handler":handler,"value":{"close":true}}}});
         run.ack(&enter, &IntentOutcome::Applied { result });

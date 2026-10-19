@@ -358,22 +358,6 @@ async fn resize_then_down_then_enter_uses_one_cursor() {
 }
 
 #[tokio::test]
-async fn aside_uses_surface_reception_instead_of_the_kernel_clock() {
-    let now = later(scene().1, 3_600_000);
-    let mut run = tests::idle_in(
-        folded(vec![frame(1, opened(question(false, true)))]),
-        Arc::new(TestSession::default()),
-        now.instant,
-    );
-    run.ui.last_typed = Some(now.wall);
-    interactions::refocus_at(&mut run, now.wall);
-    assert!(
-        run.ui.dialog.aside,
-        "the fixture's remote opened_at is long before the local keystroke"
-    );
-}
-
-#[tokio::test]
 async fn a_question_key_can_finish_the_pane_action_waiting_for_its_answer() {
     let now = still(scene().1);
     let session = Arc::new(TestSession::default());
@@ -910,8 +894,7 @@ async fn a_login_opened_after_typing_keeps_paste_out_of_the_composer() {
     state.interactions = vec![open];
     let now = still(scene().1);
     let mut run = tests::idle_in(state, Arc::new(TestSession::default()), now.instant);
-    run.ui.last_typed = Some(now.wall);
-    interactions::refocus_at(&mut run, now.wall);
+    interactions::refocus(&mut run);
     assert!(!run.ui.dialog.aside);
     run.terminal_event(Term::Paste("sk-dummy-never-unmasked".into()));
     let mut screen = Recorder::default();

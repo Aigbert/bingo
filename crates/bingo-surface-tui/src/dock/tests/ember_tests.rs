@@ -6,7 +6,7 @@ use bingo_sdk::{
 };
 use serde_json::json;
 
-fn fixture(capture: &Capture) -> (SessionState, crate::ui::Ui) {
+fn fixture() -> (SessionState, crate::ui::Ui) {
     let (mut state, _) = story::scene("done");
     let mut summary = state.summary.clone();
     summary.model = Some("opus-5.5".into());
@@ -18,7 +18,6 @@ fn fixture(capture: &Capture) -> (SessionState, crate::ui::Ui) {
     ui.catalogs
         .values
         .insert("tools".into(), story::catalogue());
-    ui.last_typed = Some(capture.now().wall);
     (state, ui)
 }
 fn show(state: &mut SessionState, ui: &mut crate::ui::Ui, owner: &str, view: View) {
@@ -44,7 +43,7 @@ fn show(state: &mut SessionState, ui: &mut crate::ui::Ui, owner: &str, view: Vie
 fn m198_permission_mode_band_uses_policy_meanings_and_session_rules() {
     let capture = Capture::load("model");
     capture.render(|| {
-        let (mut state, mut ui) = fixture(&capture);
+        let (mut state, mut ui) = fixture();
         let modes = [
             ("default", "default", "trusted read-only tools run; everything else asks"),
             ("acceptEdits", "accept edits", "edits inside the working directories run without a prompt"),
@@ -83,7 +82,7 @@ fn m198_wake_band_has_six_delays_and_only_a_pending_cancel() {
     let capture = Capture::load("model");
     capture.render(|| {
         for pending in [false, true] {
-            let (mut state, mut ui) = fixture(&capture);
+            let (mut state, mut ui) = fixture();
             let wake = pending.then(|| {
                 bingo_schedule::wake::set(
                     capture.now().wall,

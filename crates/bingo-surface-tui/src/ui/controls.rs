@@ -24,7 +24,6 @@ pub struct Controls {
     pub history: PromptHistory,
     pub queue_arrivals: crate::queue_rows::Arrivals,
     pub dialog: Dialog,
-    pub last_typed: Option<jiff::Timestamp>,
     pub menu: Menu,
     /// What the transcript is holding: a focused block, a run of cells.
     pub select: Select,
@@ -66,7 +65,6 @@ impl Controls {
             history: PromptHistory::new(history),
             queue_arrivals: Default::default(),
             dialog: Dialog::default(),
-            last_typed: None,
             menu: Menu::default(),
             select: Select::default(),
             focus: Focus::Composer,

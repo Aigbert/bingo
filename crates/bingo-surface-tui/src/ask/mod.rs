@@ -1,4 +1,3 @@
-pub mod aside;
 mod body;
 pub mod dock;
 pub mod guard;

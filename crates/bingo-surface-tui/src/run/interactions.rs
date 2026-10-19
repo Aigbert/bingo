@@ -1,21 +1,6 @@
 use super::*;
 
 pub(super) fn refocus(run: &mut Run) {
-    refocus_at(run, run.now().wall);
-}
-
-pub(super) fn refocus_at(run: &mut Run, now: jiff::Timestamp) {
-    let open_ids: std::collections::HashSet<_> = run
-        .session
-        .tree
-        .sessions()
-        .flat_map(|state| state.interactions.iter().map(|open| open.id.clone()))
-        .collect();
-    run.received_asks.retain(|id, _| open_ids.contains(id));
-    for id in open_ids {
-        run.received_asks.entry(id).or_insert(now);
-    }
-
     let open = run.session.tree.open_interaction().map(|(_, open)| open);
     let changed = run.ui.dialog.current() != open.map(|open| &open.id);
     run.ui.dialog.focus_on(open);
@@ -23,11 +8,7 @@ pub(super) fn refocus_at(run: &mut Run, now: jiff::Timestamp) {
         run.ui.dialog.aside = !matches!(open.kind, bingo_sdk::InteractionKind::Login { .. })
             && (crate::sessions::active(&run.ui)
                 || crate::palette::active(&run.ui)
-                || crate::plugins::active(&run.ui)
-                || crate::ask::aside::recent(
-                    run.received_asks.get(&open.id).copied().unwrap_or(now),
-                    run.ui.last_typed,
-                ));
+                || crate::plugins::active(&run.ui));
     }
 }
 

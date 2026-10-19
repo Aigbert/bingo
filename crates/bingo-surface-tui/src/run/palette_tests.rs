@@ -88,7 +88,6 @@ async fn the_top_palette_owns_keys_when_an_ask_arrives_after_idle() {
                 let session = Arc::new(TestSession::default());
                 let mut run = tests::idle_in(state, session.clone(), now.instant);
                 crate::palette::open(&mut run.ui, first, now);
-                run.ui.last_typed = Some(now.wall - std::time::Duration::from_secs(2));
                 run.session
                     .tree
                     .fold
@@ -97,7 +96,7 @@ async fn the_top_palette_owns_keys_when_an_ask_arrives_after_idle() {
                     .tree
                     .fold
                     .apply(&child_frame(2, opened(ask.clone())));
-                interactions::refocus_at(&mut run, now.wall);
+                interactions::refocus(&mut run);
                 assert!(
                     run.ui.dialog.aside,
                     "the palette keeps the arriving ask aside"

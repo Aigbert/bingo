@@ -139,9 +139,6 @@ pub(crate) fn pane_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Ve
 }
 
 fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
-    if matches!(key.code, KeyCode::Char(_)) && (key.modifiers - KeyModifiers::SHIFT).is_empty() {
-        ui.last_typed = Some(now.wall);
-    }
     if keys::look(key) == Some(keys::Look::Find) {
         crate::search::open(ui, now);
         return Vec::new();

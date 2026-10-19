@@ -186,7 +186,6 @@ struct Run {
     /// what was refused.
     mine: HashMap<IntentId, Submission>,
     rewind_prompts: surface::Prompts,
-    received_asks: HashMap<bingo_sdk::InteractionId, jiff::Timestamp>,
     site_keys: HashMap<IntentId, site_keys::Pending>,
     command_fetch: u64,
     typeahead: typeahead::Typeahead,
@@ -337,7 +336,6 @@ async fn attach(
         ui: Ui::new(history::load(&opts.env.data_dir), at),
         mine: HashMap::new(),
         rewind_prompts: Default::default(),
-        received_asks: HashMap::new(),
         site_keys: HashMap::new(),
         command_fetch: 0,
         typeahead: Default::default(),
@@ -1797,7 +1795,6 @@ mod tests {
             ui: Ui::new(Vec::new(), at),
             mine: HashMap::new(),
             rewind_prompts: Default::default(),
-            received_asks: HashMap::new(),
             site_keys: HashMap::new(),
             command_fetch: 0,
             typeahead: Default::default(),
