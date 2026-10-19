@@ -85,14 +85,17 @@ impl Turn {
         format!("{}-{}", self.id, self.n)
     }
 
+    fn stamp(&self, at: i64) -> Timestamp {
+        Timestamp::from_millisecond(SETUP + self.moment(at)).unwrap()
+    }
+
     fn stamped(&self, mut item: Item, at: i64, end: Option<i64>) -> Item {
         item.turn = Some(TurnId::from_raw(&self.id));
-        let moment = |at: i64| Timestamp::from_millisecond(SETUP + self.moment(at)).unwrap();
-        item.started_at = moment(at);
+        item.started_at = self.stamp(at);
         if let ItemBody::ToolCall { began_at, .. } = &mut item.body {
             *began_at = Some(item.started_at);
         }
-        item.completed_at = end.map(moment);
+        item.completed_at = end.map(|end| self.stamp(end));
         item
     }
 
@@ -123,7 +126,7 @@ impl Turn {
         let input = serde_json::json!({ "target": arg });
         let mut call = tool(&id, name, input, None, ItemStatus::Running);
         if let ItemBody::ToolCall { call_id, .. } = &mut call.body {
-            *call_id = format!("call_{id}").into();
+            *call_id = format!("call_{id}");
         }
         let call = self.stamped(call, at, None);
         self.open = Some(call.clone());

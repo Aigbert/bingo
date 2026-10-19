@@ -322,7 +322,7 @@ fn call(id: &str, data: &Value) -> Item {
     {
         *progress = (!tail.is_empty()).then_some(tail);
         // A provider names each call once; the drawing a row pulls is keyed by it.
-        *call_id = format!("call_{id}").into();
+        *call_id = format!("call_{id}");
     }
     item
 }

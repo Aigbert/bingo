@@ -20,7 +20,7 @@ pub struct World {
 }
 
 pub fn id(name: &str) -> SessionId {
-    SessionId::from_raw(&format!("ses_{name}"))
+    SessionId::from_raw(format!("ses_{name}"))
 }
 
 impl World {
