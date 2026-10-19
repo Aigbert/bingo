@@ -14,7 +14,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use bingo_sdk::{
     ArgSpec, Command, CommandContext, CommandOutcome, CommandSpec, ErrorCode, KernelError,
-    SessionId, View,
+    SessionId,
 };
 
 use crate::PermissionsPolicy;
@@ -55,11 +55,11 @@ impl Command for PermissionCommand {
 
     fn spec(&self) -> CommandSpec {
         CommandSpec {
-            opens: false,
+            opens: true,
             keys: vec![],
             hidden: false,
             name: "permission".into(),
-            aliases: vec!["permissions".into()],
+            aliases: vec![],
             hint: "what it may do without asking".into(),
             args: ArgSpec::Words {
                 labels: Mode::ALL
@@ -88,8 +88,12 @@ impl Command for PermissionCommand {
     async fn run(&self, args: &str, cx: &CommandContext) -> Result<CommandOutcome, KernelError> {
         let asked = args.trim();
         if asked.is_empty() {
-            return Ok(CommandOutcome::View {
-                view: View::text(self.listing(&cx.session)),
+            return Ok(CommandOutcome::Surface {
+                action: bingo_sdk::Action {
+                    name: bingo_sdk::sheet::PERMISSION_MODE.into(),
+                    args: serde_json::json!({}),
+                },
+                fallback: Some(self.listing(&cx.session)),
             });
         }
         if let Some(rule) = asked.strip_prefix("forget ") {
@@ -301,18 +305,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn no_argument_names_this_session_s_mode_and_the_five_to_choose_from() {
+    async fn no_argument_opens_the_sheet_with_a_complete_text_fallback() {
         let policy = policy(json!({}));
         let command = PermissionCommand::new(Arc::clone(&policy));
         typed(&command, "plan", "ses_mine").await;
 
-        let CommandOutcome::View {
-            view: View::Text { children, .. },
+        let CommandOutcome::Surface {
+            action,
+            fallback: Some(text),
         } = typed(&command, "  ", "ses_mine").await
         else {
-            panic!("a listing is a text view");
+            panic!("the command opens its sheet and supplies text to other surfaces");
         };
-        let text = bingo_sdk::view::text_children(&children);
+        assert_eq!(action.name, bingo_sdk::sheet::PERMISSION_MODE);
+        assert_eq!(action.args, serde_json::json!({}));
         assert!(
             text.starts_with("permission mode: plan\n"),
             "the session's own mode comes first: {text}"
@@ -386,7 +392,11 @@ mod tests {
     fn the_spec_runs_now_and_takes_a_mode() {
         let spec = PermissionCommand::new(policy(json!({}))).spec();
         assert_eq!(spec.name, "permission");
-        assert_eq!(spec.aliases, ["permissions"]);
+        assert!(
+            spec.opens,
+            "the bare command opens the mode sheet before argument completion"
+        );
+        assert!(spec.aliases.is_empty());
         assert!(spec.instant, "reading a mode never waits for a turn");
         assert_eq!(spec.family, "session");
         let ArgSpec::Words { values, then, .. } = spec.args else {

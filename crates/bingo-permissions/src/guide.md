@@ -88,7 +88,7 @@ asks about it anyway.
 
 ## Commands
 
-- `/permission`, `/permissions` — the mode this session runs in, and the five
+- `/permission` — the mode this session runs in, and the five
   it could run in.
 - `/permission <mode>` — run in that mode from now on, this session only. It is
   instant: it answers while a turn is busy, and the next call is decided

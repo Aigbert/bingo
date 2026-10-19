@@ -79,13 +79,12 @@ async fn transition(
     let IntentOutcome::Applied { result } = change(attachment, origin.clone(), "").await else {
         panic!("mode listing");
     };
-    let view: View = serde_json::from_value(result["view"].clone()).unwrap();
+    assert_eq!(result["surface"]["name"], bingo_sdk::sheet::PERMISSION_MODE);
+    let text = result["message"].as_str().unwrap();
     let current = if allowed { after } else { before };
     assert!(
-        view.fold()
-            .starts_with(&format!("permission mode: {current}\n")),
-        "{}",
-        view.fold()
+        text.starts_with(&format!("permission mode: {current}\n")),
+        "{text}"
     );
 }
 async fn matrix(origin: Origin) {
