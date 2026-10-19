@@ -55,22 +55,25 @@ impl Tree {
         self.0.start_kill()
     }
 
-    /// Ask first on unix; Windows has no signal a program can answer.
-    pub async fn terminate(&mut self, grace: Duration) -> io::Result<ExitStatus> {
+    /// Ask first on unix; Windows has no signal a program can answer. The
+    /// status is the tree's own only when it ended itself: `None` says it
+    /// had to be killed, and the code a killed tree is left with on Windows
+    /// is the killer's word, not the program's.
+    pub async fn terminate(&mut self, grace: Duration) -> io::Result<Option<ExitStatus>> {
         if self.id().is_none() {
-            return self.wait().await;
+            return self.wait().await.map(Some);
         }
         #[cfg(unix)]
         {
             let _ = self.0.signal(15);
             if let Ok(status) = tokio::time::timeout(grace, self.wait()).await {
-                return status;
+                return status.map(Some);
             }
         }
         #[cfg(windows)]
         let _ = grace;
         self.start_kill()?;
-        self.wait().await
+        self.wait().await.map(|_| None)
     }
 }
 

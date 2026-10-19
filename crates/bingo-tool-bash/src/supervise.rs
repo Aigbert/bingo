@@ -117,6 +117,7 @@ async fn end_it(child: &mut Tree) -> State {
         .await
         .ok()
         .and_then(Result::ok)
+        .flatten()
         .map(state_of)
         .unwrap_or(State::Killed)
 }
