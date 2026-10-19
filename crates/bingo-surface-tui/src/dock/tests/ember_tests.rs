@@ -192,6 +192,58 @@ fn band_lines(buffer: &ratatui::buffer::Buffer, area: ratatui::layout::Rect) -> 
         })
         .collect()
 }
+#[test]
+fn m198_wake_band_has_six_delays_and_only_a_pending_cancel() {
+    let capture = Capture::load("model");
+    capture.render(|| {
+        for pending in [false, true] {
+            let (mut state, mut ui) = fixture(&capture);
+            let wake = pending.then(|| {
+                bingo_schedule::wake::set(
+                    capture.now().wall,
+                    jiff::SignedDuration::from_mins(5),
+                    "continue".into(),
+                )
+            });
+            show(
+                &mut state,
+                &mut ui,
+                "bingo.schedule",
+                bingo_schedule::wake_sheet::tree(
+                    wake.as_ref(),
+                    None,
+                    100,
+                    19,
+                    capture.now().wall,
+                    Default::default(),
+                ),
+            );
+            let screen = drawn(100, 32, &solo(&state), &mut ui, capture.now());
+            let lines = band_lines(screen.buffer(), ui.shown.regions.composer);
+            for delay in ["10s", "1m", "5m", "10m", "30m", "1h"] {
+                assert!(
+                    lines
+                        .iter()
+                        .any(|line| line.trim_start_matches([' ', '▎']) == format!("in {delay}"))
+                );
+            }
+            assert_eq!(
+                lines.iter().any(|line| line.trim() == "cancel the wake-up"),
+                pending
+            );
+            let y = ui.shown.regions.composer.y
+                + lines
+                    .iter()
+                    .position(|line| line.contains("▎ in 10s"))
+                    .unwrap() as u16;
+            assert_eq!(screen.buffer()[(3, y)].fg, crate::theme::text().fg.unwrap());
+            assert_eq!(
+                screen.buffer()[(1, y)].bg,
+                crate::theme::palette().named("pick").unwrap()
+            );
+        }
+    });
+}
 
 #[test]
 fn m198_model_chosen_full_frame() {

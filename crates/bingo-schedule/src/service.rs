@@ -42,9 +42,9 @@ impl Owner {
         self.schedules.store().save(&entry).map_err(storage)?;
         self.schedules.changed();
         Ok(format!(
-            "{} {}",
+            "{} · {}",
             if enabled { "resumed" } else { "paused" },
-            entry.id
+            entry.text
         ))
     }
 }

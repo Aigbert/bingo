@@ -43,6 +43,7 @@ pub mod store;
 mod supervisor;
 pub mod tools;
 pub mod wake;
+pub mod wake_sheet;
 pub mod wakes;
 
 use std::sync::{Arc, OnceLock};
@@ -79,6 +80,7 @@ static MANIFEST: PluginManifest = PluginManifest {
         "command:schedule",
         "service:schedule",
         "command:wake",
+        "command:bingo.schedule:ui",
         "hook:schedule",
         "service:bingo.schedule.pages",
     ],
@@ -187,6 +189,19 @@ impl Plugin for SchedulePlugin {
         registrar.add(service::contribution(owner.clone()));
         let _ = self.service.set(owner);
         registrar.add(guide::contribution(registrar));
+        registrar.add(Contribution::Command(Arc::new(wake_sheet::Handler(
+            schedules.clone(),
+        ))));
+        for link in [
+            Arc::new(wake_sheet::Open) as Arc<dyn bingo_sdk::Interceptor>,
+            Arc::new(wake_sheet::Drawing(schedules.clone())),
+        ] {
+            registrar.add(Contribution::Interceptor {
+                placement: bingo_sdk::plugin::Placement::Builtin,
+                external: None,
+                link,
+            });
+        }
         self.schedules
             .set(schedules)
             .map_err(|_| PluginError::Failed("the schedules plugin registered twice".into()))
@@ -235,7 +250,7 @@ mod plugin_tests {
             .register(&mut registrar)
             .expect("registering does no i/o");
         let contributions = registrar.into_contributions();
-        assert_eq!(contributions.len(), MANIFEST.provides.len());
+        assert_eq!(contributions.len(), MANIFEST.provides.len() + 2);
         let tools: Vec<String> = contributions
             .iter()
             .filter_map(|c| match c {

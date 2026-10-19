@@ -95,6 +95,9 @@ pub async fn publish(host: &HostHandle, session: &SessionId, pending: Option<&Wa
     if let Err(error) = host.extend(session, PLUGIN, KIND, payload(pending)).await {
         tracing::debug!(%error, "the pending wake was not published");
     }
+    if let Err(error) = host.invalidate(session, vec!["wake.sheet".into()]).await {
+        tracing::debug!(%error, "the wake sheet was not invalidated");
+    }
 }
 
 /// Who a woken turn's input is from: an earlier turn of this same
