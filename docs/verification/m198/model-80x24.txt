@@ -6,7 +6,7 @@
 
    Ember primitives are ready.
 
-▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+
 
    fake-1         fake                                                  in use
  ▎ claude-fable-5 anthropic   1M     reads images
@@ -21,4 +21,4 @@
    effort   low  medium  high  xhigh  max
    thinks before most answers
 
-   scheduled wcgxm1hx: every 30m,…    ↑↓ model   ←→ effort   ⏎ use   esc close
+   fake-1                             ↑↓ model   ←→ effort   ⏎ use   esc close

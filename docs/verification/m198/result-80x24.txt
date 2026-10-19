@@ -1,6 +1,6 @@
-   Ember primitives are ready.
+   Check the Ember palette.
 
-⇄ fake-1 · fake · thinking off · this session
+   Ember primitives are ready.
 
 ▍  Check the drive fixture
 

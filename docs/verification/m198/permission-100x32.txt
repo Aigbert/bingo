@@ -8,11 +8,11 @@
 
 
 
+
+
    Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 ▍  Check the drive fixture
 
@@ -29,4 +29,4 @@
    allowed for this session
      none yet; "Yes, allow … for this session" adds one
 
-   ✓ forgot · fixture                                                  ↑↓ mode   ⏎ use   esc close
+   fake-1                                                              ↑↓ mode   ⏎ use   esc close

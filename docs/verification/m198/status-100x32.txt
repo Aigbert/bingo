@@ -13,11 +13,11 @@
 
 
 
+
+
 ▍  Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 
    Status                                                                 Check the Ember palette.
@@ -29,4 +29,4 @@
    plugins     38 on
    rules       none yet
 
-   ✓ fake-1 off                                                       ↑↓ line   ⏎ open   esc close
+   fake-1                                                             ↑↓ line   ⏎ open   esc close

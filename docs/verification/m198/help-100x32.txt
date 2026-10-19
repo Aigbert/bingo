@@ -4,11 +4,11 @@
 
 
 
+
+
 ▍  Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 
    Keys                                                                  /help lists every command
@@ -16,9 +16,9 @@
    write                                          while it works
    ⏎          send                                ⏎          steer at the next step
    ⇧⏎         new line                            tab        queue for after
-   /          commands and skills                 esc        stop the turn
-   @          files and agents                    ctrl+b     send the command to the background
-   !          run a shell command
+   /          commands and skills                 ↑          edit what you queued
+   @          files and agents                    esc        stop the turn
+   !          run a shell command                 ctrl+b     send the command to the background
    ctrl+v     paste an image
 
    look back                                      switch
@@ -29,4 +29,4 @@
    esc esc    rewind                              ctrl+t     tasks
                                                   ctrl+c     stop, twice to quit
 
-   ✓ resumed · Check the Ember palette.                                                  esc close
+   fake-1                                                                                esc close

@@ -16,17 +16,17 @@
 
 
 
+
+
 ▍  Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 
    Sessions                                                                        needs you first
 
    filter  ▍type to filter by title or directory
 
- ▎ ●  Check the Ember palette.  /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/m198-drive-8s…now
+ ▎ ●  Check the Ember palette.  /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/m198-drive-0l…now
 
-   bingo.provider.anthropic on · from the next turn                ↑↓ session   ⏎ open   esc close
+   fake-1                                                          ↑↓ session   ⏎ open   esc close

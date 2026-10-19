@@ -1,199 +1,59 @@
-M198 round 3 — verification on fec21d36
+M198 round 4: verification on dev acb299e02 (27 commits)
 
-1. Nested command provenance
-CommandContext is in-process, not serialized: no serde field/default or wire schema applies. Core fills surface from invocation; status/models/crew pass it through.
-$ cargo test --workspace --locked
-test model_picker::a_sheet_choice_records_no_notice_and_publishes_one_toast ... ok
-test ordered_teammates_keep_their_inks_across_roster_order_and_storage ... ok
-test receipts::tests::sheet_choice_receipts_leave_no_notice_or_duplicate_toast ... ok
-test keys::tests::provider_sub_sheets_use_stable_action_ids_and_the_builder ... ok
-test commands::tests::login_opens_the_model_list_and_one_escape_closes_it ... ok
-test keys::tests::selection_follows_labels_including_information_rows ... ok
-test tests::status_spells_all_separators_with_the_ascii_glyph_set ... ok
-test deeply_wrapped_views_resolve_on_the_embedded_runtime ... ok
-test dock::result::tests::up_scrolls_immediately_after_down_reaches_the_last_window ... ok
-test input::tests::ctrl_t_opens_the_tasks_sheet_through_its_owner ... ok
-test pane::integration_tests::side_then_dock_panes_remain_visible_at_both_widths ... ok
-test pane::seat::tests::a_side_pane_falls_back_to_its_declared_dock ... ok
-test run::palette_tests::help_and_question_mark_follow_the_commands_keys_outcome ... ok
-test sheet::tests::opening_from_a_teammate_resolves_the_same_home ... ok
-
-2. Owners
-provider/login retain model list; no forged provider selection or stale provider back path. PERMISSION_MODE is one SDK constant; all args are {}. Status dispatches permission and forwards its outcome.
-Status separators use Glyph::Sep. One macro glyph table generates enum/ALL/named/spell. Home direct children only, sorted created_at/id; tasks resolves home before roster. Grandchildren and rooms do not shift inks.
-Plugins uses CONTENT_GUTTERS, cell clipping and glyph ellipsis; test helpers are in tests. Models finds actions by op.id. Schedule single-variant wrappers/_wake removed. Sessions builds one Sheet. Runtime regression checks exact model row and outer/inner wrappers.
-
-3. Surface
-Seated.place is the source of truth for Dock; wanted no longer filters a declared fallback. No docked boolean arguments or declaration-first checks remain.
-Result draw and keys share window/count/room; keys clamp count-room. Constants name sheet/head/min/max/page rows.
-PaletteOpen::Keys maps centrally to Open::Keys; both routes use palette::open and no help-name match remains. ctrl+t belongs to bingo-tasks CommandSpec; one sessions::exists predicate.
-Nits 9–15/18: orphan/stale docs/tests removed/renamed, native focus gate, direct click select, pick movers, extracted keys handler, KEYA pgup spelling, named constants, Risks spacing. Guide-only chords declared below.
-
-4. Captures
-pastScript and echoScript are JSON data from p4b-data.js. Sessions-switched folds first think; schedule-ran folds echoScript running think and uses scheds toast text.
-blocks.rs removes the completed-block gap before a live tail. Protected M202 functions unchanged. Nine live snapshots updated to the prototype spacing.
-test dock::action_ember::m198_sessions_switched_full_frame ... ok
+Captures (cargo test --workspace --locked --no-fail-fast)
+test test_support::ember::acting::m198_model_frames_are_pressed_into_the_owner ... ok
+test test_support::ember::acting::m198_plugin_frames_are_pressed_into_the_owner ... ok
+test test_support::ember::acting::m198_session_frames_are_pressed_into_the_owner ... ok
+test test_support::ember::acting::m198_schedule_frames_are_pressed_into_the_owner ... ok
+test test_support::ember::acting::m198_task_frames_are_pressed_into_the_owner ... ok
+test test_support::ember::acting::m198_surface_frames_are_pressed_into_the_surface ... ok
+test test_support::ember::acting::m198_keys_band_waits_for_m200_ctrl_g ... ok
+test test_support::ember::acting::m198_rewound_band_waits_for_m199_welcome ... ok
+test test_support::ember::acting::m198_status_band_waits_for_m199_branch_and_m200_agents ... ok
+test test_support::ember::acting::m198_memory_band_has_no_owner_for_lines_and_dates ... ok
 test dock::ember_tests::m198_permission_mode_band_uses_policy_meanings_and_session_rules ... ok
-test dock::action_ember::m198_schedule_ran_full_frame ... ok
-test dock::ember_tests::m198_model_chosen_full_frame ... ok
-test dock::ember_tests::m198_keys_closed_full_frame ... ok
-test dock::ember_tests::m198_rewind_full_frame ... ok
-test dock::ember_tests::m198_model_full_frame ... ok
-test dock::ember_tests::m198_model_moved_full_frame ... ok
-test dock::ember_tests::m198_tasks_again_full_frame ... ok
-test dock::ember_tests::m198_tasks_full_frame ... ok
 test dock::ember_tests::m198_wake_band_has_six_delays_and_only_a_pending_cancel ... ok
-test dock::schedule_ember::m198_schedule_full_frames ... ok
-test dock::plugins_ember::m198_plugins_full_frames ... ok
-test dock::sessions_ember::m198_sessions_full_frames ... ok
+Full frame: model, model-moved, model-chosen, plugins, plugins-toggled, sessions,
+sessions-filtered, sessions-switched, rewind, keys-closed, tasks, tasks-again, schedule,
+schedule-paused, schedule-ran. Band: keys, rewind-rewound, status x3, memory x2.
+Excluded: plugins-github (M199). No scene capture edited.
 
-Every owned scene (full frame, characters and ink, unless stated):
-model: PASS
-model-moved: PASS
-model-chosen: PASS
-status: DEFERRED round 4 band tests by instruction; no pass claimed
-status-moved: DEFERRED round 4 band tests by instruction; no pass claimed
-status-entered: DEFERRED round 4 band tests by instruction; no pass claimed
-plugins: PASS
-plugins-toggled: PASS
-plugins-github: EXCLUDED M199 sign-in capture
-sessions: PASS
-sessions-filtered: PASS
-sessions-switched: PASS
-rewind: PASS
-rewind-rewound: DEFERRED round 4 band tests by instruction; no pass claimed
-keys: DEFERRED round 4 band tests by instruction; no pass claimed
-keys-closed: PASS
-tasks: PASS
-tasks-again: PASS
-schedule: PASS
-schedule-paused: PASS
-schedule-ran: PASS
-memory: DEFERRED round 4 band tests by instruction; no pass claimed
-memory-forgot: DEFERRED round 4 band tests by instruction; no pass claimed
-permission mode: PASS constructed-frame band
-wake: PASS constructed-frame band
+History
+$ unset $(git rev-parse --local-env-vars)
+$ git rebase -x 'cargo fmt --all -- --check && cargo check --workspace --all-targets --locked' dev
+27 Executing lines; 27 Finished dev lines; Successfully rebased and updated refs/heads/m198-sheets.
 
-5. History
-All round-3 source fixes first committed --fixup to their introducing owner. Autosquash intermediate completed; tree reconstructed into 24 ordered owner/contracts/native-sheet/record commits on unchanged fec21d36.
-Schema/exhaustive consumer changes are atomic with the contract. Owner TUI/bin/runtime assertions travel with the owner; no later test(bin) repair commit. Bodies identify cross-crate tests.
-Final rebase -x proof: pending.
+Gates (ANTHROPIC_API_KEY and OPENAI_API_KEY unset)
+$ cargo fmt --all -- --check                                   exit 0
+$ cargo check --workspace --all-targets --locked               Finished dev
+$ cargo clippy --workspace --all-targets --locked -- -D warnings  Finished dev, exit 0
+$ cargo test --workspace --locked --no-fail-fast
+133 result groups: 6626 passed; 1 failed; 0 ignored.
+FAILED acp::the_restore_ladder_climbs_resume_then_load_then_a_file (bingo tests/cli/acp.rs:631,
+left ["initialize","session/new",...] vs right [...,"session/resume",...]); not touched by M198.
+$ cargo test -p bingo --test cli --locked the_restore_ladder   1 passed; 0 failed
+$ scripts/check_discipline.sh     discipline ok (advisory warnings only)
+$ scripts/budget.sh               423 (max 423); relink isolation 0; budget ok
+$ cargo deny check                advisories ok, bans ok, licenses ok, sources ok
 
-6. Records and gates
-Plan Verified rewritten in place, 135 lines; Files/Risks/departures current. M200 face note defers TUI switch to round 4. README deleted; checks/drive retained.
+Windows: cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
+PASS (22): bingo-agents bingo-checkpoints bingo-collab bingo-context bingo-core
+  bingo-experience bingo-mod-ask bingo-mod-browse bingo-mod-crew bingo-mod-memory
+  bingo-mod-models bingo-mod-palette bingo-mod-plugins bingo-mod-schedule bingo-mod-sessions
+  bingo-mod-status bingo-rooms bingo-schedule bingo-sdk bingo-skills bingo-tasks bingo-tool-bash
+Owed to CI (9), native build scripts only, 0 Rust errors: bingo, bingo-channel-adapter,
+  bingo-channel-feishu, bingo-channels, bingo-mcp, bingo-mods, bingo-permissions,
+  bingo-plugin-rpc, bingo-surface-tui (aws-lc-sys v0.44.0, rquickjs-sys v0.14.0,
+  tree-sitter v0.26.13, tree-sitter-bash v0.25.1).
 
-$ cargo fmt --all -- --check
-exit 0; no output
-
-$ cargo check --workspace --all-targets --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.34s
-
-$ cargo clippy --workspace --all-targets --locked -- -D warnings
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 11.62s
-
-$ cargo test --workspace --locked
-130 result groups: 6565 passed; 0 failed; exit 0. No wall-clock test failure in this final suite.
-
-$ scripts/check_discipline.sh
-discipline ok (advisory warnings only)
-
-$ scripts/budget.sh
-dependencies (unique, normal): 423 (max  423)
-warm cargo check -p bingo-core: 0s (max  20s)
-relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
-target/debug: 23 GB (soft max  5)
-warn: target/debug exceeds the soft limit
-test binaries: 304
-budget ok
-
-$ cargo deny check
-advisories ok, bans ok, licenses ok, sources ok
-
-$ cd sdk/typescript && npm test
-34 passed; 0 failed.
-
-$ cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (sequential)
-bingo: BLOCKED tree-sitter v0.26.13, rquickjs-sys v0.14.0, tree-sitter-bash v0.25.1, aws-lc-sys v0.44.0
-bingo-agents: PASS
-bingo-channel-adapter: BLOCKED aws-lc-sys v0.44.0
-bingo-channel-feishu: BLOCKED aws-lc-sys v0.44.0
-bingo-channels: BLOCKED aws-lc-sys v0.44.0
-bingo-checkpoints: PASS
-bingo-collab: PASS
-bingo-context: PASS
-bingo-core: PASS
-bingo-experience: PASS
-bingo-mcp: BLOCKED aws-lc-sys v0.44.0
-bingo-mod-ask: PASS
-bingo-mod-browse: PASS
-bingo-mod-crew: PASS
-bingo-mod-memory: PASS
-bingo-mod-models: PASS
-bingo-mod-palette: PASS
-bingo-mod-plugins: PASS
-bingo-mod-schedule: PASS
-bingo-mod-sessions: PASS
-bingo-mod-status: PASS
-bingo-mods: BLOCKED rquickjs-sys v0.14.0, aws-lc-sys v0.44.0
-bingo-permissions: BLOCKED tree-sitter v0.26.13, tree-sitter-bash v0.25.1
-bingo-plugin-rpc: BLOCKED aws-lc-sys v0.44.0
-bingo-rooms: PASS
-bingo-schedule: PASS
-bingo-sdk: PASS
-bingo-skills: PASS
-bingo-surface-tui: BLOCKED aws-lc-sys v0.44.0
-bingo-tasks: PASS
-bingo-tool-bash: PASS
-22 crates checked all the way through; 9 blocked. Native blockers: Windows C headers missing (aws-lc-sys/tree-sitter/tree-sitter-bash); MSVC flags rejected by clang (rquickjs-sys). No native build bypass. Models rerun after final stale-provider cleanup: exit 0.
-
-PTY smoke/drive
+PTY
 $ cargo build -p bingo --locked
-Finished dev profile; exit 0.
 $ TUI_SMOKE_SOCKET=m198-drive scripts/tui-smoke.sh
-tui-smoke ok
+tui-smoke ok  (model, login, keys and sessions steps now wait for dock sheets)
 $ python3 docs/verification/m198/drive.py
-PASS 100x32: model opened, moved, closed
-PASS 100x32: status opened, moved, closed
-PASS 100x32: plugins opened, moved, closed
-PASS 100x32: resume opened, moved, closed
-PASS 100x32: help opened, moved, closed
-PASS 100x32: tasks opened, moved, closed
-PASS 100x32: schedule opened, moved, closed
-PASS 100x32: memory opened, moved, closed
-PASS 100x32: permission opened, moved, closed
-PASS 100x32: wake opened, moved, closed
-PASS 100x32: result opened, scrolled, closed
-PASS 100x32: Tasks escape restores draft
-PASS 100x32: Sessions escape restores draft
-PASS 100x32: rewind opened, moved, acted and closed
-CLEAN 100x32: owned tmux server stopped; temporary files removed
-PASS 80x24: model opened, moved, closed
-PASS 80x24: status opened, moved, closed
-PASS 80x24: plugins opened, moved, closed
-PASS 80x24: resume opened, moved, closed
-PASS 80x24: help opened, moved, closed
-PASS 80x24: tasks opened, moved, closed
-PASS 80x24: schedule opened, moved, closed
-PASS 80x24: memory opened, moved, closed
-PASS 80x24: permission opened, moved, closed
-PASS 80x24: wake opened, moved, closed
-PASS 80x24: result opened, scrolled, closed
-PASS 80x24: Tasks escape restores draft
-PASS 80x24: Sessions escape restores draft
-PASS 80x24: rewind opened, moved, acted and closed
-CLEAN 80x24: owned tmux server stopped; temporary files removed
-Owned m198-drive server cleaned; temporary HOME/data/cwd, fake provider.
-
-Retries/repairs
-Workspace semantic failures during development: crew RPC fixture lacked Terminal origin; teammate fixture room lacked driver/key; pane integration fixture omitted sync_panes. Corrected, focused tests and final workspace pass.
-Drive /rename timeout repeated once alone: FAILED same rename editor. /experience timeout repeated once alone: FAILED same memory pane (owner intercepts it). Drive now uses /mcp for generic result, with dedicated result-scroll unit coverage.
-No wall-clock cargo test failed in round 3; no prototype or scene capture edited.
-
-Departures/owed
-CommandContext is not a wire record, so serde-default is inapplicable; absent surfaces use None. ParentLink stores session, so direct-parent check reads parent.session.
-Guide-only alt+m/alt+t/ctrl+v are bound/documented and absent from sheet. Queued-edit Up (M196) and ctrl+g (M200) stay owed.
-Missing facts remain blank: cost, branch/N changed, image capability, instruction scope/line counts, memory dates, unavailable plugin descriptions/counts.
-Round 4: TextChild toast parts, key-driven captures, owed bands, palette word-only snapshots, TUI face migration and sdk identity deletion. Toast text/message modules unchanged this round.
-window.rs remains for mentions/ask options; over remains for mentions/Browse; pager and mod Rect/Overlay anchors retained.
-Shared edits: composer sheet branch/demand; Open/layer dock routing; Binding groups/words, not policy; native input/task catalogue routing; Focus test helper removed. twice/activity.rs/activity_hidden unchanged.
-Roster chronology scout/reviewer/ada/bo yields requested inks; screens/windows helpers still used by ask tests.
+100x32: PASS model, status, plugins, resume, help, tasks, schedule, memory, permission, wake,
+  result, Tasks draft, Sessions draft, rewind; CLEAN
+80x24: the same 14 PASS; CLEAN
+Private m198-drive server, temporary HOME/data/cwd, fake provider; no server left running.
+Observed: on macOS the drive's memory sheet shows the instruction file by its full /private/var
+path, because the cwd is given through the /var symlink.

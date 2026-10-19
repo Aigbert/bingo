@@ -2,11 +2,11 @@
 
 
 
+
+
 ▍  Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 
    Plugins                                                         38 of 38 on

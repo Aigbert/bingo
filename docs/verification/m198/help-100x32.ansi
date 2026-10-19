@@ -4,11 +4,11 @@
 
 
 
+
+
 [38;2;43;125;60m[48;2;239;234;232m▍[39m  Check the Ember palette.
 
 [49m   Ember primitives are ready.
-
-[38;2;176;76;20m⇄[38;2;163;158;154m fake-1 · fake · thinking off · this session[39m
 
 [48;2;239;234;232m
  [38;2;239;122;44m [39m [1mKeys[0m[48;2;239;234;232m                                                                  [38;2;163;158;154m/help lists every command[39m
@@ -16,9 +16,9 @@
  [38;2;239;122;44m  [38;2;163;158;154mwrite[39m                                          [38;2;163;158;154mwhile it works[39m
  [38;2;239;122;44m  [39m⏎          [38;2;119;113;109msend[39m                                ⏎          [38;2;119;113;109msteer at the next step[39m
  [38;2;239;122;44m  [39m⇧⏎         [38;2;119;113;109mnew line[39m                            tab        [38;2;119;113;109mqueue for after[39m
- [38;2;239;122;44m  [39m/          [38;2;119;113;109mcommands and skills[39m                 esc        [38;2;119;113;109mstop the turn[39m
- [38;2;239;122;44m  [39m@          [38;2;119;113;109mfiles and agents[39m                    ctrl+b     [38;2;119;113;109msend the command to the background[39m
- [38;2;239;122;44m  [39m!          [38;2;119;113;109mrun a shell command[39m
+ [38;2;239;122;44m  [39m/          [38;2;119;113;109mcommands and skills[39m                 ↑          [38;2;119;113;109medit what you queued[39m
+ [38;2;239;122;44m  [39m@          [38;2;119;113;109mfiles and agents[39m                    esc        [38;2;119;113;109mstop the turn[39m
+ [38;2;239;122;44m  [39m!          [38;2;119;113;109mrun a shell command[39m                 ctrl+b     [38;2;119;113;109msend the command to the background[39m
  [38;2;239;122;44m  [39mctrl+v     [38;2;119;113;109mpaste an image[39m
  [38;2;239;122;44m  [38;2;163;158;154m                                                                                               [39m
  [38;2;239;122;44m  [38;2;163;158;154mlook back[39m                                      [38;2;163;158;154mswitch[39m
@@ -29,4 +29,4 @@
  [38;2;239;122;44m  [39mesc esc    [38;2;119;113;109mrewind[39m                              ctrl+t     [38;2;119;113;109mtasks[39m
  [38;2;239;122;44m  [39m                                               ctrl+c     [38;2;119;113;109mstop, twice to quit[39m
 
-[49m   [38;2;43;125;60m✓ [38;2;119;113;109mresumed · Check the Ember palette.[39m                                                  [38;2;119;113;109mesc[38;2;163;158;154m close[39m
+[49m   [38;2;119;113;109mfake-1[39m                                                                                [38;2;119;113;109mesc[38;2;163;158;154m close[39m

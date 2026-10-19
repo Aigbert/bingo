@@ -4,11 +4,11 @@
 
 
 
+
+
 ▍  Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 
    Permission mode                                                 ⇧tab cycles
@@ -21,4 +21,4 @@
    allowed for this session
      none yet; "Yes, allow … for this session" adds one
 
-   ✓ fake-1 off                                    ↑↓ mode   ⏎ use   esc close
+   fake-1                                          ↑↓ mode   ⏎ use   esc close

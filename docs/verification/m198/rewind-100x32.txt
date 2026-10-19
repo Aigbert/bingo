@@ -11,11 +11,11 @@
 
 
 
+
+
    Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 ▍  Check the drive fixture
 
@@ -29,4 +29,4 @@
  ▎ Check the drive fixture                                                                no files
    Check the Ember palette.                                                               no files
 
-   ✓ wakes in 1m                                                  ↑↓ prompt   ⏎ rewind   esc close
+   esc again to rewind                                            ↑↓ prompt   ⏎ rewind   esc close

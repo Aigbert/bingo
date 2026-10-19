@@ -1,11 +1,11 @@
 
 
 
+
+
 ▍  Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 
    Keys                                              /help lists every command
@@ -19,6 +19,6 @@
 
    while it works
    ⏎          steer at the next step
-   9 of 28
+   9 of 29
 
-   ✓ resumed · Check the Ember palette.                              esc close
+   fake-1                                                            esc close

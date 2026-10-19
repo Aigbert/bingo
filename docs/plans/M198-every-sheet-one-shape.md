@@ -47,31 +47,11 @@ written once.
    | Permission mode | surface (ADR-0095 §5) | the cycle's order | — |
    | Wake | `bingo-schedule` (`/wake`) | the six delays, then cancel | — |
 
-   - **Model:** the right side reads `in use` in good. The foot is the effort scale (the current
-     effort glow bold) and its description muted. ⏎ toasts `✓ <model> <effort>`.
-   - **Status:** the context meter is 20 cells, `━` over `─` (`=`/`-` under ASCII), amber from
-     80%. The plugins row names the first broken plugin in amber. ⏎ on the context row
-     compacts.
-   - **Plugins:** `✓` good or `·` dim, the name at 13, the description dim, and the error amber
-     or the kind faint on the right. Switching toasts `<name> on · from the next turn`. ⏎ on a
-     broken one opens the sign-in sheet.
-   - **Sessions:** the lamp breathes amber while asking and glow while working, and is faint
-     when idle. The title at 26, the directory dim, and `needs you`, `working` or when on the
-     right. The head fact reads `needs you first`, or `N of M` while filtering.
-   - **Rewind:** a top note reads `the conversation and the files both go back`, and each row
-     reads `N files back` or `no files`. ⏎ rewinds, puts the prompt back in the input, and
-     toasts `✓ rewound · N files restored`.
-   - **Keys:** two columns from 90 columns, the key at 11 cells, ASCII twins under ASCII. `?`
-     opens it, and so does `/help`. The head fact reads `/help lists every command`.
-   - **Tasks:** `✓` good, the spinner in the owner's ink, or `◌` dim. The owner's name on the
-     right, in its ink (bingo glow). `ctrl+t` opens it, and the tasks band goes.
-   - **Schedule:** the lamp breathes over 2.4 s while on. The foot reads
-     `/schedule every 30m <prompt> adds one`. ⏎ runs now at home.
-   - **Memory:** ⌫ on a memory forgets it with `✓ forgot · <title>`. On an instruction it says
-     `instructions live in files · edit <file>`.
-   - **Permission mode:** the picked mode in its colour. The foot lists the session's rules in
-     `code`, or the "none yet" line.
-   - **Wake:** `in 10s` … `in 1h`, then `cancel the wake-up` in bad while one is set.
+   - Rows, hints, effort words, state marks and meters follow the prototype helpers above.
+   - Missing cost, change counts or catalogue capability facts draw nothing.
+   - Model changes acknowledge ID, effort, provider and context; effort changes use EFFORT words.
+   - Keys use one binding table, four KEYMAP groups and glyph-table ASCII twins.
+   - Permission rows include policy meanings; wake lists six delays and a pending cancel.
 3. **Opening and closing.**
    - A sheet replaces the input in the dock, and esc gives the input back with the draft intact.
    - A sheet keeps its selection while its rows change (by id, never by index), and the guard
@@ -87,11 +67,20 @@ written once.
 
 ## Files
 
-- `crates/bingo-sdk/src/sheet.rs` (new; one noun).
-- `crates/bingo-mod-{models,status,plugins,sessions,schedule,memory}/src/{draw.rs,rows.rs,
-  keys.rs}`; `crates/bingo-tasks` (its pages); `crates/bingo-schedule` (`/wake`).
-- `crates/bingo-surface-tui/src/{rewind.rs,keys.rs,guide.rs,screens/tasks.rs,dock.rs}` and the
-  permission mode sheet.
+- `crates/bingo-sdk/`: pure pick/sheet/glyph bricks, typed presses and wire fixtures.
+- `crates/bingo-mod-{models,status,plugins,sessions,schedule,memory,browse,palette}/`.
+- `crates/bingo-{tasks,schedule,collab,permissions,checkpoints,mods}/`.
+- `crates/bingo{,-core,-channels,-channel-adapter,-channel-feishu,-mod-crew}/`: viewport/context consumers.
+- `crates/bingo-{agents,context,experience,mcp,mod-ask,plugin-rpc,rooms,skills,tool-bash}/`: context literals.
+- `crates/bingo-surface-tui/`: dock, sheets, bindings, capture fixtures and owner tests; the
+  sheet stage (`run/acting/tests/sheets/`) is a kernel stand-in that holds the real owner mods.
+- `scripts/tui-smoke.sh`: the model, keys and sessions steps wait for dock sheets.
+- `schema/`, `sdk/typescript/`: generated viewport/placement contracts and stack-safe views.
+- `docs/{plans,adr,verification}/`: M198 evidence, ADR-0097 service seam and M200 face rule.
+- `bingo-tasks` adds workspace `bingo-collab` for roster-order owner inks.
+- TUI promotes workspace `bingo-services` to read transient checkpoint file counts.
+- Plugins enables SDK `testing` for its owner contract; no new workspace package.
+- `Viewport.glyphs` defaults to Unicode; its fixture, schemas and TypeScript land together.
 
 ## Exit criteria
 
@@ -100,11 +89,11 @@ written once.
       `sessions`, `sessions-filtered`, `sessions-switched`, `rewind`, `rewind-rewound`, `keys`,
       `keys-closed`, `tasks`, `tasks-again`, `schedule`, `schedule-paused`, `schedule-ran`,
       `memory` and `memory-forgot`.
-- [ ] The `sheet.rs` unit tests above. One test per owner shows its rows come from the builder
+- [x] The `sheet.rs` unit tests above. One test per owner shows its rows come from the builder
       (no second windowing).
-- [ ] The permission mode and wake sheets have band tests against a frame built the same way.
+- [x] The permission mode and wake sheets have band tests against a frame built the same way.
       They have no capture.
-- [ ] Gates and checks as in M192. tmux drive: each sheet opened, moved, acted on and closed at
+- [x] Gates and checks as in M192. tmux drive: each sheet opened, moved, acted on and closed at
       100×32; sessions filtered and keys at 80×24.
 
 ## Non-goals
@@ -114,8 +103,45 @@ today beyond what its capture shows; mouse in sheets beyond a click on a row.
 
 ## Risks
 
+- An open sheet hides the queued rows and the mentions, as the prototype's dock does; M196 owns those rows.
+- `activity_hidden` is no longer set; it remains until M196 removes its read at the merge.
+- Rewind file counts are read through the registered service only while its sheet is open; absent facts stay blank.
 - **Many mods change at once.** One commit per owner, each with its own tests, so a bad sheet
   reverts alone.
-- **Facts a capture shows that bingo lacks.** The cost line, `N changed` and `reads images` come
-  from the snapshot and catalogue today. A missing fact draws nothing rather than a guess, and
-  Verified names each one.
+- Missing capture facts draw nothing; Verified names each one.
+
+## Verified
+
+Round 4, on dev acb299e02. Evidence: `docs/verification/m198/checks.txt`.
+
+- [x] Captures by key — every M198 scene opens its sheet through `Run::terminal_event` (or
+  `/name` as a line) on a stage holding the owner mods, presses the capture's `after` keys, and
+  compares the frame. No capture builds UI state by hand beyond the world it starts from.
+  - Full frame (15): model, model-moved, model-chosen, plugins, plugins-toggled, sessions,
+    sessions-filtered, sessions-switched, rewind, keys-closed, tasks, tasks-again, schedule,
+    schedule-paused, schedule-ran.
+  - Bands (7): keys (ctrl+g row, M200); rewind-rewound (welcome, M199); status ×3 (branch
+    and "3 changed", M199; agents row, M200); memory ×2 (instruction line counts and memory
+    dates: no owner, the memory service lacks them). plugins-github stays M199's.
+- [x] Toast parts — `Slot::Toast`/`ToastProps` carry `TextChild` parts drawn through the one
+  tone path. Owners send segments; schemas and TypeScript changed with the contract.
+- [x] Faces — TUI inks come from `bingo_collab::face`; `Faces` owns the mention names.
+- [x] History — fixes folded with `--fixup` and autosquash; 27 commits. `rebase -x 'cargo fmt
+  --all -- --check && cargo check --workspace --all-targets --locked' dev`: 27/27.
+- [x] Gates — fmt, check and clippy exit 0. Workspace tests: 133 groups, 6626 passed, 1 failed
+  (`acp::the_restore_ladder_climbs_resume_then_load_then_a_file`, untouched by M198; it passed
+  alone). `discipline ok`, `budget ok` (423 of 423), deny ok.
+- [ ] Windows — 22 of 31 touched crates pass. Nine are blocked by aws-lc-sys, rquickjs-sys or
+  tree-sitter build scripts and are owed to CI; none has a Rust error.
+- [x] PTY — `tui-smoke ok`. The drive passes 14/14 at 100×32 and at 80×24, with CLEAN on both,
+  on a private `m198-drive` server with a temporary HOME, data dir and cwd and the fake provider.
+- Departures: a press is signed with the terminal; the sessions filter resets the cursor;
+  memory paths drop `./` ("AGENTS.md", as p4b-data.js MEMORY); the stage runs
+  `HookPoint::Event` observers as the kernel does; schedule fires use the real clock at
+  scene build; toast parts are third in history so every commit builds; rewind file replies
+  moved to `pulling.rs` (run.rs ≤1000 lines).
+- Plan errors: the ↑ queued-edit row is not owed (M196 merged; it is in KEYMAP and the
+  guide); the rewound welcome is M199's, not M192's; exit criterion 1 asks full frames of
+  scenes whose facts are M199's and M200's.
+- Still owed: window.rs (mentions M196 part 2, ask options M197), the pager, and the mod
+  Rect/Overlay anchors.

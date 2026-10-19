@@ -1,11 +1,11 @@
 
 
 
+
+
    Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 ▍  Check the drive fixture
 
@@ -21,4 +21,4 @@
    in 30m
    in 1h
 
-   accept edits · edits inside the working dire…   ↑↓ when   ⏎ set   esc close
+   fake-1 · accept edits                           ↑↓ when   ⏎ set   esc close

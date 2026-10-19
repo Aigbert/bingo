@@ -8,11 +8,11 @@
 
 
 
+
+
    Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 ▍  Check the drive fixture
 
@@ -21,4 +21,4 @@
 
    draft survives the sheet▍
 
-   ✓ wakes in 1m                                           ⏎ send   ⇧⏎ newline
+   fake-1 · accept edits                                   ⏎ send   ⇧⏎ newline

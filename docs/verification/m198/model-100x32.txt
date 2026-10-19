@@ -29,4 +29,4 @@
    effort   low  medium  high  xhigh  max
    thinks before most answers
 
-   scheduled q1cmshs4: every 30m, next 2026-10-19 12:4…   ↑↓ model   ←→ effort   ⏎ use   esc close
+   fake-1                                                 ↑↓ model   ←→ effort   ⏎ use   esc close

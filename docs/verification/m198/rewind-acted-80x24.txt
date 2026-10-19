@@ -16,7 +16,7 @@
 
 
 
- ─── rewound, 11 items dropped ─────────────────────────────────────────────────
+ ─── rewound, 10 items dropped ─────────────────────────────────────────────────
 
 
    Check the Ember palette.▍

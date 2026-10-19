@@ -2,11 +2,11 @@
 
 
 
+
+
 ▍  Check the Ember palette.
 
    Ember primitives are ready.
-
-⇄ fake-1 · fake · thinking off · this session
 
 
    Plugins                                                         38 of 38 on
@@ -21,4 +21,4 @@
    ✓  bingo.mod.sessions                                              built in
    8 of 38
 
-   ✓ fake-1 off                           ↑↓ plugin   space switch   esc close
+   fake-1                                 ↑↓ plugin   space switch   esc close
