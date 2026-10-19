@@ -332,7 +332,7 @@ mod tests {
     use futures::StreamExt;
 
     use super::*;
-    use crate::testing::unanswering;
+    use crate::testing::{past_deadline, unanswering};
 
     fn declared() -> ProviderSpec {
         ProviderSpec {
@@ -414,8 +414,7 @@ mod tests {
             .stream(request(), CancellationToken::new())
             .await
             .expect("the open goes out");
-        let error = stream
-            .next()
+        let error = past_deadline(deadline::PROVIDER_IDLE, stream.next())
             .await
             .expect("a stream that says nothing still ends")
             .expect_err("with the timeout the kernel retries");

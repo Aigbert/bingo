@@ -94,7 +94,7 @@ impl Compactor for RemoteCompactor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{capabilities, unanswering};
+    use crate::testing::{capabilities, past_deadline, unanswering};
 
     #[test]
     fn the_remote_context_carries_the_native_parent_request() {
@@ -132,20 +132,22 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_compactor_past_its_deadline_fails_the_call() {
         let remote = RemoteCompactor::new("slow", spec(), unanswering());
-        let error = remote
-            .compact(
-                CompactContext {
-                    items: &[],
-                    usage: Default::default(),
-                    capabilities: &capabilities(),
-                    provider: Arc::new(crate::testing::NoProvider),
-                    request: &serde_json::from_value(serde_json::json!({"model":"m", "maxTokens":100, "system":[], "messages":[], "tools":[]})).expect("request"),
-                    cancel: Default::default(),
-                    failures: 0,
-                    keep_budget: 100,
-                },
-                CompactReason::Threshold,
-            )
+        let model = capabilities();
+        let request = serde_json::from_value(serde_json::json!({"model":"m", "maxTokens":100, "system":[], "messages":[], "tools":[]})).expect("request");
+        let compacting = remote.compact(
+            CompactContext {
+                items: &[],
+                usage: Default::default(),
+                capabilities: &model,
+                provider: Arc::new(crate::testing::NoProvider),
+                request: &request,
+                cancel: Default::default(),
+                failures: 0,
+                keep_budget: 100,
+            },
+            CompactReason::Threshold,
+        );
+        let error = past_deadline(deadline::COMPACT, compacting)
             .await
             .expect_err("a process that says nothing compacts nothing");
         assert_eq!(error.error.code, ErrorCode::Timeout);

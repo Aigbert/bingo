@@ -133,6 +133,28 @@ async fn a_dropped_call_tells_the_plugin_it_is_no_longer_waited_for() {
     manager.shutdown().await;
 }
 
+/// Holds `running` to `bound` on a clock moved by hand, then lets it finish on
+/// the real one. On Windows a child's pipe is read on the blocking pool, and a
+/// blocking task keeps a paused clock from advancing by itself.
+async fn past_bound<F: std::future::Future>(
+    bound: Duration,
+    running: F,
+) -> Result<F::Output, tokio::time::error::Elapsed> {
+    tokio::time::pause();
+    let mut running = Box::pin(running);
+    assert!(futures::poll!(&mut running).is_pending());
+    tokio::time::advance(bound - Duration::from_secs(1)).await;
+    assert!(
+        futures::poll!(&mut running).is_pending(),
+        "the deadline must not fire early"
+    );
+    tokio::time::advance(Duration::from_secs(2)).await;
+    tokio::time::resume();
+    // Real time from here: the timer has fired, and the bound only stops a
+    // regression from hanging a slow CI box.
+    tokio::time::timeout(Duration::from_secs(60), running).await
+}
+
 async fn deadline_tool(seconds: Option<u64>) {
     let started = crate::harness::started_with_timeout(&[("stub", &[])], seconds).await;
     let tool = only_tool(&started.manager).await;
@@ -141,18 +163,8 @@ async fn deadline_tool(seconds: Option<u64>) {
         started.project.path(),
         CancellationToken::new(),
     );
-    tokio::time::pause();
-    let mut running = Box::pin(tool.call(json!({"awaitCancel": true}), &cx));
-    assert!(futures::poll!(&mut running).is_pending());
     let bound = Duration::from_secs(seconds.unwrap_or(600));
-    tokio::time::advance(bound - Duration::from_secs(1)).await;
-    assert!(
-        futures::poll!(&mut running).is_pending(),
-        "the deadline must not fire early"
-    );
-    let result = tokio::time::timeout(Duration::from_secs(2), &mut running).await;
-    drop(running);
-    tokio::time::resume();
+    let result = past_bound(bound, tool.call(json!({"awaitCancel": true}), &cx)).await;
     let error = result
         .expect("tool/call must have a deadline")
         .expect_err("a timeout");
@@ -183,15 +195,8 @@ async fn deadline_command(seconds: Option<u64>) {
         cwd: started.project.path().into(),
         host: bingo_sdk::testing::NoHost::handle(),
     };
-    tokio::time::pause();
-    let mut running = Box::pin(command.run("never-answer", &cx));
-    assert!(futures::poll!(&mut running).is_pending());
     let bound = Duration::from_secs(seconds.unwrap_or(600));
-    tokio::time::advance(bound - Duration::from_secs(1)).await;
-    assert!(futures::poll!(&mut running).is_pending());
-    let result = tokio::time::timeout(Duration::from_secs(2), &mut running).await;
-    drop(running);
-    tokio::time::resume();
+    let result = past_bound(bound, command.run("never-answer", &cx)).await;
     let error = result
         .expect("command/run must have a deadline")
         .expect_err("a timeout");

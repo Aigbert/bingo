@@ -239,7 +239,7 @@ mod tests {
     use serde_json::json;
 
     use super::*;
-    use crate::testing::unanswering;
+    use crate::testing::{past_deadline, unanswering};
 
     fn declared(methods: &[&str]) -> ServiceSpec {
         ServiceSpec {
@@ -292,11 +292,13 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_service_that_says_nothing_gives_up_at_the_deadline_and_names_the_plugin() {
         let (_bridge, service) = remote(declared(&["get"]));
-        let why = service
-            .call("get", json!({ "key": "k" }))
-            .await
-            .expect_err("a process that says nothing answers nothing")
-            .to_string();
+        let why = past_deadline(
+            deadline::SERVICE,
+            service.call("get", json!({ "key": "k" })),
+        )
+        .await
+        .expect_err("a process that says nothing answers nothing")
+        .to_string();
         assert_eq!(why, "stub: the service kv said nothing within 30s");
     }
 

@@ -1,7 +1,9 @@
 //! Doubles this crate's own tests share: a live process that never answers,
 //! and the facts a query has to carry to be one.
 
+use std::future::Future;
 use std::sync::Arc;
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bingo_sdk::{
@@ -15,19 +17,34 @@ use crate::manifest::Entry;
 
 /// A process that is alive, reads what it is sent and answers nothing: every
 /// request on this connection waits for its deadline and for nothing else.
-/// `cat` buffers a pipe rather than echoing it, and a line echoed back would
-/// be a request the router ignores anyway.
+/// Its output goes nowhere because a bare `cat` would echo each request back,
+/// the router would refuse it as a request from the plugin, and that refusal,
+/// echoed in turn, would settle the call before its deadline.
 pub fn unanswering() -> Arc<Connection> {
     let dir = tempfile::tempdir().expect("a temporary directory");
     let shell = bingo_process::shell::resolve().expect("the supported shell");
     let entry = Entry {
         command: shell.path().to_string_lossy().into_owned(),
-        args: vec!["-c".into(), "cat".into()],
+        args: vec!["-c".into(), "cat >/dev/null".into()],
         env: Default::default(),
     };
     let connection = Connection::spawn("quiet", &entry, dir.path(), dir.path(), None)
         .expect("the supported shell runs cat");
     Arc::new(connection)
+}
+
+/// Runs `call` on a paused clock past `deadline`, moving the clock by hand.
+/// On Windows a child's pipe is read on the blocking pool, and a blocking
+/// task keeps a paused clock from advancing by itself, so a test that waits
+/// for auto-advance with a child attached never wakes there.
+pub async fn past_deadline<F: Future>(deadline: Duration, call: F) -> F::Output {
+    let mut call = std::pin::pin!(call);
+    assert!(
+        futures::poll!(&mut call).is_pending(),
+        "the call is out and waiting on its deadline"
+    );
+    tokio::time::advance(deadline + Duration::from_secs(1)).await;
+    call.await
 }
 
 /// What a `ContextQuery` borrows. The query itself is built by the caller:

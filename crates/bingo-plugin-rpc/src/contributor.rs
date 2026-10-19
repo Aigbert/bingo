@@ -103,7 +103,7 @@ impl ContextContributor for RemoteContributor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{query, unanswering};
+    use crate::testing::{past_deadline, query, unanswering};
 
     #[test]
     fn a_contributor_is_named_for_its_plugin_and_itself() {
@@ -135,17 +135,18 @@ mod tests {
         let remote =
             RemoteContributor::new("notes", declared(Placement::RoundStart), unanswering());
         let (session, turn, host) = query();
-        let error = remote
-            .contribute(ContextQuery {
-                session: &session,
-                host: &host,
-                turn: &turn,
-                round: 0,
-                items: &[],
-                usage: &Default::default(),
-                capabilities: &crate::testing::capabilities(),
-                cwd: std::path::Path::new("/work"),
-            })
+        let (usage, model) = (Default::default(), crate::testing::capabilities());
+        let contributing = remote.contribute(ContextQuery {
+            session: &session,
+            host: &host,
+            turn: &turn,
+            round: 0,
+            items: &[],
+            usage: &usage,
+            capabilities: &model,
+            cwd: std::path::Path::new("/work"),
+        });
+        let error = past_deadline(deadline::CONTRIBUTE, contributing)
             .await
             .expect_err("a process that says nothing contributes nothing");
         let said = error.to_string();

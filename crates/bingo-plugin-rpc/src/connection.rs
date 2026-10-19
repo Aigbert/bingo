@@ -728,7 +728,7 @@ mod tests {
         drop(stderr_sink(file.path(), "wordcount"));
     }
 
-    /// `cat` echoes nothing back, so the request is still waiting when the
+    /// `true` answers nothing, so the request is still waiting when the
     /// process ends: the reader's `closed` is what wakes it.
     #[tokio::test]
     async fn a_request_whose_process_ends_fails_instead_of_hanging() {

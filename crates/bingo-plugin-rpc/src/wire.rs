@@ -943,7 +943,9 @@ mod tests {
         let wire = serde_json::to_value(&params).expect("the handshake serialises");
         assert_eq!(wire["pluginVersion"], json!("1.2.3"));
         assert_eq!(wire["pluginRoot"], json!("/plugins/wordcount"));
-        assert_eq!(wire["env"]["dataDir"], json!("/home/u/.bingo/data"));
+        // The data directory is a path on the host's machine, spelled natively.
+        let data_dir = std::path::Path::new("/home/u").join(".bingo").join("data");
+        assert_eq!(wire["env"]["dataDir"], json!(data_dir));
         assert_eq!(
             serde_json::from_value::<InitializeParams>(wire).expect("and parses"),
             params
