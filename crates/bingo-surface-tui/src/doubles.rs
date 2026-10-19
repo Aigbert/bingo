@@ -28,7 +28,7 @@ pub struct TestSession {
     pace: std::time::Duration,
     submitted: Mutex<Vec<(IntentId, Input)>>,
     answers: Mutex<Vec<(bingo_sdk::InteractionId, bingo_sdk::Answer, Activation)>>,
-    interrupts: Mutex<usize>,
+    interrupts: Mutex<Vec<(IntentId, InterruptScope)>>,
 }
 
 impl TestSession {
@@ -60,7 +60,10 @@ impl TestSession {
     }
 
     pub fn interrupts(&self) -> usize {
-        *self.interrupts.lock().expect("no poisoned lock")
+        self.interrupts.lock().expect("no poisoned lock").len()
+    }
+    pub fn interruptions(&self) -> Vec<(IntentId, InterruptScope)> {
+        self.interrupts.lock().expect("no poisoned lock").clone()
     }
 }
 
@@ -73,8 +76,11 @@ impl SessionPort for TestSession {
             .push((intent, input));
     }
 
-    fn interrupt(&self, _intent: IntentId, _scope: InterruptScope) {
-        *self.interrupts.lock().expect("no poisoned lock") += 1;
+    fn interrupt(&self, intent: IntentId, scope: InterruptScope) {
+        self.interrupts
+            .lock()
+            .expect("no poisoned lock")
+            .push((intent, scope));
     }
 
     fn answer(

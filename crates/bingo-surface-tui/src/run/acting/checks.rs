@@ -57,7 +57,13 @@ pub(super) fn check(scene: &Scene) {
         .take(expected_withdrawals)
         .collect();
     assert_eq!(withdrawals, queued_intents);
-    assert_eq!(scene.session.interrupts(), expected_withdrawals);
+    let interrupts: Vec<_> = scene
+        .session
+        .interruptions()
+        .into_iter()
+        .map(|(_, scope)| scope)
+        .collect();
+    assert_eq!(interrupts, vec![InterruptScope::Head; expected_withdrawals]);
     if scene.name == "image-sent" {
         assert!(
             matches!(&inputs[0], Input::Text { images, .. } if images.len() == 1 && images[0].media_type == "image/png")

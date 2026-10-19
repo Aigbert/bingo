@@ -2,7 +2,7 @@ use super::*;
 use crossterm::event::{KeyCode, KeyEvent};
 
 pub(super) enum Answer {
-    Frame(Event),
+    Frame(Box<Event>),
     Steer(String, String),
     Escape,
 }
@@ -25,13 +25,13 @@ pub(super) async fn advance(scene: &mut Scene, to: i64) {
         scene.set_time(at);
         match answer {
             Answer::Frame(event) => {
-                let promote = match &event {
+                let promote = match event.as_ref() {
                     Event::ItemStarted { item } if matches!(&item.body, ItemBody::ToolCall { name, .. } if name == "bash") => {
                         Some(item.id.clone())
                     }
                     _ => None,
                 };
-                scene.emit(event);
+                scene.emit(*event);
                 if let Some(id) = promote {
                     timeline::promote(scene, id);
                 }
@@ -56,7 +56,7 @@ pub(super) fn start(scene: &mut Scene, turn: &Value, n: usize, intent: IntentId,
     scene.timeline.extend(
         story::provider_events(n, turn)
             .into_iter()
-            .map(|(at, event)| (at - CLOCK_ORIGIN_MS, Answer::Frame(event))),
+            .map(|(at, event)| (at - CLOCK_ORIGIN_MS, Answer::Frame(Box::new(event)))),
     );
     for (index, data) in turn["items"].as_array().unwrap().iter().enumerate() {
         if data["k"] == "you" {
@@ -130,10 +130,10 @@ pub(super) fn shell(scene: &mut Scene, intent: IntentId, text: &str) {
     };
     scene
         .timeline
-        .push((at - CLOCK_ORIGIN_MS, Answer::Frame(event)));
+        .push((at - CLOCK_ORIGIN_MS, Answer::Frame(Box::new(event))));
     scene
         .timeline
-        .push((at - CLOCK_ORIGIN_MS, Answer::Frame(ack)));
+        .push((at - CLOCK_ORIGIN_MS, Answer::Frame(Box::new(ack))));
 }
 
 pub(super) fn land(scene: &mut Scene, id: &str, prompt: &str) {
