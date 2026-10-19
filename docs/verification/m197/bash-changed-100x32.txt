@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Revise the note, run a few commands, then ask about the cache.
+   ¶ read    note.txt                                                                      8 lines
+   ± edit    note.txt                                                                        +1 −1
+   ◆ run     echo first                                                                  needs you
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Run this command?   in /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/m197-drive-XXXXXXXX/cwd
+
+     $ echo first second
+
+ ▎ Yes
+   Yes, allow echo for this session
+   No, and tell it why
+   Change it first
+
+   fake-1                                                         ↑↓ choose   ⏎ confirm   esc stop

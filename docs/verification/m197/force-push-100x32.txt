@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Revise the note, run a few commands, then ask about the cache.
+▍  use cargo clean                                                                         said no
+   ¶ read    note.txt                                                                      8 lines
+   ± edit    note.txt                                                                        +1 −1
+   $ run     echo first second                                                 ok · changed by you
+   $ run     rm -rf build                                                                  said no
+   ◆ run     git push --force origin main                                                needs you
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Run this command?                                                       rewrites remote history
+
+     $ git push --force origin main
+     drops 1 commit that only origin/main has
+       acc5ad6 Keep the remote history
+
+   Yes, force-push
+ ▎ No, and tell it why  type to tell bingo why
+   Change it first
+
+   fake-1                                                         ↑↓ choose   ⏎ confirm   esc stop

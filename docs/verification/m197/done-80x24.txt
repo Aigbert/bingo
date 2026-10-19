@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+▍  Revise the note, run a few commands, then ask about the cache.
+▍  use cargo clean                                                     said no
+▍  keep the remote history                                             said no
+   ¶ read    note.txt                                                  8 lines
+   ± edit    note.txt                                                    +1 −1
+   $ run     echo first second                             ok · changed by you
+   $ run     rm -rf build                                              said no
+   $ run     git push --force origin main                              said no
+   ? ask                                                             2 answers
+
+   Ask drive finished.
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands
+
+   fake-1                                 ctrl+o details   / commands   ? keys

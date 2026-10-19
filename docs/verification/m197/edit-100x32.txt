@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+▍  Revise the note, run a few commands, then ask about the cache.
+   ¶ read    note.txt                                                                      8 lines
+   ◆ edit    note.txt                                                                    needs you
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Edit note.txt?                                                                            +1 −1
+
+          1   source line 1
+          2   source line 2
+          3 − source line 3
+          3 + revised line 3
+          4   source line 4
+          5   source line 5
+          6   source line 6
+
+ ▎ Yes
+   Yes, allow edits in m197-drive-XXXXXXXX/cwd/ for this session
+   No, and tell it why
+   Change it first
+
+   fake-1                                                         ↑↓ choose   ⏎ confirm   esc stop

@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Revise the note, run a few commands, then ask about the cache.
+▍  use cargo clean                                                                         said no
+▍  keep the remote history                                                                 said no
+   ¶ read    note.txt                                                                      8 lines
+   ± edit    note.txt                                                                        +1 −1
+   $ run     echo first second                                                 ok · changed by you
+   $ run     rm -rf build                                                                  said no
+   $ run     git push --force origin main                                                  said no
+   ◆ ask                                                                                 needs you
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ✓ Store    Lifetime                                                                      2 of 2
+   How long should an entry live?
+
+ ▎ An hour          fresh enough
+   A day            fewer misses
+   Something else
+
+   fake-1                                                       ←→ questions   ⏎ choose   esc stop
