@@ -70,7 +70,9 @@ async fn the_plugin_root_reaches_the_process_through_its_environment() {
     assert_eq!(
         said(&answered.expect("an output")),
         home.path()
-            .join(".bingo/plugins/stub")
+            .join(".bingo")
+            .join("plugins")
+            .join("stub")
             .display()
             .to_string()
     );

@@ -1140,7 +1140,7 @@ pub(crate) mod tests {
     #[test]
     fn the_missing_key_hint_names_the_login_the_variable_and_the_settings_file() {
         let directory = tempfile::tempdir().expect("a temporary directory");
-        let file = directory.path().join(".bingo/settings.toml");
+        let file = directory.path().join(".bingo").join("settings.toml");
         assert_eq!(
             providers(&directory, json!({}))[0].auth(),
             AuthStatus::Missing {
