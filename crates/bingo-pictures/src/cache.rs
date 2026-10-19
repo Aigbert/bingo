@@ -164,9 +164,11 @@ mod tests {
     #[test]
     fn a_life_no_clock_could_measure_is_kept_rather_than_wrapped() {
         let cache = Cache::under(std::path::Path::new("/data"), u64::MAX).expect("a cache");
+        // About 270 years on: far past any real entry, yet inside the range of
+        // Windows' clock, which ends in the year 30828.
         assert!(fresh(
             SystemTime::UNIX_EPOCH,
-            SystemTime::UNIX_EPOCH + Duration::from_secs(1 << 40),
+            SystemTime::UNIX_EPOCH + Duration::from_secs(1 << 33),
             cache.ttl
         ));
     }
