@@ -48,7 +48,10 @@ async fn key(host: &impl HostApi, session: &mut Attachment, key: &str) -> Value 
     let intent = IntentId::mint();
     session.handle.submit(
         intent.clone(),
-        Input::action(action, Origin::surface("tui")),
+        Input::action(
+            action,
+            Origin::surface("tui").on(render::SurfaceName::Terminal),
+        ),
     );
     serde_json::to_value(ack_for(session, &intent).await).unwrap()
 }
@@ -188,6 +191,13 @@ async fn disabled_crew_retains_tables_and_no_key() {
     for line in ["/agents", "/room", "/rooms", "/tasks", "/team"] {
         let receipt = command(&mut root, line).await;
         assert_eq!(receipt["kind"], "applied", "{line}: {receipt}");
+        if line == "/tasks" {
+            assert_eq!(
+                receipt["result"]["surface"]["args"]["plugin"],
+                "bingo.tasks"
+            );
+            continue;
+        }
         if line == "/agents" {
             assert_eq!(
                 receipt["result"]["message"],

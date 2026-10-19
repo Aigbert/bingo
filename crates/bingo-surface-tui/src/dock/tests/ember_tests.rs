@@ -129,6 +129,54 @@ fn m198_model_moved_full_frame() {
     });
 }
 
+fn tasks() -> Vec<bingo_tasks::Task> {
+    crate::test_support::ember::world::rows("tasks")
+        .into_iter()
+        .map(|row| {
+            serde_json::from_value(
+                json!({"id":row["id"],"subject":row["t"],"status":row["st"],"owner":row["who"]}),
+            )
+            .unwrap()
+        })
+        .collect()
+}
+#[test]
+fn m198_tasks_full_frame() {
+    tasks_frame("tasks");
+}
+#[test]
+fn m198_tasks_again_full_frame() {
+    tasks_frame("tasks-again");
+}
+fn tasks_frame(name: &str) {
+    let capture = Capture::load(name).spinners(&[(25, 3), (26, 3)]);
+    capture.render(|| {
+        let (mut state, mut ui) = fixture(&capture);
+        let size = capture.size();
+        let roster = crate::test_support::ember::world::roster(&state.summary);
+        show(
+            &mut state,
+            &mut ui,
+            "bingo.tasks",
+            bingo_tasks::sheet::tree(
+                &tasks(),
+                None,
+                size.width,
+                crate::layout::grid::dock_cap(size.height.into()),
+                Default::default(),
+                &roster,
+            ),
+        );
+        let screen = drawn(
+            size.width,
+            size.height,
+            &solo(&state),
+            &mut ui,
+            capture.now(),
+        );
+        assert_regions(&capture, Band::Frame, screen.buffer(), &ui.shown.regions);
+    });
+}
 #[test]
 fn m198_keys_closed_full_frame() {
     let capture = Capture::load("keys-closed");

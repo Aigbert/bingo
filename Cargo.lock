@@ -1223,6 +1223,7 @@ name = "bingo-tasks"
 version = "0.6.6"
 dependencies = [
  "async-trait",
+ "bingo-collab",
  "bingo-sdk",
  "bingo-services",
  "futures",

@@ -21,7 +21,7 @@ impl Command for TasksCommand {
     fn spec(&self) -> CommandSpec {
         CommandSpec {
             opens: false,
-            keys: vec![],
+            keys: vec!["ctrl+t".into()],
             hidden: false,
             name: "tasks".into(),
             aliases: Vec::new(),

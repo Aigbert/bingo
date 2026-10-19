@@ -79,7 +79,6 @@ async fn folded_commands_open_their_places_and_keep_plain_callers_and_verbs() {
 async fn bare_names(host: &impl HostApi, root: &mut Attachment) {
     for (line, tab) in [
         ("/agents", "agents"),
-        ("/tasks", "tasks"),
         ("/room", "rooms"),
         ("/rooms", "rooms"),
         ("/team", "team"),
@@ -97,6 +96,10 @@ async fn bare_names(host: &impl HostApi, root: &mut Attachment) {
         team.contains("reviewer") && team.contains("scout   not seated"),
         "{team}"
     );
+    let tasks = command(root, "/tasks").await;
+    assert_eq!(tasks["result"]["surface"]["args"]["plugin"], "bingo.tasks");
+    let text = plain(root, "/tasks").await;
+    assert!(text["result"]["view"].is_object());
 }
 
 async fn full_verbs(host: &impl HostApi, root: &mut Attachment, reviewer: &mut Attachment) {

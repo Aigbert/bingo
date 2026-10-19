@@ -13,6 +13,7 @@ workspace = true
 
 [dependencies]
 bingo-sdk.workspace = true
+bingo-collab.workspace = true
 bingo-services.workspace = true
 async-trait.workspace = true
 schemars.workspace = true

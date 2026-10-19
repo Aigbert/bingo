@@ -858,9 +858,6 @@ fn control(ui: &mut Ui, key: KeyEvent) -> Vec<Effect> {
         KeyCode::Char('u') => edit(ui, |c| c.delete_to_line_start()),
         KeyCode::Char('k') => edit(ui, |c| c.delete_to_line_end()),
         KeyCode::Char('v') => return vec![Effect::PasteImage],
-        // Claude Code's own key for its own list (M74): the rows go off the
-        // band and come back, and nothing opens.
-        KeyCode::Char('t') => ui.activity_hidden = !ui.activity_hidden,
         _ => {}
     }
     Vec::new()

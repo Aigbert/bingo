@@ -34,6 +34,7 @@ mod journal;
 mod list;
 mod render;
 mod service;
+pub mod sheet;
 mod task;
 mod update;
 
@@ -56,13 +57,14 @@ pub use update::TaskUpdateTool;
 static MANIFEST: PluginManifest = PluginManifest {
     id: "bingo.tasks",
     version: env!("CARGO_PKG_VERSION"),
-    uses: &[],
+    uses: &[bingo_services::agents_control::CAPABILITY],
     provides: &[
         "tool:TaskCreate",
         "tool:TaskUpdate",
         "tool:TaskGet",
         "tool:TaskList",
         "command:tasks",
+        "command:bingo.tasks:ui",
         "context:tasks",
         "service:bingo.tasks.pages",
         bingo_services::tasks_write::CAPABILITY,
@@ -147,6 +149,17 @@ impl Plugin for TasksPlugin {
             writer.clone(),
             Some(bingo_services::tasks_write::wire(writer)),
         ));
+        registrar.add(Contribution::Command(Arc::new(sheet::Handler)));
+        for link in [
+            Arc::new(sheet::Open) as Arc<dyn bingo_sdk::Interceptor>,
+            Arc::new(sheet::Drawing),
+        ] {
+            registrar.add(Contribution::Interceptor {
+                placement: bingo_sdk::plugin::Placement::Builtin,
+                external: None,
+                link,
+            });
+        }
         Ok(())
     }
 }
@@ -186,7 +199,7 @@ mod plugin_tests {
             .register(&mut registrar)
             .expect("register");
         let contributions = registrar.into_contributions();
-        assert_eq!(contributions.len(), MANIFEST.provides.len());
+        assert_eq!(contributions.len(), MANIFEST.provides.len() + 2);
         let tools: Vec<String> = contributions
             .iter()
             .filter_map(|c| match c {

@@ -43,7 +43,10 @@ mod tests {
                     "the page never says the {name} tool"
                 );
             }
-            if let Some(name) = provided.strip_prefix("command:") {
+            if let Some(name) = provided
+                .strip_prefix("command:")
+                .filter(|name| !name.ends_with(":ui"))
+            {
                 assert!(
                     page().body.contains(&format!("/{name}")),
                     "the page never says /{name}"
