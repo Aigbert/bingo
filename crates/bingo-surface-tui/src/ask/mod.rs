@@ -3,6 +3,7 @@ pub mod drawing;
 pub mod options;
 pub mod receipts;
 pub mod scope;
+pub mod spec;
 
 use crate::ui::Ui;
 use bingo_sdk::{Action, Interaction, SessionState, View};
