@@ -147,6 +147,7 @@ def drive(width, height):
             capture("background")
             wait("finished in the background")
             wait("2 passed")
+            wait("The background tests passed.")
             capture("background-done")
             type_text("!seq 1 50")
             keys("Enter")
