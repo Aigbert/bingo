@@ -37,6 +37,30 @@ pub fn lines(lang: Option<&str>, text: &str, width: usize) -> Vec<Line<'static>>
         .collect()
 }
 
+pub fn numbered(
+    lang: Option<&str>,
+    text: &str,
+    start: Option<u32>,
+    width: usize,
+) -> Vec<Line<'static>> {
+    let Some(start) = start else {
+        return lines(lang, text, width);
+    };
+    text.lines()
+        .enumerate()
+        .map(|(i, text)| {
+            let number = start.saturating_add(u32::try_from(i).unwrap_or(u32::MAX));
+            crate::layout::grid::fit(
+                Line::from(vec![
+                    Span::styled(format!("{number:>4}   "), theme::dim()),
+                    Span::styled(text.to_owned(), theme::ash()),
+                ]),
+                width,
+            )
+        })
+        .collect()
+}
+
 fn band_line(
     number: Option<usize>,
     row: Line<'static>,

@@ -157,6 +157,8 @@ impl Tool for ScheduleCreateTool {
         self.schedules.changed();
         let mut out = ToolOutput::text(self.receipt(&entry));
         out.display = Some(bingo_sdk::View::Code {
+            start: None,
+            of: None,
             language: Some("json".into()),
             source: entry.document().unwrap_or_default(),
         });

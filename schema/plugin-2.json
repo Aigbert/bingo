@@ -6540,6 +6540,24 @@
               "type": "string",
               "description": "The code itself."
             },
+            "start": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0,
+              "description": "The first source line, when the owner numbers the code."
+            },
+            "of": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0,
+              "description": "The number of lines in the source file, when known."
+            },
             "kind": {
               "type": "string",
               "const": "Code"

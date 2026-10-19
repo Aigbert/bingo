@@ -20,6 +20,8 @@ fn every_node() -> Vec<(View, &'static str)> {
         ),
         (
             View::Code {
+                start: None,
+                of: None,
                 language: Some("rust".into()),
                 source: "fn main() {}".into(),
             },
@@ -371,4 +373,32 @@ fn action_meaning_is_optional_and_round_trips() {
 fn keybar_has_only_pairs() {
     let wire = serde_json::to_value(crate::component::KeyBarProps::default()).unwrap();
     assert_eq!(wire, serde_json::json!({"pairs":[]}));
+}
+
+#[test]
+fn code_start_is_additive_and_absent_on_the_old_wire() {
+    let old = serde_json::json!({"kind":"Code","source":"one"});
+    let code: View = serde_json::from_value(old.clone()).unwrap();
+    assert_eq!(serde_json::to_value(code).unwrap(), old);
+    let numbered = serde_json::json!({"kind":"Code","source":"one","start":42});
+    let code: View = serde_json::from_value(numbered.clone()).unwrap();
+    assert!(matches!(
+        code,
+        View::Code {
+            start: Some(42),
+            of: None,
+            ..
+        }
+    ));
+    assert_eq!(serde_json::to_value(code).unwrap(), numbered);
+}
+
+#[test]
+fn code_file_count_is_additive_and_absent_on_the_old_wire() {
+    let old = serde_json::json!({"kind":"Code","source":"one","start":42});
+    let code: View = serde_json::from_value(old.clone()).unwrap();
+    assert_eq!(serde_json::to_value(code).unwrap(), old);
+    let counted = serde_json::json!({"kind":"Code","source":"one","start":42,"of":80});
+    let code: View = serde_json::from_value(counted.clone()).unwrap();
+    assert_eq!(serde_json::to_value(code).unwrap(), counted);
 }

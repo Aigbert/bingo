@@ -183,8 +183,12 @@ export type Payload = ({
   "kind": "Code";
   /** The language name for highlighting, such as `rust`. */
   "language"?: (string | null);
+  /** The number of lines in the source file, when known. */
+  "of"?: (number | null);
   /** The code itself. */
   "source": string;
+  /** The first source line, when the owner numbers the code. */
+  "start"?: (number | null);
   [key: string]: unknown;
 } | {
   "kind": "diff";
@@ -760,8 +764,12 @@ export type View = ({
   "kind": "Code";
   /** The language name for highlighting, such as `rust`. */
   "language"?: (string | null);
+  /** The number of lines in the source file, when known. */
+  "of"?: (number | null);
   /** The code itself. */
   "source": string;
+  /** The first source line, when the owner numbers the code. */
+  "start"?: (number | null);
   [key: string]: unknown;
 } | {
   "kind": "diff";
@@ -1558,8 +1566,12 @@ export type View = ({
   "kind": "Code";
   /** The language name for highlighting, such as `rust`. */
   "language"?: (string | null);
+  /** The number of lines in the source file, when known. */
+  "of"?: (number | null);
   /** The code itself. */
   "source": string;
+  /** The first source line, when the owner numbers the code. */
+  "start"?: (number | null);
   [key: string]: unknown;
 } | {
   "kind": "diff";
@@ -2397,8 +2409,12 @@ export type View = ({
   "kind": "Code";
   /** The language name for highlighting, such as `rust`. */
   "language"?: (string | null);
+  /** The number of lines in the source file, when known. */
+  "of"?: (number | null);
   /** The code itself. */
   "source": string;
+  /** The first source line, when the owner numbers the code. */
+  "start"?: (number | null);
   [key: string]: unknown;
 } | {
   "kind": "diff";

@@ -125,7 +125,12 @@ pub fn marked_with(view: &View, width: usize, marks: &Marks, engine: &Engine<'_>
 fn still_lines(view: &View, width: usize, marks: &Marks) -> Vec<Line<'static>> {
     match view {
         View::Markdown { text, dim_color } => markdown::lines(text, width, *dim_color),
-        View::Code { language, source } => code::lines(language.as_deref(), source, width),
+        View::Code {
+            language,
+            source,
+            start,
+            ..
+        } => code::numbered(language.as_deref(), source, *start, width),
         View::Diff { unified } => diff::lines(unified),
         View::List { items } => list::lines(items),
         View::Table { headers, rows } => table::lines(headers, rows, width),

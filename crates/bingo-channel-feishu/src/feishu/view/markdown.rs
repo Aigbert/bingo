@@ -37,7 +37,9 @@ pub(super) fn view(view: &View) -> String {
                 .collect(),
             style,
         ),
-        View::Code { source, language } => code(source, language.as_deref()),
+        View::Code {
+            source, language, ..
+        } => code(source, language.as_deref()),
         View::Link { href, label } => link(href, label.as_deref()),
         _ => escape(&view.fold()),
     }

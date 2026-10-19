@@ -162,6 +162,8 @@ fn every_node() -> Vec<View> {
             dim_color: false,
         },
         View::Code {
+            start: None,
+            of: None,
             language: Some("rust".into()),
             source: (1..=10)
                 .map(|i| format!("let line_{i} = {i};\n"))

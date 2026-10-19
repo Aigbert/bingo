@@ -57,6 +57,12 @@ pub enum View {
         language: Option<String>,
         /// The code itself.
         source: String,
+        /// The first source line, when the owner numbers the code.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        start: Option<u32>,
+        /// The number of lines in the source file, when known.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        of: Option<u32>,
     },
     /// A diff drawn with added and removed lines marked.
     Diff {
