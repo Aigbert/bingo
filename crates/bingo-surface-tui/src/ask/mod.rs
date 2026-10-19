@@ -47,7 +47,7 @@ pub fn sheet(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<L
     let picking = dock::Picking {
         cursor: ui.dialog.focus,
         typing: ui.dialog.words.as_ref().map(|words| words.text()),
-        opened: interaction.opened_at,
+        opened: guard::armed(ui, interaction, now),
         keyed_at: ui.keyed_at,
     };
     let width = frame.area().width;

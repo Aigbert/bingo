@@ -1216,8 +1216,19 @@ mod tests {
             child_frame(1, announced("reviewer")),
             child_frame(2, opened(child_permission())),
         ];
-        let keys = vec![ctrl('g'), key(KeyCode::Enter), ctrl('d')];
-        let (_, session) = harness.go(frames, keys, None).await;
+        // Each press waits out the guard, which re-arms on the walk in.
+        let (host, session) = TestHost::with(frames);
+        drive(
+            &host,
+            options(None, harness.home.path()),
+            &mut harness.recorder,
+            keys_after(
+                crate::ask::guard::GUARD,
+                vec![ctrl('g'), key(KeyCode::Enter), ctrl('d')],
+            ),
+        )
+        .await
+        .expect("the loop ran");
         assert_eq!(
             session.answers(),
             vec![(

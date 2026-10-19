@@ -6,6 +6,16 @@ use std::time::{Duration, Instant};
 
 pub const GUARD: Duration = Duration::from_millis(400);
 
+/// When the ask's guard last armed: when its question came on screen, or
+/// when its session was last walked into, whichever is later. An ask that
+/// waited away from view is read afresh before a key counts.
+pub fn armed(ui: &crate::ui::Ui, interaction: &bingo_sdk::Interaction, now: Now) -> Timestamp {
+    let shown = crate::ask::question::since(ui, interaction);
+    ui.switched
+        .and_then(|at| now.wall.checked_sub(now.since(at)).ok())
+        .map_or(shown, |walked| walked.max(shown))
+}
+
 /// Whether a key at `now` counts for an ask that opened at `opened`.
 pub fn open(opened: Timestamp, now: Timestamp) -> bool {
     elapsed(opened, now) >= GUARD

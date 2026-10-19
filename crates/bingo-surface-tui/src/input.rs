@@ -1961,6 +1961,28 @@ mod tests {
         );
     }
 
+    /// An ask that waited away from view is read afresh: walking into its
+    /// session re-arms the 400 ms guard (M200, after M197).
+    #[test]
+    fn walking_in_re_arms_the_guard_of_an_ask_that_waited() {
+        let mut tree = with_child(vec![child_frame(2, opened(child_permission()))]);
+        tree.show(&child_id());
+        let (mut ui, now) = scene();
+        let walked = later(now, 60_000);
+        ui.switched = Some(walked.instant);
+        ui.dialog
+            .focus_on(tree.open_interaction().map(|(_, open)| open));
+        assert!(press_tree(&mut ui, &tree, key(KeyCode::Enter), later(walked, 399)).is_empty());
+        assert_eq!(
+            press_tree(&mut ui, &tree, key(KeyCode::Enter), later(walked, 400)),
+            vec![Effect::Answer {
+                interaction: bingo_sdk::InteractionId::from_raw("int_2"),
+                answer: Answer::AllowOnce,
+                activation: Activation::Keyboard,
+            }]
+        );
+    }
+
     #[test]
     fn ctrl_c_and_escape_close_the_same_child_interaction() {
         let mut tree = with_child(vec![child_frame(2, opened(child_permission()))]);

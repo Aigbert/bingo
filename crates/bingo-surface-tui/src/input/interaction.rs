@@ -36,7 +36,7 @@ fn guarded(ui: &Ui, interaction: &bingo_sdk::Interaction, now: Now) -> bool {
         bingo_sdk::InteractionKind::Login { .. } => interaction
             .guard_until
             .is_some_and(|until| now.wall < until),
-        _ => !crate::ask::guard::open(crate::ask::question::since(ui, interaction), now.wall),
+        _ => !crate::ask::guard::open(crate::ask::guard::armed(ui, interaction, now), now.wall),
     }
 }
 

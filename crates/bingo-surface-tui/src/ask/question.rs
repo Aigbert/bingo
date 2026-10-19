@@ -34,7 +34,7 @@ pub fn sheet(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<L
     };
     let drawn = site.rows(&mut frame.pulls, false);
     let drawn = frame.collect(drawn);
-    let opened = since(ui, interaction);
+    let opened = guard::armed(ui, interaction, now);
     let fade = guard::fade(opened, now);
     let (caret_now, rest) = dock::rested(now, ui.keyed_at);
     let writing = focus(ui, &frame.pulls, interaction).is_some_and(|focus| focus.writing);
