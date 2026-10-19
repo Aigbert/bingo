@@ -158,14 +158,6 @@ pub fn on_key(
         KeyCode::Down => *focus = (*focus + 1).min(rows_of(questions, form.tab) - 1),
         KeyCode::Char(' ') => tick(form, questions, *focus),
         KeyCode::Enter => return chosen(form, focus, questions),
-        KeyCode::Char(c @ '1'..='9') if bare(key) => {
-            let index = (c as usize) - ('1' as usize);
-            if index >= rows_of(questions, form.tab) {
-                return None;
-            }
-            *focus = index;
-            return chosen(form, focus, questions);
-        }
         _ => {}
     }
     None
@@ -232,7 +224,7 @@ fn tick(form: &mut Form, questions: &[Question], focus: usize) {
     }
 }
 
-/// `⏎`, or the digit that stands for a row: what the row under the cursor does.
+/// `⏎`: what the row under the cursor does.
 fn chosen(form: &mut Form, focus: &mut usize, questions: &[Question]) -> Option<Answer> {
     match questions.get(form.tab) {
         Some(question) => on_question(form, focus, questions, question),
@@ -329,11 +321,6 @@ fn ticked_ids(slot: &Slot, question: &Question) -> Vec<String> {
 fn written(slot: &Slot) -> Option<String> {
     let text = slot.words.as_ref()?.text().trim();
     (!text.is_empty()).then(|| text.to_string())
-}
-
-/// A bare digit, not a chord.
-fn bare(key: KeyEvent) -> bool {
-    (key.modifiers - KeyModifiers::SHIFT).is_empty()
 }
 
 /// What the card is asked under: what the whole set is about where the asker
@@ -499,7 +486,7 @@ pub fn rows(form: &Form, focus: usize, questions: &[Question], at: Head<'_>) -> 
         answers,
         tail: vec![
             (layers::rule(at.width), None),
-            numbered(chat_row(questions, form.tab), focus, CHAT),
+            pickable(chat_row(questions, form.tab), focus, CHAT),
         ],
         keys: (keys(questions, form.tab), None),
     }
@@ -615,7 +602,7 @@ fn sending(form: &Form, focus: usize, questions: &[Question]) -> (Vec<Row>, Vec<
     (
         vec![(Line::from(Span::styled(says, theme::text())), None)],
         Vec::new(),
-        vec![numbered(0, focus, SUBMIT)],
+        vec![pickable(0, focus, SUBMIT)],
     )
 }
 
@@ -647,7 +634,7 @@ fn preview_of(question: &Question, focus: usize) -> Option<String> {
     question.options.get(focus)?.preview.clone()
 }
 
-/// The options, each numbered, with its description under it — unless the
+/// The options, each with its description under it — unless the
 /// question carries previews, and then the labels stand alone so the mockup is
 /// what is read.
 fn option_rows(
@@ -659,7 +646,7 @@ fn option_rows(
 ) -> Vec<Row> {
     let mut out = Vec::new();
     for (index, option) in question.options.iter().enumerate() {
-        out.push(numbered(
+        out.push(pickable(
             index,
             focus,
             &labelled(form, tab, question, option),
@@ -674,14 +661,14 @@ fn option_rows(
     out
 }
 
-/// One row a key or a click picks: the cursor, the number it answers to, and
-/// its words. Every numbered row of the card is this one.
-fn numbered(index: usize, focus: usize, label: &str) -> Row {
+/// One row a key or a click picks: the cursor and its words. Every row of the
+/// card that answers is this one.
+fn pickable(index: usize, focus: usize, label: &str) -> Row {
     let focused = index == focus;
     (
         Line::from(vec![
             theme::cursor_span(focused),
-            Span::styled(format!("{}. {label}", index + 1), weight(focused)),
+            Span::styled(label.to_owned(), weight(focused)),
         ]),
         Some(index),
     )
@@ -715,7 +702,7 @@ fn ticked(form: &Form, tab: usize, option: &QuestionOption) -> String {
 /// The row where a person answers in their own words, and what they have
 /// typed into it so far.
 fn words_rows(form: &Form, tab: usize, focus: usize, index: usize) -> Vec<Row> {
-    let mut out = vec![numbered(index, focus, WORDS)];
+    let mut out = vec![pickable(index, focus, WORDS)];
     if let Some(words) = form.slot(tab).and_then(|slot| slot.words.as_ref()) {
         out.push((
             Line::from(vec![
@@ -1018,20 +1005,6 @@ mod tests {
     }
 
     #[test]
-    fn a_digit_picks_the_row_it_names_and_fixes_it() {
-        let questions = three();
-        let (mut form, mut focus) = (Form::default(), 0);
-        press(&mut form, &mut focus, &questions, &[KeyCode::Char('2')]);
-        assert!(form.fixed(0) && form.tab == 1);
-        assert_eq!(
-            press(&mut form, &mut focus, &questions, &[KeyCode::Char('9')]),
-            None,
-            "a digit no row answers to does nothing"
-        );
-        assert!(!form.fixed(1));
-    }
-
-    #[test]
     fn the_words_row_answers_in_the_persons_own_words() {
         let questions = vec![question("Auth", false, false)];
         let (mut form, mut focus) = (Form::default(), 2);
@@ -1065,7 +1038,12 @@ mod tests {
         let (mut form, mut focus) = (Form::default(), 0);
         // Two options, the words row, then the way out.
         assert_eq!(
-            press(&mut form, &mut focus, &questions, &[KeyCode::Char('4')]),
+            press(
+                &mut form,
+                &mut focus,
+                &questions,
+                &[KeyCode::Down, KeyCode::Down, KeyCode::Down, KeyCode::Enter]
+            ),
             Some(Answer::Cancel)
         );
         let (mut form, mut focus) = (Form::default(), 0);
@@ -1338,18 +1316,16 @@ mod tests {
         assert!(
             drawn
                 .iter()
-                .any(|row| row.contains(&format!("1. [{}] the first one", theme::tick()))),
+                .any(|row| row.contains(&format!("[{}] the first one", theme::tick()))),
             "{drawn:#?}"
         );
         assert!(
-            drawn
-                .iter()
-                .any(|row| row.contains("2. [ ] the second one")),
+            drawn.iter().any(|row| row.contains("[ ] the second one")),
             "{drawn:#?}"
         );
         assert!(
-            drawn.iter().any(|row| row.contains(&format!("3. {WORDS}")))
-                && drawn.iter().any(|row| row.contains(&format!("4. {CHAT}"))),
+            drawn.iter().any(|row| row.contains(WORDS))
+                && drawn.iter().any(|row| row.contains(CHAT)),
             "{drawn:#?}"
         );
     }
@@ -1453,7 +1429,7 @@ mod tests {
         let all = drawn(&form, focus, &questions, 80);
         assert!(
             all.iter().any(|row| row == "Send the answers.")
-                && all.iter().any(|row| row.contains(&format!("1. {SUBMIT}"))),
+                && all.iter().any(|row| row.contains(SUBMIT)),
             "{all:#?}"
         );
     }
