@@ -26,6 +26,7 @@ pub(super) fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>
         &crate::views::Marks::at(rows.now),
         |changed, width| ledger(changed, width, rows.now),
     );
+    in_view_ink(&mut out, rows.accent());
     if step.state == StepState::Running {
         out.next = out
             .next
@@ -46,6 +47,25 @@ pub(super) fn step_block(item: &Item, step: &Step, opened: bool, rows: &Rows<'_>
         out.lines.extend(fail_tail(item, rows));
     }
     Block::from(out)
+}
+
+/// `viewInk()`: a row's own accent is the viewed session's, so a teammate's
+/// running step spins in its ink, not home's.
+fn in_view_ink(drawing: &mut crate::views::Drawing, accent: &str) {
+    let palette = theme::palette();
+    let (Some(glow), Some(ink)) = (palette.named("glow"), palette.named(accent)) else {
+        return;
+    };
+    if glow == ink {
+        return;
+    }
+    let spans = drawing
+        .lines
+        .iter_mut()
+        .flat_map(|line| line.spans.iter_mut());
+    for span in spans.filter(|span| span.style.fg == Some(glow)) {
+        span.style.fg = Some(ink);
+    }
 }
 
 pub(crate) fn asked(step: &Step, width: usize) -> Line<'static> {
