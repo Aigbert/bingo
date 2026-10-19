@@ -484,7 +484,12 @@ fn default_item_lines(
         ItemBody::Action { name, args, result } => {
             action(item.status, name, args, result.as_ref(), rows, cue).into()
         }
-        ItemBody::Compaction { before, after, .. } => compacted(*before, *after, rows).into(),
+        ItemBody::Compaction {
+            before,
+            after,
+            window,
+            ..
+        } => notice::compacted(item, (*before, *after), *window, rows).into(),
         ItemBody::Rewind { dropped, .. } => rewound(*dropped, rows).into(),
         ItemBody::Interruption { marker, .. } => vec![indented(marker, theme::dim())].into(),
         ItemBody::Notice { level, text, .. } => speaks(
@@ -516,14 +521,6 @@ fn indented(text: &str, style: Style) -> Line<'static> {
         Span::raw(" ".repeat(speaks_indent())),
         Span::styled(text.to_owned(), style),
     ])
-}
-
-/// The seam a compaction left, across the width of the transcript.
-fn compacted(before: u64, after: u64, rows: &Rows<'_>) -> Vec<Line<'static>> {
-    vec![rule(
-        &format!("context compacted ({before} → {after} tokens)"),
-        rows.width,
-    )]
 }
 
 /// The seam a rewind left.
@@ -889,7 +886,16 @@ fn calls(item: &Item, tool: &str) -> bool {
 /// next turn takes it away.
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
     let mut out = live::draw(state, rows);
+    if !out.lines.is_empty()
+        && state
+            .turn
+            .as_ref()
+            .is_none_or(|turn| turn.retrying.is_none())
+    {
+        out.lines.insert(0, Line::default());
+    }
     for props in crate::component::closing::props(state) {
+        out.lines.push(Line::default());
         out.append(crate::component::closing::draw(
             state,
             rows.pulled,

@@ -5,7 +5,7 @@ use bingo_sdk::{
     component::{Props, SpinnerProps},
     view::{TextChild, TextMotion, TextStyle},
 };
-use ratatui::text::{Line, Span};
+use ratatui::text::Span;
 use std::time::Instant;
 use unicode_width::UnicodeWidthStr;
 
@@ -132,16 +132,14 @@ pub fn draw(state: &bingo_sdk::SessionState, rows: &Rows<'_>) -> views::Drawing 
             next,
         }
     };
-    if let Some(retry) = state.turn.as_ref().and_then(|turn| turn.retrying.as_ref()) {
-        drawing.lines.push(Line::from(Span::styled(
-            format!("   retrying {}/{}", retry.attempt, retry.max),
-            theme::ash(),
-        )));
-    }
+    let retry = super::retry::draw(rows);
+    drawing.lines.extend(retry.lines);
+    drawing.next = drawing.next.into_iter().chain(retry.next).min();
     drawing
 }
 
 pub fn requests(rows: &Rows<'_>, frame: &mut crate::layout::Layout, height: u16) {
+    super::retry::request(rows, frame, height);
     let from = frame.blocks.closing_start();
     let to = from + draw(rows.state, rows).lines.len();
     if frame

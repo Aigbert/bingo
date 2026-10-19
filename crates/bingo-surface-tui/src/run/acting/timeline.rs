@@ -92,7 +92,12 @@ pub(super) fn submitted(scene: &mut Scene) {
             let expected = turn["prompt"].as_str().unwrap();
             // The composer token names the Image part, not a word in the prototype's prompt.
             assert_eq!(text.trim_start_matches("[image 1] "), expected);
-            timeline::start(scene, &turn, 2, intent, &input);
+            let n = if scene.name.starts_with("welcome") {
+                0
+            } else {
+                2
+            };
+            timeline::start(scene, &turn, n, intent, &input);
         }
     }
 }

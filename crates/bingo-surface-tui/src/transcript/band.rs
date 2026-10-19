@@ -7,7 +7,7 @@ use bingo_sdk::{
 };
 
 pub fn owns(item: &Item, state: &SessionState) -> bool {
-    state.summary.driver != bingo_sdk::Driver::Log && prompt(item)
+    state.summary.driver != bingo_sdk::Driver::Log && item.headline().is_none() && prompt(item)
 }
 
 fn prompt(item: &Item) -> bool {

@@ -10,6 +10,7 @@ use serde_json::json;
 use std::sync::{Arc, Mutex};
 
 mod checks;
+mod edges;
 #[cfg(test)]
 #[path = "acting/tests/proofs.rs"]
 mod proofs;

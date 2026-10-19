@@ -16,12 +16,16 @@ pub(super) fn draw(head: &bingo_sdk::Headline, at: i64, width: usize, now: Now) 
         curve: None,
     };
     let parts: Vec<_> = head.parts.iter().map(|part| part.as_str().into()).collect();
-    let mut label = Line::from(crate::tone::parts(
+    let label = Line::from(crate::tone::parts(
         &parts,
         head.tone,
         crate::tone::Content::Markdown,
         Some((motion.clone(), now)),
     ));
+    divider(label, motion, width, now)
+}
+
+fn divider(mut label: Line<'static>, motion: TextMotion, width: usize, now: Now) -> Drawing {
     let muted = theme::foreground("muted").unwrap_or_default();
     label.spans.insert(0, Span::styled(" ", muted));
     label.spans.push(Span::styled(" ", muted));
@@ -38,6 +42,56 @@ pub(super) fn draw(head: &bingo_sdk::Headline, at: i64, width: usize, now: Now) 
         lines: vec![line],
         next: views::motion::next(&motion, now),
     }
+}
+
+pub(super) fn compacted(
+    item: &bingo_sdk::Item,
+    (before, after): (u64, u64),
+    window: Option<u64>,
+    rows: &super::Rows<'_>,
+) -> Drawing {
+    let numbers = if let Some(window) = window {
+        let percent = |used: u64| (used as f64 / window.max(1) as f64 * 100.0).round();
+        format!(
+            "context {}% {} {}%",
+            percent(before),
+            theme::glyphs::get("arrow"),
+            percent(after)
+        )
+    } else {
+        format!(
+            "context {before} {} {after} tokens",
+            theme::glyphs::get("arrow")
+        )
+    };
+    let motion = TextMotion::Fade {
+        from: "glow".into(),
+        at_ms: item.started_at.as_millisecond(),
+        ms: 400,
+        curve: None,
+    };
+    let label = Line::from(
+        [
+            ("compacted".to_owned(), "muted"),
+            (theme::glyphs::get("sep").into(), "faint"),
+            (numbers, "dim"),
+        ]
+        .into_iter()
+        .map(|(text, ink)| {
+            let style = theme::foreground(ink).unwrap_or_default();
+            Span::styled(
+                text,
+                views::motion::style(
+                    style,
+                    theme::palette().named(ink).unwrap_or(theme::palette().fg()),
+                    Some(&motion),
+                    Some(rows.now),
+                ),
+            )
+        })
+        .collect::<Vec<_>>(),
+    );
+    divider(label, motion, rows.width, rows.now)
 }
 
 #[cfg(test)]

@@ -64,6 +64,10 @@ pub fn changed(item: &Item, props: &Props) -> Item {
         (ItemBody::User { parts, origin }, Props::UserMessage(props)) => {
             *parts = vec![bingo_sdk::ContentPart::text(&props.text)];
             *origin = props.origin.clone();
+            item.meta.remove("headline");
+            if let Some(headline) = &props.headline {
+                item.set_headline(headline.clone());
+            }
         }
         (ItemBody::Assistant { text }, Props::AssistantMessage(props)) => {
             *text = props.text.clone()
