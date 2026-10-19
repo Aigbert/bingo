@@ -292,7 +292,8 @@ start '{"responses":[{"steps":[{"text":"nothing to do"}]}]}'
 keys '@Car'
 await '▎ Cargo.toml'
 keys Enter
-await '@Cargo.toml ▍'
+# The caret stands over the blank the pick leaves after the path.
+await '@Cargo.toml▍'
 finish
 
 step 'the keys sheet opens on ? and closes on esc'

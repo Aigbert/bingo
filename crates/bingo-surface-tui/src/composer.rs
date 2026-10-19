@@ -203,7 +203,7 @@ impl Composer {
             column += grapheme.width();
         }
         if self.cursor >= self.text.len() {
-            cursor = (lines.len() - 1, column);
+            cursor = (lines.len() - 1, trim_tail(&mut lines));
         }
         if cursor.1 >= width {
             cursor = (cursor.0 + 1, 0);
@@ -274,6 +274,16 @@ impl Composer {
             None => self.text.len(),
         }
     }
+}
+
+/// The prototype's wrap drops the last row's trailing blanks, so a caret at
+/// the end of the text stands over the first of them. The column it returns.
+fn trim_tail(lines: &mut [String]) -> usize {
+    let Some(last) = lines.last_mut() else {
+        return 0;
+    };
+    last.truncate(last.trim_end_matches(' ').len());
+    last.width()
 }
 
 /// The offset `column` graphemes into `start..end`, clamped to the line's end.
