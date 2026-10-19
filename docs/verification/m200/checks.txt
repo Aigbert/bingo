@@ -1,0 +1,118 @@
+# M200 checks, 2026-10-19, branch m200-crew rebased on dev 9b99b108a (M197 merged)
+
+$ cargo fmt --all -- --check                                   # exit 0
+$ cargo check --workspace --all-targets --locked               # exit 0
+$ cargo clippy --workspace --all-targets --locked -- -D warnings  # exit 0
+
+$ cargo test --workspace --locked                              # exit 0
+  summed over 135 test binaries: 6680 passed, 0 failed, 0 ignored
+
+## M200 tests (each ok in that run)
+  a_look_naming_a_principal_round_trips_its_fixture
+  a_look_without_a_principal_says_nothing_of_one
+  crew_contract::faces_read_the_trees_roster_through_the_shared_rule
+  crew_frames::m200_agent_frame_follows_the_prototype
+  crew_frames::m200_agent_frames_follow_the_prototype_keys
+  crew_frames::m200_crew_frames_follow_the_prototype
+  crew_frames::m200_crew_frames_follow_the_prototype_keys
+  crew_frames::m200_room_frame_follows_the_prototype
+  crew_frames::m200_room_frames_follow_the_prototype_keys
+  crew_rows::the_crew_draws_a_teammates_row_and_the_ledger_draws_it_without_the_crew
+  input::tests::ctrl_g_walks_to_whoever_waits_and_says_when_nobody_does
+  input::tests::walking_in_re_arms_the_guard_of_an_ask_that_waited
+  input::tests::escape_in_a_working_teammate_goes_home_and_ctrl_c_stops_it
+  keybar::tests::away_from_home_esc_is_back_and_ctrl_c_is_stop
+  ordered_teammates_keep_their_inks_across_roster_order_and_storage
+  owed::tests::a_called_member_owes_until_they_post
+  owed::tests::unseating_or_closing_drops_what_was_owed
+  posting::tests::a_teammates_own_hire_is_neither_away_nor_crew_ink
+  rows::tests::a_teammate_row_names_it_and_says_whether_it_reported
+  rows::tests::any_other_step_is_left_to_the_ledger
+  rows::tests::room_commands_are_listed_in_an_open_room_and_skills_never_there
+  run::tests::a_permission_a_child_raised_is_answered_where_it_waits
+  test_support::ember::acting::m196_palette_ran_waits_for_m199_branch_and_m200_agents
+  test_support::ember::acting::m198_status_band_waits_for_m199_branch_and_m200_agents
+  test_support::ember::acting::m200_keys_frame_names_ctrl_g
+  transcript::tests::a_rooms_moves_are_notices_and_posts_join_by_voice
+  tree::tests::ctrl_g_walks_to_the_next_session_that_waits_and_wraps
+  tree::tests::with_nobody_else_waiting_ctrl_g_goes_home_and_at_home_stays
+
+## Fourteen harness captures
+  m200_crew_frames_follow_the_prototype: crew, small-crew
+  m200_crew_frames_follow_the_prototype_keys: crew-allowed, crew-home, crew-reviewer
+  m200_agent_frame_follows_the_prototype: agent
+  m200_agent_frames_follow_the_prototype_keys: agent-allowed, agent-home, agent-reviewer
+  m200_room_frame_follows_the_prototype: room
+  m200_room_frames_follow_the_prototype_keys: room-mention, room-waiting, room-answered, room-home
+  The two reviewer frames draw M197's dock ask in the reviewer's session: 'Run this command?',
+  the command, its reason, four options.
+
+## RPC and --print
+  git diff dev -- schema/ removes 0 lines (4 files, 183 insertions). Additions: ToolLook.who,
+  Step.teammate (Teammate: name, ink, reportedAt), PaletteHere (driver, closed).
+
+$ scripts/check_discipline.sh                                  # exit 0, discipline ok
+  New warnings against dev 9b99b108a, warn only: blocks.rs 714 non-test lines (a room's
+  head segment), component/sites_tests.rs 701 -> 705, test_support.rs 966 -> 967,
+  bingo-mods/tests/builtins.rs 736 -> 737. Gone: mod-crew draw.rs fn tree (65 lines);
+  dock/edge.rs fn draw is 68 lines on dev and below 60 here.
+$ scripts/budget.sh                                            # exit 0
+  dependencies (unique, normal): 422 (max  423)
+  relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+  budget ok
+$ cargo deny check                                             # exit 0
+  advisories ok, bans ok, licenses ok, sources ok
+
+## Windows: cargo check -p <crate> --all-targets --locked --target x86_64-pc-windows-msvc
+  windows bingo-collab EXIT 0
+  windows bingo-mod-crew EXIT 0
+  windows bingo-rooms EXIT 0
+  windows bingo-mod-palette EXIT 0
+  windows bingo-surface-tui EXIT 101
+  The TUI stops in a C build script (aws-lc-sys 0.44.0, rquickjs-sys 0.14.0) before any bingo
+  code compiles; M196 and M201 record the same cross-toolchain limit. On 218b09500 the
+  same run passed bingo-agents, bingo-mod-ledger and bingo-sdk, which this rebase leaves as
+  they were.
+
+$ cargo build -p bingo --locked                                # exit 0
+$ TUI_SMOKE_SOCKET=m200-drive scripts/tui-smoke.sh               # exit 0 on the branch itself
+  tui-smoke ok
+
+$ python3 docs/verification/m200/drive.py                      # three runs on this base, exit 0 each
+  PASS 100x32: hired-scout
+  PASS 100x32: reviewer-asks
+  PASS 100x32: walked-to-reviewer
+  PASS 100x32: reviewer-answered
+  PASS 100x32: home
+  PASS 100x32: crew-sheet
+  PASS 100x32: walked-in
+  PASS 100x32: room-seated
+  PASS 100x32: room-answered
+  PASS 100x32: room-unseated
+  PASS 100x32: room-closed
+  CLEAN 100x32: owned tmux server stopped; temporary files removed
+  PASS 80x24: hired-scout
+  PASS 80x24: reviewer-asks
+  PASS 80x24: walked-to-reviewer
+  PASS 80x24: reviewer-answered
+  PASS 80x24: home
+  PASS 80x24: crew-sheet
+  PASS 80x24: walked-in
+  PASS 80x24: room-seated
+  PASS 80x24: room-answered
+  PASS 80x24: room-unseated
+  PASS 80x24: room-closed
+  CLEAN 80x24: owned tmux server stopped; temporary files removed
+  Notes from the drive:
+  - ctrl+g walks into the reviewer with its ask in the dock, 'Yes' chosen; the drive waits
+    out the 400 ms guard that re-arms on the walk in, then answers with enter.
+  - A room member is heard only through SendMessage(to: '#design'); its own text stays home.
+  - Hires here are foreground, so their home rows stay 'started': no post follows them.
+  - Room captures differ between runs only in timing: the dock's edge rule above
+    'This room is closed', and the seated name reaching the footer a refresh after the
+    'reviewer joined' notice. Those dumps were reverted, not committed.
+
+$ unset $(git rev-parse --local-env-vars)
+$ git rebase --keep-base -x 'cargo fmt --all -- --check && cargo check --workspace --all-targets --locked' dev
+  38 commits on dev, each passing; exit 0. The tree after the proof equals the tree before
+  it, and only this file changed after it, in the last commit.

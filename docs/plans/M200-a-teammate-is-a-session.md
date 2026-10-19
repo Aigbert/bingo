@@ -1,14 +1,13 @@
 # M200 — A teammate is a session
 
-ADR-0097 §9, §11; ADR-0086; ADR-0002. Spec: `docs/design/ember/prototype/`:
+ADR-0097 §9, §11; ADR-0086; ADR-0002. After M193, M194, M196, M197 and M198. Spec in
+`docs/design/ember/prototype/`:
 - `p4d-crew.js`: `enterView` … `nextNeed`, `post`, `seatAgent`, `unseatAgent`, `closeRoom`,
   `mentionPool`, `crewRow`, `SHEETS.crew`;
 - `p5-stream.js`: the agent branches of `markSeg`/`verbSeg`/`argSegs`, `theirPostLines`,
   `yourPostLines`, `owedOn`, `mentionSegs`, `typingLines`;
 - `p6-dock.js`: `edgeLine`, `needSegs`, `viewSegs`, `crewSegs`, `ambientSegs`, `viewHints`,
   `placeholder`; `p8-page.js`: the window title.
-
-After: M193, M194, M196, M197 and M198.
 
 ## Goal
 
@@ -19,18 +18,14 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
 
 ## Bricks
 
-1. **One colour per teammate** (`bingo-collab`, new `face.rs`).
-   The rule landed in M198 (bingo-collab face.rs); the TUI switched to it, sigils gone, in M198 r4.
+1. **One colour per teammate** (`bingo-collab` `face.rs`; landed in M198 r4, sigils gone).
    - The k-th teammate of the home tree takes the k-th ink of `crew1, crew2, crew0, crew3, crew4,
-     crew5` (teal, violet and lime first, the farthest apart), wrapping past six. Teammates are
-     ordered by creation (`created_at`, then id), live or stored, rooms excluded, so dismissing
-     one never moves another. The ink is derived at render time, never stored. (A name hash
-     too often gives two of three teammates one colour.) The prototype's `ROSTER` follows this
-     order, so fixtures creating teammates in that order reproduce every capture unchanged.
-   - It lives in `bingo-collab`, so the surface (from its tree) and `bingo-mod-crew` (from the
-     host's list) compute the same ink. It replaces the TUI's name hash, which only the TUI
-     read; `fixtures/faces.json` becomes cases of ordered teammates. The sigils go: `◆` now
-     means "waits for you". A room is `plan`, home `glow`, you `fg`.
+     crew5` (teal, violet, lime first), wrapping past six, ordered by creation (`created_at`,
+     then id), live or stored, rooms excluded: dismissing one never moves another. The ink is
+     derived at render time; the prototype's `ROSTER` follows this order.
+   - It lives in `bingo-collab`, so the surface and `bingo-mod-crew` compute the same ink;
+     `fixtures/faces.json` holds ordered teammates. `◆` now means "waits for you". A room is
+     `plan`, home `glow`, you `fg`.
 2. **Walking in** (`enterView`, `walkTo`).
    - A view is `Tree::show`. Each session keeps its draft, scroll and dock, and an ask waiting
      there re-arms its 400 ms guard (M197).
@@ -39,9 +34,8 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
    - A teammate's stream begins with the notice `<name> · <role>` (its definition's
      description). The window title reads `<home title, or bingo> › <name> — <dir>`. A click on
      a teammate's name in a post, an agent row or a crew row walks in.
-   - Placeholders: `Message <name>`; `Steer <name>, or queue what comes next`;
-     `Answer above, or type to tell <name> something else`; in a room
-     `Post to <room>, @ to call on someone`, or `This room is closed`.
+   - Placeholders: `Message <name>`; `Steer <name>, or queue what comes next`; `Answer above,
+     or type to tell <name> something else`; a room's `Post to <room>, @ to call on someone`.
 3. **Keys away from home** (`viewHints`; `keys.rs` stays the policy table).
    - esc clears the draft, then goes home, and never stops anything: the `Back` rung takes any
      viewed session, and `Interrupt` applies only at home. ctrl+c stops the viewed session's
@@ -104,10 +98,10 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
    - In a room, `/seat`, `/unseat` and `/close` sit beside `/room`, which stays. `/seat` with no
      name writes `/seat ` and toasts `seat who? <free names>`. `/close` with no reason writes
      `/close ` and toasts `say why the room closes`; the reason is recorded as `why`.
-   - In a closed room, posting toasts `this room is closed` and keeps the draft.
-   - The palette, told whether the viewed session is a room as it is told the sessions today,
-     hides skills there and lists the room commands while the room is open; elsewhere it never
-     lists them.
+   - A closed room's placeholder is `This room is closed`; a post there toasts
+     `this room is closed` and keeps the draft.
+   - The palette, told whether the viewed session is a room, hides skills there and lists the
+     room commands only while that room is open.
    - `@` in a room lists the seated and `@all`; elsewhere the crew, then files (M196). Naming
      someone not seated toasts `<name> is not in this room · /seat <name> brings them in`; a
      post that names nobody toasts `posted · @ someone to ask for an answer`.
@@ -116,25 +110,24 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
 
 ## Files
 
-- `crates/bingo-collab/src/{face.rs,owed.rs,room.rs}`, and `fixtures/faces.json` (moved).
-- `crates/bingo-surface-tui/src/{tree.rs,face.rs,crew.rs,crew_contract.rs,seats.rs,keys.rs,
-  keybar.rs,terminal.rs,turns.rs,dock.rs,transcript/}`.
-- `crates/bingo-sdk/src/{model.rs,component/ledger.rs}` (`who`, `Teammate`), the regenerated
-  schemas, and the agents tools' looks in `crates/bingo-agents`.
-- `crates/bingo-mod-crew/src/{draw.rs,cards.rs,keys.rs,command.rs,state.rs}`, and new `rows.rs`.
-- `crates/bingo-rooms/src/command.rs`, `crates/bingo-mod-palette/src/rows.rs`.
+- `bingo-collab/src/{face,owed,room}.rs`, `fixtures/faces.json` (moved); `bingo-surface-tui/src/
+  {tree,face,crew,crew_contract,seats,keys,keybar,terminal,turns,dock}.rs`, `transcript/`.
+- `bingo-sdk/src/{model.rs,component/ledger.rs}` (`who`, `Teammate`), the schemas, the agents
+  tools' looks; `bingo-mod-crew/src/{draw,cards,keys,command,state}.rs` and new `rows.rs`;
+  `bingo-rooms/src/command.rs`, `bingo-mod-palette/src/rows.rs`.
 
 ## Exit criteria
 
-- [ ] Full frame through the harness: `crew`, `crew-reviewer`, `crew-allowed`, `crew-home`,
-      `agent`, `agent-reviewer`, `agent-allowed`, `agent-home`, `room`, `room-mention`,
-      `room-waiting`, `room-answered`, `room-home` and `small-crew`.
-- [ ] Unit tests: the face fixture (order, rooms excluded, past six); ctrl+g's order and wrap; esc away
-      from home never interrupts; what is owed clears when the named member posts and when they
-      are unseated; room commands only in an open room; posts join by voice.
-- [ ] The agent row is drawn by `bingo-mod-crew` when it is on, and by mod-ledger when it is off.
-- [ ] RPC and `--print` are unchanged except the additive `who` and `Step.teammate`.
-- [ ] Gates and checks as in M192. tmux drive with the fake provider: hire two teammates, walk
+- [x] Full frame through the harness: 14 of 14 match (`crew`, `crew-allowed`, `crew-home`,
+      `crew-reviewer`, `agent`, `agent-allowed`, `agent-home`, `agent-reviewer`, `room`,
+      `room-mention`, `room-waiting`, `room-answered`, `room-home`, `small-crew`); the two
+      reviewer frames draw M197's dock ask in the reviewer's session.
+- [x] Unit tests: the face fixture (order, rooms excluded, past six); ctrl+g's order and wrap;
+      esc away from home never interrupts; what is owed clears when the named member posts and
+      when they are unseated; room commands only in an open room; posts join by voice.
+- [x] The agent row is drawn by `bingo-mod-crew` when it is on, and by mod-ledger when it is off.
+- [x] RPC and `--print` change only by the additive `who`, `Step.teammate` and palette `here`.
+- [x] Gates and checks as in M192. tmux drive with the fake provider: hire two teammates, walk
       in from the crew sheet, ctrl+g to an ask, answer it, esc home; in a room, seat, post with
       an @, read the answer, unseat, and close.
 
@@ -149,3 +142,9 @@ person picks.
 - **A Ledger interception that fails** falls back to mod-ledger's row, never a blank one.
 - **IM messages become posts.** A channel's input names its sender as `principal`, so it reads
   as a post in that sender's ink. This is intended, and the Feishu tests pin it.
+
+## Verified
+
+2026-10-19, rebased on dev 9b99b108a (M197), output in [checks.txt](../verification/m200/checks.txt):
+gates, 6680 tests and 38 per-commit checks pass; 14 of 14 frames match; Windows passes for four
+crates, the TUI stops in a C build script; the smoke and `drive.py` (100×32, 80×24) pass.
