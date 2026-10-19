@@ -101,6 +101,7 @@ fn an_expired_toast_never_uses_a_stale_mod_answer() {
         bingo_sdk::slot::with(
             serde_json::json!({}),
             [bingo_sdk::slot::Slot::Toast {
+                tone: bingo_sdk::Tone::Neutral,
                 text: "gone forever".into(),
                 until: later(now, 2700).wall,
                 alert: false,

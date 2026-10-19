@@ -69,6 +69,13 @@ async fn supervise(watch: Watch) {
     job.finished(state);
     jobs.publish(&host, &job.session).await;
     let outcome = notify::outcome(&job, state).await;
+    let toast = notify::toast(jiff::Timestamp::now(), state, &outcome);
+    if let Err(error) = host
+        .signal(&job.session, crate::jobs::PLUGIN, notify::TOAST, toast)
+        .await
+    {
+        tracing::debug!(%error, "the completion toast was not published");
+    }
     announce(
         &host,
         &job,

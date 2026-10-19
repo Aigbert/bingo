@@ -10071,6 +10071,9 @@
             "text": {
               "type": "string"
             },
+            "tone": {
+              "$ref": "#/$defs/Tone"
+            },
             "until": {
               "type": "string"
             },
@@ -10739,6 +10742,9 @@
       "properties": {
         "text": {
           "type": "string"
+        },
+        "tone": {
+          "$ref": "#/$defs/Tone"
         },
         "until": {
           "type": "string"

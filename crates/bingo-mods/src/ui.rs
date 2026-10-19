@@ -268,6 +268,7 @@ async fn toast(caller: &Caller, input: Toast, alert: bool) -> Result<Value, Serv
             session: Some(input.session),
             slot: format!("toast:{}", ItemId::mint()),
             view: Some(Slot::Toast {
+                tone: bingo_sdk::Tone::Neutral,
                 text: input.text,
                 until,
                 alert,

@@ -118,9 +118,12 @@ pub(super) fn stopped(
     run.ui.pictures = held;
     run.ui.composer.set(&text);
     run.ui.edited();
-    run.ui.notify(
+    run.ui.notify_parts(
         Level::Info,
-        "stopped · what you queued is back in the input",
+        vec![
+            "stopped".into(),
+            "what you queued is back in the input".into(),
+        ],
         run.now().instant,
     );
 }

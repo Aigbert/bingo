@@ -16,6 +16,7 @@ pub struct State {
 struct Toast {
     key: String,
     text: String,
+    tone: bingo_sdk::Tone,
     until: jiff::Timestamp,
     alert: bool,
 }
@@ -23,16 +24,22 @@ fn placed(state: &SessionState) -> Vec<Toast> {
     bingo_sdk::slot::placed(state)
         .into_iter()
         .filter_map(|placed| {
-            let (text, until, alert) = match placed.slot {
-                Slot::Toast { text, until, alert } => (text, until, alert),
+            let (text, tone, until, alert) = match placed.slot {
+                Slot::Toast {
+                    text,
+                    tone,
+                    until,
+                    alert,
+                } => (text, tone, until, alert),
                 _ => return None,
             };
             Some(Toast {
                 key: format!(
-                    "{}/{}/{}/{until}/{text}/{alert}",
+                    "{}/{}/{}/{until}/{text}/{tone:?}/{alert}",
                     state.summary.id, placed.plugin, placed.kind
                 ),
                 text,
+                tone,
                 until,
                 alert,
             })
@@ -102,8 +109,8 @@ pub fn current(ui: &Ui, state: &SessionState, now: Now) -> Option<crate::ui::Not
         return Some(crate::ui::Notice::new(
             crate::ui::NoticeKind::Message(crate::ui::Message {
                 about: None,
-                text: toast.text,
-                level: bingo_sdk::Level::Info,
+                parts: vec![toast.text],
+                tone: toast.tone,
             }),
             said,
         ));
@@ -126,12 +133,13 @@ pub fn components(
         .placed
         .toasts
         .active(state, now)
-        .filter(|(placed, _)| placed.text == toast.text)
+        .filter(|(placed, _)| toast.parts == [placed.text.as_str()])
     else {
         return Some(notice);
     };
     let props = bingo_sdk::component::Props::Toast(bingo_sdk::component::ToastProps {
         text: placed.text,
+        tone: placed.tone,
         until: placed.until,
         alert: placed.alert,
     });
@@ -152,12 +160,7 @@ pub fn components(
             vec![ratatui::text::Line::from(props.text.clone())]
         },
     );
-    toast.text = drawing
-        .lines
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>()
-        .join(" · ");
+    toast.parts = drawing.lines.iter().map(ToString::to_string).collect();
     Some(notice)
 }
 
@@ -175,6 +178,7 @@ mod tests {
             bingo_sdk::slot::with(
                 serde_json::json!({}),
                 [Slot::Toast {
+                    tone: bingo_sdk::Tone::Neutral,
                     text: "latest".into(),
                     until: later(now, 2900).wall,
                     alert: false,
@@ -204,6 +208,7 @@ mod tests {
         let slot = bingo_sdk::slot::with(
             serde_json::json!({}),
             [Slot::Toast {
+                tone: bingo_sdk::Tone::Neutral,
                 text: "once".into(),
                 until: later(now, 2000).wall,
                 alert: true,
@@ -243,6 +248,7 @@ mod tests {
             bingo_sdk::slot::with(
                 serde_json::json!({}),
                 [Slot::Toast {
+                    tone: bingo_sdk::Tone::Neutral,
                     text: "Saved counter".into(),
                     until: now.wall + std::time::Duration::from_secs(4),
                     alert: false,
@@ -260,6 +266,7 @@ mod tests {
         let mut state = state();
         let mut slots = [
             Slot::Toast {
+                tone: bingo_sdk::Tone::Neutral,
                 text: "held".into(),
                 until: now.wall + std::time::Duration::from_secs(4),
                 alert: true,

@@ -906,8 +906,8 @@ impl Run {
     /// where it has scrolled away, the status line says it once instead.
     fn told_of(&mut self, version: String) {
         if self.ui.shown.top > 0 {
-            let said = format!("↑ v{version} is out · bingo update");
-            self.ui.notify(Level::Info, said, self.now().instant);
+            let parts = vec![format!("↑ v{version} is out"), "bingo update".into()];
+            self.ui.notify_parts(Level::Info, parts, self.now().instant);
         }
         self.ui.welcome.update = Some(version);
     }
@@ -1909,7 +1909,7 @@ mod tests {
         let run = told_of_update(12);
         assert_eq!(run.ui.welcome.update.as_deref(), Some("0.5.0"));
         let said = run.ui.notice().expect("a notice");
-        assert_eq!(said.plain().unwrap().level, Level::Info);
+        assert_eq!(said.plain().unwrap().tone, bingo_sdk::Tone::Neutral);
         assert_eq!(said.plain().unwrap().text, "↑ v0.5.0 is out · bingo update");
     }
 
@@ -2133,7 +2133,7 @@ mod tests {
         let Some(notice) = run.ui.notice() else {
             panic!("one notice: {:?}", run.ui.notice)
         };
-        assert_eq!(notice.plain().unwrap().level, Level::Info);
+        assert_eq!(notice.plain().unwrap().tone, bingo_sdk::Tone::Neutral);
         assert_eq!(notice.plain().unwrap().text, format!("opened {want}"));
     }
 
@@ -2208,7 +2208,7 @@ mod tests {
         let Some(notice) = run.ui.notice() else {
             panic!("one notice: {:?}", run.ui.notice)
         };
-        assert_eq!(notice.plain().unwrap().level, Level::Warn);
+        assert_eq!(notice.plain().unwrap().tone, bingo_sdk::Tone::Attention);
         assert!(
             notice
                 .plain()
@@ -2232,8 +2232,8 @@ mod tests {
         assert!(seen.lock().expect("the record").is_empty());
         assert!(!dir.path().join(crate::viewer::DIR).exists());
         assert_eq!(
-            run.ui.notice().map(|notice| notice.plain().unwrap().level),
-            Some(Level::Warn)
+            run.ui.notice().map(|notice| notice.plain().unwrap().tone),
+            Some(bingo_sdk::Tone::Attention)
         );
     }
 

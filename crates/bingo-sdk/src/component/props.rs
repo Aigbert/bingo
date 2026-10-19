@@ -125,6 +125,8 @@ props!(SessionStatusProps {
     title: Option<String>, cwd: String, provider: Option<String>, model: Option<String>, effort: Option<crate::Effort>, context: Option<crate::ContextUsage>, usage: crate::Usage });
 props!(ToastProps {
     text: String,
+    #[serde(default, skip_serializing_if = "crate::Tone::is_neutral")]
+    tone: crate::Tone,
     #[schemars(with = "String")]
     until: jiff::Timestamp,
     alert: bool

@@ -632,8 +632,13 @@ fn a_still_notice_is_said_at_once_and_still_leaves() {
     ui.notify(bingo_sdk::Level::Error, "unknown command: /x", now.instant);
     assert_eq!(
         style_of(&tree, &mut ui, still(now), "unknown command"),
+        theme::as_drawn(theme::foreground("muted").unwrap()),
+        "no fade, but the same muted words"
+    );
+    assert_eq!(
+        style_of(&tree, &mut ui, still(now), theme::glyphs::get("times")),
         theme::as_drawn(theme::bad()),
-        "no fade, but the same words"
+        "only the mark carries the bad ink"
     );
     ui.expire(still(later(now, 4_132)));
     assert!(

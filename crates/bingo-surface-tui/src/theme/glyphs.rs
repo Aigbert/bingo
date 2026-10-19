@@ -197,8 +197,6 @@ pub fn get(name: &str) -> &'static str {
         .map_or("", |(_, value)| value)
 }
 
-// The next screen milestones consume key names alongside their grid.
-#[allow(dead_code)]
 pub fn key_text(text: &str) -> String {
     if super::glyphs() != &ASCII {
         return text.to_string();

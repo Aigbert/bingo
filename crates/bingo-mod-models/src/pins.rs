@@ -41,6 +41,7 @@ pub(crate) async fn announce(cx: &CommandContext, text: String) -> Result<(), Ke
             slot::with(
                 serde_json::json!({}),
                 [slot::Slot::Toast {
+                    tone: bingo_sdk::Tone::Neutral,
                     text,
                     until,
                     alert: false,

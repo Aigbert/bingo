@@ -244,6 +244,12 @@ pub enum Tone {
     Attention,
 }
 
+impl Tone {
+    pub fn is_neutral(&self) -> bool {
+        *self == Self::Neutral
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TreeNode {

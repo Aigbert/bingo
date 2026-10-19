@@ -228,7 +228,8 @@ async fn keys_typed_before_a_dialog_opened_are_never_entered_into_it() {
         assert_eq!(
             run.ui
                 .notice()
-                .map(|notice| notice.plain().unwrap().text.as_str()),
+                .map(|notice| notice.plain().unwrap().text)
+                .as_deref(),
             Some(typeahead::kept_out_notice(2).as_str())
         );
     }

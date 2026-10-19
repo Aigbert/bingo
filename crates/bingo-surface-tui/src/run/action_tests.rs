@@ -414,8 +414,8 @@ async fn a_refused_mode_key_names_the_command_it_submitted() {
             error: KernelError::new(bingo_sdk::ErrorCode::InvalidInput, "refused"),
         },
     );
-    assert_eq!(
-        run.ui.notice().unwrap().plain().unwrap().about.as_deref(),
-        Some("/permission plan")
-    );
+    let crate::ui::NoticeKind::Message(message) = &run.ui.notice().unwrap().kind else {
+        panic!("message notice");
+    };
+    assert_eq!(message.about.as_deref(), Some("/permission plan"));
 }

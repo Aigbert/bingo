@@ -286,6 +286,7 @@ pub struct Pressed {
 }
 
 pub const ESC_WINDOW: std::time::Duration = std::time::Duration::from_millis(600);
+pub const CLEARED_HOLD: std::time::Duration = std::time::Duration::from_millis(1800);
 pub const EXIT_WINDOW: std::time::Duration = std::time::Duration::from_millis(1500);
 
 pub fn twice(

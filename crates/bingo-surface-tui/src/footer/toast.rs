@@ -42,18 +42,7 @@ fn words(kind: &NoticeKind, state: &bingo_sdk::SessionState) -> Vec<Span<'static
             spans
         }
         NoticeKind::Message(toast) => {
-            let color = match toast.level {
-                bingo_sdk::Level::Error => "bad",
-                bingo_sdk::Level::Warn => "amber",
-                _ => "muted",
-            };
-            let mut spans = Vec::new();
-            for (index, part) in toast.text.split(" · ").enumerate() {
-                if index > 0 {
-                    spans.push(Span::styled(" · ", ink("faint")));
-                }
-                spans.push(Span::styled(part.to_owned(), ink(color)));
-            }
+            let mut spans = crate::tone::parts(&toast.parts, toast.tone, false, None);
             if let Some(about) = &toast.about {
                 spans.push(Span::styled(format!(" · {about}"), ink("dim")));
             }
@@ -91,4 +80,28 @@ fn next(age: Duration, hold: Duration, motion: bool) -> Duration {
         hold
     };
     target.min(end).saturating_sub(age)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn a_toast_uses_its_tone_once_and_keeps_its_tail_dim() {
+        let kind = NoticeKind::Message(crate::ui::Message {
+            parts: vec!["failed · literally".into(), "try again".into()],
+            tone: bingo_sdk::Tone::Bad,
+            about: Some("draft".into()),
+        });
+        let spans = words(&kind, &crate::test_support::state());
+        assert_eq!(spans[0].style, ink("bad"));
+        assert_eq!(
+            spans[0].content,
+            format!("{} ", theme::glyphs::get("times"))
+        );
+        assert_eq!(spans[1].content, "failed · literally");
+        assert_eq!(spans[1].style, ink("muted"));
+        assert_eq!(spans[2].style, ink("faint"));
+        assert_eq!(spans[3].style, ink("muted"));
+        assert_eq!(spans[4].style, ink("dim"));
+    }
 }

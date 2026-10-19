@@ -178,9 +178,12 @@ pub(crate) fn refuse(
         return false;
     }
     let model = state.summary.model.as_deref().unwrap_or("this model");
-    ui.notify(
+    ui.notify_parts(
         bingo_sdk::Level::Warn,
-        format!("{model} can't read images · alt+m switches model"),
+        vec![
+            format!("{model} can't read images"),
+            format!("{} switches model", crate::theme::glyphs::key_text("alt+m")),
+        ],
         now.instant,
     );
     true

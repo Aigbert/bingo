@@ -7,7 +7,7 @@
 
 use std::time::{Duration, Instant};
 
-use bingo_sdk::{CommandSpec, Level, View};
+use bingo_sdk::{CommandSpec, Level, Tone, View};
 
 use crate::clock::{FRAME, Now};
 use crate::commands::{self, Suggestion};
@@ -48,8 +48,23 @@ pub const SWITCH: Duration = Duration::from_millis(2 * FRAME.as_millis() as u64)
 #[derive(Clone, Debug)]
 pub struct Message {
     pub about: Option<String>,
+    pub parts: Vec<String>,
+    pub tone: Tone,
+}
+
+// Test assertions may read prose; the drawing always consumes the original parts.
+#[cfg(test)]
+pub struct Plain {
     pub text: String,
-    pub level: Level,
+    pub tone: Tone,
+}
+
+fn tone(level: Level) -> Tone {
+    match level {
+        Level::Info => Tone::Neutral,
+        Level::Warn => Tone::Attention,
+        Level::Error => Tone::Bad,
+    }
 }
 
 /// A message or a mode-key acknowledgement; the latter owns no session words.
@@ -79,9 +94,13 @@ impl Notice {
         let hold = kind.hold();
         Self { kind, said, hold }
     }
-    pub fn plain(&self) -> Option<&Message> {
+    #[cfg(test)]
+    pub fn plain(&self) -> Option<Plain> {
         match &self.kind {
-            NoticeKind::Message(text) => Some(text),
+            NoticeKind::Message(message) => Some(Plain {
+                text: message.parts.join(" · "),
+                tone: message.tone,
+            }),
             NoticeKind::Mode => None,
         }
     }
@@ -334,30 +353,47 @@ impl Ui {
     }
 
     pub fn notify(&mut self, level: Level, text: impl Into<String>, now: Instant) {
-        self.say(level, text.into(), None, now);
+        self.notify_parts(level, vec![text.into()], now);
     }
 
-    pub fn notify_for(&mut self, text: &str, hold: Duration, now: Instant) {
-        self.notify(Level::Info, text, now);
-        if let Some(notice) = &mut self.notice {
-            notice.hold = hold;
-        }
+    pub fn notify_parts(&mut self, level: Level, parts: Vec<String>, now: Instant) {
+        self.notify_for(level, parts, TOAST_HOLD, now);
+    }
+
+    pub fn notify_for(&mut self, level: Level, parts: Vec<String>, hold: Duration, now: Instant) {
+        self.say(
+            Message {
+                parts,
+                tone: tone(level),
+                about: None,
+            },
+            hold,
+            now,
+        );
     }
 
     /// A notice that names what it is about — the line an intent carried,
     /// said after it in dim.
     pub fn notify_about(&mut self, level: Level, text: String, about: String, now: Instant) {
-        self.say(level, text, Some(about), now);
+        self.say(
+            Message {
+                parts: vec![text],
+                tone: tone(level),
+                about: Some(about),
+            },
+            TOAST_HOLD,
+            now,
+        );
     }
 
-    /// One notice is read at a time, and it is the latest: a newer word
-    /// replaces the one being said, and nothing is queued to be said later.
-    fn say(&mut self, level: Level, text: String, about: Option<String>, now: Instant) {
+    /// A newer notice replaces the old one; nothing waits to be said later.
+    fn say(&mut self, message: Message, hold: Duration, now: Instant) {
         self.placed.toasts.discard();
-        self.notice = Some(Notice::new(
-            NoticeKind::Message(Message { level, text, about }),
-            now,
-        ));
+        self.notice = Some(Notice {
+            kind: NoticeKind::Message(message),
+            said: now,
+            hold,
+        });
     }
 
     pub fn notify_mode(&mut self, now: Instant) {
@@ -391,7 +427,7 @@ impl Ui {
     pub fn withdraw(&mut self, text: &str) {
         if self
             .notice()
-            .is_some_and(|notice| notice.plain().is_some_and(|plain| plain.text == text))
+            .is_some_and(|notice| matches!(&notice.kind, NoticeKind::Message(message) if message.parts == [text]))
         {
             self.notice = None;
         }
@@ -588,11 +624,35 @@ mod tests {
     }
 
     fn said(ui: &Ui) -> Option<&str> {
-        ui.notice().map(|n| n.plain().unwrap().text.as_str())
+        ui.notice().and_then(|notice| match &notice.kind {
+            NoticeKind::Message(message) => message.parts.first().map(String::as_str),
+            NoticeKind::Mode => None,
+        })
     }
 
     fn life() -> i64 {
         NOTICE.as_millis() as i64
+    }
+
+    #[test]
+    fn a_notice_keeps_parts_tone_and_hold_from_birth() {
+        let (mut ui, now) = scene();
+        let hold = Duration::from_millis(1800);
+        ui.notify_for(
+            Level::Warn,
+            vec!["cannot read".into(), "switch model".into()],
+            hold,
+            now.instant,
+        );
+        let notice = ui.notice().unwrap();
+        let NoticeKind::Message(message) = &notice.kind else {
+            panic!("message")
+        };
+        assert_eq!(message.parts, ["cannot read", "switch model"]);
+        assert_eq!(message.tone, Tone::Attention);
+        assert_eq!(notice.hold(), hold);
+        assert!(!notice.gone(now.instant + hold));
+        assert!(notice.gone(now.instant + hold + TOAST_FADE));
     }
 
     #[test]

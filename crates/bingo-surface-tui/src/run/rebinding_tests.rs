@@ -151,8 +151,8 @@ async fn a_missing_control_drops_its_edit_with_the_existing_stale_notice() {
         format!("counter: {}", bingo_sdk::view::STALE_CONTROL)
     );
     assert_eq!(
-        run.ui.notice().expect("a notice").plain().unwrap().level,
-        Level::Warn,
+        run.ui.notice().expect("a notice").plain().unwrap().tone,
+        bingo_sdk::Tone::Attention,
         "the host's own level"
     );
 }
@@ -310,8 +310,8 @@ async fn an_unkeyed_button_shifted_by_a_redraw_is_stale_not_its_neighbour() {
         format!("counter: {}", bingo_sdk::view::STALE_CONTROL)
     );
     assert_eq!(
-        run.ui.notice().expect("a notice").plain().unwrap().level,
-        Level::Warn
+        run.ui.notice().expect("a notice").plain().unwrap().tone,
+        bingo_sdk::Tone::Attention
     );
 }
 

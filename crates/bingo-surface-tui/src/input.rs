@@ -501,7 +501,12 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         keys::Interrupt::Exit => return vec![Effect::Exit],
         keys::Interrupt::Arm => {
             ui.armed = Some(now.instant);
-            ui.notify_for("ctrl+c again to quit", keys::EXIT_WINDOW, now.instant);
+            ui.notify_for(
+                Level::Info,
+                vec!["ctrl+c again to quit".into()],
+                keys::EXIT_WINDOW,
+                now.instant,
+            );
         }
     }
     Vec::new()
@@ -566,8 +571,12 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         Some(keys::Escape::Clear) => {
             clear_draft(ui);
             ui.notify_for(
-                "cleared · ↑ brings it back",
-                std::time::Duration::from_millis(1800),
+                Level::Info,
+                vec![
+                    "cleared".into(),
+                    format!("{} brings it back", crate::theme::glyphs::key_text("↑")),
+                ],
+                keys::CLEARED_HOLD,
                 now.instant,
             );
         }
@@ -575,7 +584,12 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         Some(keys::Escape::Rewind) => twice(ui, now),
         Some(keys::Escape::Arm) => {
             ui.escaped_at = Some(now.instant);
-            ui.notify_for("esc again to rewind", keys::ESC_WINDOW, now.instant);
+            ui.notify_for(
+                Level::Info,
+                vec!["esc again to rewind".into()],
+                keys::ESC_WINDOW,
+                now.instant,
+            );
         }
         Some(keys::Escape::Back) => {
             let parent = tree

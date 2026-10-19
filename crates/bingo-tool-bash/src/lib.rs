@@ -1221,7 +1221,12 @@ pub(crate) mod tests {
         );
         assert!(delivered[0].1.contains(&job.id), "{:?}", delivered[0].1);
 
-        let last = kernel.signals().last().cloned().expect("a signal");
+        let signals = kernel.signals();
+        let last = signals
+            .iter()
+            .rfind(|(_, kind, _)| kind == jobs::KIND)
+            .expect("jobs signal");
+        assert!(signals.iter().any(|(_, kind, value)| kind == notify::TOAST && value["slots"][0]["tone"] == "bad"));
         assert_eq!(last.2, Value::Null, "no job is running, so no card");
         assert_eq!(
             std::fs::read_to_string(&job.log).expect("the log"),

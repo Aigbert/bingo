@@ -771,6 +771,7 @@ fn toast_run(
         bingo_sdk::slot::with(
             json!({}),
             [bingo_sdk::slot::Slot::Toast {
+                tone: bingo_sdk::Tone::Neutral,
                 text: "Surface fallback".into(),
                 until: now.wall.checked_add(Duration::from_secs(60)).unwrap(),
                 alert: false,

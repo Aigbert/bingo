@@ -114,16 +114,15 @@ mod tests {
     #[test]
     fn headlined_code_preserves_embedded_backticks_and_plain_escapes() {
         let drawn = parts(
-            &["``echo `date` `` finished".into(), r"\*ok\_".into()],
+            &["`` echo `date` `` finished".into(), r"\*ok\_".into()],
             Tone::Good,
             true,
             None,
         );
         assert!(
-            drawn
-                .iter()
-                .any(|s| s.content == "echo `date` "
-                    && s.style == theme::foreground("code").unwrap())
+            drawn.iter().any(
+                |s| s.content == "echo `date`" && s.style == theme::foreground("code").unwrap()
+            )
         );
         assert!(
             drawn

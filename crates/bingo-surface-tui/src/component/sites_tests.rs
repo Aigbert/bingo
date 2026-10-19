@@ -551,6 +551,7 @@ fn placed_site(component: Component) -> bingo_sdk::SessionState {
                 bingo_sdk::slot::with(
                     json!({}),
                     [Slot::Toast {
+                        tone: bingo_sdk::Tone::Neutral,
                         text: "original".into(),
                         until: ts() + std::time::Duration::from_secs(10),
                         alert: false,
