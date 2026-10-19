@@ -143,7 +143,11 @@ fn entry(
 fn next_time(now: jiff::Timestamp, at: jiff::Timestamp, zone: &jiff::tz::TimeZone) -> String {
     let now_local = now.to_zoned(zone.clone());
     let at_local = at.to_zoned(zone.clone());
-    if now_local.date().checked_add(jiff::Span::new().days(1)).ok() == Some(at_local.date()) {
+    // A fire within the hour reads as minutes even across midnight.
+    let soon = at.as_second() - now.as_second() < 3600;
+    if !soon
+        && now_local.date().checked_add(jiff::Span::new().days(1)).ok() == Some(at_local.date())
+    {
         format!("tomorrow {:02}:{:02}", at_local.hour(), at_local.minute())
     } else {
         bingo_sdk::until(now, at)
@@ -161,6 +165,12 @@ mod tests {
             next_time(now, at, &jiff::tz::TimeZone::UTC),
             "tomorrow 09:00"
         );
+    }
+    #[test]
+    fn a_fire_within_the_hour_past_midnight_reads_as_minutes() {
+        let now = "2026-10-19T23:51:00Z".parse().unwrap();
+        let at = "2026-10-20T00:03:30Z".parse().unwrap();
+        assert_eq!(next_time(now, at, &jiff::tz::TimeZone::UTC), "in 12m");
     }
     #[test]
     fn schedules_use_the_shared_window_and_declared_lamp_clock() {
