@@ -75,6 +75,7 @@ unknown. The traits that pick a row's tier (`read_only`, `edit`) already belong 
    - A dangerous ask draws a bad edge, starts on No, colours its allow item red, and offers no
      session-wide allow.
    - Every sheet is one shape: head, list, detail. The one thing to fix sorts first.
+   A surface may read a registered service trait for a fact it draws and never keeps beyond that sheet.
 9. **Each teammate and each room is a session you look at.**
    - `/agents` lists them by need, and ⏎ walks in.
    - Away from home, their colour takes the side light and the comet. esc clears the draft,
