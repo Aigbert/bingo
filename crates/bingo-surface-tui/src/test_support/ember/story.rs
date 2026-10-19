@@ -146,6 +146,9 @@ fn fold_reply(state: &mut SessionState, id: &str, turn: &Value) {
 
 pub(super) fn stamp(item: &mut Item, at: i64, end: Option<i64>) {
     item.started_at = Timestamp::from_millisecond(at).unwrap();
+    if let ItemBody::ToolCall { began_at, .. } = &mut item.body {
+        *began_at = Some(item.started_at);
+    }
     item.completed_at = end.map(|ms| Timestamp::from_millisecond(ms).unwrap());
 }
 

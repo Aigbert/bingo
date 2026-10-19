@@ -270,6 +270,62 @@ async fn stop_answer_matches_the_kernel_for_a_running_tool() {
 }
 
 #[tokio::test]
+async fn stop_answer_matches_the_kernel_for_a_queued_chain_call() {
+    // sleep is available in both Git Bash on Windows and Unix shells.
+    let mut kernel = Kernel::new(json!([{"steps":[
+        {"toolCall":{"name":"Bash","input":{"command":"sleep 60 && echo done"}}},
+        {"toolCall":{"name":"Bash","input":{"command":"echo queued"}}}
+    ]}]))
+    .await;
+    kernel
+        .attached
+        .handle
+        .submit(IntentId::mint(), Input::text("start", crate::origin()));
+    kernel.until(|e| matches!(e, Event::ItemStarted { item } if matches!(item.body, ItemBody::ToolCall { .. }))).await;
+    kernel
+        .until(|e| matches!(e, Event::InteractionOpened { .. }))
+        .await;
+    let ask = kernel.attached.snapshot.interactions[0].id.clone();
+    kernel.attached.handle.answer(
+        IntentId::mint(),
+        ask,
+        bingo_sdk::Answer::AllowOnce,
+        bingo_sdk::Activation::Pointer,
+    );
+    kernel.until(|e| matches!(e, Event::ItemUpdated { item } if item.status == bingo_sdk::ItemStatus::Running && matches!(item.body, ItemBody::ToolCall { .. }))).await;
+    let queued = kernel.attached.snapshot.transcript.items().iter().find(|item| {
+        matches!(&item.body, ItemBody::ToolCall { input, .. } if input["command"] == "echo queued")
+    }).unwrap();
+    assert_eq!(queued.status, bingo_sdk::ItemStatus::Pending);
+    let queued_id = queued.id.clone();
+    let expected = answers::stopped(
+        &kernel.attached.snapshot,
+        jiff::Timestamp::UNIX_EPOCH,
+        answers::StopPhase::Tools,
+    );
+    kernel
+        .attached
+        .handle
+        .interrupt(IntentId::mint(), InterruptScope::Head);
+    let actual = kernel
+        .until(|e| matches!(e, Event::TurnCompleted { .. }))
+        .await;
+    let actual: Vec<_> = actual
+        .into_iter()
+        .filter(|e| matches!(e, Event::ItemCompleted { .. }))
+        .collect();
+    let expected: Vec<_> = expected
+        .into_iter()
+        .filter(|e| matches!(e, Event::ItemCompleted { .. }))
+        .collect();
+    assert!(actual.iter().any(|e| matches!(e, Event::ItemCompleted { item }
+        if item.id == queued_id && item.status == bingo_sdk::ItemStatus::Interrupted
+            && matches!(item.body, ItemBody::ToolCall { duration_ms: Some(0), began_at: None, .. }))));
+    assert_eq!(normalized(&actual), normalized(&expected));
+    kernel.host.shutdown().await;
+}
+
+#[tokio::test]
 async fn stop_answer_leaves_streamed_tool_input_without_a_completion() {
     let mut kernel = Kernel::new(json!([{"steps":[
         {"toolCall":{"name":"Bash","input":{"command":"echo pending"}}},

@@ -140,13 +140,13 @@ pub fn stopped(state: &SessionState, at: Timestamp, phase: StopPhase) -> Vec<Eve
         {
             continue;
         }
-        let ran = item.status == ItemStatus::Running;
         item.status = ItemStatus::Interrupted;
         item.completed_at = Some(at);
         if let ItemBody::ToolCall {
             output,
             progress,
             duration_ms,
+            began_at,
             ..
         } = &mut item.body
         {
@@ -154,13 +154,11 @@ pub fn stopped(state: &SessionState, at: Timestamp, phase: StopPhase) -> Vec<Eve
                 bingo_core::executor::INTERRUPTED_MARKER,
             )));
             *progress = None;
-            *duration_ms = Some(if ran {
+            *duration_ms = Some(began_at.map_or(0, |began| {
                 at.as_millisecond()
-                    .saturating_sub(item.started_at.as_millisecond())
+                    .saturating_sub(began.as_millisecond())
                     .max(0) as u64
-            } else {
-                0
-            });
+            }));
         }
         events.push(Event::ItemCompleted { item });
     }
