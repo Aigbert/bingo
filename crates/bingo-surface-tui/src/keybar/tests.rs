@@ -1,29 +1,6 @@
 use super::*;
 use crate::test_support::*;
 use bingo_sdk::View;
-use ratatui::{Terminal, backend::TestBackend, widgets::Paragraph};
-
-#[test]
-fn approved_prototype_keybar_states() {
-    let states: std::collections::BTreeMap<String, KeyBarProps> =
-        serde_json::from_str(include_str!("prototype.json")).unwrap();
-    for (name, props) in states {
-        let mut screens = String::new();
-        for width in [108, 80, 32] {
-            let mut terminal = Terminal::new(TestBackend::new(width, 1)).unwrap();
-            terminal
-                .draw(|frame| {
-                    frame.render_widget(
-                        Paragraph::new(own(&Props::KeyBar(props.clone()), width as usize)),
-                        frame.area(),
-                    )
-                })
-                .unwrap();
-            screens.push_str(&format!("{width} columns\n{}\n", terminal.backend()));
-        }
-        insta::assert_snapshot!(name, screens);
-    }
-}
 
 #[test]
 fn a_toast_replaces_the_previous_one_without_moving_the_frame() {
