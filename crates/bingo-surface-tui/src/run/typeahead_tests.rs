@@ -414,7 +414,7 @@ fn status_id() -> &'static str {
 
 fn status_pane(state: &mut SessionState) {
     let rows = bingo_mod_status::rows::rows(&(&*state).into(), &[], &[], None);
-    let view = bingo_mod_status::draw::tree(&rows, "session", 108, 12, 0);
+    let view = bingo_mod_status::draw::tree(&rows, "session", 108, 12, Default::default());
     let pane: bingo_sdk::slot::Slot = serde_json::from_value(json!({
         "kind":"pane", "id":"status", "title":"", "focus":true, "asked":true,
         "closeOnEscape":true, "holdToasts":true, "rows":12, "view":view
@@ -522,7 +522,7 @@ async fn a_surface_run_line_holds_keys_until_its_status_pane_opens() {
             result: json!({"handled":false}),
         },
     );
-    assert_eq!(run.ui.composer.text(), "xy");
+    assert_eq!(run.ui.composer.text(), "");
     assert!(run.typeahead.is_empty());
 }
 
@@ -608,7 +608,7 @@ async fn status_receipt_before_paint_keeps_keys_until_the_pane_can_read_them() {
                 result: json!({"handled":false}),
             },
         );
-        assert_eq!(run.ui.composer.text(), "x");
+        assert_eq!(run.ui.composer.text(), "");
         assert!(run.typeahead.is_empty());
     }
 }

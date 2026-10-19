@@ -23,7 +23,7 @@ fn publication(asked: bool) -> Event {
 
 fn hub_publication() -> Event {
     let rows = bingo_mod_status::rows::rows(&(&state()).into(), &[], &[], None);
-    let view = bingo_mod_status::draw::tree(&rows, "session", 108, 14, 0);
+    let view = bingo_mod_status::draw::tree(&rows, "session", 108, 14, Default::default());
     let Event::Signal { mut payload, .. } = publication(true) else {
         unreachable!()
     };
@@ -55,7 +55,7 @@ async fn refresh_preserves_a_draft_and_only_own_opener_receipt_refocuses() {
         .unwrap();
     run.ui.sync_panes(run.session.tree.viewed());
     let drawn = draw_tree(108, 30, &run.session.tree, &mut run.ui, now);
-    assert!(drawn.contains("spent"));
+    assert!(drawn.contains("context"));
     assert!(matches!(run.ui.focus, Focus::Composer));
     assert_eq!(run.ui.composer.text(), "a draft");
     let pane = crate::pane::placed(run.session.tree.viewed()).remove(0);

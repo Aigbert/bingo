@@ -108,20 +108,18 @@ fn modifiers(token: &str) -> ratatui::style::Modifier {
 }
 
 fn same_spinner(expected: &str, actual: &str) -> bool {
-    [theme::glyphs::GU, theme::glyphs::GA]
-        .iter()
-        .filter_map(|table| {
-            table
-                .iter()
-                .find(|(name, _)| *name == "spin")
-                .map(|(_, frames)| *frames)
-        })
-        .any(|frames| {
-            expected.chars().count() == 1
-                && actual.chars().count() == 1
-                && frames.contains(expected)
-                && frames.contains(actual)
-        })
+    [
+        bingo_sdk::glyph::GlyphSet::Unicode,
+        bingo_sdk::glyph::GlyphSet::Ascii,
+    ]
+    .into_iter()
+    .map(|set| bingo_sdk::glyph::Glyph::Spin.spell(set))
+    .any(|frames| {
+        expected.chars().count() == 1
+            && actual.chars().count() == 1
+            && frames.contains(expected)
+            && frames.contains(actual)
+    })
 }
 
 fn report(

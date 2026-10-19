@@ -1,5 +1,5 @@
 //! Pane declarations and the surface state belonging to their controls.
-mod draw;
+pub(crate) mod draw;
 mod focus;
 pub use focus::{focusable, keys as focus_keys, tab_control};
 mod mouse;
@@ -57,8 +57,8 @@ impl Pane {
         bingo_sdk::Input::Action { action, origin }
     }
 }
-pub fn heading_rows(pane: &Pane) -> u16 {
-    u16::from(!pane.title.is_empty())
+pub fn heading_rows(pane: &Pane, seat: &seat::Seated) -> u16 {
+    u16::from(!pane.title.is_empty() && !seat.docked())
 }
 pub fn placed(state: &SessionState) -> Vec<Pane> {
     bingo_sdk::slot::placed(state)
@@ -183,10 +183,10 @@ pub(crate) fn view<'a>(
         }
     }
 }
-fn shown(ui: &Ui, pane: &Pane, seated: &seat::Seated) -> Shown {
+pub(crate) fn shown(ui: &Ui, pane: &Pane, seated: &seat::Seated) -> Shown {
     crate::component::pane::shown(
         pane,
-        matches!(&ui.focus, Focus::Pane(key) if key == &pane.key),
+        ui,
         seated,
         ui.placed
             .panes

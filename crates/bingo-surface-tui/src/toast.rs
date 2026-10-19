@@ -124,10 +124,10 @@ pub fn components(
     now: Now,
     width: usize,
     pulls: &mut Vec<crate::pulled::Key>,
-) -> Option<crate::ui::Notice> {
+) -> Option<(crate::ui::Notice, Option<Vec<ratatui::text::Span<'static>>>)> {
     let mut notice = current(ui, state, now)?;
     let crate::ui::NoticeKind::Message(toast) = &mut notice.kind else {
-        return Some(notice);
+        return Some((notice, None));
     };
     let Some((placed, _)) = ui
         .placed
@@ -135,7 +135,7 @@ pub fn components(
         .active(state, now)
         .filter(|(placed, _)| toast.parts == [placed.text.as_str()])
     else {
-        return Some(notice);
+        return Some((notice, None));
     };
     let props = bingo_sdk::component::Props::Toast(bingo_sdk::component::ToastProps {
         text: placed.text,
@@ -161,7 +161,16 @@ pub fn components(
         },
     );
     toast.parts = drawing.lines.iter().map(ToString::to_string).collect();
-    Some(notice)
+    Some((
+        notice,
+        Some(
+            drawing
+                .lines
+                .into_iter()
+                .flat_map(|line| line.spans)
+                .collect(),
+        ),
+    ))
 }
 
 #[cfg(test)]

@@ -167,6 +167,13 @@ impl Catalogs {
 pub enum Open {
     #[default]
     Nothing,
+    Keys(Option<String>),
+    Mode(Option<String>),
+    Result {
+        head: String,
+        view: View,
+        at: usize,
+    },
     Palette(crate::palette::Opened),
     Sessions(crate::sessions::Opened),
     Browse(crate::browse::Opened),
@@ -183,7 +190,10 @@ impl Open {
     pub fn captures(&self) -> bool {
         matches!(
             self,
-            Open::Sessions(_)
+            Open::Keys(_)
+                | Open::Mode(_)
+                | Open::Result { .. }
+                | Open::Sessions(_)
                 | Open::Plugins(_)
                 | Open::Browse(_)
                 | Open::Palette(_)
@@ -285,7 +295,6 @@ pub struct Ui {
     /// behind it (ADR-0095 §2).
     pub notice: Option<Notice>,
     pub keyed_at: Instant,
-    /// A command's `View`, shown until the next key.
     pub block: Option<View>,
     pub embers: crate::embers::Embers,
     /// How much of each block a person opened or shut, with `ctrl+o` or a

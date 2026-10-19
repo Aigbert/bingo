@@ -15,8 +15,8 @@ pub const RM: usize = 2;
 #[allow(dead_code)] // M193 draws with this grid primitive.
 pub const MEASURE: usize = 100;
 
-pub fn dock_cap(height: usize) -> usize {
-    (height.saturating_mul(66) / 100).saturating_sub(2).max(6)
+pub fn dock_cap(height: usize) -> u16 {
+    u16::try_from((height.saturating_mul(66) / 100).saturating_sub(2).max(6)).unwrap_or(u16::MAX)
 }
 
 pub fn fit(line: Line<'static>, width: usize) -> Line<'static> {

@@ -1,0 +1,364 @@
+{
+  "models": [
+    {
+      "id": "opus-5.5",
+      "prov": "anthropic",
+      "ctx": "1M",
+      "img": true,
+      "effs": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max"
+      ]
+    },
+    {
+      "id": "sonnet-5.5",
+      "prov": "anthropic",
+      "ctx": "1M",
+      "img": true,
+      "effs": [
+        "off",
+        "low",
+        "medium",
+        "high",
+        "max"
+      ]
+    },
+    {
+      "id": "haiku-5.5",
+      "prov": "anthropic",
+      "ctx": "200k",
+      "img": true,
+      "effs": [
+        "off",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    {
+      "id": "gpt-6-astra",
+      "prov": "openai",
+      "ctx": "400k",
+      "img": true,
+      "effs": [
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "xhigh"
+      ]
+    },
+    {
+      "id": "gpt-6-mini",
+      "prov": "openai",
+      "ctx": "400k",
+      "img": false,
+      "effs": [
+        "minimal",
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    {
+      "id": "qwen4-coder",
+      "prov": "local",
+      "ctx": "128k",
+      "img": false,
+      "effs": [
+        "off"
+      ]
+    }
+  ],
+  "plugins": [
+    {
+      "n": "tool-fs",
+      "d": "read, edit and write files",
+      "on": true,
+      "kind": "built in"
+    },
+    {
+      "n": "tool-bash",
+      "d": "run shell commands",
+      "on": true,
+      "kind": "built in"
+    },
+    {
+      "n": "tool-web",
+      "d": "fetch pages and search the web",
+      "on": true,
+      "kind": "built in"
+    },
+    {
+      "n": "agents",
+      "d": "hire agents and give them work",
+      "on": true,
+      "kind": "built in"
+    },
+    {
+      "n": "rooms",
+      "d": "rooms where agents and you talk",
+      "on": true,
+      "kind": "built in"
+    },
+    {
+      "n": "schedule",
+      "d": "prompts that run on a clock",
+      "on": true,
+      "kind": "built in"
+    },
+    {
+      "n": "experience",
+      "d": "learns from your corrections",
+      "on": false,
+      "kind": "built in"
+    },
+    {
+      "n": "feishu",
+      "d": "talk to this session from Feishu",
+      "on": true,
+      "kind": "channel"
+    },
+    {
+      "n": "github",
+      "d": "issues, pull requests and checks",
+      "on": true,
+      "kind": "mcp",
+      "err": "token expired",
+      "fix": "⏎ sign in"
+    },
+    {
+      "n": "linear",
+      "d": "issues and cycles",
+      "on": false,
+      "kind": "mcp"
+    }
+  ],
+  "sessions": [
+    {
+      "t": "bingo-site 文档页",
+      "dir": "~/bingo-site",
+      "when": "3m",
+      "st": "working"
+    },
+    {
+      "t": "飞书卡片按钮回调",
+      "dir": "~/bingo-improve",
+      "when": "40m",
+      "st": "asking"
+    },
+    {
+      "t": "steer 吞掉排队消息",
+      "dir": "~/bingo-improve",
+      "when": "12m"
+    },
+    {
+      "t": "给 total 加标签",
+      "dir": "~/total",
+      "when": "2h"
+    },
+    {
+      "t": "release v0.6.3",
+      "dir": "~/bingo-improve",
+      "when": "Sep 15"
+    },
+    {
+      "t": "axum 路由迁移",
+      "dir": "~/api",
+      "when": "Sep 12"
+    },
+    {
+      "t": "blender 场景灯光",
+      "dir": "~/blender_demo",
+      "when": "Sep 9"
+    },
+    {
+      "t": "windows CI 超时",
+      "dir": "~/bingo-improve",
+      "when": "Sep 3"
+    },
+    {
+      "t": "cargo deny 报 rustls",
+      "dir": "~/bingo-improve",
+      "when": "Aug 30"
+    }
+  ],
+  "tasks": [
+    {
+      "id": 5,
+      "t": "审一遍 queue 的改动",
+      "st": "pending",
+      "who": "reviewer"
+    },
+    {
+      "id": 4,
+      "t": "补 steer 之后排队的回归测试",
+      "st": "in_progress",
+      "who": "bingo"
+    },
+    {
+      "id": 3,
+      "t": "找出所有调用 drain() 的地方",
+      "st": "in_progress",
+      "who": "scout"
+    },
+    {
+      "id": 2,
+      "t": "修 reset() 清空队列",
+      "st": "completed",
+      "who": "bingo"
+    },
+    {
+      "id": 1,
+      "t": "复现消息被吞",
+      "st": "completed",
+      "who": "you"
+    }
+  ],
+  "scheds": [
+    {
+      "when": "every 30m",
+      "what": "看一眼 CI，挂了就告诉我",
+      "next": "in 12m",
+      "on": true
+    },
+    {
+      "when": "daily 09:00",
+      "what": "总结昨天合进 dev 的提交",
+      "next": "tomorrow 09:00",
+      "on": true
+    },
+    {
+      "when": "once Fri 18:00",
+      "what": "提醒我发 v0.6.4",
+      "next": "Fri 18:00",
+      "on": false
+    }
+  ],
+  "memory": [
+    {
+      "kind": "instructions",
+      "t": "AGENTS.md",
+      "d": "this project · 64 lines"
+    },
+    {
+      "kind": "instructions",
+      "t": "~/.bingo/AGENTS.md",
+      "d": "every project · 12 lines"
+    },
+    {
+      "kind": "memory",
+      "t": "在 dev 上开发，main 是发布线",
+      "d": "Sep 2"
+    },
+    {
+      "kind": "memory",
+      "t": "测试别钉墙上的时钟，CI 更慢",
+      "d": "Sep 11"
+    },
+    {
+      "kind": "memory",
+      "t": "提交信息用英文，主题不超过 60 个字符",
+      "d": "Aug 30"
+    }
+  ],
+  "modes": [
+    {
+      "n": "default",
+      "c": "muted",
+      "d": "trusted read-only tools run; everything else asks"
+    },
+    {
+      "n": "accept edits",
+      "c": "auto",
+      "d": "edits inside the working directories run without a prompt"
+    },
+    {
+      "n": "plan",
+      "c": "plan",
+      "d": "nothing that is not read-only runs at all"
+    },
+    {
+      "n": "bypass",
+      "c": "bad",
+      "d": "everything runs except what only a person may decide"
+    }
+  ],
+  "roster": [
+    {
+      "name": "scout",
+      "c": "crew1",
+      "role": "finds things in the codebase",
+      "model": {
+        "id": "haiku-5.5",
+        "eff": "low"
+      }
+    },
+    {
+      "name": "reviewer",
+      "c": "crew2",
+      "role": "reads diffs and says what breaks",
+      "model": {
+        "id": "opus-5.5",
+        "eff": "high"
+      }
+    },
+    {
+      "name": "ada",
+      "c": "crew0",
+      "role": "writes the test first",
+      "model": {
+        "id": "sonnet-5.5",
+        "eff": "medium"
+      }
+    },
+    {
+      "name": "bo",
+      "c": "crew3",
+      "role": "runs releases and watches CI",
+      "model": {
+        "id": "haiku-5.5",
+        "eff": "low"
+      }
+    }
+  ],
+  "pastScript": [
+    {
+      "k": "think",
+      "at": 0,
+      "ms": 600,
+      "text": "这是另一个会话。"
+    },
+    {
+      "k": "step",
+      "at": 700,
+      "end": 900,
+      "tool": "read",
+      "arg": "README.md",
+      "st": "ok",
+      "tail": [],
+      "res": "88 lines"
+    },
+    {
+      "k": "narr",
+      "at": 1000,
+      "text": "这是「{title}」会话的最后一轮。往下接着说就行。"
+    }
+  ],
+  "echoScript": [
+    {
+      "k": "think",
+      "at": 0,
+      "ms": 500,
+      "text": "原型里的回答是预先写好的。"
+    },
+    {
+      "k": "narr",
+      "at": 600,
+      "text": "收到「{text}」。这是原型，回答是预先写好的；试试「{T2P}」，看完整的一轮：读文件、改代码、跑测试、失败、修好。"
+    }
+  ]
+}

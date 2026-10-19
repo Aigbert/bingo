@@ -129,57 +129,8 @@ pub const ASCII: Glyphs = Glyphs {
     },
 };
 
-pub const GU: &[(&str, &str)] = &[
-    ("lamp", "●"),
-    ("bullet", "•"),
-    ("sep", " · "),
-    ("ok", "✓"),
-    ("still", "◌"),
-    ("edge", "▔"),
-    ("base", "▁"),
-    ("thin", "─"),
-    ("vbar", "│"),
-    ("quote", "▎"),
-    ("caret", "▍"),
-    ("ell", "…"),
-    ("arrow", "→"),
-    ("up", "↑"),
-    ("down", "↓"),
-    ("minus", "−"),
-    ("times", "×"),
-    ("dot", "·"),
-    ("ret", "⏎"),
-    ("pin", "◆"),
-    ("side", "▍"),
-    ("think", "≈"),
-    ("spin", SPIN_U),
-];
-pub const GA: &[(&str, &str)] = &[
-    ("lamp", "*"),
-    ("bullet", "-"),
-    ("sep", " - "),
-    ("ok", "+"),
-    ("still", "o"),
-    ("edge", "-"),
-    ("base", "_"),
-    ("thin", "-"),
-    ("vbar", "|"),
-    ("quote", "|"),
-    ("caret", "|"),
-    ("ell", "..."),
-    ("arrow", "->"),
-    ("up", "^"),
-    ("down", "v"),
-    ("minus", "-"),
-    ("times", "x"),
-    ("dot", "."),
-    ("ret", "enter"),
-    ("pin", "*"),
-    ("side", "|"),
-    ("think", ":"),
-    ("spin", SPIN_A),
-];
 pub const KEYA: &[(&str, &str)] = &[
+    ("pgup pgdn", "pgup/pgdn"),
     ("⇧⏎", "shift+enter"),
     ("⇧tab", "shift+tab"),
     ("⏎", "enter"),
@@ -189,12 +140,23 @@ pub const KEYA: &[(&str, &str)] = &[
     ("↓", "down"),
     ("⌫", "backspace"),
 ];
+pub fn set() -> bingo_sdk::glyph::GlyphSet {
+    if super::glyphs() == &ASCII {
+        bingo_sdk::glyph::GlyphSet::Ascii
+    } else {
+        bingo_sdk::glyph::GlyphSet::Unicode
+    }
+}
 pub fn get(name: &str) -> &'static str {
-    let table = if super::glyphs() == &ASCII { GA } else { GU };
-    table
+    bingo_sdk::glyph::Glyph::named(name).map_or("", |glyph| glyph.spell(set()))
+}
+
+pub fn chord(ascii: &str) -> String {
+    let glyph = KEYA
         .iter()
-        .find(|(key, _)| *key == name)
-        .map_or("", |(_, value)| value)
+        .find(|(_, key)| *key == ascii)
+        .map_or(ascii, |(glyph, _)| glyph);
+    key_text(glyph)
 }
 
 pub fn key_text(text: &str) -> String {
@@ -212,19 +174,22 @@ mod tests {
 
     #[test]
     fn prototype_glyphs_have_their_documented_cell_widths() {
-        for (ascii, table) in [(false, GU), (true, GA)] {
-            for &(name, glyph) in table {
-                if name == "spin" {
+        use bingo_sdk::glyph::{Glyph, GlyphSet};
+        for set in [GlyphSet::Unicode, GlyphSet::Ascii] {
+            for &name in Glyph::ALL {
+                let glyph = name.spell(set);
+                if name == Glyph::Spin {
                     for frame in glyph.chars() {
                         assert_eq!(frame.width(), Some(1));
                     }
-                } else if !(matches!(name, "sep" | "ell" | "ret") || ascii && name == "arrow") {
-                    assert_eq!(glyph.width(), 1, "{name}: {glyph}");
+                } else if !(matches!(name, Glyph::Sep | Glyph::Ell | Glyph::Ret)
+                    || set == GlyphSet::Ascii && name == Glyph::Arrow)
+                {
+                    assert_eq!(glyph.width(), 1, "{name:?}: {glyph}");
                 }
             }
         }
-        assert_eq!(GA.iter().find(|(key, _)| *key == "arrow").unwrap().1, "->");
-        assert!(GA.iter().all(|(_, glyph)| glyph.is_ascii()));
+        assert_eq!(Glyph::Arrow.spell(GlyphSet::Ascii), "->");
         assert!(KEYA.iter().all(|(_, text)| text.is_ascii()));
         super::super::with(crate::painted::ascii(), || {
             assert_eq!(

@@ -45,7 +45,11 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let band = crate::component::band::draw(state, ui, frame, now);
     activity.extend(band.lines.iter().cloned());
     let palette = palette(tree, ui, frame, now);
-    let mut regions = frame::regions(area, demand(&draft, &activity, &palette));
+    frame.sheet = crate::dock::sheets::prepare(tree, ui, frame, now);
+    let mut regions = frame::regions(
+        area,
+        demand(&draft, &activity, &palette, frame.sheet.as_deref()),
+    );
     grow(frame, &mut regions, now);
     activity = frame.collect(views::Drawing {
         lines: activity,
@@ -60,6 +64,7 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
         regions.transcript.height -= 1;
     }
     frame.regions = regions;
+    crate::dock::sheets::seat(tree, ui, frame);
     render_transcript(tree, ui, frame, regions.transcript, now, &tools);
     render_activity(ui, frame, regions.activity, activity);
     crate::component::band::place(&band, frame, regions.activity, band_offset);
@@ -96,10 +101,22 @@ fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) 
 }
 
 /// What the frame must make room for before the transcript is given the rest.
-fn demand(draft: &Draft, activity: &[Line<'_>], palette: &[Line<'_>]) -> Demand {
+fn demand(
+    draft: &Draft,
+    activity: &[Line<'_>],
+    palette: &[Line<'_>],
+    sheet: Option<&[Line<'_>]>,
+) -> Demand {
     Demand {
-        composer: u16::try_from(draft.rows() + draft.above.len()).unwrap_or(u16::MAX),
-        activity: u16::try_from(activity.len()).unwrap_or(u16::MAX),
+        composer: u16::try_from(
+            sheet.map_or_else(|| draft.rows() + draft.above.len(), |lines| lines.len()),
+        )
+        .unwrap_or(u16::MAX),
+        activity: if sheet.is_some() {
+            0
+        } else {
+            u16::try_from(activity.len()).unwrap_or(u16::MAX)
+        },
         palette: u16::try_from(palette.len()).unwrap_or(u16::MAX),
     }
 }
@@ -269,15 +286,13 @@ fn layer(
     tools: &crate::tool_rows::Looks,
     now: Now,
 ) {
-    // Every list a cursor walks is drawn in the room the layer has, and no
-    // more of it than that: what is off the window's ends says so (§3).
-    let rows = usize::from(above.height);
     match ui.focus.open() {
-        Open::Nothing => {}
-        Open::Sessions(_) => {
-            let lines = crate::sessions::draw(ui, tree, frame, above.width, above.height, now);
-            over(frame, above, lines);
-        }
+        Open::Nothing
+        | Open::Keys(_)
+        | Open::Mode(_)
+        | Open::Result { .. }
+        | Open::Sessions(_)
+        | Open::Plugins(_) => {}
         Open::Browse(_) => {
             let lines = crate::browse::draw(
                 ui,
@@ -296,10 +311,6 @@ fn layer(
                 over(frame, above, lines.into_iter().skip(1).collect());
             }
         }
-        Open::Plugins(_) => {
-            let lines = crate::plugins::draw(ui, tree, frame, above.width, above.height, now);
-            over(frame, above, lines);
-        }
         // Drawn under the box, in its own rows (ADR-0095 §1).
         Open::Palette(_) => {}
         Open::Pager(open) => paged(tree, frame, above, open, reveal, tools),
@@ -310,7 +321,7 @@ fn layer(
             rewind::lines(
                 &bingo_sdk::transcript::turns(&tree.viewed().transcript),
                 card.selected,
-                rows,
+                usize::from(above.height),
             ),
         ),
     }
@@ -823,6 +834,18 @@ fn lined(area: Rect, padding: usize) -> Rect {
 /// The prompt box: the caret lives here and nowhere else. Its border is the
 /// one box the frame draws itself; what is inside it is [`crate::composer`]'s.
 fn render_composer(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: Now, draft: Draft) {
+    if let Some(lines) = frame.sheet.clone() {
+        crate::dock::sheets::draw(frame, area, lines);
+        let edge = crate::dock::draw(tree, ui, area.width as usize, now);
+        frame.place(
+            edge,
+            Rect {
+                height: area.height.min(1),
+                ..area
+            },
+        );
+        return;
+    }
     frame.render_widget(Paragraph::new("").style(crate::dock::ground()), area);
     let drawing = crate::dock::draw(tree, ui, area.width as usize, now);
     frame.place(

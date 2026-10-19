@@ -18,6 +18,8 @@ pub use canvas::Canvas;
 
 #[derive(Debug, Default)]
 pub struct Layout {
+    pub sheet_actions: Vec<crate::views::targets::Target>,
+    pub sheet: Option<Vec<ratatui::text::Line<'static>>>,
     pub growth: Option<crate::dock::Growth>,
     pub inline: Option<(usize, usize, usize)>,
     pub palette_height: Option<(String, usize)>,

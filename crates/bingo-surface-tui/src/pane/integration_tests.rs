@@ -312,3 +312,19 @@ fn escape_keeps_an_ordinary_panes_close_behavior_during_a_turn() {
         matches!(&effects[..], [Effect::Submit(Input::Action { action, .. })] if action.args["event"] == "close")
     );
 }
+
+#[test]
+fn side_then_dock_panes_remain_visible_at_both_widths() {
+    let state = with_text(state_with(json!(["side", "dock"])));
+    for (width, expected) in [
+        (200, bingo_sdk::slot::Place::Side),
+        (80, bingo_sdk::slot::Place::Dock),
+    ] {
+        let (mut ui, now) = scene();
+        ui.sync_panes(&state);
+        let screen = draw_sized(width, 24, &state, &mut ui, still(now));
+        assert!(screen.contains("Pane content"), "{screen}");
+        assert_eq!(ui.shown.seating.panes.len(), 1);
+        assert_eq!(ui.shown.seating.panes[0].place, expected);
+    }
+}

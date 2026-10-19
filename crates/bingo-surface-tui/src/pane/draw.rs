@@ -33,16 +33,20 @@ fn draw_one(
     seated: &Seated,
     now: Now,
 ) {
+    if seated.docked() {
+        return;
+    }
     let area = seated.area;
+    let heading = super::heading_rows(pane, seated);
     let focused = matches!(&ui.focus, Focus::Pane(key) if key == &pane.key);
     frame.render_widget(Clear, area);
-    if super::heading_rows(pane) > 0 {
+    if heading > 0 {
         frame.render_widget(
             Paragraph::new(Line::from(Span::styled(&pane.title, theme::bold()))),
             Rect::new(area.x, area.y, area.width, area.height.min(1)),
         );
     }
-    if focused && super::heading_rows(pane) > 0 {
+    if focused && heading > 0 {
         let label = super::moved::label(seated.place);
         let width = (label.width() as u16).min(area.width);
         frame.render_widget(
@@ -60,13 +64,13 @@ fn draw_one(
     }
     let body = Rect::new(
         area.x,
-        area.y.saturating_add(super::heading_rows(pane)),
+        area.y.saturating_add(heading),
         area.width,
-        area.height.saturating_sub(super::heading_rows(pane)),
+        area.height.saturating_sub(heading),
     );
     let drawing = lines(ui, state, pane, seated, now);
     let lines = frame.collect(drawing);
-    let top = offset(ui, seated, lines.len(), super::heading_rows(pane));
+    let top = offset(ui, seated, lines.len(), heading);
     frame.render_widget(
         Paragraph::new(lines.into_iter().skip(top).collect::<Vec<_>>()),
         body,
@@ -78,6 +82,9 @@ fn draw_one(
     }
 }
 pub(super) fn offset(ui: &Ui, seat: &Seated, lines: usize, heading: u16) -> usize {
+    if seat.docked() {
+        return lines.saturating_sub(usize::from(seat.area.height));
+    }
     ui.placed
         .panes
         .scroll
@@ -86,7 +93,7 @@ pub(super) fn offset(ui: &Ui, seat: &Seated, lines: usize, heading: u16) -> usiz
         .unwrap_or_default()
         .min(lines.saturating_sub(usize::from(seat.area.height.saturating_sub(heading))))
 }
-pub(super) fn lines(
+pub(crate) fn lines(
     ui: &Ui,
     state: &SessionState,
     pane: &Pane,
@@ -109,16 +116,18 @@ pub(super) fn lines(
         .copied()
         .unwrap_or_default();
     let focused = matches!(&ui.focus, Focus::Pane(key) if key == &pane.key);
-    edited(
-        &mut view,
-        index,
-        ui.placed.panes.editors.get(&(pane.key.clone(), index)),
-        focused,
-        &mut 0,
-    );
+    if !seated.docked() {
+        edited(
+            &mut view,
+            index,
+            ui.placed.panes.editors.get(&(pane.key.clone(), index)),
+            focused,
+            &mut 0,
+        );
+    }
     let props = crate::component::pane::props(
         pane,
-        focused,
+        ui,
         seated,
         ui.placed
             .panes

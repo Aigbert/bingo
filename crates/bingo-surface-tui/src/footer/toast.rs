@@ -16,10 +16,10 @@ pub(super) fn draw(
     width: usize,
     now: Now,
 ) -> Option<Drawing> {
-    let notice = crate::toast::components(ui, state, now, width, &mut frame.pulls)?;
+    let (notice, styled) = crate::toast::components(ui, state, now, width, &mut frame.pulls)?;
     let age = now.since(notice.said());
     let hold = notice.hold();
-    let mut spans = words(&notice.kind, state);
+    let mut spans = styled.unwrap_or_else(|| words(&notice.kind, state));
     fade(&mut spans, age, hold, now.motion);
     Some(Drawing {
         lines: vec![grid::fit(Line::from(spans), width)],

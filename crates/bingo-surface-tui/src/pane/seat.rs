@@ -13,6 +13,12 @@ pub struct Seated {
     pub key: String,
     pub place: Place,
     pub area: Rect,
+    pub body_rows: Option<u16>,
+}
+impl Seated {
+    pub fn docked(&self) -> bool {
+        self.place == Place::Dock
+    }
 }
 #[derive(Debug, Default)]
 pub struct Seating {
@@ -31,6 +37,7 @@ pub fn seat(area: Rect, wanted: &[Pane], moved: &BTreeMap<String, Place>) -> Sea
         let places = moved.get(&pane.key).into_iter().chain(&pane.place);
         let choice = places.copied().find_map(|place| {
             fits(&seating, pane, place, wanted).map(|area| Seated {
+                body_rows: None,
                 key: pane.key.clone(),
                 place,
                 area,
@@ -98,6 +105,7 @@ fn fits(seating: &Seating, pane: &Pane, place: Place, wanted: &[Pane]) -> Option
             let width = dimension(columns, rest.width.saturating_sub(TRANSCRIPT_MIN_COLUMNS))?;
             Some(Rect::new(rest.right() - width, rest.y, width, rest.height))
         }
+        Place::Dock if !occupied(seating, Place::Dock) => Some(full),
         Place::Overlay | Place::Rect(_) if floating(seating) < FLOATING_MAX => {
             let rect = match place {
                 Place::Rect(rect) => floating_rect(full, rect),
@@ -105,7 +113,6 @@ fn fits(seating: &Seating, pane: &Pane, place: Place, wanted: &[Pane]) -> Option
             };
             (rect.width >= columns.0 && rect.height >= rows.0).then_some(rect)
         }
-        Place::Dock => None,
         _ => None,
     }
 }

@@ -27,6 +27,26 @@ pub const WHEEL: isize = 3;
 /// cells and the release copies it, a click lands on a block, on a child's
 /// row, or on a card's option.
 pub fn on_mouse(ui: &mut Ui, tree: &Tree, mouse: MouseEvent, now: Now) -> Vec<Effect> {
+    if !matches!(
+        crate::focus::owner(ui, tree),
+        crate::focus::Owner::Interaction | crate::focus::Owner::Search
+    ) && mouse.kind == MouseEventKind::Down(MouseButton::Left)
+        && let Some(target) = ui
+            .shown
+            .sheet_actions
+            .iter()
+            .find(|target| target.area.contains(Position::new(mouse.column, mouse.row)))
+    {
+        let action = target.item.action.clone();
+        return if action.name == "surface:sheet" {
+            crate::dock::sheets::clicked(ui, tree, &action, now)
+        } else {
+            vec![Effect::SiteKey {
+                action,
+                key: KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE),
+            }]
+        };
+    }
     match crate::focus::owner(ui, tree) {
         crate::focus::Owner::Search => return Vec::new(),
         crate::focus::Owner::Layer => return Vec::new(),

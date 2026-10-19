@@ -31,7 +31,6 @@ pub const STATIC: &[&str] = &[
     "pgup",
     "pgdn",
     "ctrl+v",
-    "ctrl+t",
     "ctrl+o",
     "ctrl+b",
     "alt+p",

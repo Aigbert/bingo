@@ -145,10 +145,6 @@ impl Focus {
             *self = Self::Composer;
         }
     }
-    #[cfg(test)]
-    pub fn is(&self, open: &crate::ui::Open) -> bool {
-        self.open() == open && self.showing()
-    }
 }
 
 #[cfg(test)]

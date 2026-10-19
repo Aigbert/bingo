@@ -20,6 +20,7 @@ impl Key {
         }
         request.viewport.columns = columns;
         request.viewport.rows = rows;
+        request.viewport.glyphs = crate::theme::glyphs::set();
         Self {
             session: state.summary.id.clone(),
             generation: state
@@ -56,6 +57,7 @@ impl Key {
         self.same_request(other)
             && self.generation == other.generation
             && self.request.props == other.request.props
+            && self.request.viewport.glyphs == other.request.viewport.glyphs
             && self.request.viewport.columns == other.request.viewport.columns
             && self.request.viewport.place == other.request.viewport.place
             && (!matches!(

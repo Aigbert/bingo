@@ -319,6 +319,7 @@ pub struct Blocks {
     /// no item.
     tail: Vec<Line<'static>>,
     tail_next: Option<Instant>,
+    tail_gap: bool,
     /// How many blocks have been drawn since this cache was made. Tests
     /// distinguish memo hits from visible motion refreshes.
     renders: usize,
@@ -355,6 +356,10 @@ impl Blocks {
         self.blocks.truncate(kept);
         let tail = transcript::closing(state, rows);
         self.tail = tail.lines;
+        // While a turn runs, the tail is its live row, which hangs under the
+        // item being written; only a finished turn's closing stands apart.
+        // Set beside `tail` so one `measure` never sees the two disagree.
+        self.tail_gap = state.turn.is_none();
         self.tail_next = tail.next;
         self.height = self.measure();
         self.height
@@ -652,7 +657,7 @@ impl Blocks {
         });
         let opened = !self.blocks.is_empty();
         let tail = (!self.tail.is_empty()).then_some(Segment {
-            gap: opened,
+            gap: opened && self.tail_gap,
             id: None,
             lines: self.tail.as_slice(),
         });

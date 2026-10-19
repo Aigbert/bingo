@@ -5,6 +5,9 @@ use bingo_sdk::{
 };
 
 pub fn hints(state: &SessionState, ui: &Ui, frame: &Layout) -> Option<SiteHints> {
+    if let Some(hints) = sheet_hints(ui) {
+        return Some(hints);
+    }
     if let Some(search) = ui.focus.search() {
         return Some(search_hints(search));
     }
@@ -58,6 +61,17 @@ pub fn hints(state: &SessionState, ui: &Ui, frame: &Layout) -> Option<SiteHints>
                 .and_then(|(_, view)| from_view(view))
                 .cloned()
         })
+}
+fn sheet_hints(ui: &Ui) -> Option<SiteHints> {
+    if ui.focus.showing() {
+        let pairs: Option<Vec<bingo_sdk::component::KeyPair>> = match ui.focus.open() {
+            _ => None,
+        };
+        if let Some(pairs) = pairs {
+            return Some(SiteHints::new(pairs));
+        }
+    }
+    None
 }
 fn from_view(view: &View) -> Option<&SiteHints> {
     match view {

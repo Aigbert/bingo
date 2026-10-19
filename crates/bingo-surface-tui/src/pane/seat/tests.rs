@@ -146,3 +146,14 @@ fn an_above_pane_preserves_the_existing_side_panes_minimum() {
     assert_eq!(got.panes.len(), 1);
     assert_eq!(got.collapsed, vec!["above"]);
 }
+
+#[test]
+fn a_side_pane_falls_back_to_its_declared_dock() {
+    let wanted = [pane("counter", vec![Place::Side, Place::Dock])];
+    for (width, expected) in [(200, Place::Side), (80, Place::Dock)] {
+        let got = seat(Rect::new(0, 0, width, 24), &wanted, &BTreeMap::new());
+        assert_eq!(got.panes.len(), 1);
+        assert_eq!(got.panes[0].place, expected);
+        assert_eq!(got.panes[0].docked(), expected == Place::Dock);
+    }
+}

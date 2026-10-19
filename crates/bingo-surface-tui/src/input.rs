@@ -85,7 +85,6 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
         return Vec::new();
     }
     let owner = crate::focus::owner(ui, tree);
-    ui.block = None;
     owned_keys(ui, tree, key, now, owner)
 }
 
@@ -141,10 +140,12 @@ fn composer_keys(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effec
     if let Some(line) = keys::commands::line(ui, tree.viewed(), key) {
         return command_line(ui, tree, now, line);
     }
-    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL)
-        && let Some(effects) = crate::palette::command(ui, "/resume", now)
-    {
-        return effects;
+    if key == KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL) {
+        return if crate::sessions::exists(tree.viewed()) {
+            crate::sessions::open(ui, now)
+        } else {
+            crate::palette::open(ui, bingo_sdk::component::PaletteOpen::Sessions, now)
+        };
     }
     if let Some(effects) = layered(ui, tree, key, now) {
         return effects;
@@ -214,9 +215,6 @@ fn layered(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Option<Vec<Effe
             _ => return None,
         }
         return Some(Vec::new());
-    }
-    if !ui.focus.captures() {
-        return None;
     }
     None
 }
@@ -1238,7 +1236,7 @@ mod tests {
             "the first one arms it and closes nothing"
         );
         on_key(&mut ui, &tree, key(KeyCode::Esc), now);
-        assert!(ui.focus.is(&Open::Rewind(Rewind::default())));
+        assert!(matches!(ui.focus.open(), Open::Rewind(card) if card.selected == 0));
 
         on_key(&mut ui, &tree, key(KeyCode::Down), now);
         let effects = on_key(&mut ui, &tree, key(KeyCode::Enter), now);
@@ -3093,20 +3091,29 @@ mod tests {
             .iter()
             .find(|binding| binding.keys == "ctrl+b")
             .expect("a row for ctrl+b");
-        assert_eq!(row.description, "background running command");
+        assert_eq!(row.description, "send the command to the background");
     }
 
-    /// Claude Code's key for its own list (M74): the rows go off the band and
-    /// come back, and no layer opens over anything.
     #[test]
-    fn ctrl_t_hides_the_task_list_and_again_shows_it() {
+    fn ctrl_t_opens_the_tasks_sheet_through_its_owner() {
         let (mut ui, now) = scene();
-        assert!(!ui.activity_hidden);
-        assert!(press(&mut ui, &state(), ctrl('t'), now).is_empty());
-        assert!(ui.activity_hidden);
-        assert!(!ui.focus.showing(), "nothing opens");
-        press(&mut ui, &state(), ctrl('t'), now);
-        assert!(!ui.activity_hidden, "the same chord brings it back");
+        ui.composer.set("keep this draft");
+        ui.catalogs.commands = crate::commands::entries(vec![bingo_sdk::CommandSpec {
+            name: "owner-tasks".into(),
+            keys: vec![bingo_sdk::KeyBinding::Chord("ctrl+t".into())],
+            opens: true,
+            hidden: false,
+            aliases: vec![],
+            hint: String::new(),
+            args: bingo_sdk::ArgSpec::None,
+            instant: true,
+            family: String::new(),
+        }]);
+        assert_eq!(
+            press(&mut ui, &state(), ctrl('t'), now),
+            vec![Effect::Run("/owner-tasks".into())]
+        );
+        assert_eq!(ui.composer.text(), "keep this draft");
     }
 
     #[test]
@@ -3139,14 +3146,6 @@ mod tests {
             line(&mut ui, &state, "again", now),
             vec![Effect::Submit(Input::text("again", crate::origin()))]
         );
-    }
-
-    #[test]
-    fn a_view_block_is_dismissed_by_the_next_key() {
-        let (mut ui, now) = scene();
-        ui.block = Some(bingo_sdk::View::text("x"));
-        press(&mut ui, &state(), key(KeyCode::Left), now);
-        assert!(ui.block.is_none());
     }
 
     #[test]

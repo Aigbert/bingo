@@ -114,7 +114,7 @@ pub(super) fn capture(run: &mut Run, intent: &IntentId, line: Option<&str>) {
         && let Some(text) = turn.asked(transcript).map(str::to_owned)
     {
         run.rewind_prompts.0.insert(
-            (run.session.tree.view().clone(), turn.id),
+            (run.session.tree.view().clone(), turn.id.clone()),
             (intent.clone(), text),
         );
     }

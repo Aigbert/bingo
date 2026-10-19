@@ -187,5 +187,12 @@ fn refresh(ui: &mut Ui, value: &serde_json::Value) -> Vec<Effect> {
         vec![]
     }
 }
+
+pub fn exists(state: &bingo_sdk::SessionState) -> bool {
+    bingo_sdk::render::matched(&state.config)
+        .0
+        .contains_key(&bingo_sdk::render::Component::Sessions)
+}
+
 #[cfg(test)]
 mod tests;

@@ -26,6 +26,72 @@ pub fn turns(name: &str) -> Vec<Value> {
     turns
 }
 
+/// The prototype's small scripts use offsets from the turn's start.
+pub fn script(state: &mut SessionState, name: &str, title: &str, start: Timestamp, elapsed: i64) {
+    let id = format!("script-{name}");
+    emit(state, start.as_millisecond(), started(&id));
+    let mut prompt = user("script-prompt", title);
+    prompt.turn = Some(TurnId::from_raw(&id));
+    stamp(
+        &mut prompt,
+        start.as_millisecond(),
+        Some(start.as_millisecond()),
+    );
+    emit(
+        state,
+        start.as_millisecond(),
+        Event::ItemCompleted { item: prompt },
+    );
+    for (n, mut data) in super::world::rows(name).into_iter().enumerate() {
+        let offset = data["at"].as_i64().unwrap();
+        if offset > elapsed {
+            continue;
+        }
+        let at = start.as_millisecond() + offset;
+        data["at"] = json!(at);
+        if let Some(end) = data["end"].as_i64() {
+            data["end"] = json!(start.as_millisecond() + end);
+        }
+        if let Some(text) = data["text"].as_str() {
+            data["text"] = json!(
+                text.replace("{title}", title)
+                    .replace(
+                        "{text}",
+                        &if title.chars().count() > 24 {
+                            format!("{}…", title.chars().take(24).collect::<String>())
+                        } else {
+                            title.into()
+                        }
+                    )
+                    .replace("{T2P}", "修好它，加一个回归测试")
+            );
+        }
+        let mut item = from_data(&format!("{id}-{n}"), &data);
+        item.turn = Some(TurnId::from_raw(&id));
+        let end = data["end"]
+            .as_i64()
+            .unwrap_or(at + data["ms"].as_i64().unwrap_or(0));
+        if end > start.as_millisecond() + elapsed {
+            item.status = ItemStatus::Running;
+        }
+        let end = item.status.is_terminal().then_some(end);
+        stamp(&mut item, at, end);
+        let event = if item.status.is_terminal() {
+            Event::ItemCompleted { item }
+        } else {
+            Event::ItemStarted { item }
+        };
+        emit(state, end.unwrap_or(at), event);
+    }
+    if name == "pastScript" {
+        emit(
+            state,
+            start.as_millisecond() + 1300,
+            completed(&id, TurnStatus::Completed),
+        );
+    }
+}
+
 fn clock_origin(value: &mut Value) {
     match value {
         Value::Object(fields) => {

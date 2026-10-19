@@ -50,7 +50,7 @@ pub fn regions(size: Rect, demand: Demand) -> Regions {
     let rows = palette_rows(demand.palette, rest.height);
     let palette = take_bottom(&mut rest, rows);
     let rows = composer_rows(demand.composer, rest.height)
-        .min(crate::layout::grid::dock_cap(usize::from(size.height)) as u16 + 2);
+        .min(crate::layout::grid::dock_cap(usize::from(size.height)) + 2);
     let composer = take_bottom(&mut rest, rows);
     let rows = activity_rows(demand.activity, rest.height);
     let activity = take_bottom(&mut rest, rows);
@@ -119,10 +119,7 @@ mod tests {
             composer: 40,
             ..Demand::default()
         });
-        assert_eq!(
-            r.composer.height,
-            crate::layout::grid::dock_cap(24) as u16 + 2
-        );
+        assert_eq!(r.composer.height, crate::layout::grid::dock_cap(24) + 2);
         let r = at(Demand {
             composer: 1,
             palette: 8,

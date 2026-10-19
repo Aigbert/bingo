@@ -2,10 +2,11 @@ use bingo_sdk::{component::*, slot::Shown};
 
 pub fn props(
     pane: &crate::pane::Pane,
-    focused: bool,
+    ui: &crate::ui::Ui,
     seat: &crate::pane::seat::Seated,
     offset: usize,
 ) -> Props {
+    let focused = matches!(&ui.focus, crate::focus::Focus::Pane(key) if key == &pane.key);
     Props::Pane(PaneProps {
         hints: pane.hints.clone(),
         title: pane.title.clone(),
@@ -21,25 +22,25 @@ pub fn props(
         .into(),
         scroll: SiteScroll {
             offset,
-            body_rows: usize::from(
+            body_rows: usize::from(seat.body_rows.unwrap_or_else(|| {
                 seat.area
                     .height
-                    .saturating_sub(crate::pane::heading_rows(pane)),
-            ),
+                    .saturating_sub(crate::pane::heading_rows(pane, seat))
+            })),
         },
         view: SiteView { agent_id: None },
     })
 }
 pub fn shown(
     pane: &crate::pane::Pane,
-    focused: bool,
+    ui: &crate::ui::Ui,
     seat: &crate::pane::seat::Seated,
     offset: usize,
 ) -> Shown {
     let mut shown = pane.view.clone();
     if let Shown::Pull { request } = &mut shown {
         let mut value = request.props.as_object().cloned().unwrap_or_default();
-        if let serde_json::Value::Object(fields) = props(pane, focused, seat, offset).value() {
+        if let serde_json::Value::Object(fields) = props(pane, ui, seat, offset).value() {
             value.extend(fields);
         }
         request.props = value.into();

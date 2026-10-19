@@ -112,7 +112,7 @@ fn press(ui: &mut Ui, state: &SessionState, seat: &Seated, event: MouseEvent, no
     ui.select.dragging = None;
     focus(ui, state, &seat.key);
     ui.placed.panes.selection = None;
-    if event.row == seat.area.y && heading(state, seat) > 0 {
+    if event.row == seat.area.y && heading(ui, state, seat) > 0 {
         let width = moved::label(seat.place).width() as u16;
         if focused && event.column >= seat.area.right().saturating_sub(width) {
             moved::cycle(ui, state, &seat.key);
@@ -128,11 +128,11 @@ fn press(ui: &mut Ui, state: &SessionState, seat: &Seated, event: MouseEvent, no
         ));
     }
 }
-fn heading(state: &SessionState, seat: &Seated) -> u16 {
+fn heading(_ui: &Ui, state: &SessionState, seat: &Seated) -> u16 {
     placed(state)
         .iter()
         .find(|pane| pane.key == seat.key)
-        .map_or(1, super::heading_rows)
+        .map_or(1, |pane| super::heading_rows(pane, seat))
 }
 fn cell(ui: &Ui, state: &SessionState, seat: &Seated, event: MouseEvent, now: Now) -> Cell {
     let lines = placed(state)
@@ -141,7 +141,7 @@ fn cell(ui: &Ui, state: &SessionState, seat: &Seated, event: MouseEvent, now: No
         .map_or(0, |pane| {
             draw::lines(ui, state, pane, seat, now).lines.len()
         });
-    let header = heading(state, seat);
+    let header = heading(ui, state, seat);
     let top = draw::offset(ui, seat, lines, header);
     Cell {
         line: top
@@ -167,7 +167,9 @@ fn scroll(ui: &mut Ui, state: &SessionState, seat: &Seated, down: bool, now: Now
         .lines
         .len()
         .saturating_sub(usize::from(
-            seat.area.height.saturating_sub(super::heading_rows(&pane)),
+            seat.area
+                .height
+                .saturating_sub(super::heading_rows(&pane, seat)),
         ));
     let top = ui.placed.panes.scroll.entry(seat.key.clone()).or_default();
     *top = if down {

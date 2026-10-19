@@ -9,6 +9,7 @@ pub mod answers;
 mod compare;
 mod parse;
 pub mod story;
+pub mod world;
 
 /// The private clock origin in prototype/p8-page.js (snapshot and capture).
 pub const CLOCK_ORIGIN_MS: i64 = 10_000_000;
