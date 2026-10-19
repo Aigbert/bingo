@@ -2778,6 +2778,8 @@ mod tests {
     #[tokio::test]
     async fn opening_the_palette_reads_the_store_and_the_card_fills() {
         let mut harness = Harness::new();
+        // The dock rises a row a frame; a still terminal shows it whole.
+        harness.recorder.motion = Some(false);
         let (host, _) = TestHost::with_stored(vec![], vec![stored_summary("ses_7", "scout")]);
         let ended = drive(
             &host,

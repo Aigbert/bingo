@@ -157,11 +157,7 @@ pub fn assert_regions(
         Band::Frame => buffer.area,
         Band::Stream => regions.above(),
         Band::Footer => regions.status,
-        Band::Dock => [regions.composer, regions.palette]
-            .into_iter()
-            .filter(|rect| rect.height > 0)
-            .reduce(|a, b| a.union(b))
-            .unwrap_or_default(),
+        Band::Dock => regions.composer,
     };
     assert_area(capture, band, buffer, area);
 }

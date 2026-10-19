@@ -13,8 +13,6 @@ pub struct Demand {
     /// Rows between the transcript and the box: the activity row and whatever
     /// is queued behind it.
     pub activity: u16,
-    /// Rows of the open palette, under the box; none while it is closed.
-    pub palette: u16,
 }
 
 /// The frame, top to bottom. Every region may be empty; the footer and
@@ -25,8 +23,6 @@ pub struct Regions {
     pub activity: Rect,
     pub composer: Rect,
     pub status: Rect,
-    /// The open palette, under the box.
-    pub palette: Rect,
 }
 
 impl Regions {
@@ -47,8 +43,6 @@ impl Regions {
 pub fn regions(size: Rect, demand: Demand) -> Regions {
     let mut rest = size;
     let status = take_bottom(&mut rest, 1);
-    let rows = palette_rows(demand.palette, rest.height);
-    let palette = take_bottom(&mut rest, rows);
     let rows = composer_rows(demand.composer, rest.height)
         .min(crate::layout::grid::dock_cap(usize::from(size.height)) + 2);
     let composer = take_bottom(&mut rest, rows);
@@ -59,13 +53,7 @@ pub fn regions(size: Rect, demand: Demand) -> Regions {
         activity,
         composer,
         status,
-        palette,
     }
-}
-
-/// The palette leaves the box its smallest self above it.
-fn palette_rows(want: u16, room: u16) -> u16 {
-    want.min(room.saturating_sub(COMPOSER_MIN))
 }
 
 /// The dock takes its body, edge and pad, bounded by the available rows.
@@ -113,21 +101,14 @@ mod tests {
         }
     }
     #[test]
-    fn the_dock_caps_its_body_and_palette_keeps_its_place() {
+    fn the_dock_caps_its_body() {
         let at = |demand| regions(Rect::new(0, 0, 80, 24), demand);
         let r = at(Demand {
             composer: 40,
             ..Demand::default()
         });
         assert_eq!(r.composer.height, crate::layout::grid::dock_cap(24) + 2);
-        let r = at(Demand {
-            composer: 1,
-            palette: 8,
-            ..Demand::default()
-        });
-        assert_eq!(r.composer.bottom(), r.palette.y);
-        assert_eq!(r.palette.bottom(), r.status.y);
-        assert_eq!(r.status.height, 1);
+        assert_eq!(r.composer.bottom(), r.status.y);
     }
 }
 

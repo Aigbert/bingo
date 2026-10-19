@@ -3,7 +3,7 @@ use super::*;
 use serde_json::Value;
 
 fn rows(props: &PaletteProps) -> Vec<(String, Value)> {
-    let query = props.query.trim_start_matches('/').to_lowercase();
+    let query = props.query.trim_start_matches('/');
     match props.open {
         PaletteOpen::Sessions => props
             .conversation
@@ -15,29 +15,33 @@ fn rows(props: &PaletteProps) -> Vec<(String, Value)> {
                     .iter()
                     .map(|s| (s.label.clone(), json!({"resume":s.id}))),
             )
-            .filter(|(name, _)| name.to_lowercase().contains(&query))
+            .filter(|(name, _)| bingo_sdk::rank::fuzzy(query, name).is_some())
             .collect(),
         PaletteOpen::Keys => props
             .key_hints
             .keys()
-            .filter(|name| name.contains(&query))
+            .filter(|name| bingo_sdk::rank::fuzzy(query, name).is_some())
             .map(|key| (key.clone(), Value::Null))
             .collect(),
-        PaletteOpen::Commands => props
-            .commands
-            .iter()
-            .filter(|entry| {
-                entry.meta["hidden"] != true
-                    && entry.meta["foldedInto"].as_str().is_none()
-                    && entry.id.starts_with(&query)
-            })
-            .map(|entry| {
-                (
-                    format!("/{}", entry.id),
-                    json!({"run":format!("/{}", entry.id)}),
-                )
-            })
-            .collect(),
+        PaletteOpen::Commands => bingo_sdk::rank::ranked(
+            query,
+            &props
+                .commands
+                .iter()
+                .filter(|entry| {
+                    entry.meta["hidden"] != true && entry.meta["foldedInto"].as_str().is_none()
+                })
+                .collect::<Vec<_>>(),
+            |entry| entry.id.as_str(),
+        )
+        .into_iter()
+        .map(|(entry, _)| {
+            (
+                format!("/{}", entry.id),
+                json!({"run":format!("/{}", entry.id)}),
+            )
+        })
+        .collect(),
     }
 }
 fn selected(props: &PaletteProps, rows: &[(String, Value)], at: Option<usize>) -> usize {

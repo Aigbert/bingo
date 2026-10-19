@@ -248,57 +248,6 @@ async fn prototype_scenarios_at_both_sizes() {
         }
     }
 }
-/// `count` skills on the shelves a person has, a plugin's guide among the
-/// first three.
-fn skills(ui: &mut Ui, count: usize) {
-    const NAMED: [(&str, &str, &str); 3] = [
-        ("deploy", "ship the current branch to staging", "project"),
-        ("standup", "write today's standup from the git log", "yours"),
-        ("guide-memory", "how memory is kept and recalled", "guide"),
-    ];
-    let skills = (0..count).map(|n| match NAMED.get(n) {
-        Some((name, hint, shelf)) => ((*name).to_owned(), (*hint).to_owned(), *shelf),
-        None => (
-            format!("docs-{n:02}"),
-            format!("write the docs page number {n} from its outline"),
-            "project",
-        ),
-    });
-    ui.catalogs.commands.extend(
-        skills
-            .map(|(name, hint, shelf)| {
-                serde_json::from_value::<bingo_sdk::CommandSpec>(json!({
-                    "name": name,
-                    "hint": hint,
-                    "args": {"kind": "free", "hint": ""},
-                    "family": format!("skill/{shelf}"),
-                }))
-                .unwrap()
-            })
-            .map(crate::commands::entry),
-    );
-}
-#[tokio::test]
-async fn the_skills_group_at_zero_three_and_twenty() {
-    for (width, height) in [(108, 30), (80, 24)] {
-        for count in [0, 3, 20] {
-            for (name, query) in [("bare", "/"), ("search", "/d")] {
-                let fixture = Fixture::new();
-                let (state, mut ui, now) = setup();
-                skills(&mut ui, count);
-                open(&mut ui, PaletteOpen::Commands, now);
-                ui.composer.set(query);
-                let screen = fixture.paint(&mut ui, &state, now, width, height).await;
-                let reachable = count == 0 || screen.contains("skill");
-                assert!(reachable, "every skill stays reachable from /: {screen}");
-                insta::assert_snapshot!(
-                    format!("palette_skills_{count}_{name}_{width}x{height}"),
-                    screen
-                );
-            }
-        }
-    }
-}
 #[tokio::test]
 async fn a_query_nothing_matches_says_so() {
     let fixture = Fixture::new();
@@ -306,7 +255,7 @@ async fn a_query_nothing_matches_says_so() {
     open(&mut ui, PaletteOpen::Commands, now);
     ui.composer.set("/zz");
     let screen = fixture.paint(&mut ui, &state, now, 80, 24).await;
-    assert!(screen.contains("nothing matches “zz”"), "{screen}");
+    assert!(screen.contains("no command matches /zz"), "{screen}");
     insta::assert_snapshot!("palette_nothing_matches_80x24", screen);
 }
 #[tokio::test]
@@ -321,9 +270,7 @@ async fn search_arguments_escape_and_resume_use_the_same_site() {
     ui.composer.set("/mo");
     let screen = fixture.paint(&mut ui, &state, now, 80, 24).await;
     assert!(
-        screen.contains("model migration")
-            && screen.contains("commands")
-            && screen.contains("sessions"),
+        screen.contains("/model") && !screen.contains("model migration"),
         "{screen}"
     );
     fixture
@@ -563,14 +510,11 @@ async fn pending_queries_keep_the_accepted_drawing_and_its_height() {
     let tree = solo(&state);
     open(&mut ui, PaletteOpen::Commands, now);
     let first = fixture.paint(&mut ui, &state, now, 80, 24).await;
-    let header = first
-        .lines()
-        .position(|line| line.trim_matches('"').trim() == "commands")
-        .unwrap();
+    let top = |screen: &str, name: &str| screen.lines().position(|line| line.contains(name));
     for letter in "rename".chars() {
         crate::input::on_key(&mut ui, &tree, typed(letter), now);
         let pending = draw_tree(80, 24, &tree, &mut ui, now);
-        assert_eq!(pending.lines().nth(header), first.lines().nth(header));
+        assert_eq!(top(&pending, "/model"), top(&first, "/model"));
         assert!(
             pending.contains("choose model"),
             "last drawing disappeared: {pending}"
@@ -578,20 +522,17 @@ async fn pending_queries_keep_the_accepted_drawing_and_its_height() {
         assert!(waiting(&ui, &tree, now), "old rows must not accept actions");
     }
     let current = fixture.paint(&mut ui, &state, now, 80, 24).await;
-    assert_eq!(
-        current
-            .lines()
-            .position(|line| line.trim_matches('"').trim() == "commands"),
-        Some(header)
-    );
+    assert!(!current.contains("/model"), "{current}");
     assert!(!waiting(&ui, &tree, now));
     let moved = crate::input::on_key(&mut ui, &tree, key(KeyCode::Left), now);
     assert!(moved.is_empty());
     let moved = draw_tree(80, 24, &tree, &mut ui, now);
+    let header = top(&current, "/rename").unwrap();
     let palette_rows = |screen: &str| {
         screen
             .lines()
             .skip(header)
+            .take_while(|line| !line.trim_matches('"').trim().is_empty())
             .map(str::to_owned)
             .collect::<Vec<_>>()
     };
@@ -617,5 +558,17 @@ async fn bare_rename_enter_draws_its_inline_arguments() {
             assert!(screen.contains("now"), "{screen}");
         }
         close(&mut ui, now);
+    }
+}
+
+#[test]
+fn every_native_command_key_is_one_the_keys_list_shows() {
+    for (chord, _) in NATIVE {
+        assert!(
+            crate::keys::BINDINGS
+                .iter()
+                .any(|binding| binding.keys == *chord),
+            "{chord}"
+        );
     }
 }

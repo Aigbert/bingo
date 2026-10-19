@@ -22,7 +22,6 @@ pub struct Layout {
     pub sheet: Option<Vec<ratatui::text::Line<'static>>>,
     pub growth: Option<crate::dock::Growth>,
     pub inline: Option<(usize, usize, usize)>,
-    pub palette_height: Option<(String, usize)>,
     pub card_actions: Vec<crate::views::targets::Target>,
     pub band_actions: Vec<crate::views::targets::Target>,
     pub seating: crate::pane::seat::Seating,
@@ -180,9 +179,6 @@ pub fn layout(
 fn compose(previous: Layout, tree: &Tree, ui: &Ui, size: Rect, now: Now) -> Layout {
     let mut next = Layout {
         growth: previous.growth,
-        palette_height: previous
-            .palette_height
-            .filter(|(id, _)| crate::palette::request(ui) == Some(id.as_str())),
         blocks: previous.blocks,
         measurements: previous.measurements,
         canvas: Canvas::new(size),

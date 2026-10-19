@@ -569,27 +569,6 @@ fn a_child_transcript() {
 }
 
 #[test]
-fn the_command_dropdown() {
-    let state = folded(answered());
-    let (mut ui, now) = scene();
-    ui.catalogs.commands = crate::commands::entries(vec![bingo_sdk::CommandSpec {
-        opens: false,
-        keys: vec![],
-        hidden: false,
-        name: "model".into(),
-        aliases: vec![],
-        hint: "[provider/]model".into(),
-        args: bingo_sdk::ArgSpec::Catalog {
-            source: "models".into(),
-        },
-        instant: true,
-        family: "kernel".into(),
-    }]);
-    write(&mut ui, &state, "/", now);
-    both("dropdown", &solo(&state), &mut ui, now);
-}
-
-#[test]
 fn a_notice_and_a_context_warning() {
     let state = folded(vec![
         item(1, user("itm_1", "compact it")),

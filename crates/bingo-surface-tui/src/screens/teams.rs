@@ -292,7 +292,6 @@ async fn the_palette_roster_preserves_status_unread_and_owed_columns() {
     crate::palette::open(&mut ui, bingo_sdk::component::PaletteOpen::Sessions, now);
     let wide = fixture.paint_tree(&mut ui, &tree, now, 160, 40).await;
     for text in [
-        "this conversation",
         "reviewer",
         "working · in #design · 3 unread · live",
         "watcher",
@@ -308,10 +307,6 @@ async fn the_palette_roster_preserves_status_unread_and_owed_columns() {
     insta::assert_snapshot!("palette_roster", wide);
     let painted = crate::painted::painted(160, 40, &tree, &mut ui, now);
     assert!(
-        painted.coloured("this conversation").is_empty(),
-        "group labels remain dim"
-    );
-    assert!(
         !painted.coloured("owes an answer · 22m").is_empty(),
         "debts retain attention colour"
     );
@@ -326,7 +321,7 @@ async fn the_palette_roster_starts_on_the_viewed_room_and_returns_to_the_root() 
     let now = still(now);
     crate::palette::open(&mut ui, bingo_sdk::component::PaletteOpen::Sessions, now);
     let screen = fixture.paint_tree(&mut ui, &tree, now, 80, 24).await;
-    assert!(screen.contains("❯ #design"), "{screen}");
+    assert!(screen.contains("▎ #design"), "{screen}");
     insta::assert_snapshot!("palette_roster_in_the_room", screen);
     for _ in 0..4 {
         fixture

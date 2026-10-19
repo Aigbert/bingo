@@ -35,7 +35,7 @@ async fn selected(run: &mut Run, fixture: &Fixture, now: crate::clock::Now) -> S
         .paint_tree(&mut run.ui, &run.session.tree, now, 80, 24)
         .await
         .lines()
-        .find(|line| line.contains('❯'))
+        .find(|line| line.contains('▎'))
         .unwrap()
         .trim()
         .into()

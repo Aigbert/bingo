@@ -44,12 +44,8 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     let band_offset = activity.len();
     let band = crate::component::band::draw(state, ui, frame, now);
     activity.extend(band.lines.iter().cloned());
-    let palette = palette(tree, ui, frame, now);
     frame.sheet = crate::dock::sheets::prepare(tree, ui, frame, now);
-    let mut regions = frame::regions(
-        area,
-        demand(&draft, &activity, &palette, frame.sheet.as_deref(), ui),
-    );
+    let mut regions = frame::regions(area, demand(&draft, &activity, frame.sheet.as_deref(), ui));
     grow(frame, &mut regions, now);
     activity = frame.collect(views::Drawing {
         lines: activity,
@@ -71,7 +67,6 @@ pub fn compose(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) {
     render_composer(tree, ui, frame, regions.composer, now, draft);
     crate::pane::draw(ui, state, frame, now);
 
-    frame.render_widget(Paragraph::new(palette), regions.palette);
     if matches!(ui.focus, crate::focus::Focus::Pane(_)) {
         frame.cursor = None;
     }
@@ -101,13 +96,7 @@ fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) 
 }
 
 /// What the frame must make room for before the transcript is given the rest.
-fn demand(
-    draft: &Draft,
-    activity: &[Line<'_>],
-    palette: &[Line<'_>],
-    sheet: Option<&[Line<'_>]>,
-    ui: &Ui,
-) -> Demand {
+fn demand(draft: &Draft, activity: &[Line<'_>], sheet: Option<&[Line<'_>]>, ui: &Ui) -> Demand {
     Demand {
         composer: match sheet {
             Some(lines) => u16::try_from(lines.len()).unwrap_or(u16::MAX),
@@ -120,18 +109,7 @@ fn demand(
         } else {
             u16::try_from(activity.len()).unwrap_or(u16::MAX)
         },
-        palette: u16::try_from(palette.len()).unwrap_or(u16::MAX),
     }
-}
-
-/// The open palette's rows, drawn before the frame is cut since they decide
-/// how far the box moves up.
-fn palette(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
-    if !crate::palette::active(ui) {
-        return Vec::new();
-    }
-    let (width, rows) = crate::palette::room(frame.area());
-    crate::palette::draw(ui, tree, frame, width, rows, now)
 }
 
 struct Draft {
@@ -145,7 +123,13 @@ impl Draft {
     }
 }
 
+/// What rides in the dock over the input: the open palette's list, or the
+/// session's own rows.
 fn composer_above(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
+    if crate::palette::active(ui) {
+        let (width, rows) = crate::palette::room(frame.area());
+        return crate::palette::draw(ui, tree, frame, width, rows, now);
+    }
     let width = frame.area().width as usize;
     let mut drawing = activity::dock(tree, ui, width, now);
     drawing.append(crate::queue_rows::draw(
@@ -155,7 +139,7 @@ fn composer_above(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Lin
         now,
     ));
     let lines = frame.collect(drawing);
-    if ui.focus.search().is_some() || crate::palette::active(ui) {
+    if ui.focus.search().is_some() {
         Vec::new()
     } else {
         lines
@@ -316,7 +300,7 @@ fn layer(tree: &Tree, ui: &Ui, frame: &mut Layout, above: Rect, now: Now) {
                 over(frame, above, lines.into_iter().skip(1).collect());
             }
         }
-        // Drawn under the box, in its own rows (ADR-0095 §1).
+        // Drawn in the dock over the input.
         Open::Palette(_) => {}
     }
 }
@@ -1221,27 +1205,6 @@ mod tests {
                     .contains(ratatui::style::Modifier::DIM)
         }));
         assert!(render(&state, &mut ui, now).contains("needs you"));
-    }
-
-    #[test]
-    fn dropdown() {
-        let state = state();
-        let (mut ui, now) = scene();
-        ui.catalogs.commands = crate::commands::entries(vec![bingo_sdk::CommandSpec {
-            opens: false,
-            keys: vec![],
-            hidden: false,
-            name: "model".into(),
-            aliases: vec![],
-            hint: "[provider/]model".into(),
-            args: bingo_sdk::ArgSpec::Catalog {
-                source: "models".into(),
-            },
-            instant: true,
-            family: "kernel".into(),
-        }]);
-        write(&mut ui, &state, "/", now);
-        insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 
     #[test]

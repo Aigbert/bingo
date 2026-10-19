@@ -88,7 +88,7 @@ fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
         query: ui.composer.text().into(),
         open: open.first,
         commands,
-        bindings: crate::keys::commands::bindings(ui, state).commands,
+        bindings: bindings(ui, state),
         sessions: open
             .sessions
             .iter()
@@ -104,6 +104,26 @@ fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
         catalogs,
     }
 }
+/// Keys this client answers itself, by the command each stands for, so the
+/// list can show them beside the command; a bound setting wins.
+const NATIVE: &[(&str, &str)] = &[
+    ("alt+m", "/model"),
+    ("alt+t", "/think"),
+    ("ctrl+r", "/resume"),
+    ("esc esc", "/rewind"),
+    ("shift+tab", "/permission"),
+];
+
+fn bindings(ui: &Ui, state: &SessionState) -> std::collections::BTreeMap<String, String> {
+    let mut bound = crate::keys::commands::bindings(ui, state).commands;
+    for (chord, line) in NATIVE {
+        if !bound.values().any(|bound| bound == line) {
+            bound.insert((*chord).into(), (*line).into());
+        }
+    }
+    bound
+}
+
 /// The catalogues the query's command completes from: none before the query
 /// reaches its arguments, since every press carries them.
 fn sources(ui: &Ui, query: &str) -> Vec<String> {
@@ -186,18 +206,7 @@ pub fn draw(
         &crate::views::Marks::at(now),
         |props, width| fallback::draw(props, open.fallback_at, width, rows),
     );
-    let mut lines = frame.collect(drawing);
-    if answer.is_some() {
-        let previous = frame
-            .palette_height
-            .as_ref()
-            .filter(|(id, _)| id == &open.id)
-            .map_or(0, |(_, rows)| *rows);
-        let height = previous.max(lines.len()).min(usize::from(rows));
-        lines.resize(height, Line::default());
-        frame.palette_height = Some((open.id.clone(), height));
-    }
-    lines
+    frame.collect(drawing)
 }
 fn handler(ui: &Ui) -> Option<Action> {
     let id = request(ui)?;
@@ -240,11 +249,13 @@ pub fn waiting(ui: &Ui, tree: &Tree, now: Now) -> bool {
     crate::component::key(tree.viewed(), &open.id, &props, width, rows).is_some()
 }
 
-/// The room the palette is drawn in under the box: the frame's width and
-/// half its height. Drawing and waiting read it here, so they ask for the
-/// same drawing.
+/// The room the palette is drawn in: the frame's width and the dock's cap.
+/// Drawing and waiting read it here, so they ask for the same drawing.
 pub fn room(area: ratatui::layout::Rect) -> (u16, u16) {
-    (area.width, area.height / 2)
+    (
+        area.width,
+        crate::layout::grid::dock_cap(usize::from(area.height)),
+    )
 }
 
 /// Query editing belongs to the composer; list actions belong to the mod.
