@@ -237,12 +237,12 @@ async fn escape_returns_from_aside_and_otherwise_stops_permission_asks() {
             };
             assert_eq!(
                 asking.interrupts(),
-                usize::from(child_asks && editing != "aside"),
+                usize::from(editing != "aside"),
                 "{child_asks} {editing}"
             );
             assert_eq!(
                 asking.answers().len(),
-                usize::from(child_asks && editing != "aside"),
+                usize::from(editing != "aside"),
                 "{child_asks} {editing}"
             );
             assert_eq!(other.interrupts(), 0);

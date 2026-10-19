@@ -31,7 +31,7 @@ pub const BINDINGS: &[Binding] = &[
         // The stack of [`ESCAPES`], in the order it is obeyed; a test holds
         // the two together.
         keys: "esc",
-        description: "sheet → card → dropdown → interrupt → clear → latest → back → rewind → arm rewind",
+        description: "sheet → card → dropdown → pane → search → interrupt → clear → latest → back → rewind → arm rewind",
     },
     Binding {
         keys: "esc esc",
@@ -139,7 +139,6 @@ pub enum Close {
     Dropdown,
     Pane,
     Search,
-    Back,
 }
 
 /// What `esc` closes, innermost first. It is a table rather than a chain of
@@ -155,6 +154,8 @@ pub enum Escape {
     Clear,
     /// Return the transcript to its newest row.
     Latest,
+    /// An empty child view returns to its parent.
+    Back,
     /// The second empty escape opens the rewind picker.
     Rewind,
     /// The first empty escape says how to rewind.
@@ -166,10 +167,12 @@ pub const ESCAPES: &[(Escape, &str)] = &[
     (Escape::Close(Close::Sheet), "sheet"),
     (Escape::Close(Close::Card), "card"),
     (Escape::Close(Close::Dropdown), "dropdown"),
+    (Escape::Close(Close::Pane), "pane"),
+    (Escape::Close(Close::Search), "search"),
     (Escape::Interrupt, "interrupt"),
     (Escape::Clear, "clear"),
     (Escape::Latest, "latest"),
-    (Escape::Close(Close::Back), "back"),
+    (Escape::Back, "back"),
     (Escape::Rewind, "rewind"),
     (Escape::Arm, "arm rewind"),
 ];
@@ -203,7 +206,7 @@ impl Open {
             Escape::Latest => self.scrolled,
             Escape::Rewind => self.rewind && self.armed,
             Escape::Arm => self.rewind,
-            Escape::Close(Close::Back) => self.subsession,
+            Escape::Back => self.subsession,
         }
     }
 }
@@ -211,11 +214,19 @@ impl Open {
 /// The innermost thing `esc` closes, and nothing at all when a person has
 /// nothing open and nothing running.
 pub fn escape(open: Open) -> Option<Escape> {
-    // Pane and search owners consume Esc before the composer's stack.
-    [Escape::Close(Close::Pane), Escape::Close(Close::Search)]
-        .into_iter()
-        .chain(ESCAPES.iter().map(|(rung, _)| *rung))
-        .find(|rung| open.has(*rung))
+    closing(open).map(Escape::Close).or_else(|| {
+        ESCAPES
+            .iter()
+            .map(|(rung, _)| *rung)
+            .find(|rung| !matches!(rung, Escape::Close(_)) && open.has(*rung))
+    })
+}
+
+fn closing(open: Open) -> Option<Close> {
+    ESCAPES.iter().find_map(|(rung, _)| match rung {
+        Escape::Close(place) if open.has(*rung) => Some(*place),
+        _ => None,
+    })
 }
 
 /// What `tab` does, innermost first (§7). A layer that captures never reaches
@@ -306,17 +317,12 @@ pub fn twice(
 }
 
 pub fn interrupt(at: Pressed) -> Interrupt {
-    let close = match escape(at.open) {
-        Some(Escape::Close(place)) => Some(Interrupt::Close(place)),
-        _ => None,
-    };
     [
         at.open.busy.then_some(Interrupt::Turn),
-        close,
+        closing(at.open).map(Interrupt::Close),
         at.detail.then_some(Interrupt::Fold),
         at.open.typing.then_some(Interrupt::Clear),
         at.armed.then_some(Interrupt::Exit),
-        Some(Interrupt::Arm),
     ]
     .into_iter()
     .flatten()
@@ -369,7 +375,7 @@ mod tests {
                 subsession: true,
                 ..Open::default()
             }),
-            Some(Escape::Close(Close::Back))
+            Some(Escape::Back)
         );
         let mut pressed = Pressed {
             open: Open {
@@ -445,7 +451,7 @@ mod tests {
                 subsession: true,
                 ..Open::default()
             }),
-            Some(Escape::Close(Close::Back))
+            Some(Escape::Back)
         );
         assert_eq!(escape(Open::default()), None, "and nothing to close");
     }

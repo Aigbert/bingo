@@ -521,15 +521,6 @@ fn close(ui: &mut Ui, tree: &Tree, place: keys::Close, now: Now) -> Vec<Effect> 
                 KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
             );
         }
-        keys::Close::Back => {
-            let parent = tree
-                .viewed()
-                .summary
-                .parent
-                .as_ref()
-                .map_or_else(|| tree.root_id().clone(), |parent| parent.session.clone());
-            return vec![Effect::View(parent)];
-        }
     }
     Vec::new()
 }
@@ -545,7 +536,7 @@ fn open(ui: &Ui, tree: &Tree, now: Now) -> keys::Open {
     keys::Open {
         // One layer is open at a time, whichever form it takes.
         sheet: owner == crate::focus::Owner::Layer && !matches!(ui.focus.open(), Open::Pager(_)),
-        card: tree.is_root(tree.view()) && tree.open_interaction().is_some(),
+        card: tree.open_interaction().is_some(),
         dropdown: !suggestions(ui, tree).is_empty(),
         pane: owner == crate::focus::Owner::Pane && tree.open_interaction().is_none(),
         search: owner == crate::focus::Owner::Search && tree.open_interaction().is_none(),
@@ -597,6 +588,15 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
                 keys::ESC_WINDOW,
                 now.instant,
             );
+        }
+        Some(keys::Escape::Back) => {
+            let parent = tree
+                .viewed()
+                .summary
+                .parent
+                .as_ref()
+                .map_or_else(|| tree.root_id().clone(), |parent| parent.session.clone());
+            return vec![Effect::View(parent)];
         }
         // The stack was empty, so this `esc` is one of `esc esc`.
         None => {}
@@ -958,12 +958,6 @@ fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect>
 /// The pictures — the tokens the line still names and the `@word`s in it —
 /// are files, read by the loop, which knows the directory and what is held
 /// (`run::submit`). The loop also writes the line to the history file.
-fn clears_toast(effect: &Effect) -> bool {
-    matches!(effect, Effect::Submit(Input::Text {
-        text, delivery: Delivery::Wake, ..
-    }) if !text.trim().is_empty())
-}
-
 fn own_line(text: String, delivery: Delivery) -> Effect {
     Effect::Submit(Input::Text {
         headline: None,
@@ -972,6 +966,12 @@ fn own_line(text: String, delivery: Delivery) -> Effect {
         origin: crate::origin(),
         delivery,
     })
+}
+
+fn clears_toast(effect: &Effect) -> bool {
+    matches!(effect, Effect::Submit(Input::Text {
+        text, delivery: Delivery::Wake, ..
+    }) if !text.trim().is_empty())
 }
 
 /// What a line does, whoever wrote it; `line` is how it leaves when it is
@@ -2004,7 +2004,7 @@ mod tests {
     }
 
     #[test]
-    fn ctrl_c_and_escape_leave_the_same_child_with_an_open_interaction() {
+    fn ctrl_c_and_escape_close_the_same_child_interaction() {
         let mut tree = with_child(vec![child_frame(2, opened(child_permission()))]);
         tree.show(&child_id());
         let (mut esc_ui, now) = scene();
@@ -2016,8 +2016,46 @@ mod tests {
             KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
             now,
         );
-        assert_eq!(escaped, vec![Effect::View(tree.root_id().clone())]);
+        assert!(
+            matches!(escaped.as_slice(), [Effect::StopInteraction { session, .. }] if session == &child_id())
+        );
         assert_eq!(interrupted, escaped);
+    }
+
+    #[test]
+    fn escape_goes_home_but_ctrl_c_arms_exit_in_an_idle_child() {
+        let mut tree = with_child(vec![]);
+        tree.show(&child_id());
+        let (mut ui, now) = scene();
+        assert_eq!(
+            press_tree(&mut ui, &tree, key(KeyCode::Esc), now),
+            vec![Effect::View(tree.root_id().clone())],
+        );
+        let effects = press_tree(
+            &mut ui,
+            &tree,
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            now,
+        );
+        assert!(effects.is_empty());
+        assert!(ui.exit_armed(now.instant));
+        assert_eq!(
+            ui.notice().unwrap().plain().unwrap().text,
+            "ctrl+c again to quit"
+        );
+    }
+
+    #[test]
+    fn ctrl_c_twice_on_an_empty_line_in_a_child_exits() {
+        let mut tree = with_child(vec![]);
+        tree.show(&child_id());
+        let (mut ui, now) = scene();
+        let key = KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL);
+        assert!(press_tree(&mut ui, &tree, key, now).is_empty());
+        assert_eq!(
+            press_tree(&mut ui, &tree, key, later(now, 100)),
+            vec![Effect::Exit]
+        );
     }
 
     #[test]
