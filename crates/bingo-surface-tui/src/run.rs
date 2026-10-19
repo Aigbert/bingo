@@ -1217,8 +1217,8 @@ mod tests {
         let (exit, _) = harness.go(frames, vec![], None).await;
         assert_eq!(exit, Exit { code: 0 });
         let screen = harness.recorder.last();
-        assert!(screen.contains("◗"), "{screen}");
-        assert!(screen.contains("◗ reviewer(review it)"), "{screen}");
+        assert!(screen.contains("●"), "{screen}");
+        assert!(screen.contains("● reviewer(review it)"), "{screen}");
     }
 
     #[tokio::test]

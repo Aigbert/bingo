@@ -90,7 +90,9 @@ pub struct Rows<'a> {
     pub history: std::rc::Rc<History<'a>>,
     pub pulled: Option<&'a crate::pulled::Memo>,
     pub state: &'a SessionState,
-    pub names: Vec<markdown::mentions::Name>,
+    /// Whose ink each teammate wears and the names a mention can match,
+    /// read off the tree this frame.
+    pub faces: crate::face::Faces,
     pub width: usize,
     /// How much of each block a person opened or shut; everything else wears
     /// its kind's own start ([`crate::fold`]).
@@ -184,7 +186,7 @@ impl<'a> Rows<'a> {
             tools: Default::default(),
             pulled: None,
             state,
-            names: Vec::new(),
+            faces: Default::default(),
             width,
             folds,
             now,
@@ -227,7 +229,7 @@ impl<'a> Rows<'a> {
 
     /// What the welcome box has to add: the release this build could become.
     pub fn in_tree(mut self, tree: &tree::Tree) -> Self {
-        self.names = markdown::mentions::known(tree);
+        self.faces = crate::face::Faces::of(tree);
         self
     }
 
@@ -655,7 +657,7 @@ fn returns(body: Vec<Line<'static>>, rows: &Rows<'_>) -> Vec<Line<'static>> {
 fn assistant(text: &str, status: ItemStatus, fold: Fold, rows: &Rows<'_>, arriving: bool) -> Block {
     let width = rows.measured().saturating_sub(5).min(100);
     let source = answer::closed(text, status);
-    let mut written = markdown::mentioned(&source, width, &rows.names);
+    let mut written = markdown::mentioned(&source, width, rows.faces.names());
     answer::finish(&mut written.lines, status, width, rows.now, arriving);
     let body = pictured::in_the_words(written.lines, &written.images, fold, rows);
     Block {
@@ -764,8 +766,9 @@ fn child_row(
     let name = tree::name(child);
     let step = crate::tool_rows::resolve(tool, input, &rows.tools, theme::bullet().is_ascii());
     let mut heading = signature(&name, &step.target, rows, Landing::Settled);
+    let ink = rows.faces.ink(&child.summary.id);
     if let Some(span) = heading.spans.first_mut() {
-        span.style = crate::face::style(&name).patch(theme::bold());
+        span.style = crate::face::style(ink).patch(theme::bold());
     }
     let live = matches!(
         bingo_collab::lifecycle::Lifecycle::of_state(child),
@@ -775,8 +778,8 @@ fn child_row(
         )
     );
     let mut out = marked(
-        crate::face::face(&name).sigil(),
-        crate::face::pulse(&name, live, rows.now),
+        crate::face::mark(),
+        crate::face::pulse(ink, live, rows.now),
         vec![heading],
         rows,
     );
@@ -1359,7 +1362,7 @@ mod tests {
                 "found it\n\nit was the cursor all along",
             )]),
             vec![
-                " ✦ scout: found it".to_string(),
+                " ● scout: found it".to_string(),
                 String::new(),
                 "   it was the cursor all along".to_string(),
             ],
@@ -1374,7 +1377,7 @@ mod tests {
     fn an_unsigned_post_is_the_holders_and_says_so() {
         assert_eq!(
             drawn_in_room(vec![person("itm_1", "then let us ship it")]),
-            vec![" ✦ parent: then let us ship it"],
+            vec![" ● parent: then let us ship it"],
         );
     }
 

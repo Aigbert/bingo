@@ -1,6 +1,7 @@
 //! Collaboration names, records and pure folds (ADR-0071).
 pub mod cursor;
 pub mod ear;
+pub mod face;
 pub mod mentions;
 pub mod name;
 pub mod owed;

@@ -20,6 +20,7 @@ home as the teammate's own words. In a room, whoever you @ owes you an answer un
 ## Bricks
 
 1. **One colour per teammate** (`bingo-collab`, new `face.rs`).
+   The rule landed in M198 (bingo-collab face.rs); the TUI switched to it, sigils gone, in M198 r4.
    - The k-th teammate of the home tree takes the k-th ink of `crew1, crew2, crew0, crew3, crew4,
      crew5` (teal, violet and lime first, the farthest apart), wrapping past six. Teammates are
      ordered by creation (`created_at`, then id), live or stored, rooms excluded, so dismissing

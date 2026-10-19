@@ -108,7 +108,7 @@ fn revision(
         arriving: matches!(place.role, Role::Own)
             && matches!(item.body, ItemBody::Assistant { .. })
             && rows.arriving(item),
-        names: rows.names.clone(),
+        names: rows.faces.names().to_vec(),
         room: (rows.state.summary.driver == bingo_sdk::Driver::Log).then_some(rows.state.seq),
         size: size(&item.body),
         agent: agent.map(|child| child.seq),

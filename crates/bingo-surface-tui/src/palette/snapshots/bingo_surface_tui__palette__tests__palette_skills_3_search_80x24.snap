@@ -20,7 +20,7 @@ expression: screen
 "   commands                                                                     "
 "   /model   choose model                                            fake/small  "
 "   this conversation                                                            "
-"   ◆ project  idle                                                    this one  "
+"   ● project  idle                                                    this one  "
 "   keys                                                                         "
 "   shift+tab     permission mode                                       default  "
 "   alt+m         model                                                          "

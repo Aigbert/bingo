@@ -1,0 +1,181 @@
+[
+  {
+    "rows": [
+      [
+        "home",
+        "bingo",
+        0,
+        "home"
+      ],
+      [
+        "ada",
+        "ada",
+        3,
+        "stored"
+      ],
+      [
+        "scout",
+        "scout",
+        1,
+        "live"
+      ],
+      [
+        "room",
+        "#design",
+        1,
+        "room"
+      ],
+      [
+        "reviewer",
+        "reviewer",
+        2,
+        "live"
+      ],
+      [
+        "bo",
+        "bo",
+        4,
+        "live"
+      ],
+      [
+        "grandchild",
+        "nested",
+        0,
+        "live",
+        "ada"
+      ]
+    ],
+    "expected": {
+      "bingo": "glow",
+      "you": "fg",
+      "ada": "crew0",
+      "scout": "crew1",
+      "reviewer": "crew2",
+      "bo": "crew3",
+      "#design": "plan",
+      "unknown": "muted",
+      "nested": "muted"
+    }
+  },
+  {
+    "rows": [
+      [
+        "h",
+        "six",
+        9,
+        "stored"
+      ],
+      [
+        "b",
+        "second",
+        1,
+        "live"
+      ],
+      [
+        "a",
+        "first",
+        1,
+        "stored"
+      ],
+      [
+        "c",
+        "third",
+        2,
+        "live"
+      ],
+      [
+        "d",
+        "fourth",
+        3,
+        "live"
+      ],
+      [
+        "e",
+        "fifth",
+        4,
+        "live"
+      ],
+      [
+        "f",
+        "sixth",
+        5,
+        "live"
+      ],
+      [
+        "g",
+        "seventh",
+        6,
+        "live"
+      ]
+    ],
+    "expected": {
+      "first": "crew1",
+      "second": "crew2",
+      "third": "crew0",
+      "fourth": "crew3",
+      "fifth": "crew4",
+      "sixth": "crew5",
+      "seventh": "crew1",
+      "six": "crew2"
+    }
+  },
+  {
+    "rows": [
+      [
+        "home",
+        "bingo",
+        0,
+        "home"
+      ],
+      [
+        "ada",
+        "ada",
+        3,
+        "stored"
+      ],
+      [
+        "scout",
+        "scout",
+        1,
+        "live"
+      ],
+      [
+        "room",
+        "#design",
+        1,
+        "room"
+      ],
+      [
+        "reviewer",
+        "reviewer",
+        2,
+        "live"
+      ],
+      [
+        "bo",
+        "bo",
+        4,
+        "live"
+      ],
+      [
+        "grandchild",
+        "nested",
+        0,
+        "live",
+        "ada"
+      ]
+    ],
+    "expected": {
+      "bingo": "glow",
+      "you": "fg",
+      "ada": "crew0",
+      "scout": "crew1",
+      "reviewer": "crew2",
+      "bo": "crew3",
+      "#design": "plan",
+      "unknown": "muted",
+      "nested": "muted"
+    },
+    "openedFrom": "ada"
+  }
+]

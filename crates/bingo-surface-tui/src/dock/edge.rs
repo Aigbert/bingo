@@ -31,7 +31,7 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
         }
         let ink = tree
             .viewing()
-            .map(|s| format!("crew{}", crate::face::face(&crate::tree::name(s)).hue()))
+            .map(|s| crate::face::Faces::of(tree).ink(&s.summary.id).to_owned())
             .unwrap_or_else(|| "glow".into());
         return comet(width, now.past(turn.started_at), &ink, now);
     }

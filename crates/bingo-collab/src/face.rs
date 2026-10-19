@@ -1,0 +1,43 @@
+//! A teammate's ink follows creation order in the home tree, including stored rows.
+use bingo_sdk::{SessionId, SessionSummary};
+
+const CREW: [&str; 6] = ["crew1", "crew2", "crew0", "crew3", "crew4", "crew5"];
+
+pub fn ink(id: &SessionId, home: &str, rows: &[SessionSummary]) -> &'static str {
+    let Some(row) = rows.iter().find(|row| &row.id == id) else {
+        return "muted";
+    };
+    if crate::room::Room::of(row).is_some() {
+        return "plan";
+    }
+    if row.id.as_str() == home {
+        return "glow";
+    }
+    let mut teammates = rows
+        .iter()
+        .filter(|row| {
+            row.parent.as_ref().map(|parent| parent.session.as_str()) == Some(home)
+                && crate::room::Room::of(row).is_none()
+        })
+        .collect::<Vec<_>>();
+    teammates.sort_by(|a, b| {
+        a.created_at
+            .cmp(&b.created_at)
+            .then_with(|| a.id.cmp(&b.id))
+    });
+    teammates
+        .iter()
+        .position(|row| &row.id == id)
+        .map_or("muted", |slot| CREW[slot % CREW.len()])
+}
+
+pub fn who(name: &str, home: &str, rows: &[SessionSummary]) -> &'static str {
+    match name {
+        "bingo" => "glow",
+        "you" => "fg",
+        name => rows
+            .iter()
+            .find(|row| crate::name::of_session(row) == name)
+            .map_or("muted", |row| ink(&row.id, home, rows)),
+    }
+}

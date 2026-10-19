@@ -9,17 +9,20 @@ use ratatui::{style::Style, text::Span};
 pub struct Name {
     pub text: String,
     pub room: bool,
+    pub ink: &'static str,
 }
 
-pub fn known(tree: &Tree) -> Vec<Name> {
+pub fn known(tree: &Tree, faces: &crate::face::Faces) -> Vec<Name> {
     tree.sessions()
         .map(|state| Name {
             text: tree::name(state),
             room: state.summary.driver == bingo_sdk::Driver::Log,
+            ink: faces.ink(&state.summary.id),
         })
         .chain([Name {
             text: crate::seats::HOLDER.into(),
             room: false,
+            ink: faces.who(crate::seats::HOLDER),
         }])
         .collect()
 }
@@ -46,7 +49,7 @@ pub fn spans(text: &str, style: Style, names: &[Name]) -> Vec<Span<'static>> {
         let ink = if name.room {
             theme::mode()
         } else {
-            face::style(&name.text)
+            face::style(name.ink)
         };
         out.push(Span::styled(token.to_string(), style.patch(ink)));
         plain = end;

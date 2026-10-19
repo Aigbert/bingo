@@ -151,12 +151,13 @@ fn crew(tree: &Tree, now: Now) -> Drawing {
     if agents.is_empty() {
         return Drawing::default();
     }
+    let faces = crate::face::Faces::of(tree);
     let mut spans: Vec<_> = agents
         .iter()
         .take(4)
         .enumerate()
         .map(|(i, state)| {
-            let name = format!("crew{}", crate::face::face(&crate::tree::name(state)).hue());
+            let name = faces.ink(&state.summary.id);
             let shifted = Now {
                 wall: now.wall + jiff::SignedDuration::from_millis(i as i64 * 450),
                 ..now
@@ -164,7 +165,7 @@ fn crew(tree: &Tree, now: Now) -> Drawing {
             Span::styled(
                 theme::glyphs::get("lamp"),
                 theme::blended(
-                    &name,
+                    name,
                     "bg",
                     0.35 * clock::breathe(shifted, Duration::from_millis(1800)),
                 )
@@ -206,7 +207,7 @@ fn needs_you(tree: &Tree) -> Drawing {
             let (name, color) = if row.session == tree.root_id() {
                 ("bingo".to_owned(), "glow".to_owned())
             } else {
-                let color = format!("crew{}", crate::face::face(&row.name).hue());
+                let color = crate::face::Faces::of(tree).ink(row.session).to_owned();
                 (row.name, color)
             };
             spans.push(Span::styled(name, ink(&color)));

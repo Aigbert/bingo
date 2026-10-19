@@ -178,15 +178,6 @@ pub fn with<R>(theme: Theme, f: impl FnOnce() -> R) -> R {
 
 // ---- the tokens ---------------------------------------------------------
 
-/// Identity colours belong only to agent sigils and names.
-pub fn crew(index: usize) -> Style {
-    match current().colors {
-        Colors::True(palette) => Style::new().fg(palette.crew()[index % 6]),
-        Colors::Indexed(palette) => Style::new().fg(nearest(palette.crew()[index % 6])),
-        _ => text(),
-    }
-}
-
 /// Answers, what you type, option labels — the terminal's own foreground, in
 /// every look (M73). No palette names it: a terminal that flips its scheme
 /// remaps every cell of prose itself, on the spot and in its scrollback, which
@@ -473,7 +464,7 @@ pub fn spendable() -> std::collections::HashSet<Color> {
         keep(style);
     }
     for index in 0..6 {
-        keep(crew(index));
+        keep(foreground(&format!("crew{index}")).unwrap_or_default());
     }
     for step in 0..=SAMPLES {
         let t = step as f32 / SAMPLES as f32;

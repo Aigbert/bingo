@@ -12,7 +12,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 mod fold;
-pub mod identity;
 pub use fold::text_children;
 mod read;
 pub mod table;

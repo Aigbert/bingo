@@ -43,21 +43,22 @@ fn crew() -> crate::tree::Tree {
     folded_tree(frames)
 }
 
+/// The inks come from the tree's own roster, not from the names: the same
+/// rows in any order give the same inks, and the home stays bingo's glow.
 #[test]
-fn faces_match_the_cross_surface_fixture() {
-    let rows: serde_json::Value =
-        serde_json::from_str(include_str!("../fixtures/faces.json")).unwrap();
-    assert_eq!(rows.as_array().unwrap().len(), 20);
-    for row in rows.as_array().unwrap() {
-        let name = row["name"].as_str().unwrap();
-        let got = face::face(name);
-        assert_eq!(got.0, row["hash"].as_u64().unwrap() as u32, "{name}");
-        assert_eq!(got.hue(), row["hue"].as_u64().unwrap() as usize);
-        assert_eq!(got.sigil(), row["sigil"].as_str().unwrap());
-        theme::with(painted::ascii(), || {
-            assert_eq!(face::face(name).sigil(), row["ascii"].as_str().unwrap())
-        });
+fn faces_read_the_trees_roster_through_the_shared_rule() {
+    let tree = crew();
+    let faces = face::Faces::of(&tree);
+    let rows: Vec<_> = tree.sessions().map(|state| state.summary.clone()).collect();
+    let home = tree.root_id().as_str();
+    assert_eq!(faces.ink(tree.root_id()), "glow");
+    for state in tree.sessions() {
+        let id = &state.summary.id;
+        assert_eq!(faces.ink(id), bingo_collab::face::ink(id, home, &rows));
     }
+    let inks: Vec<_> = ["reviewer", "scout"].map(|name| faces.who(name)).into();
+    assert!(inks.iter().all(|ink| ink.starts_with("crew")), "{inks:?}");
+    assert_ne!(inks[0], inks[1]);
 }
 
 #[test]
@@ -67,11 +68,9 @@ fn crew_hues_use_the_prototype_identity_palette() {
             let theme::Colors::True(p) = look.colors else {
                 unreachable!()
             };
-            for name in [
-                "reviewer", "scout", "writer", "builder", "tester", "planner", "fox", "Scout",
-            ] {
-                let color = face::style(name).fg.unwrap();
-                assert!(p.crew().contains(&color), "{name}: {color:?}");
+            for ink in ["crew0", "crew1", "crew2", "crew3", "crew4", "crew5"] {
+                let color = face::style(ink).fg.unwrap();
+                assert!(p.crew().contains(&color), "{ink}: {color:?}");
             }
         });
     }
@@ -82,7 +81,7 @@ fn child_row_has_a_face_and_keeps_lifecycle_words() {
     let (mut ui, now) = scene();
     let screen = draw_tree(120, 40, &crew(), &mut ui, now);
     assert!(
-        screen.contains(&format!("{} reviewer(", face::face("reviewer").sigil())),
+        screen.contains(&format!("{} reviewer(", face::mark())),
         "{screen}"
     );
     assert!(screen.contains("working · 3 tools"), "{screen}");
@@ -189,7 +188,12 @@ fn room_mentions_wear_the_known_names_hues() {
         let (mut ui, now) = scene();
         let screen = painted::painted(120, 40, &chat(), &mut ui, now);
         let row = screen.row("@parent ask");
-        assert!(row.iter().any(|(text, style)| text.contains("@scout") && style.fg == face::style("scout").fg), "{row:?}");
+        let scout = face::style(face::Faces::of(&chat()).who("scout")).fg;
+        assert!(
+            row.iter()
+                .any(|(text, style)| text.contains("@scout") && style.fg == scout),
+            "{row:?}"
+        );
         assert!(
             row.iter()
                 .any(|(text, style)| text.contains("#design") && style.fg == theme::mode().fg),
@@ -289,7 +293,9 @@ fn a_placed_status_outranks_crew_until_it_expires() {
 fn prose_only_colours_known_mentions_and_refreshes_when_names_arrive() {
     theme::with(painted::truecolor(), || {
         let mut tree = crew();
-        let names = crate::markdown::mentions::known(&tree);
+        let faces = face::Faces::of(&tree);
+        let names = crate::markdown::mentions::known(&tree, &faces);
+        let scout = face::style(faces.who("scout")).fg;
         let lines =
             crate::markdown::mentioned("@SCOUT #design @unknown mail@scout `@scout`", 120, &names)
                 .lines;
@@ -297,7 +303,7 @@ fn prose_only_colours_known_mentions_and_refreshes_when_names_arrive() {
         assert!(
             spans
                 .iter()
-                .any(|span| span.content == "@SCOUT" && span.style.fg == face::style("scout").fg)
+                .any(|span| span.content == "@SCOUT" && span.style.fg == scout)
         );
         assert!(
             spans
@@ -305,7 +311,7 @@ fn prose_only_colours_known_mentions_and_refreshes_when_names_arrive() {
                 .filter(|span| span.content.contains("unknown")
                     || span.content.contains("mail@")
                     || span.content.contains('`'))
-                .all(|span| span.style.fg != face::style("scout").fg)
+                .all(|span| span.style.fg != scout)
         );
         tree.fold.apply(&frame(
             40,

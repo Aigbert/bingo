@@ -1529,7 +1529,7 @@ mod tests {
         let tree = spawned(vec![child_frame(2, started("trn_9"))]);
         let (mut ui, now) = scene();
         let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("◗ reviewer(review the diff)"), "{screen}");
+        assert!(screen.contains("● reviewer(review the diff)"), "{screen}");
         assert!(screen.contains("⎿  working"), "{screen}");
         insta::assert_snapshot!(screen);
     }
@@ -1541,7 +1541,7 @@ mod tests {
         ui.dialog
             .focus_on(tree.open_interaction().map(|(_, open)| open));
         let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("◗"), "{screen}");
+        assert!(screen.contains("●"), "{screen}");
     }
 
     #[test]
@@ -1613,16 +1613,16 @@ mod tests {
         ]);
         let (mut ui, now) = scene();
         let screen = render_tree(&tree, &mut ui, now);
-        assert!(screen.contains("◗ reviewer: the plan"), "{screen}");
+        assert!(screen.contains("● reviewer: the plan"), "{screen}");
         assert!(
             screen.contains("  none of M9's exit criteria name one"),
             "the rest of a message is prose under the name, not a folded \
              result: {screen}"
         );
         assert!(!screen.contains("⎿"), "{screen}");
-        assert!(screen.contains("✦ scout: M9's"), "{screen}");
+        assert!(screen.contains("● scout: M9's"), "{screen}");
         assert!(
-            screen.contains("✦ parent: then let us ship it"),
+            screen.contains("● parent: then let us ship it"),
             "and what the person typed is a post like any other, under the \
              name the roster reads it by: {screen}"
         );

@@ -58,7 +58,7 @@ pub fn conversation(tree: &Tree, stored: &[SessionSummary], now: Now) -> Vec<Pal
                 } else {
                     ""
                 };
-                format!("{}{ear} {}", crate::face::face(&row.name).sigil(), row.name)
+                format!("{}{ear} {}", crate::face::mark(), row.name)
             } else {
                 row.name
             };

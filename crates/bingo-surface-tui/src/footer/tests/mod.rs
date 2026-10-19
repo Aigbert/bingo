@@ -415,12 +415,10 @@ fn needs_you_names_one_two_or_many_with_their_inks() {
                 .expect("the count");
             assert_eq!(count.style, super::ink("amber"));
         }
+        let faces = crate::face::Faces::of(&tree);
         for span in &line.spans {
             if ["reviewer", "tester"].contains(&span.content.as_ref()) {
-                assert_eq!(
-                    span.style,
-                    super::ink(&format!("crew{}", crate::face::face(&span.content).hue()))
-                );
+                assert_eq!(span.style, super::ink(faces.who(&span.content)));
             }
         }
     }

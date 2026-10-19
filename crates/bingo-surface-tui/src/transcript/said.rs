@@ -88,7 +88,7 @@ fn post(item: &Item, place: &super::Place<'_>, rows: &Rows<'_>) -> Vec<Line<'sta
             Line::from(crate::markdown::mentions::spans(
                 line,
                 theme::text(),
-                &rows.names,
+                rows.faces.names(),
             ))
         })
         .collect();
@@ -97,7 +97,7 @@ fn post(item: &Item, place: &super::Place<'_>, rows: &Rows<'_>) -> Vec<Line<'sta
             0,
             Span::styled(
                 format!("{}: ", post.author),
-                crate::face::style(&post.author).patch(theme::bold()),
+                crate::face::style(rows.faces.who(&post.author)).patch(theme::bold()),
             ),
         );
     }
@@ -112,12 +112,9 @@ fn post(item: &Item, place: &super::Place<'_>, rows: &Rows<'_>) -> Vec<Line<'sta
         };
         last.spans.push(Span::styled(arrow, theme::dim()));
     }
-    let glyph = if grouped {
-        " "
-    } else {
-        crate::face::face(&post.author).sigil()
-    };
-    let mut out = super::marked(glyph, crate::face::style(&post.author), body, rows);
+    let glyph = if grouped { " " } else { crate::face::mark() };
+    let ink = crate::face::style(rows.faces.who(&post.author));
+    let mut out = super::marked(glyph, ink, body, rows);
     if rows.first_post == Some(&item.id) {
         out.extend(member_row(&members, rows));
     }

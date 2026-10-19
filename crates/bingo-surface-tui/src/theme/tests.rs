@@ -269,7 +269,6 @@ fn every_token_is_spent_where_the_design_says() {
         ("fading", &[]),
         ("warming", &[]),
         ("ink", &["highlight.rs"]),
-        ("crew", &["face.rs"]),
     ];
     for (token, files) in allowed {
         let mut seen: Vec<String> = sources()

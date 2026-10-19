@@ -36,7 +36,7 @@ fn a_room_transcript() {
         !screen.contains("⎿"),
         "no post is a folded result: {screen}"
     );
-    assert!(screen.contains("✦ parent: then let us ship it"), "{screen}");
+    assert!(screen.contains("● parent: then let us ship it"), "{screen}");
     both("room_transcript", &tree, &mut ui, now);
 }
 
