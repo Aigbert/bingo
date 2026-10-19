@@ -12,6 +12,8 @@
 
 
 
+
+
    ! echo shell-landed
 
        shell-landed
@@ -23,8 +25,6 @@
    The shell is in background.
 
    ── ✓ sh check.sh finished in the background · 2 passed ────────────────────────────────────────
-
-   The background tests passed.
 
 ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
    ▍Steer, or queue what comes next

@@ -1,137 +1,110 @@
-M196 round 2 — verification on m196-acting-never-moves
-Final Cargo gates and Windows checks ran serially. Full native suite: 6552 passed; 0 failed; 0 ignored.
-No wall-clock failure or isolated retry in the final gate run.
+M196 part 1, round 3 — command evidence
+Cargo jobs ran serially.
 
-$ cargo fmt --all -- --check (exit 0)
-No output.
+$ unset $(git rev-parse --local-env-vars)
+exit 0
 
-$ cargo check --workspace --all-targets --locked (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.78s
+$ git rebase -x 'cargo check --workspace --all-targets --locked' fec21d36
+23 checks: Finished `dev` profile; exit 0
+Successfully rebased and updated refs/heads/m196-acting-never-moves.
+Before/after ordered commit hashes identical; no amendments.
 
-$ cargo clippy --workspace --all-targets --locked -- -D warnings (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 20.51s
+$ cargo fmt --all -- --check
+exit 0
 
-$ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked (exit 0)
-126 result lines: 6552 passed; 0 failed; 0 ignored.
-TUI: 1435 passed; core: 692 passed; tool-bash: 157 passed; PTY: 20 passed.
+$ cargo check --workspace --all-targets --locked
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.41s
+exit 0
 
-$ scripts/check_discipline.sh (exit 0)
+$ cargo clippy --workspace --all-targets --locked -- -D warnings
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 38.32s
+exit 0
+
+$ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
+126 test-result lines: 6553 passed; 0 failed; 0 ignored.
+TUI: 1435 passed; core: 693 passed; tool-bash: 157 passed; PTY: 20 passed.
+exit 0
+
+$ scripts/check_discipline.sh
 discipline ok
+exit 0
 
-$ scripts/budget.sh (exit 0)
+$ scripts/budget.sh
 dependencies (unique, normal): 423 (max  423)
-warm cargo check -p bingo-core: 1s (max  20s)
-relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
-target/debug: 14 GB (soft max  5)
-warn: target/debug exceeds the soft limit
-test binaries: 187
+target/debug: 15 GB (soft max  5)
 budget ok
+exit 0
 
-$ cargo deny check (exit 0)
+$ cargo deny check
 advisories ok, bans ok, licenses ok, sources ok
+exit 0
 
-Named exit/review evidence from the workspace run:
-test palette::tests::ctrl_p_is_unbound_and_absent_from_the_palette_keys ... ok
-test test_support::ember::acting::acting_full_frames_match_the_prototype ... ok
-test run::acting::proofs::queued_answer_matches_the_kernel ... ok
-test run::acting::proofs::withdrawal_answer_matches_the_kernel ... ok
-test run::acting::proofs::sent_answer_matches_the_kernel ... ok
-test run::acting::proofs::stop_answer_matches_the_kernel ... ok
-test run::acting::proofs::shell_answer_matches_the_kernel ... ok
-test run::acting::proofs::steer_answer_matches_the_kernel ... ok
-test headlined_and_plain_inputs_round_trip_byte_identically ... ok
-test a_headline_lives_in_item_meta_and_round_trips_through_accessors ... ok
-test session::tests::images::a_logged_input_keeps_its_headline ... ok
-test host::tests::queue::opening_and_queued_inputs_keep_their_headlines ... ok
-test turn::tests::headline::a_steer_absorbed_at_the_barrier_keeps_its_headline ... ok
-test run::headline_tests::the_fake_provider_reads_text_but_never_the_headline ... ok
-test notify::headline_tests::markdown_parts_keep_backticks_and_outcome_punctuation ... ok
-test tone::tests::headlined_code_preserves_embedded_backticks_and_plain_escapes ... ok
-test slot::pull_contract::pulled_panes_and_toasts_round_trip ... ok
-test ui::tests::a_notice_keeps_parts_tone_and_hold_from_birth ... ok
-test footer::toast::tests::a_toast_uses_its_tone_once_and_keeps_its_tail_dim ... ok
-test tone::tests::attention_inks_only_its_first_part_and_plugin_text_stays_whole ... ok
-test notify::toast_tests::completion_toast_has_its_own_kind_tone_and_fixed_deadline ... ok
-test run::withdraw::tests::stopping_withdraws_two_lines_before_completion_can_drain_them ... ok
-test run::withdraw::tests::a_stop_with_only_lost_withdrawals_still_interrupts_once ... ok
-test run::withdraw::tests::a_fake_provider_delivery_wins_withdrawal_without_duplication ... ok
-test input::acting_tests::ctrl_c_and_escape_send_the_same_interaction_cancel ... ok
-test run::headline_tests::image_refusal_is_checked_once_at_the_run_boundary ... ok
-test transcript::ran::live_tests::a_live_shell_draws_a_running_step_instead_of_a_settled_well ... ok
-test keys::tests::every_acting_rung_obeys_the_policy_order ... ok
-test transcript::chips::tests::a_mid_line_image_token_leaves_one_space ... ok
-test stopping_returns_a_queued_line_to_the_input ... ok
+$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s
+exit 0
 
-$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked (exit 0)
-18 result lines: 307 passed; 0 failed.
+$ cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.54s
+exit 0
 
-$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods --locked (exit 0)
-15 result lines: 142 passed; 0 failed.
+$ cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.58s
+exit 0
 
-$ BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-plugin-rpc -p bingo-surface-rpc --locked (exit 0)
-4 result lines: 249 passed; 0 failed.
-
-$ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.20s
-
-$ cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.56s
-
-$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 101)
+$ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
 error: failed to run custom build command for `aws-lc-sys v0.44.0`
-aws-lc-sys: stdlib.h/windows.h not found.
-
-$ cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
-
-$ cargo check -p bingo --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 101)
-error: failed to run custom build command for `tree-sitter v0.26.13`
-error: failed to run custom build command for `rquickjs-sys v0.14.0`
-error: failed to run custom build command for `tree-sitter-bash v0.25.1`
-error: failed to run custom build command for `aws-lc-sys v0.44.0`
-aws-lc-sys: stdlib.h/windows.h not found.
-tree-sitter/tree-sitter-bash: stdio.h not found.
-rquickjs-sys: cc rejects the MSVC /std:c11 flag as a missing file.
-
-$ cargo check -p bingo-channels --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 101)
-error: failed to run custom build command for `aws-lc-sys v0.44.0`
-aws-lc-sys: stdlib.h/windows.h not found.
-
-$ cargo check -p bingo-surface-print --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 101)
-error: failed to run custom build command for `aws-lc-sys v0.44.0`
-aws-lc-sys: stdlib.h/windows.h not found.
-
-$ cargo check -p bingo-surface-rpc --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s
-
-$ cargo check -p bingo-mods --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 101)
-error: failed to run custom build command for `rquickjs-sys v0.14.0`
-error: failed to run custom build command for `aws-lc-sys v0.44.0`
-aws-lc-sys: stdlib.h/windows.h not found.
-rquickjs-sys: cc rejects the MSVC /std:c11 flag as a missing file.
-
-$ cargo check -p bingo-mod-models --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.18s
-
-$ cargo check -p bingo-mod-palette --all-targets --target x86_64-pc-windows-msvc --locked --keep-going (exit 0)
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.92s
+fatal error: 'stdlib.h' file not found
+fatal error: 'windows.h' file not found
+exit 101
 
 $ cargo build -p bingo --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 55.71s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.34s
+exit 0
 
 $ TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh
 tui-smoke ok
+exit 0
 
 $ python3 docs/verification/m196/drive.py
 PASS 100x32: enter/tab/up/down/esc/esc esc/ctrl+c/ctrl+d/!/ctrl+b/ctrl+v/?
 CLEAN 100x32: owned server and temporary HOME/data/cwd
 PASS 80x24: enter/tab/up/down/esc/esc esc/ctrl+c/ctrl+d/!/ctrl+b/ctrl+v/?
 CLEAN 80x24: owned server and temporary HOME/data/cwd
+exit 0
 
-Review checks: notify::finished and its three tests are byte-identical to fec21d36.
-Seven palette snapshots change only their esc row; shell_ran/quiet_notices have no round-2 diff.
-Prototype and sealed scene captures are untouched.
-The first clippy run found a large scene Answer enum; 5636e48f boxed its Event.
-Three error-toast snapshots were reaccepted for the required times glyph; notice tests: 30 passed.
-The missing palette Toast.tone field was added only after explicit authorization.
-A preliminary cargo fmt --check overlapped an earlier Windows check; no compilation/test jobs overlapped.
+$ cargo test -p bingo-surface-tui --lib --locked
+test result: ok. 1435 passed; 0 failed; 0 ignored.
+All ten keyed full frames, six real-Host proofs, drain and key regressions: ok.
+
+$ cargo test -p bingo-core --locked
+test result: ok. 693 passed; 0 failed; 0 ignored.
+the_provider_reads_text_but_never_the_headline ... ok
+
+$ cargo test -p bingo-tool-bash --locked
+test result: ok. 157 passed; 0 failed; 0 ignored.
+
+$ cargo test -p bingo-surface-tui --lib stopping_withdraws_two_lines_before_completion_can_drain_them --locked
+Mutation: replace Esc/withdrawal/reply with run.interrupt(attached.session.clone()).
+FAILED: assertion left: 2, right: 1 (TurnStarted count); exit 101.
+Restored before the full TUI and workspace test runs; both pass.
+
+$ node docs/verification/m194b/fixtures.cjs
+Exported acting turns only; keys, queues, drafts and toasts stay in the run
+exit 0
+
+$ git diff --exit-code -- crates/bingo-surface-tui/src/test_support/ember/acting-turns.json
+empty diff; exit 0
+
+Byte comparison against `git show fec21d36:crates/bingo-tool-bash/src/notify.rs`:
+Extracted each named function through its closing brace and compared literal strings.
+finished and its three tests: byte-identical to fec21d36.
+
+$ cargo check --workspace --all-targets --locked
+Final records tree: Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.07s
+exit 0
+
+$ git diff --check
+exit 0
+
+$ tmux -L m196-drive list-sessions
+No server remains after both drives.

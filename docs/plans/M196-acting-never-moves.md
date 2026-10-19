@@ -89,7 +89,7 @@ The input never moves, and every key in it does one predictable thing:
 - ADR-0098; sdk/headline.rs, Input/item/props/slot contracts and generated schemas.
 - Core/user.rs shares user-item construction for logging, opening and steering.
 - TUI run/time.rs and clipboard.rs inject clock/clipboard; run/acting exercises real Run boundaries.
-- tool-bash completion headlines/toasts; m194b/fixtures.cjs exports turns only.
+- tool-bash notify/{headline,toast}.rs; m194b/fixtures.cjs exports turns only.
 - PTY tests, smoke and docs/verification/m196/drive.py. Palette/mentions implementation stays part 2.
 
 ## Exit criteria
@@ -100,7 +100,7 @@ The input never moves, and every key in it does one predictable thing:
   rung and timed double press, both legacy alt+Enter cases, image refusal, idle-only `?`.
 - [ ] Part 2: bricks 7–8, palette ranking; palette, palette-st, palette-ran, skills,
   skills-review, skills-sent, mention, mention-inserted, small-palette, ascii-palette.
-- [x] Round-2 black-box PTY stopping_returns_a_queued_line_to_the_input.
+- [x] Black-box PTY stopping_returns_a_queued_line_to_the_input.
 - [x] Seven native gates, smoke, and drive.py at 100×32 and 80×24. Windows results below.
 
 ## Non-goals
@@ -119,29 +119,31 @@ Asks and questions (M197); sheets (M198); teammates and rooms (M200); the exit r
 
 ## Verified
 
-- [x] Bricks 1–6, 9 and all ten keyed full frames: `cargo test --workspace --locked` (provider credentials unset):
-  `6552 passed; 0 failed; 0 ignored`; TUI `1435 passed`. Exact sends and six real-Host answer proofs pass.
-- [x] Same run: all on_key rungs, clock windows, legacy alt+Enter, stop races/order/NotFound, images and idle `?` pass.
-  `acting_full_frames_match_the_prototype ... ok`; only named spinner cells are exempt.
+- [x] Round 3 history: `unset $(git rev-parse --local-env-vars)` then
+  `git rebase -x 'cargo check --workspace --all-targets --locked' fec21d36`: 23 checks passed;
+  `Successfully rebased`; ordered hashes unchanged, no amendments. Final records checked separately.
+- [x] `cargo test --workspace --locked` (provider credentials unset): `6553 passed; 0 failed; 0 ignored`.
+  TUI `1435 passed`, core `693 passed`, bash `157 passed`; all six real-Host answer proofs pass.
+- [x] All ten keyed part-1 frames: `acting_full_frames_match_the_prototype ... ok`.
+  Exact sends, replies, timing and named spinner exemptions retained; catalogue now enters as a reply.
+- [x] All on_key rungs, clock windows, alt+Enter, images, idle `?`, parts/tone and shell rows pass.
+  `a_sent_line_clears_the_toast_after_slash_dispatch ... ok`; closing uses the selected rung.
+- [x] Drain proof folds beyond completion to a mailbox snapshot; `stopping_withdraws_two_lines_before_completion_can_drain_them ... ok`.
+  Skipping withdrawals fails alone: `left: 2`, `right: 1` starts; restored before passing full suites.
 - [x] Black-box PTY: `stopping_returns_a_queued_line_to_the_input ... ok`; `20 passed; 0 failed`.
-- [x] Headline contracts/provider isolation, parts/tone/hold and shell rows: same run; core `692 passed`, bash `157 passed`.
-  `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` for sdk/mods/plugin-rpc/surface-rpc: all pass, schemas committed.
-- [x] `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 6.78s`.
-- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 20.51s`.
-- [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `423 (max 423)`, `budget ok` (14 GB soft warning).
-- [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`. No wall-clock retry in the final gate run.
-- [x] `cargo build -p bingo --locked`: `Finished dev profile ... in 55.71s`.
-  `TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
-- [x] `python3 docs/verification/m196/drive.py`: `PASS 100x32` / `PASS 80x24`; both `CLEAN` lines confirm cleanup.
-- [x] Windows `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked --keep-going`:
-  sdk/core/tool-bash pass all the way through; additional passes: surface-rpc/mod-models/mod-palette.
-- [ ] Windows TUI/binary: aws-lc-sys lacks stdlib.h/windows.h; binary also fails tree-sitter/tree-sitter-bash
-  (stdio.h) and rquickjs-sys (/std:c11). Channels/print share aws-lc-sys; mods also fails rquickjs-sys.
-- [ ] Part 2: bricks 7–8/ranking and the ten named captures in Exit criteria await M198's list window.
-- Prototype/kernel win: shell lines are standalone items, not turns; no shell-specific placeholder exists.
-  Image transport retains its token; fixture prompt comparison removes it. Setup facts are named in round-2.md.
-- Only authorized Esc rows changed in seven palette snapshots. Three error-toast snapshots gain ×;
-  shell_ran/quiet_notices retain round-one bytes. Prototype/captures untouched. No M202 protected function changed.
+- [x] `node docs/verification/m194b/fixtures.cjs` plus acting-turns.json `git diff --exit-code`: empty diff.
+  Bash `finished` and its three tests remain byte-identical to fec21d36; headline/toast modules split.
+- [x] `cargo fmt --all -- --check`, workspace all-target check, clippy `-- -D warnings`: exit 0.
+- [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `423 (max 423)`, `budget ok`.
+  Target/debug 15 GB is a soft warning. `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] `cargo build -p bingo --locked`: exit 0; `TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
+- [x] `python3 docs/verification/m196/drive.py`: `PASS 100x32`, `PASS 80x24`; both `CLEAN` lines confirm cleanup.
+- [x] Windows all-target checks with `--locked --keep-going`: sdk/core/tool-bash pass fully.
+- [ ] Windows TUI: aws-lc-sys native build lacks stdlib.h/windows.h; no Rust diagnostic bypassed.
+- [ ] Part 2: bricks 7–8/ranking and the ten named captures in Exit criteria await M198.
+- Departure: stop proof uses an active streaming assistant block. Executing tools retain an interruption
+  output; the instruction's output-clearing premise is false. No kernel behavior changed to fit the proof.
 - No new dependency or package; one kernel fact, ADR-0098: a delivery may carry its headline.
-- Evidence, per-scene timeline, departures and constructor exceptions: [round 2](../verification/m196/round-2.md),
-  [checks](../verification/m196/checks.txt), [shared-site handoff](../verification/m196/handoff.md). Final Cargo checks ran serially.
+- Prototype/captures, round-2.md and protected shared sites unchanged. No final wall-clock failures or retries.
+- Item/commit/test evidence and earlier departures: [round 3](../verification/m196/round-3.md),
+  [round 2](../verification/m196/round-2.md), [checks](../verification/m196/checks.txt), [handoff](../verification/m196/handoff.md).
