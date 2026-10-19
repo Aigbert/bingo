@@ -49,12 +49,17 @@ pub fn expand(word: &str, home: Option<&str>) -> String {
     }
 }
 
-/// The home directory, read once. A surface that cannot see one just prints
-/// absolute paths.
+/// The home directory, read once, from where the binary reads its own: `HOME`
+/// is not set on Windows. A surface that cannot see one just prints absolute
+/// paths.
 pub fn home() -> Option<&'static str> {
     static HOME: OnceLock<Option<String>> = OnceLock::new();
-    HOME.get_or_init(|| std::env::var("HOME").ok().filter(|h| !h.is_empty()))
-        .as_deref()
+    HOME.get_or_init(|| {
+        std::env::home_dir()
+            .map(|home| home.to_string_lossy().into_owned())
+            .filter(|home| !home.is_empty())
+    })
+    .as_deref()
 }
 
 fn looks_like_a_path(word: &str) -> bool {

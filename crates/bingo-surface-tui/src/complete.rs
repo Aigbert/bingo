@@ -34,15 +34,18 @@ pub fn walk(cwd: &Path) -> Vec<String> {
         .build()
         .filter_map(Result::ok)
         .filter(|entry| entry.file_type().is_some_and(|kind| kind.is_file()))
-        .filter_map(|entry| {
-            entry
-                .path()
-                .strip_prefix(cwd)
-                .ok()
-                .map(|path| path.to_string_lossy().into_owned())
-        })
+        .filter_map(|entry| entry.path().strip_prefix(cwd).ok().map(mentioned))
         .take(CAP)
         .collect()
+}
+
+/// A path as a mention spells it: a word in a line, written the same on every
+/// platform, so its parts are joined by `/` whatever the system joins them by.
+fn mentioned(path: &Path) -> String {
+    path.iter()
+        .map(|part| part.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// The mention under the caret, without its `@`, when the word being typed is
