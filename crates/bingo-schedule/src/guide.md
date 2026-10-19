@@ -6,7 +6,7 @@ handing work to a later turn of itself. A schedule is written down and outlives
 the process; a wake is held in memory and does not.
 
 Neither is a daemon. **Schedules fire only while a bingo process is running**,
-and every listing says whether one is. A resident `bingo gateway` process is
+and the plain listing says whether one is. A resident `bingo gateway` process is
 the usual way to have one.
 
 ## Schedules
@@ -53,16 +53,17 @@ may do:
 - `unconfirmed` — an entry from before this column existed. It is treated
   like the model's until the person confirms it.
 
+`/schedule every 30m <prompt>` adds a repeating prompt from your own command line.
+
 `/schedule add <spec> [as <mode>] -- <text>` writes an entry as the
 person's, working in this session's directory: `/schedule add every 30m --
 /wake`, `/schedule add daily at 09:00 as acceptEdits -- tidy the docs`.
 `/schedule confirm <id> [digest]` makes an entry the person has read theirs.
 The table offers a digest that binds its exact text and mode; a changed entry
-is refused. The panel supplies it automatically. Without it, the typed verb
-confirms the current file. Control and bidi characters are shown as escapes;
-the panel requires typed confirmation for such text. Both verbs require the person's asked line. The built-in panel can ask the client
-to submit a line after the person confirms; a model, a mod acting alone,
-an arbitrary button or a chat correspondent cannot authorize it.
+is refused. Without it, the typed verb confirms the current file. Control and
+bidi characters are shown as escapes. These verbs require the person's asked
+line; a model, a mod acting alone, an arbitrary button or a chat correspondent
+cannot authorize them.
 
 A fire that is refused — a command line or a wider mode on an entry that is
 not the person's — is never silent. The `/schedule` listing names the entry
@@ -131,7 +132,7 @@ idempotent — it checks and reports, it does not start the work again. A check
 that fails goes back to diagnosis, not to a shorter interval. When the evidence
 is there or the budget is gone, say what you found and set no further wake.
 
-The terminal `/schedule` panel includes the pending wake; `/wake` selects it.
+The terminal `/wake` sheet offers six delays and cancellation of a pending wake.
 Text clients keep the wake time and note. `/wake off` ends it at any time,
 including while the turn that set it is still running.
 
@@ -158,5 +159,5 @@ id prefixes work; ambiguous prefixes are refused. All these lines require a
 person's input; a model or a mod cannot run them on its own.
 
 With the built-in schedules mod on, the bare command opens a panel. With it
-off, the same table and lines remain. `/status` shows a pending wake counting
-down; Enter on that row prefills `/wake off` for you to send.
+off, the same table and lines remain. The separate `/wake` sheet counts down a
+pending wake on the surface clock.

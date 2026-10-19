@@ -38,11 +38,11 @@ impl Command for ScheduleCommand {
             args: ArgSpec::Words {
                 labels: Default::default(),
                 alone: vec![],
-                values: [ADD, CONFIRM, "pause", "resume", "run", "forget"]
+                values: [ADD, "every", CONFIRM, "pause", "resume", "run", "forget"]
                     .map(str::to_string)
                     .to_vec(),
                 // Every mutation requires the person's asked line.
-                person: [ADD, CONFIRM, "pause", "resume", "run", "forget"]
+                person: [ADD, "every", CONFIRM, "pause", "resume", "run", "forget"]
                     .map(str::to_string)
                     .to_vec(),
                 then: Some(Box::new(ArgSpec::Free {
@@ -60,6 +60,7 @@ impl Command for ScheduleCommand {
         match bingo_sdk::command::split_verb(args) {
             ("", _) => Ok(self.listed()),
             (ADD, rest) => consent::add(&self.schedules, rest, cx),
+            ("every", rest) => consent::every(&self.schedules, rest, cx),
             (CONFIRM, rest) => consent::confirm(&self.schedules, rest),
             (verb @ ("pause" | "resume" | "run" | "forget"), rest) => {
                 self.mutate(verb, rest, cx).await

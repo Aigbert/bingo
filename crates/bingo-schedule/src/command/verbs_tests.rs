@@ -6,6 +6,7 @@ async fn verbs_refuse_unasked_and_disabled_and_resolve_prefixes() {
     let command = ScheduleCommand::new(f.schedules.clone());
     for verb in [
         "add every 2h -- check",
+        "every 30m check",
         "confirm abcd",
         "pause abcd",
         "resume abcd",
@@ -97,6 +98,28 @@ async fn confirmation_rejects_text_or_mode_changed_after_display() {
                 .await
                 .is_err()
         );
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn the_sheet_footer_spelling_keeps_the_prompt_and_person_consent() {
+    let f = Fixture::new();
+    let command = ScheduleCommand::new(f.schedules.clone());
+    bingo_sdk::render::under_input(true, async {
+        command
+            .run("every 30m check CI -- then tell me", &f.command())
+            .await
+            .unwrap();
+        let shelf = f.shelf();
+        assert_eq!(shelf.entries.len(), 1);
+        assert_eq!(shelf.entries[0].spec.to_string(), "every 30m");
+        assert_eq!(shelf.entries[0].text, "check CI -- then tell me");
+        assert!(shelf.entries[0].asked());
+        for line in ["every", "every 30m", "every bad check"] {
+            assert!(command.run(line, &f.command()).await.is_err());
+        }
+        assert_eq!(f.shelf().entries.len(), 1);
     })
     .await;
 }

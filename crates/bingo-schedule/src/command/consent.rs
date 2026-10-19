@@ -89,6 +89,24 @@ pub fn add(
     written(schedules, &entry, "scheduled")
 }
 
+/// The sheet's abbreviated spelling carries the same person-only consent.
+pub fn every(
+    schedules: &Schedules,
+    args: &str,
+    cx: &CommandContext,
+) -> Result<CommandOutcome, KernelError> {
+    persons_own("every")?;
+    let (interval, text) = args
+        .trim()
+        .split_once(char::is_whitespace)
+        .ok_or_else(|| invalid("use /schedule every 30m <prompt>".into()))?;
+    add(
+        schedules,
+        &format!("every {interval} -- {}", text.trim()),
+        cx,
+    )
+}
+
 /// `/schedule confirm <id> [digest]`: an entry the person has read, made theirs.
 pub fn confirm(schedules: &Schedules, args: &str) -> Result<CommandOutcome, KernelError> {
     persons_own(CONFIRM)?;
