@@ -267,3 +267,49 @@ async fn opening_and_queued_inputs_keep_their_headlines() {
     );
     host.shutdown().await;
 }
+
+#[tokio::test]
+async fn the_provider_reads_text_but_never_the_headline() {
+    let (host, provider) = gated_host(vec![
+        Script::Events(tool_call("Echo", json!({"v":1}))),
+        Script::Events(text("ok")),
+    ])
+    .await;
+    let mut a = attached(&host).await;
+    a.handle.submit(
+        IntentId::mint(),
+        Input::text("model-only-words", Origin::surface("test")).with_headline(Headline {
+            tone: Tone::Good,
+            parts: vec!["never-in-a-provider-request".into()],
+        }),
+    );
+    let gate = opened(&mut a).await;
+    host.deliver(
+        &a.session,
+        IntentId::mint(),
+        Input::text("background-notice-words", Origin::surface("background")).with_headline(
+            Headline {
+                tone: Tone::Good,
+                parts: vec!["background-headline-never-in-a-request".into()],
+            },
+        ),
+        Delivery::Wake,
+    )
+    .await
+    .unwrap();
+    queued(&mut a, 1).await;
+    a.handle.answer(
+        IntentId::mint(),
+        gate,
+        Answer::AllowOnce,
+        Activation::Pointer,
+    );
+    turns_completed(&mut a, 1).await;
+    let requests = serde_json::to_string(&provider.requests()).unwrap();
+    assert!(requests.contains("model-only-words"));
+    let next = serde_json::to_string(&provider.requests()[1]).unwrap();
+    assert!(next.contains("background-notice-words"));
+    assert!(!requests.contains("background-headline-never-in-a-request"));
+    assert!(!requests.contains("never-in-a-provider-request"));
+    host.shutdown().await;
+}
