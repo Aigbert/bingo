@@ -1,6 +1,6 @@
 //! A teammate's ink follows the home tree's roster order, the rule
 //! `bingo_collab::face` gives every owner; this only reads it off the tree.
-use crate::{clock, theme, tree::Tree};
+use crate::{theme, tree::Tree};
 use bingo_sdk::{SessionId, SessionSummary};
 use ratatui::style::Style;
 
@@ -38,20 +38,15 @@ impl Faces {
     pub fn who(&self, name: &str) -> &'static str {
         bingo_collab::face::who(name, &self.home, &self.rows)
     }
+
+    /// The home's teammate that signs with `name`.
+    pub fn teammate(&self, name: &str) -> Option<&SessionSummary> {
+        bingo_collab::face::teammate(name, &self.home, &self.rows)
+    }
 }
 
 pub fn style(ink: &str) -> Style {
     theme::foreground(ink).unwrap_or_default()
-}
-
-/// Weight pulses without ever borrowing a state colour for an identity.
-pub fn pulse(ink: &str, live: bool, now: clock::Now) -> Style {
-    let style = style(ink);
-    if live && now.motion && clock::alternating(now, theme::PULSE) {
-        style.patch(theme::bold())
-    } else {
-        style
-    }
 }
 
 /// The mark a teammate's row and post wear, in that teammate's ink.

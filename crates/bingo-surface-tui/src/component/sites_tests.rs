@@ -27,7 +27,7 @@ fn matched(state: &mut bingo_sdk::SessionState) {
 fn unmatched_frame_has_no_component_requests() {
     for component in Component::ALL {
         let state = site(component);
-        let asked = requests_in(&seen(component, &state));
+        let asked = requests_in(&solo(&state));
         assert!(asked.is_empty(), "{component:?}");
     }
 }
@@ -162,9 +162,9 @@ fn site(component: Component) -> bingo_sdk::SessionState {
     }
 }
 /// Where a call's sites are drawn. A step asks `Ledger` for its row and, its
-/// turn opened, `ToolResult` for what it brought back; a call that spawned an
-/// agent is its own row and asks `ToolUse` and `ToolGroup`; a running call a
-/// producer drew a row for asks `ToolProgress`.
+/// turn opened, `ToolResult` for what it brought back; a quiet call is no step
+/// and asks `ToolUse` and `ToolGroup`; a running call a producer drew a row for
+/// asks `ToolProgress`.
 fn call_site(component: Component) -> bingo_sdk::SessionState {
     let completed = |id: &str| {
         let item = tool(
@@ -183,7 +183,7 @@ fn call_site(component: Component) -> bingo_sdk::SessionState {
         ])
     };
     match component {
-        Component::ToolUse | Component::ToolGroup => completed(SPAWNING),
+        Component::ToolUse | Component::ToolGroup => quiet(),
         Component::ToolProgress => crate::transcript::slots::fixtures::with_row(
             running(),
             bingo_sdk::slot::Slot::Row {
@@ -201,17 +201,21 @@ fn call_site(component: Component) -> bingo_sdk::SessionState {
     }
 }
 
-/// The call [`child_summary`]'s agent was spawned by.
-const SPAWNING: &str = "itm_1";
-
-/// The tree a site's session is seen in: for a call that spawned an agent,
-/// with that agent under it.
-fn seen(component: Component, state: &bingo_sdk::SessionState) -> crate::tree::Tree {
-    let mut tree = solo(state);
-    if matches!(component, Component::ToolUse | Component::ToolGroup) {
-        tree.fold.apply(&child_frame(1, announced("helper")));
+/// A call that keeps quiet: no step, only the view it brought back.
+fn quiet() -> bingo_sdk::SessionState {
+    let mut output = bingo_sdk::ToolOutput::text("original");
+    output.display = Some(bingo_sdk::View::text("original"));
+    let mut item = tool(
+        "itm_one",
+        "sample",
+        json!({"text":"original"}),
+        Some(output),
+        bingo_sdk::ItemStatus::Completed,
+    );
+    if let bingo_sdk::ItemBody::ToolCall { quiet, .. } = &mut item.body {
+        *quiet = true;
     }
-    tree
+    folded(vec![frame(1, Event::ItemCompleted { item })])
 }
 
 /// A fresh screen with every finished turn opened, as a person reading what
@@ -229,7 +233,7 @@ fn replaces_drawn_site(component: Component) {
         vec![json!({})],
     )]))
     .unwrap();
-    let tree = seen(component, &state);
+    let tree = solo(&state);
     let (mut ui, now) = reading(&tree);
     let now = later(now, 2000);
     draw_tree(80, 30, &tree, &mut ui, now);
@@ -307,7 +311,7 @@ async fn counting_host_receives_no_unmatched_render_requests() {
 fn a_replacement_group_hides_its_child_requests() {
     let mut state = site(Component::ToolGroup);
     matched(&mut state);
-    let tree = seen(Component::ToolGroup, &state);
+    let tree = solo(&state);
     let (mut ui, now) = reading(&tree);
     draw_tree(80, 30, &tree, &mut ui, now);
     let key = ui
@@ -481,7 +485,7 @@ fn every_builtin_site_keeps_pixels_when_answered_with_engine() {
         }
         let mut state = site(component);
         matched(&mut state);
-        let tree = seen(component, &state);
+        let tree = solo(&state);
         let (mut ui, now) = reading(&tree);
         let now = later(now, 2000);
         if component == Component::Browse {

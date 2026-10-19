@@ -304,25 +304,6 @@ pub fn asking(state: &SessionState) -> bool {
     !state.interactions.is_empty()
 }
 
-/// What a child's row says under it (design §4): what it is doing and what it
-/// has spent doing it. Nothing for a session nothing answers — a room is not
-/// at work, so it reports no work.
-pub fn activity(state: &SessionState) -> Option<String> {
-    let lifecycle = Lifecycle::of_state(state)?;
-    let cost = if lifecycle == Lifecycle::Working
-        || (lifecycle == Lifecycle::Idle && state.last_status().is_some())
-    {
-        let mut cost = work(state);
-        if state.last_status().is_some() && lifecycle == Lifecycle::Idle {
-            cost.push_str(&format!(" · {}s", seconds(state)));
-        }
-        cost
-    } else {
-        String::new()
-    };
-    Some(describe(state, &cost))
-}
-
 /// A never-run child's brief belongs beside its lifecycle word.
 pub fn describe(state: &SessionState, spent: &str) -> String {
     let Some(lifecycle) = Lifecycle::of_state(state) else {
@@ -364,46 +345,8 @@ fn opening(parts: &[bingo_sdk::ContentPart]) -> Option<String> {
         .map(str::to_string)
 }
 
-/// `3 tools · ↓ 140`.
-pub fn work(state: &SessionState) -> String {
-    let tools = state
-        .transcript
-        .items()
-        .iter()
-        .filter(|item| matches!(item.body, ItemBody::ToolCall { .. }))
-        .count();
-    let usage = &state.summary.usage;
-    format!(
-        "{tools} tool{} · ↓ {}",
-        if tools == 1 { "" } else { "s" },
-        crate::count::count(usage.output_tokens)
-    )
-}
-
-/// The finished child's latest turn uses the same waited-out clock as its band.
-pub fn seconds(state: &SessionState) -> i64 {
-    let Some(item) = state.transcript.items().last() else {
-        return 0;
-    };
-    item.turn
-        .as_ref()
-        .and_then(|turn| {
-            bingo_sdk::transcript::clock(state, turn, item.completed_at.unwrap_or(item.started_at))
-        })
-        .map_or(0, |clock| clock.elapsed.as_secs().max(0))
-}
-
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn rough_edges_a_child_counts_only_what_it_wrote() {
-        let mut state = state();
-        state.summary.usage.input_tokens = 40_000;
-        state.summary.usage.cache_read_tokens = 80_000;
-        state.summary.usage.output_tokens = 8_100;
-        assert_eq!(work(&state), "0 tools · ↓ 8.1k");
-    }
-
     use super::*;
     use crate::test_support::*;
     use bingo_sdk::{Applied, Event};
@@ -495,10 +438,6 @@ mod tests {
             Some("reviewer".to_string())
         );
         assert_eq!(tree.spawned_by(&spawned), Some(&child_id()));
-        assert_eq!(
-            agents.get(&spawned).and_then(|child| activity(child)),
-            Some("idle".to_string())
-        );
 
         tree.show(&child_id());
         assert!(
@@ -539,39 +478,6 @@ mod tests {
             agents.get(&opened).map(|room| name(room)),
             Some("#design".to_string())
         );
-        assert_eq!(
-            agents.get(&opened).and_then(|room| activity(room)),
-            None,
-            "a room is not at work, so its row reports none"
-        );
-    }
-
-    #[test]
-    fn a_child_row_says_what_it_is_doing_and_what_it_has_work() {
-        let mut tree = Tree::new(state());
-        for frame in busy_child("reviewer") {
-            tree.fold.apply(&frame);
-        }
-        let running = tree.fold.sessions().nth(1).expect("the child");
-        assert_eq!(
-            activity(running).as_deref(),
-            Some("working · 3 tools · ↓ 140")
-        );
-
-        tree.fold.apply(&child_frame(
-            10,
-            completed("trn_9", bingo_sdk::TurnStatus::Completed),
-        ));
-        let done = tree.fold.sessions().nth(1).expect("the child");
-        assert_eq!(
-            activity(done).as_deref(),
-            Some("idle · completed · 3 tools · ↓ 140 · 3s")
-        );
-
-        tree.fold
-            .apply(&child_frame(11, opened(child_permission())));
-        let asking = tree.fold.sessions().nth(1).expect("the child");
-        assert_eq!(activity(asking).as_deref(), Some("asking"));
     }
 
     /// What a row says of a session that has not run yet: the thing it was
@@ -730,10 +636,6 @@ mod tests {
             },
         ));
         assert_eq!(tree.rows()[1].status, Some(Lifecycle::Stored));
-        assert_eq!(
-            activity(tree.state(&child_id()).unwrap()).as_deref(),
-            Some("stored")
-        );
         tree.fold.apply(&child_frame(4, announced("reviewer")));
         let child = tree.state(&child_id()).expect("still in the tree");
         assert_eq!(Lifecycle::of_state(child), Some(Lifecycle::Idle));

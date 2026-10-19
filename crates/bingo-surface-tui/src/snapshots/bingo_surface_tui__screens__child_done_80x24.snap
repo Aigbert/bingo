@@ -1,6 +1,7 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-expression: "draw_tree(80, 24, tree, ui, now)"
+assertion_line: 74
+expression: "draw_tree(80, small, tree, ui, now)"
 ---
 "                                                                                "
 "                                                                                "
@@ -18,9 +19,9 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "                                                                                "
 "                                                                                "
 "                                                                                "
+"                                                                                "
 "▍  have it reviewed                                                             "
-" ● reviewer(review the diff)                                                    "
-"  ⎿  idle · completed · 3 tools · ↓ 140 · 3s                                    "
+"   @ spawn   review the diff                                                    "
 "                                                                                "
 "                                                                                "
 "   ▍Reply, or / for commands                                                    "

@@ -1,5 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
+assertion_line: 78
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 "                                                                                                                        "
@@ -32,9 +33,9 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 "                                                                                                                        "
 "                                                                                                                        "
 "                                                                                                                        "
+"                                                                                                                        "
 "▍  have it reviewed                                                                                                     "
-" ● reviewer(review the diff)                                                                                            "
-"  ⎿  working · 3 tools · ↓ 140                                                                                          "
+"   @ spawn   review the diff                                                                                            "
 "                                                                                                                        "
 "                                                                                                                        "
 " ▍ Waiting for 1 background agent to finish                                                                             "

@@ -77,17 +77,6 @@ fn crew_hues_use_the_prototype_identity_palette() {
 }
 
 #[test]
-fn child_row_has_a_face_and_keeps_lifecycle_words() {
-    let (mut ui, now) = scene();
-    let screen = draw_tree(120, 40, &crew(), &mut ui, now);
-    assert!(
-        screen.contains(&format!("{} reviewer(", face::mark())),
-        "{screen}"
-    );
-    assert!(screen.contains("working · 3 tools"), "{screen}");
-}
-
-#[test]
 fn strip_names_the_work_and_yields_to_notices() {
     let tree = crew();
     let (mut ui, now) = scene();
@@ -206,30 +195,6 @@ fn room_mentions_wear_the_known_names_hues() {
             "{row:?}"
         );
     });
-}
-
-#[test]
-fn live_faces_pulse_through_the_cache_and_stillness_preserves_words() {
-    for look in [
-        painted::truecolor(),
-        painted::daylight(),
-        painted::no_colour(),
-        painted::ascii(),
-    ] {
-        theme::with(look, || {
-            let tree = crew();
-            let (mut ui, now) = scene();
-            let before = painted::painted(120, 40, &tree, &mut ui, now).row("reviewer(");
-            let after =
-                painted::painted(120, 40, &tree, &mut ui, later(now, 1000)).row("reviewer(");
-            assert_ne!(before, after);
-            let stopped = painted::painted(120, 40, &tree, &mut ui, still(now)).row("reviewer(");
-            assert_eq!(
-                stopped,
-                painted::painted(120, 40, &tree, &mut ui, still(later(now, 1000))).row("reviewer(")
-            );
-        });
-    }
 }
 
 #[test]

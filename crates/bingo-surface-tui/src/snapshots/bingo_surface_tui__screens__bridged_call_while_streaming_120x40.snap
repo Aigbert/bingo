@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-assertion_line: 71
+assertion_line: 78
 expression: "draw_tree(120, 40, tree, ui, now)"
 ---
 "                                                                                                                        "
@@ -36,7 +36,7 @@ expression: "draw_tree(120, 40, tree, ui, now)"
 "                                                                                                                        "
 "▍  tell the room and say so                                                                                         1s  "
 "   Posting it now, and then I will read what came back and                                                              "
-"   @ send    #design                                                                                                    "
+"   @ send    posted                                                                                                     "
 "   ⠋ working                                                                                                            "
 "                                                                                                                        "
 "▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔"

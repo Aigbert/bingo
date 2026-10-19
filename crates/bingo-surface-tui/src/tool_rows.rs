@@ -25,6 +25,11 @@ impl Looks {
         )
     }
 
+    /// The input field a tool's look names its addressee in.
+    pub fn who(&self, name: &str) -> Option<&str> {
+        self.0.get(name)?.0.as_ref()?.who.as_deref()
+    }
+
     pub fn in_ui(ui: &crate::ui::Ui) -> Self {
         Self::of(
             ui.catalogs

@@ -531,19 +531,12 @@ fn rewound(dropped: u32, rows: &Rows<'_>) -> Vec<Line<'static>> {
     )]
 }
 
-/// A call that started a session is that session's row; every other call is
-/// its own (design §3: a child is a row where it began) — but a call that
+/// Every call is its own row, a call that started or addressed a teammate in
+/// that teammate's voice (design §3: a child is a row where it began) — but a call that
 /// moved the task list draws no row at all, because the list under the
 /// activity row is its row (M74, as Claude Code draws none).
 fn called(item: &Item, agents: &Agents<'_>, fold: Fold, rows: &Rows<'_>) -> crate::views::Drawing {
-    let ItemBody::ToolCall {
-        name,
-        input,
-        output,
-        quiet,
-        ..
-    } = &item.body
-    else {
+    let ItemBody::ToolCall { output, quiet, .. } = &item.body else {
         return crate::views::Drawing::default();
     };
     let Some(step) = crate::turns::step(item, rows) else {
@@ -552,10 +545,9 @@ fn called(item: &Item, agents: &Agents<'_>, fold: Fold, rows: &Rows<'_>) -> crat
     if *quiet && !item.status.failed(output.as_deref()) {
         return quiet_call(output.as_deref(), rows);
     }
-    match agents.get(&item.id) {
-        Some(child) => child_row(child, name, input, rows).into(),
-        None => steps::step_block(item, &step, fold == Fold::Open, rows).into_text_drawing(),
-    }
+    let mut step = step;
+    step.teammate = crate::turns::teammate::of(item, agents, rows);
+    steps::step_block(item, &step, fold == Fold::Open, rows).into_text_drawing()
 }
 
 fn quiet_call(output: Option<&ToolOutput>, rows: &Rows<'_>) -> crate::views::Drawing {
@@ -752,47 +744,6 @@ fn bullet_style(status: ItemStatus, failed: bool) -> Style {
 
 /// A sub-session is a row where it began: what it is, what it was asked, and
 /// what it is doing — read from its own state, never copied into this one.
-fn child_row(
-    child: &SessionState,
-    tool: &str,
-    input: &Value,
-    rows: &Rows<'_>,
-) -> Vec<Line<'static>> {
-    let name = tree::name(child);
-    let step = crate::tool_rows::resolve(tool, input, &rows.tools, theme::bullet().is_ascii());
-    let mut heading = signature(&name, &step.target, rows, Landing::Settled);
-    let ink = rows.faces.ink(&child.summary.id);
-    if let Some(span) = heading.spans.first_mut() {
-        span.style = crate::face::style(ink).patch(theme::bold());
-    }
-    let live = matches!(
-        bingo_collab::lifecycle::Lifecycle::of_state(child),
-        Some(
-            bingo_collab::lifecycle::Lifecycle::Working
-                | bingo_collab::lifecycle::Lifecycle::Asking
-        )
-    );
-    let mut out = marked(
-        crate::face::mark(),
-        crate::face::pulse(ink, live, rows.now),
-        vec![heading],
-        rows,
-    );
-    if let Some(activity) = tree::activity(child) {
-        // A child that is waiting on a person pulses until they go to it;
-        // one that is simply working recedes like every other result.
-        let style = match tree::asking(child) {
-            true => theme::attention(rows.now),
-            false => theme::dim(),
-        };
-        out.extend(returns(
-            vec![Line::from(Span::styled(activity, style))],
-            rows,
-        ));
-    }
-    out
-}
-
 /// A long-running operation of the surface's own: login, reconnect, a team
 /// starting. It reads as a tool row because that is what it is.
 fn action(
@@ -1056,22 +1007,6 @@ mod tests {
                 .map(|(i, item)| frame(i as u64 + 1, Event::ItemCompleted { item }))
                 .collect(),
         )
-    }
-
-    #[test]
-    fn child_rows_keep_the_declared_target() {
-        let state = folded(Vec::new());
-        let folds = Folds::new();
-        let pictures = Decoded::default();
-        let linked = Linked::default();
-        let mut rows = Rows::of(&state, 400, &folds, &pictures, &linked, Now::real());
-        for (name, input, look, _, target) in crate::tool_rows::cases() {
-            rows.tools = crate::tool_rows::declared(name, look);
-            let lines = child_row(&state, name, &input, &rows);
-            let text = lines.iter().map(ToString::to_string).collect::<String>();
-            assert!(text.contains(target), "{text}");
-            assert!(!text.contains("wrong"), "{text}");
-        }
     }
 
     /// The transcript without the welcome box, which `welcome.rs` pins on its

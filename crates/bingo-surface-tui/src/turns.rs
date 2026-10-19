@@ -5,13 +5,15 @@ use bingo_sdk::component::{LedgerProps, Props, Step, StepState, ledger::Marks};
 use bingo_sdk::{DecisionKind, Item, ItemBody, ItemId, ItemStatus, SessionState, Upshot};
 use std::collections::BTreeMap;
 
+pub mod teammate;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub enum Role {
     #[default]
     Own,
     Hidden,
     Step {
-        step: Step,
+        step: Box<Step>,
         opened: bool,
     },
     Narration,
@@ -76,19 +78,19 @@ fn call_role(
     rows: &crate::transcript::Rows<'_>,
     replaced: &[ItemId],
 ) -> Option<Role> {
-    let Some(step) = step(item, rows) else {
+    let Some(mut step) = step(item, rows) else {
         return Some(Role::Hidden);
     };
     let ItemBody::ToolCall { quiet, output, .. } = &item.body else {
         return None;
     };
-    ((!*quiet || item.status.failed(output.as_deref()))
-        && !agents.contains_key(&item.id)
-        && !replaced.contains(&item.id))
-    .then(|| Role::Step {
-        step,
-        opened: rows.opened.well(item),
-    })
+    step.teammate = teammate::of(item, agents, rows);
+    ((!*quiet || item.status.failed(output.as_deref())) && !replaced.contains(&item.id)).then(
+        || Role::Step {
+            step: Box::new(step),
+            opened: rows.opened.well(item),
+        },
+    )
 }
 
 fn thought_role(item: &Item, rows: &crate::transcript::Rows<'_>, in_detail: bool) -> Role {
