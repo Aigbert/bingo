@@ -27,6 +27,6 @@
    The background tests passed.
 
 ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
-   ▍Reply, or / for commands
+   ▍Steer, or queue what comes next
 
-   fake-1                                                     ctrl+o details   / commands   ? keys
+   ✓ background job finished · 2 passed                                                   esc stop

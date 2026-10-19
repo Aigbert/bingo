@@ -21,4 +21,4 @@
    steer the work                                             at the next step
    then update CHANGELOG▍
 
-   Sessions now open with ctrl+r; ctrl+g ret…   ⏎ steer   tab queue   esc stop
+   fake-1                                       ⏎ steer   tab queue   esc stop

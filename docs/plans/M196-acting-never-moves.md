@@ -85,28 +85,23 @@ The input never moves, and every key in it does one predictable thing:
 
 ## Files
 
-- `crates/bingo-surface-tui/src/{input.rs,input/,keys.rs,run/withdraw.rs,composer.rs,
-  activity.rs,complete.rs,mentions.rs,palette.rs,palette/,skills.rs,keybar.rs}`.
-- New `src/queue_rows.rs`; composer/image-chip and shell transcript rendering; no new dependencies.
-- `crates/bingo-mod-palette/src/{draw.rs,rows.rs}` (part 2).
-- `bingo-tool-bash` background notices; PTY tests, smoke and `docs/verification/m196/` drives.
+- TUI: input/key policy, queue_rows, dock/composer, shell/chip/headline drawings, parts/tone toasts.
+- ADR-0098; sdk/headline.rs, Input/item/props/slot contracts and generated schemas.
+- Core/user.rs shares user-item construction for logging, opening and steering.
+- TUI run/time.rs and clipboard.rs inject clock/clipboard; run/acting exercises real Run boundaries.
+- tool-bash completion headlines/toasts; m194b/fixtures.cjs exports turns only.
+- PTY tests, smoke and docs/verification/m196/drive.py. Palette/mentions implementation stays part 2.
 
 ## Exit criteria
 
-- [ ] Full frame through the harness: `live-steered`, `live-stopped`, `stop`, `stop-resent`,
-      `steer`, `steer-landed`, `shell`, `shell-ls`, `image`, `image-sent`, `palette`,
-      `palette-st`, `palette-ran`, `skills`, `skills-review`, `skills-sent`, `mention`,
-      `mention-inserted`, `small-palette` and `ascii-palette`, with keys as `index.json` lists
-      them.
-- [ ] `on_key` unit tests:
-  - ↑ with a draft does nothing to it;
-  - ↑ on an empty input takes the last queued;
-  - esc returns the queue in order;
-  - the esc and ctrl+c chains, each step;
-  - the palette ranks prefix over contains over subsequence.
-- [ ] A black-box pty test: type, tab while a turn runs, esc, and the input holds the queued
-      text.
-- [ ] Gates and checks as in M192. tmux drive of each key above at 100×32 and 80×24.
+- [x] Full-frame keyed scenes: live-steered, live-stopped, stop, stop-resent, steer,
+  steer-landed, shell, shell-ls, image, image-sent; exact sends and real-kernel helper proofs.
+- [x] on_key: draft/history, last queued withdrawal, ordered stop restoration, every esc/ctrl+c
+  rung and timed double press, both legacy alt+Enter cases, image refusal, idle-only `?`.
+- [ ] Part 2: bricks 7–8, palette ranking; palette, palette-st, palette-ran, skills,
+  skills-review, skills-sent, mention, mention-inserted, small-palette, ascii-palette.
+- [x] Round-2 black-box PTY stopping_returns_a_queued_line_to_the_input.
+- [x] Seven native gates, smoke, and drive.py at 100×32 and 80×24. Windows results below.
 
 ## Non-goals
 
@@ -124,27 +119,29 @@ Asks and questions (M197); sheets (M198); teammates and rooms (M200); the exit r
 
 ## Verified
 
-- [x] Bricks 1–6, 9: `cargo test --workspace --locked --no-fail-fast` (provider credentials unset):
-  `acting_full_frames_match_the_prototype ... ok` — all ten part-1 frames, their indexed keys/clocks; named spinner cells only.
-- [x] Same run: history, ordered queue restoration, every key-policy rung, timed double presses, both alt+Enter cases, image refusal, idle `?` pass;
-  `a_fake_provider_delivery_wins_withdrawal_without_duplication ... ok`; TUI `1417 passed; 1 failed` (excluded test below).
-- [x] Black-box PTY: same run, `stopping_returns_a_queued_line_to_the_input ... ok`; `20 passed; 0 failed`.
-- [x] `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 7.52s`.
-- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 4.52s`.
-- [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `dependencies ... 423 (max 423)`, `budget ok` (7 GB soft warning).
-- [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
-- [x] `cargo build -p bingo --locked`: `Finished dev profile ... in 8.50s`; `TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
-- [x] `docs/verification/m196/drive.sh`: `PASS 100x32` / `PASS 80x24`; both `CLEAN` lines confirm server and temporary HOME/data/cwd cleanup.
-- [x] `cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc`: `Finished dev profile ... in 7.19s`.
-- [ ] Workspace gate: `6525 passed; 2 failed; 0 ignored`; the remaining deterministic failure is `palette::tests::ctrl_p_is_unbound_and_absent_from_the_palette_keys`.
-  Its old BINDINGS Escape text differs from the new policy. Isolated `cargo test -p bingo-surface-tui --lib --locked <test> -- --exact`: `0 passed; 1 failed`.
-  Both the test and BINDINGS are excluded by ownership instructions; left untouched.
-  Unrelated ACP journaling failed in this suite; isolated `cargo test -p bingo --test cli --locked acp::bridge::a_bridged_call_posts_to_the_parent_and_is_journaled_under_the_turn -- --exact`: `1 passed; 0 failed`.
-- [ ] Windows TUI/binary: the same target check for `bingo-surface-tui` / `bingo` exits 101 in dependencies: missing `stdlib.h` / `windows.h`; binary also lacks QuickJS MSVC `/std:c11` support.
-- [ ] Part 2: bricks 7–8 and palette ranking; captures `palette`, `palette-st`, `palette-ran`, `skills`, `skills-review`,
-  `skills-sent`, `mention`, `mention-inserted`, `small-palette`, `ascii-palette` await M198's shared list window.
-- Prototype wins: brick 5's shell-specific placeholder does not exist in `placeholder()`; retained its standard placeholder.
-  Shell folding is gone; `OUTPUT_ROWS`/`EXPAND` still serve action/tool output and generic quiet notices. Legacy background notices keep their generic view.
-- No new dependency/package/kernel fact; prototype/scenes untouched. Shared ownership and exact changed functions: [handoff](../verification/m196/handoff.md).
-  M198 owes BINDINGS words for `esc`, `ctrl+c`, `up/down`; M202's protected functions are untouched. No branch was merged.
-- Command evidence: [checks](../verification/m196/checks.txt); text/ANSI drives in that directory. Verification remains incomplete at the two blockers above.
+- [x] Bricks 1–6, 9 and all ten keyed full frames: `cargo test --workspace --locked` (provider credentials unset):
+  `6552 passed; 0 failed; 0 ignored`; TUI `1435 passed`. Exact sends and six real-Host answer proofs pass.
+- [x] Same run: all on_key rungs, clock windows, legacy alt+Enter, stop races/order/NotFound, images and idle `?` pass.
+  `acting_full_frames_match_the_prototype ... ok`; only named spinner cells are exempt.
+- [x] Black-box PTY: `stopping_returns_a_queued_line_to_the_input ... ok`; `20 passed; 0 failed`.
+- [x] Headline contracts/provider isolation, parts/tone/hold and shell rows: same run; core `692 passed`, bash `157 passed`.
+  `BINGO_UPDATE_SCHEMA=1 cargo test -p <crate> --locked` for sdk/mods/plugin-rpc/surface-rpc: all pass, schemas committed.
+- [x] `cargo fmt --all -- --check`: exit 0; `cargo check --workspace --all-targets --locked`: `Finished dev profile ... in 6.78s`.
+- [x] `cargo clippy --workspace --all-targets --locked -- -D warnings`: `Finished dev profile ... in 20.51s`.
+- [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `423 (max 423)`, `budget ok` (14 GB soft warning).
+- [x] `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`. No wall-clock retry in the final gate run.
+- [x] `cargo build -p bingo --locked`: `Finished dev profile ... in 55.71s`.
+  `TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
+- [x] `python3 docs/verification/m196/drive.py`: `PASS 100x32` / `PASS 80x24`; both `CLEAN` lines confirm cleanup.
+- [x] Windows `cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc --locked --keep-going`:
+  sdk/core/tool-bash pass all the way through; additional passes: surface-rpc/mod-models/mod-palette.
+- [ ] Windows TUI/binary: aws-lc-sys lacks stdlib.h/windows.h; binary also fails tree-sitter/tree-sitter-bash
+  (stdio.h) and rquickjs-sys (/std:c11). Channels/print share aws-lc-sys; mods also fails rquickjs-sys.
+- [ ] Part 2: bricks 7–8/ranking and the ten named captures in Exit criteria await M198's list window.
+- Prototype/kernel win: shell lines are standalone items, not turns; no shell-specific placeholder exists.
+  Image transport retains its token; fixture prompt comparison removes it. Setup facts are named in round-2.md.
+- Only authorized Esc rows changed in seven palette snapshots. Three error-toast snapshots gain ×;
+  shell_ran/quiet_notices retain round-one bytes. Prototype/captures untouched. No M202 protected function changed.
+- No new dependency or package; one kernel fact, ADR-0098: a delivery may carry its headline.
+- Evidence, per-scene timeline, departures and constructor exceptions: [round 2](../verification/m196/round-2.md),
+  [checks](../verification/m196/checks.txt), [shared-site handoff](../verification/m196/handoff.md). Final Cargo checks ran serially.

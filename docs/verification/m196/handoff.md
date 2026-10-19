@@ -1,22 +1,23 @@
 # M196 part 1 handoff
 
-Bricks 1–6 and 9 are implemented. Bricks 7–8 remain part 2; no palette,
-mention, completion, list-window, or bingo-mod-palette source was changed.
+Bricks 1–6 and 9 are implemented. Bricks 7–8 remain part 2. Round-2 evidence
+and the acting timeline are in [round-2.md](round-2.md). The sole mod-palette edit
+is the explicitly authorized `tone: Neutral` constructor field.
 
 ## Shared places
 
 - `view.rs`: `compose`, `demand`, and `render_composer` now measure and draw derived
   queue and Activity rows above the input. `Draft` and `composer_above` collect their
-  deadlines before clipping. Removed `strip`/`render_strip` and their geometry.
+  deadlines before clipping; `Draft::rows()` serves both demand and drawing. Removed `strip`/`render_strip` and their geometry.
   `menu` and `layer` are unchanged; no sheet-choice branch was added.
-- `ui.rs`: toast hold duration, `notify_for`, and the shared 1.5-second exit window.
+- `ui.rs`: notices hold parts and tone, plus hold duration and `notify_for`.
+  The exit window remains shared with the key policy.
   `Open` is unchanged. `ui/controls.rs` replaces `esc_armed` with `escaped_at`, adds
   queue arrival clocks and the chip-paste helper; `activity_hidden` is retained.
 - `focus.rs`: unchanged, including `Focus`, `Owner`, and `owner()`.
-- `keys.rs`: Escape/Tab/Interrupt policy and policy tests only. `Binding` and
-  `BINDINGS` are unchanged. M198 must refresh the `esc`, `ctrl+c`, and `up/down`
-  descriptions. The excluded palette test that equates the old Escape description
-  with every policy row currently fails; no excluded test was edited.
+- `keys.rs`: Escape/Tab/Interrupt policy and tests; round 2 updates only the
+  authorized Escape BINDINGS description and seven palette snapshot rows.
+  M198 still owns `ctrl+c` and `up/down` wording and the future keys-sheet copy.
 - `input.rs`: timed Escape/Ctrl+C chains, history/withdrawal precedence, legacy
   ESC CR handling, and idle-only `?`. `twice` still opens the existing rewind in
   one function. `?` still runs `/help`. The `ctrl+t` binding is unchanged.
@@ -35,25 +36,23 @@ mention, completion, list-window, or bingo-mod-palette source was changed.
   has no such case: its normal placeholder is retained.
 - Shell output no longer folds. `OUTPUT_ROWS`/`EXPAND` remain for action output,
   generic tool output, and generic quiet notices; these are outside this change.
-- The background completion's first line follows the prototype; existing details
-  remain below it for the model. `transcript/notice.rs` draws the faint divider
-  and returns its 400 ms arrival deadline through `said::lines`. Legacy persisted notices retain their generic view.
+- ADR-0098 keeps the background headline separate from unchanged model text.
+  `transcript/notice.rs` draws its divider and 400 ms arrival fade. User items
+  without a headline retain their earlier rendering; no prose is parsed for marks.
 - Part 2 owns palette, palette-st, palette-ran, skills, skills-review, skills-sent,
   mention, mention-inserted, small-palette, ascii-palette, and palette ranking.
-- No new dependency, package, kernel fact, prototype edit, or scene-capture edit.
-- Native workspace tests retain the excluded palette-test failure. An unrelated ACP
-  journaling assertion failed in the final suite and passed on its one isolated retry.
-  Windows TUI/binary checks are blocked before this code by missing C headers and
-  the QuickJS MSVC C toolchain. The bash crate cross-check passes.
+- No new dependency or package; one kernel fact, ADR-0098: a delivery may carry its headline.
+- No prototype or sealed scene capture was edited.
 
 ## Reproduction
 
-`node docs/verification/m196/fixtures.cjs` exports state from each capture's own
-prototype scene, key sequence, geometry, and clock. The Rust test folds session
-frames, renders a full TestBackend frame, and compares it with the sealed capture.
-Only the named spinner cells in live-steered and steer-landed are tolerated.
+`node docs/verification/m194b/fixtures.cjs` is the sole turn exporter.
+The acting test starts a real Run with clock, clipboard, host and session doubles;
+keys enter through terminal_event, sends are checked, and kernel answers enter
+through frame/reply. Six real-Host proofs check the answer helpers.
+Only the named spinner cells in live-steered and steer-landed are exempt.
 
-`docs/verification/m196/drive.sh` owns only tmux socket `m196-drive`. It refuses
+`python3 docs/verification/m196/drive.py` owns only tmux socket `m196-drive`. It refuses
 an existing server, uses fake-provider sessions and temporary HOME/data/cwd, and
 removes its server and temporary files on every exit. Its clipboard double is
 visible only to the child process. Text and ANSI captures are beside this file.

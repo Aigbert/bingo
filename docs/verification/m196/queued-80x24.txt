@@ -18,7 +18,7 @@
 ▍  work until stopped
 
 ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
-   steer the work                                             at the next step
+   then update CHANGELOG                                                queued
    ▍Steer, or queue what comes next
 
-   Sessions now open with ctrl+r; ctrl+g returns t…   ↑ edit queued   esc stop
+   fake-1                                             ↑ edit queued   esc stop
