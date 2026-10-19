@@ -105,6 +105,7 @@ pub use approval::{APPROVALS, Approval, ApprovalReader, Waiting};
 pub mod spent;
 
 pub mod pick;
+pub mod rank;
 pub mod sheet;
 pub mod toast;
 
