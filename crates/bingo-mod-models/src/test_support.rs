@@ -18,6 +18,7 @@ pub fn host() -> (testing::TestHost, CommandContext) {
     });
     host.on_signal(|_, _, _, _| async { Ok(()) });
     let cx = CommandContext {
+        surface: None,
         session: SessionId::from_raw("picker"),
         cwd: ".".into(),
         host: host.handle(),

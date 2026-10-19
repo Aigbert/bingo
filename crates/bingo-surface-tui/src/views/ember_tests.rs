@@ -536,3 +536,34 @@ fn shimmer_samples_each_cell_and_schedules_only_with_motion() {
         assert_eq!(marked(&v, 12, &Marks::at(still(now))).next, None);
     });
 }
+
+#[test]
+fn countdown_uses_wall_time_under_reduced_motion_and_keeps_clipped_deadlines() {
+    let now = still(scene().1);
+    let view = View::Text {
+        children: vec![bingo_sdk::view::TextChild::String("wakes in 1m 00s".into())],
+        style: TextStyle {
+            motion: Some(Box::new(TextMotion::Countdown {
+                at_ms: now.wall.as_millisecond() + 60_000,
+                prefix: "wakes in ".into(),
+            })),
+            ..Default::default()
+        },
+    };
+    let first = marked(&view, 80, &Marks::at(now));
+    assert_eq!(first.lines[0].to_string(), "wakes in 1m 00s");
+    assert_eq!(
+        first.next,
+        Some(now.instant + std::time::Duration::from_millis(1))
+    );
+    assert_eq!(marked(&view, 0, &Marks::at(now)).next, first.next);
+    let later = later(now, 1000);
+    assert_eq!(
+        marked(&view, 80, &Marks::at(later)).lines[0]
+            .to_string()
+            .trim(),
+        "wakes in 59s"
+    );
+    let ended = crate::test_support::later(now, 60_000);
+    assert!(marked(&view, 80, &Marks::at(ended)).next.is_none());
+}

@@ -206,6 +206,7 @@ mod tests {
 
     fn context(session: &str) -> CommandContext {
         CommandContext {
+            surface: None,
             cancel: bingo_sdk::CancellationToken::new(),
             session: SessionId::from_raw(session),
             cwd: PathBuf::from("/work/project"),
@@ -410,6 +411,7 @@ mod forget_tests {
             policy.sessions.install(s, "Edit(src/**)");
         }
         let cx = CommandContext {
+            surface: None,
             session: session.clone(),
             cwd: "/unused".into(),
             host: NoHost::handle(),

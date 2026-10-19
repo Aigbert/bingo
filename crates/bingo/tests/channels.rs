@@ -764,18 +764,7 @@ async fn a_chat_site_delivers_its_tree_and_only_its_minted_button_runs() {
         Some("chat"),
     )
     .await;
-    tokio::time::timeout(LIMIT, async {
-        loop {
-            chat.peer.chats("chat", "/chat-ready").await;
-            let seen = chat.peer.until(|op| is(op, "finish")).await;
-            if seen.last().unwrap()["text"] == "Chat ready" {
-                break;
-            }
-            tokio::task::yield_now().await;
-        }
-    })
-    .await
-    .expect("the fixture command registers");
+    chat_ready(&mut chat).await;
     chat.peer.chats("chat", "hello").await;
     let seen = chat.peer.until(|op| is(op, "draw")).await;
     let first = seen.last().unwrap();
@@ -795,11 +784,7 @@ async fn a_chat_site_delivers_its_tree_and_only_its_minted_button_runs() {
     press["action"]["name"] = json!("forged:ui");
     chat.peer.say(press.clone()).await;
     chat.peer
-        .until(|op| {
-            op["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("earlier drawing"))
-        })
+        .until(|op| notice_text(op).is_some_and(|text| text.contains("earlier drawing")))
         .await;
     press["action"] = original;
     chat.peer.say(press.clone()).await;
@@ -820,22 +805,37 @@ async fn a_chat_site_delivers_its_tree_and_only_its_minted_button_runs() {
     std::fs::write(&module, format!("{source}\n// A new generation.\n")).unwrap();
     chat.peer.chats("chat", "/plugins reload").await;
     chat.peer.until(|op| is(op, "finish")).await;
+    chat_ready(&mut chat).await;
     chat.peer.say(press.clone()).await;
     chat.peer
-        .until(|op| {
-            op["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("earlier drawing"))
-        })
+        .until(|op| notice_text(op).is_some_and(|text| text.contains("earlier drawing")))
         .await;
     chat.peer.chats("chat", "/new").await;
     chat.peer.until(|op| op["text"] == "新会话已开启。").await;
     chat.peer.say(press).await;
     chat.peer
-        .until(|op| {
-            op["text"]
-                .as_str()
-                .is_some_and(|text| text.contains("earlier drawing"))
-        })
+        .until(|op| notice_text(op).is_some_and(|text| text.contains("earlier drawing")))
         .await;
+}
+
+fn notice_text(op: &Value) -> Option<&str> {
+    op["text"].as_str().or_else(|| {
+        op.pointer("/drawing/view/props/text")
+            .and_then(Value::as_str)
+    })
+}
+
+async fn chat_ready(chat: &mut Chat) {
+    tokio::time::timeout(LIMIT, async {
+        loop {
+            chat.peer.chats("chat", "/chat-ready").await;
+            let seen = chat.peer.until(|op| is(op, "finish")).await;
+            if seen.last().unwrap()["text"] == "Chat ready" {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("the fixture command registers");
 }

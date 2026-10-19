@@ -99,6 +99,7 @@ impl Fixture {
             return effects;
         };
         let cx = CommandContext {
+            surface: None,
             session: tree.view().clone(),
             cwd: tree.viewed().summary.cwd.clone().into(),
             host: self.host.handle(),

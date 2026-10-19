@@ -37,6 +37,7 @@ async fn a_plugin_s_commands_keep_the_name_the_plugin_gave_them() {
     assert_eq!(commands.len(), 1);
     assert_eq!(commands[0].spec().name, "stub");
     let cx = CommandContext {
+        surface: None,
         cancel: bingo_sdk::CancellationToken::new(),
         session: SessionId::from_raw("ses_test"),
         cwd: project.path().to_path_buf(),
@@ -176,6 +177,7 @@ async fn deadline_command(seconds: Option<u64>) {
     let started = crate::harness::started_with_timeout(&[("stub", &[])], seconds).await;
     let command = started.manager.commands().await.remove(0);
     let cx = CommandContext {
+        surface: None,
         cancel: CancellationToken::new(),
         session: SessionId::from_raw("ses_test"),
         cwd: started.project.path().into(),

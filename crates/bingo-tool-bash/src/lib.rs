@@ -743,6 +743,7 @@ pub(crate) mod tests {
     /// A command line as the kernel hands one to a command.
     pub(crate) fn command_context(cwd: PathBuf) -> CommandContext {
         CommandContext {
+            surface: None,
             cancel: bingo_sdk::CancellationToken::new(),
             session: SessionId::from_raw("ses_test"),
             cwd,

@@ -202,6 +202,7 @@ mod tests {
     async fn unasked_close_preserves_the_pane_and_pending_confirmation() {
         let host = testing::TestHost::default();
         let cx = CommandContext {
+            surface: None,
             session: SessionId::from_raw("ses_parent"),
             cwd: "/unused".into(),
             host: host.handle(),
@@ -242,6 +243,7 @@ mod tests {
     async fn person_controls_require_both_asked_and_the_owners_drawing() {
         let host = testing::TestHost::default();
         let cx = CommandContext {
+            surface: None,
             session: SessionId::from_raw("ses_parent"),
             cwd: "/unused".into(),
             host: host.handle(),
@@ -279,6 +281,7 @@ mod tests {
     async fn dismissal_waits_for_confirmation_and_escape_cancels() {
         let host = testing::TestHost::default();
         let cx = CommandContext {
+            surface: None,
             session: SessionId::from_raw("ses_parent"),
             cwd: "/unused".into(),
             host: host.handle(),

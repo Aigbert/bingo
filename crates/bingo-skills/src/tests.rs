@@ -123,6 +123,7 @@ pub(crate) fn host_with_pages(written: &[(&str, Pages)]) -> HostHandle {
 
 pub(crate) fn command_context() -> CommandContext {
     CommandContext {
+        surface: None,
         cancel: bingo_sdk::CancellationToken::new(),
         session: SessionId::from_raw("ses_test"),
         cwd: PathBuf::from("/work/project"),

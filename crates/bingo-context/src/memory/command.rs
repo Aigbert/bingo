@@ -142,6 +142,7 @@ mod tests {
 
         fn context(&self) -> CommandContext {
             CommandContext {
+                surface: None,
                 cancel: bingo_sdk::CancellationToken::new(),
                 session: SessionId::from_raw("ses_test"),
                 cwd: self.cwd.path().to_path_buf(),

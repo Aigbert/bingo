@@ -69,6 +69,7 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
     let inputs = Arc::new(Mutex::new(Vec::new()));
     let host = host(state.clone(), inputs.clone());
     let cx = CommandContext {
+        surface: None,
         session: state.summary.id.clone(),
         cwd: "/unused".into(),
         host: host.handle(),
@@ -132,6 +133,7 @@ async fn editable_rows_prefill_instead_of_submitting_bare_commands() {
     let inputs = Arc::new(Mutex::new(Vec::new()));
     let host = host(state.clone(), inputs.clone());
     let cx = CommandContext {
+        surface: None,
         session: state.summary.id.clone(),
         cwd: "/unused".into(),
         host: host.handle(),
@@ -169,6 +171,7 @@ async fn a_visible_key_resumes_an_expired_card_from_bounded_host_facts() {
     let state = crate::tests::state();
     let host = host(state.clone(), Default::default());
     let cx = CommandContext {
+        surface: None,
         session: state.summary.id.clone(),
         cwd: "/unused".into(),
         host: host.handle(),
@@ -202,6 +205,7 @@ async fn client_commands_and_unknown_row_ids_cannot_dispatch() {
     let inputs = Arc::new(Mutex::new(Vec::new()));
     let host = host(state.clone(), inputs.clone());
     let cx = CommandContext {
+        surface: None,
         session: state.summary.id.clone(),
         cwd: "/unused".into(),
         host: host.handle(),

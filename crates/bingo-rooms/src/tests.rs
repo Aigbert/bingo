@@ -493,6 +493,7 @@ pub(crate) fn tool_context(session: &SessionId, fleet: &Fleet) -> ToolContext {
 
 pub(crate) fn command_context(session: &SessionId, fleet: &Fleet) -> CommandContext {
     CommandContext {
+        surface: None,
         cancel: bingo_sdk::CancellationToken::new(),
         session: session.clone(),
         cwd: PathBuf::from("/work/project"),

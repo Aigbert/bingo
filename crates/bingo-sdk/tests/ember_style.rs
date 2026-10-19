@@ -6,6 +6,7 @@ fn ember_styles_round_trip_without_losing_the_motion_contract() {
     for motion in [
         json!({"kind":"breathe","with":"coal","periodMs":1800,"depth":0.8}),
         json!({"kind":"spin"}),
+        json!({"kind":"countdown","atMs":1234,"prefix":"due in "}),
         json!({"kind":"shimmer"}),
         json!({"kind":"fade","from":"glow","atMs":1234,"ms":420,"curve":"easeOut"}),
         json!({"kind":"fade","from":"glow","atMs":1234,"ms":420}),
@@ -38,7 +39,7 @@ fn unknown_motion_is_not_an_authoring_variant() {
         .iter()
         .map(|variant| variant["properties"]["kind"]["const"].as_str().unwrap())
         .collect();
-    assert_eq!(kinds, ["breathe", "spin", "shimmer", "fade"]);
+    assert_eq!(kinds, ["breathe", "spin", "shimmer", "fade", "countdown"]);
 }
 
 #[test]

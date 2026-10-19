@@ -240,6 +240,7 @@ impl ArgSpec {
 
 #[derive(Clone)]
 pub struct CommandContext {
+    pub surface: Option<crate::render::SurfaceName>,
     pub session: SessionId,
     pub cwd: PathBuf,
     pub host: HostHandle,

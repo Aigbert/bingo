@@ -298,6 +298,7 @@ impl Commands {
             .ok_or_else(|| KernelError::new(ErrorCode::SessionClosed, "the host is gone"))?;
         let cancel = self.cancel.child_token();
         let cx = CommandContext {
+            surface: run.invocation.surface,
             cancel: cancel.clone(),
             session: self.session.clone(),
             cwd: self.lookup.cwd.clone(),

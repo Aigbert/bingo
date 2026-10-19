@@ -15,6 +15,7 @@ async fn commands_and_service_forget_the_same_file_with_the_same_reply() {
     let user = dir::user(&data);
     std::fs::create_dir_all(&user).unwrap();
     let cx = CommandContext {
+        surface: None,
         session: SessionId::from_raw("s"),
         cwd: cwd.clone(),
         host: bingo_sdk::testing::NoHost::handle(),
@@ -85,6 +86,7 @@ async fn an_unscoped_name_in_both_scopes_names_both_and_deletes_neither() {
         std::fs::write(scope.join("rule.md"), "fact").unwrap();
     }
     let cx = CommandContext {
+        surface: None,
         session: SessionId::from_raw("s"),
         cwd: cwd.into(),
         host: bingo_sdk::testing::NoHost::handle(),

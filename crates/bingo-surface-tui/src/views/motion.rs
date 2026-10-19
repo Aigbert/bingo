@@ -35,6 +35,11 @@ pub fn style(style: Style, ink: Color, motion: Option<&TextMotion>, now: Option<
 }
 
 pub fn next(motion: &TextMotion, now: Now) -> Option<Instant> {
+    if let TextMotion::Countdown { at_ms, .. } = motion {
+        let remaining = at_ms.saturating_sub(now.wall.as_millisecond());
+        return (remaining > 0)
+            .then(|| now.instant + Duration::from_millis((remaining % 1000 + 1) as u64));
+    }
     moves(motion, now)?;
     match motion {
         TextMotion::Spin => Some(crate::spinner::next(now)),
@@ -113,4 +118,26 @@ pub fn shimmer(lines: &mut [ratatui::text::Line<'static>], now: Option<Now>) {
             })
             .collect();
     }
+}
+
+pub fn countdown(
+    motion: Option<&TextMotion>,
+    now: Option<Now>,
+    fallback: &[bingo_sdk::view::TextChild],
+) -> Option<String> {
+    use unicode_width::UnicodeWidthStr;
+    let (Some(TextMotion::Countdown { at_ms, prefix }), Some(now)) = (motion, now) else {
+        return None;
+    };
+    let remaining = bingo_sdk::remaining(at_ms.saturating_sub(now.wall.as_millisecond()));
+    let fallback = bingo_sdk::View::Text {
+        children: fallback.to_vec(),
+        style: Default::default(),
+    }
+    .fold();
+    let value = format!("{prefix}{remaining}");
+    Some(format!(
+        "{}{value}",
+        " ".repeat(fallback.width().saturating_sub(value.width()))
+    ))
 }

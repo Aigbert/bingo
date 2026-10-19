@@ -138,6 +138,7 @@ async fn arguments_and_nonvisual_callers_keep_the_original_command() {
 async fn crew_arguments_select_each_tab_and_refuse_unknown_tabs() {
     let (_, hook) = context();
     let cx = CommandContext {
+        surface: None,
         session: hook.session,
         cwd: hook.cwd,
         host: hook.host,

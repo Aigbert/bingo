@@ -13,6 +13,7 @@ async fn answer(run: &mut Run, session: &TestSession, fixture: &Fixture, index: 
         .run(
             &action.args.to_string(),
             &CommandContext {
+                surface: None,
                 session: run.session.tree.view().clone(),
                 cwd: "/unused".into(),
                 host: bingo_sdk::testing::NoHost::handle(),

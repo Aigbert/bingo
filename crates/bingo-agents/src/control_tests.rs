@@ -121,6 +121,7 @@ async fn team_service_and_command_share_the_declared_and_seated_roles() {
     assert_eq!(rows[1].role, "scout");
     assert!(rows[1].summary.is_none());
     let cx = CommandContext {
+        surface: None,
         session: parent.id,
         cwd,
         host: handle,

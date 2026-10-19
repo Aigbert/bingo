@@ -146,7 +146,9 @@ fn append_node(
             .and_then(|motion| super::motion::next(motion, now))
     });
     out.next = out.next.into_iter().chain(next).min();
-    if props.motion.as_deref() == Some(&TextMotion::Spin) {
+    if let Some(text) = super::motion::countdown(props.motion.as_deref(), now, children) {
+        append(&[TextChild::String(text)], style, now, out);
+    } else if props.motion.as_deref() == Some(&TextMotion::Spin) {
         let glyph = now
             .map(crate::spinner::glyph)
             .unwrap_or_else(|| theme::glyphs::get("still"));

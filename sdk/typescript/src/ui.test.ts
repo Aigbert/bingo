@@ -147,3 +147,14 @@ test('a root Escape callback cannot synthesize close for a nonclosable pane', as
   await handlers.fire('session',{...tree.onKey.args,value:{key:'esc'}},port,dispatch);
   assert.deepEqual(calls.map(call => call.method), ['panes']);
 });
+
+
+test('deep inherited view trees resolve without exhausting the engine stack', async () => {
+  const {resolveElements} = await import('./ui.ts');
+  let tree: any = {kind:'Text',children:['leaf']};
+  for (let i = 0; i < 2000; i++) tree = {kind:'Box',children:[tree]};
+  let resolved = await resolveElements(tree);
+  assert.notEqual(resolved, tree);
+  for (let i = 0; i < 2000; i++) resolved = resolved.children[0];
+  assert.deepEqual(resolved, {kind:'Text',children:['leaf']});
+});

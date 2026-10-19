@@ -198,6 +198,7 @@ impl ScheduleFixture {
             self.command.run(
                 line,
                 &CommandContext {
+                    surface: None,
                     session: cx.session,
                     cwd: cx.cwd,
                     host: cx.host,
@@ -262,6 +263,7 @@ impl ScheduleFixture {
             self.handler.run(
                 &action.args.to_string(),
                 &CommandContext {
+                    surface: None,
                     session: cx.session,
                     cwd: cx.cwd,
                     host: cx.host,

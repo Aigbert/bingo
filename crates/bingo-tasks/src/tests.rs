@@ -304,6 +304,7 @@ pub(crate) fn tool_context(session: &SessionId, journals: &Journals) -> ToolCont
 
 pub(crate) fn command_context(session: &SessionId, journals: &Journals) -> CommandContext {
     CommandContext {
+        surface: None,
         cancel: bingo_sdk::CancellationToken::new(),
         session: session.clone(),
         cwd: PathBuf::from("/work/project"),

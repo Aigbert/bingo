@@ -249,6 +249,13 @@ pub enum TextMotion {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         curve: Option<FadeCurve>,
     },
+    /// A wall-clock duration, including under reduced motion. Children are the
+    /// fallback and reserve its right-aligned width on older readers.
+    Countdown {
+        #[serde(rename = "atMs")]
+        at_ms: i64,
+        prefix: String,
+    },
     #[serde(skip)]
     #[schemars(skip)]
     Other(serde_json::Value),
@@ -265,7 +272,7 @@ impl<'de> Deserialize<'de> for TextMotion {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = serde_json::Value::deserialize(deserializer)?;
         if let Some(kind) = value.get("kind").and_then(serde_json::Value::as_str)
-            && !matches!(kind, "breathe" | "spin" | "shimmer" | "fade")
+            && !matches!(kind, "breathe" | "spin" | "shimmer" | "fade" | "countdown")
         {
             return Ok(Self::Other(value));
         }

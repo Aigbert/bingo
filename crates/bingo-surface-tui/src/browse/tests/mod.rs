@@ -171,6 +171,7 @@ impl Fixture {
             return effects;
         };
         let cx = CommandContext {
+            surface: None,
             session: state.summary.id.clone(),
             cwd: state.summary.cwd.clone().into(),
             host: self.host.clone(),

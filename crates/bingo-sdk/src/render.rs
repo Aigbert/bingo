@@ -57,6 +57,11 @@ pub enum SurfaceName {
     Text,
     Chat,
 }
+impl SurfaceName {
+    pub fn shows_sheets(self) -> bool {
+        matches!(self, Self::Terminal | Self::Desktop)
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Viewport {
     /// Where a pane sits, when the site is a pane.

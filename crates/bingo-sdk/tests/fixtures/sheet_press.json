@@ -1,0 +1,6 @@
+[
+  {"key": "down"},
+  {"pick": "model:anthropic/opus"},
+  {"pick": "pick:row"},
+  {"pick": "enter"}
+]

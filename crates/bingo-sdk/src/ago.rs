@@ -11,6 +11,16 @@ pub fn ago(now: Timestamp, then: Timestamp) -> String {
         _ => then.to_zoned(jiff::tz::TimeZone::UTC).date().to_string(),
     }
 }
+/// Remaining duration, in Ember's seconds, minutes and hours spelling.
+pub fn remaining(milliseconds: i64) -> String {
+    let seconds = milliseconds.max(0) / 1000;
+    match seconds {
+        0..60 => format!("{seconds}s"),
+        60..3600 => format!("{}m {:02}s", seconds / 60, seconds % 60),
+        _ => format!("{}h {:02}m", seconds / 3600, seconds / 60 % 60),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

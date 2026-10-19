@@ -38,6 +38,7 @@ async fn drawing() -> View {
         .run(
             "",
             &bingo_sdk::CommandContext {
+                surface: None,
                 session: state().summary.id,
                 cwd: "/unused".into(),
                 host: bingo_sdk::testing::NoHost::handle(),

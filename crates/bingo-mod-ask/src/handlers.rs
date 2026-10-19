@@ -79,6 +79,7 @@ mod tests {
         let handler = Handler(states);
         let args = args.to_string();
         let cx = CommandContext {
+            surface: None,
             session,
             cwd: "/unused".into(),
             host: bingo_sdk::testing::NoHost::handle(),

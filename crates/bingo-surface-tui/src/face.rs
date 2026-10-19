@@ -7,14 +7,12 @@ pub struct Face(pub u32);
 
 /// FNV-1a 32-bit over the exact UTF-8 name; no theme or stored identity.
 pub fn face(name: &str) -> Face {
-    Face(name.bytes().fold(2_166_136_261u32, |hash, byte| {
-        (hash ^ u32::from(byte)).wrapping_mul(16_777_619)
-    }))
+    Face(bingo_sdk::view::identity::hash(name))
 }
 
 impl Face {
     pub fn hue(self) -> usize {
-        ((self.0 >> 8) % 5) as usize
+        bingo_sdk::view::identity::hue(self.0)
     }
 
     pub fn sigil(self) -> &'static str {

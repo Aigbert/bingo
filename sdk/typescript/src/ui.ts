@@ -15,19 +15,23 @@ export class Handlers {
       for (const [token, handler] of this.tokens) if (handler.site === site) this.tokens.delete(token);
       this.generations.set(site, generation);
     }
-    const visit = (value: any): any => {
-      if (Array.isArray(value)) return value.map(visit);
-      if (!value || typeof value !== 'object') return value;
-      return Object.fromEntries(Object.entries(value).map(([key, child]) => {
+    if (!view || typeof view !== 'object') return view;
+    const root: any = Array.isArray(view) ? [] : {};
+    const pending = [{source:view, target:root}];
+    while (pending.length) {
+      const {source, target} = pending.pop()!;
+      for (const [key, child] of Object.entries(source)) {
         if (events[key] && typeof child === 'function') {
           const token = `${this.epoch}-${generation}:${++this.serial}`;
           this.tokens.set(token, {session, site, event:events[key], callback:child as Handler['callback'], port});
-          return [key, {name:`${plugin}:ui`, args:{handler:token,event:events[key]}}];
-        }
-        return [key, visit(child)];
-      }));
-    };
-    return visit(view);
+          target[key] = {name:`${plugin}:ui`, args:{handler:token,event:events[key]}};
+        } else if (child && typeof child === 'object') {
+          target[key] = Array.isArray(child) ? [] : {};
+          pending.push({source:child, target:target[key]});
+        } else target[key] = child;
+      }
+    }
+    return root;
   }
   async fire(session: string, input: any, port: Port, dispatch: (event: string, input: any, next: () => Promise<unknown>) => Promise<unknown>): Promise<any> {
     if (input?.event === 'close') {
@@ -131,6 +135,9 @@ export async function resolveElements(value: any): Promise<any> {
   if (!value || typeof value !== 'object') return value;
   const element = elements.get(value);
   if (element) return element;
+  // A wrapped sheet can nest styled runs beneath clickable cells. Release the
+  // engine stack before resolving its children on the embedded runtime.
+  await Promise.resolve();
   if (Array.isArray(value)) return Promise.all(value.map(resolveElements));
   return Object.fromEntries(await Promise.all(Object.entries(value).map(async ([key, child]) => [key, await resolveElements(child)])));
 }

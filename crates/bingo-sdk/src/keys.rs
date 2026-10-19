@@ -3,6 +3,10 @@
 use crate::CommandSpec;
 use std::collections::BTreeMap;
 
+pub fn normalize(key: &str) -> &str {
+    if key == " " { "space" } else { key }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Bindings {
     pub commands: BTreeMap<String, String>,

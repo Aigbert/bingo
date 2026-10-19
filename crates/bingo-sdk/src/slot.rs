@@ -190,8 +190,12 @@ pub fn modes(state: &SessionState) -> impl Iterator<Item = String> {
 /// (ADR-0009 §5), and nothing a signal or an extension placed: what only
 /// the policy may say, such as the mode a person cycles, is read here.
 pub fn described(state: &SessionState) -> Vec<Placed> {
-    state
-        .config
+    described_config(&state.config)
+}
+
+/// Policy-owned slots, without requiring transcript or interaction facts.
+pub fn described_config(config: &crate::ConfigView) -> Vec<Placed> {
+    config
         .policy()
         .into_iter()
         .flat_map(|(plugin, payload)| read(plugin, "", payload))

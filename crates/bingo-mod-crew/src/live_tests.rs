@@ -165,6 +165,7 @@ async fn an_inflight_render_cannot_resurrect_a_cancelled_confirmation() {
             .run(
                 &json!({"handler":"crew","event":"press","value":{"key":"esc"}}).to_string(),
                 &CommandContext {
+                    surface: None,
                     session: session.clone(),
                     cwd: "/unused".into(),
                     host: host.handle(),

@@ -306,6 +306,7 @@ impl Fixture {
 
     pub(crate) fn command(&self) -> CommandContext {
         CommandContext {
+            surface: None,
             cancel: bingo_sdk::CancellationToken::new(),
             session: session(),
             cwd: self.cwd.clone(),

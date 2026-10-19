@@ -88,6 +88,15 @@ pub fn marked(view: &View, width: usize, marks: &Marks) -> Drawing {
 pub fn marked_with(view: &View, width: usize, marks: &Marks, engine: &Engine<'_>) -> Drawing {
     let drawn = match view {
         View::Text { children, style } => text::animated(children, style, width, marks.now),
+        View::Button { children, button }
+            if button.variant.as_deref() == Some("plain") && button.label.is_none() =>
+        {
+            if let [bingo_sdk::view::TextChild::Node(node)] = children.as_slice() {
+                marked_with(node, width, marks, engine)
+            } else {
+                text::animated(children, &Default::default(), width, marks.now)
+            }
+        }
         View::Box { children, layout } => flex::lines(children, layout, width, marks, engine),
         View::Panel { title, child } => panel::lines(title, child, width, marks, engine),
         View::Engine { component, props } => engine(*component, props, width),

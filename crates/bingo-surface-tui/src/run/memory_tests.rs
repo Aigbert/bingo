@@ -210,6 +210,7 @@ impl MemoryFixture {
             .run(
                 &action.args.to_string(),
                 &CommandContext {
+                    surface: None,
                     session: cx.session,
                     cwd: cx.cwd,
                     host: cx.host,
@@ -316,7 +317,7 @@ impl MemoryFixture {
         let cx = self.cx();
         self.handler.run(
             &json!({"handler":"memory","event":"press","target":target,"confirming":confirming,"value":{"key":key}}).to_string(),
-            &CommandContext { session: cx.session, cwd: cx.cwd, host: cx.host, cancel: Default::default() },
+            &CommandContext { surface: None, session: cx.session, cwd: cx.cwd, host: cx.host, cancel: Default::default() },
         ).await.unwrap();
     }
 }

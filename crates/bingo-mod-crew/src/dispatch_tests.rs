@@ -51,6 +51,7 @@ async fn the_child_receives_a_signed_action_with_render_metadata() {
         }
     });
     let cx = CommandContext {
+        surface: None,
         session: SessionId::from_raw("ses_parent"),
         cwd: "/unused".into(),
         host: host.handle(),
