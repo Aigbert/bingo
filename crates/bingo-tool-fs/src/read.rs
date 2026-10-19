@@ -150,16 +150,32 @@ fn numbered(line: &str, n: usize) -> String {
 }
 
 /// Render the window `offset..offset + limit`, bounded by the shared cap.
-fn render(text: &str, offset: Option<usize>, limit: Option<usize>) -> String {
+fn window(text: &str, offset: Option<usize>, limit: Option<usize>) -> Vec<(usize, &str)> {
     let first = offset.unwrap_or(1).max(1);
-    let window: Vec<String> = text
-        .lines()
+    text.lines()
         .enumerate()
         .skip(first - 1)
         .take(limit.unwrap_or(usize::MAX))
-        .map(|(i, line)| numbered(line, i + 1))
-        .collect();
-    output::join(&window, usize::MAX, "lines")
+        .map(|(i, line)| (i + 1, line))
+        .collect()
+}
+
+fn render(window: &[(usize, &str)]) -> (String, usize) {
+    let numbered: Vec<_> = window.iter().map(|(n, line)| numbered(line, *n)).collect();
+    output::joined(&numbered, usize::MAX, "lines")
+}
+
+fn display(text: &str, window: &[(usize, &str)]) -> bingo_sdk::View {
+    bingo_sdk::View::Code {
+        language: None,
+        source: window
+            .iter()
+            .map(|(_, line)| *line)
+            .collect::<Vec<_>>()
+            .join("\n"),
+        start: window.first().and_then(|(n, _)| u32::try_from(*n).ok()),
+        of: u32::try_from(text.lines().count()).ok(),
+    }
 }
 
 #[async_trait]
@@ -217,7 +233,10 @@ impl Tool for ReadTool {
 
         let text = String::from_utf8(bytes)
             .map_err(|_| ToolError::Failed(format!("not valid UTF-8: {shown}")))?;
-        let mut output = ToolOutput::text(render(&text, args.offset, args.limit));
+        let window = window(&text, args.offset, args.limit);
+        let (rendered, kept) = render(&window);
+        let mut output = ToolOutput::text(rendered);
+        output.display = Some(display(&text, &window[..kept]));
         output.upshot = Some(crate::upshot::read(&text));
         Ok(output)
     }
@@ -227,6 +246,75 @@ impl Tool for ReadTool {
 mod tests {
     use super::*;
     use crate::tests::{context, write};
+
+    #[tokio::test]
+    async fn read_display_numbers_only_the_lines_returned_to_the_model() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "a.txt", "one\ntwo\nthree\n");
+        let out = ReadTool
+            .call(
+                serde_json::json!({"file_path":"a.txt", "offset":2,"limit":1}),
+                &context(dir.path()),
+            )
+            .await
+            .unwrap();
+        assert_eq!(out.parts, vec![ContentPart::text("     2\ttwo")]);
+        assert!(
+            matches!(out.display, Some(bingo_sdk::View::Code { source, start: Some(2), .. }) if source == "two")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_character_budget_cut_keeps_the_same_last_line_in_text_and_display() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = (1..=50)
+            .map(|n| format!("line {n}: {}", "x".repeat(700)))
+            .collect::<Vec<_>>()
+            .join("\n");
+        write(dir.path(), "long.txt", &text);
+        let out = ReadTool
+            .call(
+                serde_json::json!({"file_path":"long.txt", "offset":3}),
+                &context(dir.path()),
+            )
+            .await
+            .unwrap();
+        let model = out.parts[0].as_text().unwrap();
+        assert!(model.contains("[truncated:"));
+        let last = model
+            .lines()
+            .rev()
+            .nth(1)
+            .unwrap()
+            .split_once('\t')
+            .unwrap()
+            .1;
+        let Some(bingo_sdk::View::Code {
+            source,
+            start: Some(3),
+            ..
+        }) = out.display
+        else {
+            panic!("code window");
+        };
+        assert_eq!(source.lines().last(), Some(last));
+    }
+
+    #[tokio::test]
+    async fn a_tab_inside_file_content_survives_in_the_display() {
+        let dir = tempfile::tempdir().unwrap();
+        write(dir.path(), "tabs.txt", "one\nleft\tright\n");
+        let out = ReadTool
+            .call(
+                serde_json::json!({"file_path":"tabs.txt","offset":2}),
+                &context(dir.path()),
+            )
+            .await
+            .unwrap();
+        assert!(
+            matches!(out.display, Some(bingo_sdk::View::Code { source, start: Some(2), of: Some(2), .. }) if source == "left\tright")
+        );
+    }
 
     #[test]
     fn the_subject_is_the_resolved_path() {

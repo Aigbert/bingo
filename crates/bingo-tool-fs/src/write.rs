@@ -112,14 +112,12 @@ impl Tool for WriteTool {
             args.content.len(),
             path.display()
         ));
-        match old {
-            Some(old) => {
-                out.display = Some(View::Diff {
-                    unified: diff::unified(&path, &old, &args.content),
-                })
-            }
-            None => out = out.with_upshot(crate::upshot::created(&args.content)),
+        if old.is_none() {
+            out = out.with_upshot(crate::upshot::created(&args.content));
         }
+        out.display = Some(View::Diff {
+            unified: diff::unified(&path, old.as_deref().unwrap_or_default(), &args.content),
+        });
         Ok(out)
     }
 }
@@ -156,7 +154,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_new_file_brings_its_directories_and_has_nothing_to_diff() {
+    async fn a_new_file_brings_its_directories_and_an_all_added_diff() {
         let dir = tempfile::tempdir().expect("temp dir");
         let cx = context(dir.path());
         let input = args("deep/inside/a.txt", "hello\n");
@@ -173,7 +171,11 @@ mod tests {
                 .map(|t| t.starts_with("Wrote 6 bytes")),
             Some(true)
         );
-        assert_eq!(out.display, None);
+        let Some(View::Diff { unified }) = &out.display else {
+            panic!("a new file has a diff");
+        };
+        assert!(unified.contains("@@ -0,0 +1 @@"), "{unified}");
+        assert!(unified.contains("+hello\n"), "{unified}");
         assert_eq!(
             out.outcome(),
             Some(bingo_sdk::Upshot::Diff {

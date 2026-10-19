@@ -9,6 +9,10 @@ pub(crate) const MAX_CHARS: usize = 20_000;
 /// `MAX_CHARS` characters. The note counts what the model did not get, in the
 /// caller's noun ("lines", "files").
 pub(crate) fn join(lines: &[String], max: usize, noun: &str) -> String {
+    joined(lines, max, noun).0
+}
+
+pub(crate) fn joined(lines: &[String], max: usize, noun: &str) -> (String, usize) {
     let mut out = String::new();
     let mut chars = 0;
     let mut taken = 0;
@@ -28,7 +32,7 @@ pub(crate) fn join(lines: &[String], max: usize, noun: &str) -> String {
     if dropped > 0 {
         out.push_str(&format!("\n[truncated: {dropped} more {noun}]"));
     }
-    out
+    (out, taken)
 }
 
 #[cfg(test)]
