@@ -14,7 +14,8 @@ pub fn scene(name: &str) -> (SessionState, crate::tool_rows::Looks) {
 pub fn turns(name: &str) -> Vec<Value> {
     let data = match name {
         "done" | "done-detail" | "done-well" | "done-folded" | "ledger" | "ledger-up" | "find"
-        | "find-up" | "find-back" | "ascii-done" | "small-done" | "mode" | "mode-later" => {
+        | "find-up" | "find-back" | "ascii-done" | "small-done" | "mode" | "mode-later"
+        | "reduced-mode" => {
             include_str!("done.json")
         }
         "stop" => include_str!("stop.json"),
