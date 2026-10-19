@@ -835,14 +835,14 @@ fn render_composer(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: No
             height: inner.height - above,
             ..inner
         };
-        render_draft(tree.viewed(), ui, frame, input, draft.layout, now);
+        render_draft(tree, ui, frame, input, draft.layout, now);
     }
 }
 
 /// The draft itself and the caret in it. `width` is the box's, borders and
 /// all, which is what says how wide a row of text may be.
 fn render_draft(
-    state: &SessionState,
+    tree: &Tree,
     ui: &Ui,
     frame: &mut Layout,
     area: Rect,
@@ -852,6 +852,7 @@ fn render_draft(
     if usize::from(area.width) <= crate::layout::grid::TX {
         return;
     }
+    let state = tree.viewed();
     let props = crate::keybar::composer(state, ui, frame);
     let active = matches!(ui.focus, crate::focus::Focus::Composer)
         || matches!(&ui.focus, crate::focus::Focus::Layer(layer) if !layer.showing() || matches!(layer.open, Open::Palette(_)));
@@ -860,8 +861,11 @@ fn render_draft(
         &props,
         ui.composer.is_empty(),
         usize::from(area.height),
-        active,
-        ui.keyed_at,
+        crate::composer::Caret {
+            active,
+            ink: crate::face::Faces::of(tree).view_ink(&state.summary.id),
+            keyed_at: ui.keyed_at,
+        },
         Now {
             motion: now.motion && active,
             ..now

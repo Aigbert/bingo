@@ -283,7 +283,7 @@ pub(super) fn addition(item: &Item, rows: &Rows<'_>) -> crate::views::Drawing {
         style: bingo_sdk::view::TextStyle {
             color: Some("dim".into()),
             motion: Some(Box::new(bingo_sdk::view::TextMotion::Fade {
-                from: "glow".into(),
+                from: rows.accent().into(),
                 at_ms: item.started_at.as_millisecond(),
                 ms: 420,
                 curve: None,
@@ -317,7 +317,7 @@ fn light(turn: &Band, rows: &Rows<'_>, out: &mut crate::views::Drawing) {
         ("amberGlow", None)
     } else if turn.live {
         (
-            "glow",
+            rows.accent(),
             Some(TextMotion::Breathe {
                 with: "coal".into(),
                 period_ms: 1800,
@@ -333,7 +333,7 @@ fn light(turn: &Band, rows: &Rows<'_>, out: &mut crate::views::Drawing) {
             "good",
             Some(TextMotion::Fade {
                 curve: Some(bingo_sdk::view::FadeCurve::EaseOut),
-                from: "glow".into(),
+                from: rows.accent().into(),
                 at_ms: turn.end.as_millisecond(),
                 ms: 320,
             }),

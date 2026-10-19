@@ -42,11 +42,11 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
                 width,
             )]);
         }
-        let ink = tree
-            .viewing()
-            .map(|s| crate::face::Faces::of(tree).ink(&s.summary.id).to_owned())
-            .unwrap_or_else(|| "glow".into());
-        return comet(width, now.past(turn.started_at), &ink, now);
+        let ink = crate::face::Faces::of(tree).view_ink(&state.summary.id);
+        return comet(width, now.past(turn.started_at), ink, now);
+    }
+    if let Some(drawing) = walked_in(tree, ui, width, now) {
+        return drawing;
     }
     if let Some(age) = mode::changed(ui, now)
         && state
@@ -87,6 +87,29 @@ fn cautioned(open: &bingo_sdk::Interaction) -> bool {
         }
     )
 }
+
+/// Walking into a session flashes the edge in that session's ink, until
+/// anything the edge says later takes its place (`enterView`).
+fn walked_in(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Option<Drawing> {
+    let age = ui
+        .switched
+        .map(|at| now.since(at))
+        .filter(|age| *age < WALK_IN)?;
+    let state = tree.viewed();
+    let said_since = |at: Option<Duration>| at.is_some_and(|since| since < age);
+    let later = said_since(mode::changed(ui, now))
+        || said_since(state.last_turn.as_ref().map(|turn| now.past(turn.ended_at)))
+        || said_since(
+            crate::transcript::ran::latest(state)
+                .and_then(|shell| shell.completed_at)
+                .map(|end| now.past(end)),
+        );
+    let ink = crate::face::Faces::of(tree).ink(&state.summary.id);
+    (!later).then(|| flash(width, ink, age, WALK_IN.as_millis() as u64, now))
+}
+
+/// As long as a change of mode flashes: walking in is a change of place.
+const WALK_IN: Duration = Duration::from_millis(900);
 
 fn sampled(line: Line<'static>, next: Option<std::time::Instant>) -> Drawing {
     Drawing {
@@ -143,4 +166,53 @@ pub(super) fn comet(width: usize, age: Duration, ink: &str, now: Now) -> Drawing
         })
         .collect::<Vec<_>>();
     sampled(Line::from(spans), Some(now.instant + clock::FRAME))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_support::*;
+    use bingo_sdk::Event;
+
+    fn ink_of(drawing: &Drawing) -> ratatui::style::Style {
+        drawing.lines[0].spans[0].style
+    }
+
+    #[test]
+    fn a_teammate_working_runs_the_comet_in_its_own_ink() {
+        let mut tree = spawned_tree(busy_child("reviewer"));
+        tree.show(&child_id());
+        let (ui, now) = scene();
+        let ink = crate::face::Faces::of(&tree).view_ink(&child_id());
+        assert_ne!(ink, "glow");
+        let drawn = draw(&tree, &ui, 40, still(now));
+        assert_eq!(
+            ink_of(&drawn),
+            theme::blended("faint", ink, 0.4).unwrap_or_default()
+        );
+    }
+
+    #[test]
+    fn walking_in_flashes_the_edge_in_the_session_ink_for_900_ms() {
+        let idle = vec![child_frame(
+            1,
+            Event::SessionUpdated {
+                summary: child_summary("reviewer"),
+            },
+        )];
+        let mut tree = spawned_tree(idle);
+        tree.show(&child_id());
+        let (mut ui, now) = scene();
+        assert_eq!(draw(&tree, &ui, 40, now).lines[0], Line::default());
+        ui.switched = Some(now.instant);
+        let ink = crate::face::Faces::of(&tree).ink(&child_id());
+        let drawn = draw(&tree, &ui, 40, still(now));
+        assert_eq!(
+            ink_of(&drawn),
+            theme::blended(ink, "you", 0.2).unwrap_or_default()
+        );
+        assert_eq!(drawn.next, Some(now.instant + WALK_IN));
+        let after = draw(&tree, &ui, 40, later(now, 900));
+        assert_eq!(after.lines[0], Line::default());
+    }
 }

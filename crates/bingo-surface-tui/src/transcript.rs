@@ -196,6 +196,11 @@ impl<'a> Rows<'a> {
         }
     }
 
+    /// The accent of the session these rows belong to ([`crate::face::Faces::view_ink`]).
+    pub fn accent(&self) -> &'static str {
+        self.faces.view_ink(&self.state.summary.id)
+    }
+
     pub fn arriving(&self, item: &Item) -> bool {
         item.status == ItemStatus::Running
             && self

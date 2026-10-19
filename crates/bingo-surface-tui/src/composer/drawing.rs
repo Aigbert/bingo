@@ -6,15 +6,28 @@ use ratatui::text::{Line, Span};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
+/// The caret a draft wears: whether keys land here, the accent of the session
+/// in view, and when the last key rested it.
+#[derive(Clone, Copy)]
+pub struct Caret {
+    pub active: bool,
+    pub ink: &'static str,
+    pub keyed_at: std::time::Instant,
+}
+
 pub fn draw(
     layout: &Layout,
     props: &ComposerProps,
     empty: bool,
     rows: usize,
-    active: bool,
-    keyed_at: std::time::Instant,
+    caret: Caret,
     now: clock::Now,
 ) -> Drawing {
+    let Caret {
+        active,
+        ink: accent,
+        keyed_at,
+    } = caret;
     let (now, rest) = rested(now, keyed_at);
     let overflow = usize::from(layout.lines.len() > 8 && rows >= 9);
     let count = rows.saturating_sub(overflow).min(8);
@@ -26,7 +39,7 @@ pub fn draw(
     };
     let caret = Span::styled(
         caret,
-        theme::caret_ink(now, "glow", "you").unwrap_or_default(),
+        theme::caret_ink(now, accent, "you").unwrap_or_default(),
     );
     let mut lines = Vec::new();
     if overflow > 0 {
@@ -143,6 +156,14 @@ mod tests {
     use super::*;
     use crate::test_support::{later, scene, still};
 
+    fn caret(active: bool, now: clock::Now) -> Caret {
+        Caret {
+            active,
+            ink: "glow",
+            keyed_at: now.instant,
+        }
+    }
+
     #[test]
     fn input_inks_commands_shells_and_mentions_without_splitting_graphemes() {
         let spans = input("/fix @src/a.rs e\u{301}", Some(16), &Span::raw("▍"));
@@ -165,26 +186,25 @@ mod tests {
         );
         let layout = editor.layout(30);
         let props = ComposerProps::default();
-        let drawn = draw(&layout, &props, false, 9, true, now.instant, now);
+        let drawn = draw(&layout, &props, false, 9, caret(true, now), now);
         assert_eq!(drawn.lines.len(), 9);
         assert!(drawn.lines[0].to_string().contains("4 lines above"));
         assert!(drawn.lines[1].to_string().contains("line 4"));
         assert!(drawn.lines[8].to_string().contains("line 11▍"));
         assert!(drawn.next.is_some());
         assert!(
-            draw(&layout, &props, false, 9, false, now.instant, now)
+            draw(&layout, &props, false, 9, caret(false, now), now)
                 .next
                 .is_none()
         );
         assert_eq!(
-            draw(&layout, &props, false, 9, true, now.instant, still(now)).lines,
+            draw(&layout, &props, false, 9, caret(true, now), still(now)).lines,
             draw(
                 &layout,
                 &props,
                 false,
                 9,
-                true,
-                now.instant,
+                caret(true, now),
                 still(later(now, 400))
             )
             .lines

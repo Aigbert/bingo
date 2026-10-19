@@ -86,7 +86,7 @@ fn light(item: &Item, exit: Option<i32>, rows: &Rows<'_>) -> crate::views::Drawi
     let motion = item.completed_at.filter(|_| !failed).map(|end| {
         Box::new(TextMotion::Fade {
             curve: Some(FadeCurve::EaseOut),
-            from: "glow".into(),
+            from: rows.accent().into(),
             at_ms: end.as_millisecond(),
             ms: 320,
         })

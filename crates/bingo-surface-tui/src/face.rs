@@ -34,6 +34,12 @@ impl Faces {
         bingo_collab::face::ink(id, &self.home, &self.rows)
     }
 
+    /// The accent of a session's own view (`viewInk`): a teammate's ink in
+    /// its session, ember everywhere else.
+    pub fn view_ink(&self, id: &SessionId) -> &'static str {
+        bingo_collab::face::accent(id, &self.home, &self.rows)
+    }
+
     /// The ink of whoever signs with `name`: a post's author, an @mention.
     pub fn who(&self, name: &str) -> &'static str {
         bingo_collab::face::who(name, &self.home, &self.rows)
@@ -52,4 +58,26 @@ pub fn style(ink: &str) -> Style {
 /// The mark a teammate's row and post wear, in that teammate's ink.
 pub fn mark() -> &'static str {
     theme::glyphs::get("lamp")
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::test_support::*;
+
+    #[test]
+    fn a_teammate_session_wears_its_ink_where_home_wears_glow() {
+        let mut tree = spawned_tree(busy_child("reviewer"));
+        let faces = super::Faces::of(&tree);
+        let ink = faces.view_ink(&child_id());
+        assert_eq!(ink, faces.ink(&child_id()));
+        assert_eq!(faces.view_ink(tree.root_id()), "glow");
+        tree.show(&child_id());
+        let (mut ui, now) = scene();
+        let painted = crate::painted::painted(80, 24, &tree, &mut ui, still(now));
+        let accent = super::style(ink).fg.unwrap();
+        let glow = super::style("glow").fg.unwrap();
+        let inks = painted.inks();
+        assert!(inks.contains(&accent), "the spinner and side light");
+        assert!(!inks.contains(&glow), "nothing in the view is ember");
+    }
 }

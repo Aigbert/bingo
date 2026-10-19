@@ -285,7 +285,7 @@ fn seek(text: &str, start: usize, end: usize, column: usize) -> usize {
 }
 
 mod drawing;
-pub use drawing::draw as drawing;
+pub use drawing::{Caret, draw as drawing};
 
 #[cfg(test)]
 mod tests {

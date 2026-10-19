@@ -1,5 +1,5 @@
 //! The live row is a Spinner site at the end of the visible transcript.
-use crate::{clock::Now, theme, transcript::Rows, views};
+use crate::{theme, transcript::Rows, views};
 use bingo_sdk::{
     Item, ItemBody, ItemStatus, View,
     component::{Props, SpinnerProps},
@@ -124,7 +124,7 @@ pub fn draw(state: &bingo_sdk::SessionState, rows: &Rows<'_>) -> views::Drawing 
             &row.props,
             rows.width,
             &views::Marks::at(rows.now),
-            |props, width| engine(props, row.thought, width, rows.now),
+            |props, width| engine(props, row.thought, width, rows),
         )
     } else {
         views::Drawing {
@@ -153,11 +153,12 @@ pub fn requests(rows: &Rows<'_>, frame: &mut crate::layout::Layout, height: u16)
     }
 }
 
-fn engine(props: &Props, thought: Option<&Item>, width: usize, now: Now) -> views::Drawing {
+fn engine(props: &Props, thought: Option<&Item>, width: usize, rows: &Rows<'_>) -> views::Drawing {
+    let now = rows.now;
     let Props::Spinner(props) = props else {
         return Default::default();
     };
-    let glyph = node(theme::glyphs::get("still"), "glow", TextMotion::Spin);
+    let glyph = node(theme::glyphs::get("still"), rows.accent(), TextMotion::Spin);
     let word = node(
         &format!(
             "{}{}",
