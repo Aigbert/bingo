@@ -1,0 +1,225 @@
+//! M200's full frames: the crew, a teammate's session and a room, each
+//! driven by the prototype's keys and compared cell by cell and ink by ink.
+use crate::test_support::ember::{self, Band, Capture};
+use crate::test_support::*;
+use crate::{clock::Now, effect::Effect, ui::Ui};
+use bingo_sdk::{Event, Input, SessionId};
+use crossterm::event::{KeyCode, KeyEvent};
+use world::World;
+
+mod world;
+
+fn ui() -> Ui {
+    let (mut ui, _) = scene();
+    ui.catalogs
+        .values
+        .insert("tools".into(), ember::story::catalogue());
+    ui
+}
+
+/// `past(); designRoom(); enterView('#design')`.
+fn room_world() -> World {
+    let mut world = World::home();
+    world.mate("scout", world::SETUP - 600_000);
+    world.mate("reviewer", world::SETUP - 599_000);
+    world.mate("ada", world::SETUP - 598_000);
+    world.design_room();
+    world
+}
+
+/// What the kernel does later on its own: an event on a session, at a
+/// moment of the scene.
+struct Due {
+    at: i64,
+    session: SessionId,
+    event: Box<dyn FnOnce(i64) -> Event>,
+}
+
+/// One run of a scene: its world, the surface's own state and the clock.
+struct Drive {
+    world: World,
+    ui: Ui,
+    now: Now,
+    size: (u16, u16),
+    /// Milliseconds since the scene's setup.
+    t: i64,
+    due: Vec<Due>,
+    posts: usize,
+}
+
+impl Drive {
+    fn new(world: World, capture: &Capture) -> Self {
+        let size = capture.size();
+        let mut now = capture.now();
+        now.wall = jiff::Timestamp::from_millisecond(world::SETUP).unwrap();
+        let mut drive = Self {
+            world,
+            ui: ui(),
+            now,
+            size: (size.width, size.height),
+            t: 0,
+            due: Vec::new(),
+            posts: 0,
+        };
+        drive.draw();
+        drive
+    }
+
+    fn draw(&mut self) -> ratatui::backend::TestBackend {
+        drawn(
+            self.size.0,
+            self.size.1,
+            &self.world.tree,
+            &mut self.ui,
+            self.now,
+        )
+    }
+
+    /// What the loop does with `Effect::View`.
+    fn show(&mut self, session: &bingo_sdk::SessionId) {
+        self.world.tree.show(session);
+        self.ui.switched = Some(self.now.instant);
+        self.ui.scroll = Default::default();
+        let open = self.world.tree.open_interaction().map(|(_, open)| open);
+        self.ui.dialog.focus_on(open);
+        self.draw();
+    }
+
+    /// Let `ms` pass as the prototype's capture does, in ticks of at most
+    /// 50 ms: whatever fell due folds at the first tick that reaches it.
+    fn wait(&mut self, ms: i64) {
+        let mut left = ms;
+        while left > 0 {
+            let step = left.min(50);
+            self.to(self.t + step);
+            left -= step;
+            self.due.sort_by_key(|due| due.at);
+            while self.due.first().is_some_and(|due| due.at <= self.t) {
+                let due = self.due.remove(0);
+                let at = world::SETUP + self.t;
+                self.world.emit(&due.session, at, (due.event)(at));
+            }
+            self.draw();
+        }
+    }
+
+    fn to(&mut self, t: i64) {
+        self.now = later(self.now, t - self.t);
+        self.t = t;
+    }
+
+    fn later(
+        &mut self,
+        after: i64,
+        session: &SessionId,
+        event: impl FnOnce(i64) -> Event + 'static,
+    ) {
+        self.due.push(Due {
+            at: self.t + after,
+            session: session.clone(),
+            event: Box::new(event),
+        });
+    }
+
+    /// One key, as the prototype presses it: it lands, then 60 ms pass.
+    fn press(&mut self, key: KeyEvent) {
+        let effects = crate::input::on_key(&mut self.ui, &self.world.tree, key, self.now);
+        for effect in effects {
+            self.answer(effect);
+        }
+        self.draw();
+        self.wait(60);
+    }
+
+    /// The kernel's side of what a key asked for.
+    fn answer(&mut self, effect: Effect) {
+        match effect {
+            Effect::View(session) => self.show(&session),
+            Effect::Submit(Input::Text { text, .. }) => self.posted(&text),
+            other => panic!("the scene has no answer for {other:?}"),
+        }
+    }
+
+    /// A line sent in the room is a post; each teammate it calls on writes,
+    /// then answers, as `post()` in p4d-crew.js has it.
+    fn posted(&mut self, text: &str) {
+        let room = self.world.tree.viewed().summary.id.clone();
+        self.posts += 1;
+        let at = world::SETUP + self.t;
+        self.world
+            .post(&room, &format!("you-{}", self.posts), "parent", text, at);
+        if text.contains("@reviewer") {
+            let mate = world::id("reviewer");
+            self.later(700, &mate, |_| started("trn_room"));
+            self.later(2600, &room, |at| {
+                world::post_event("room-reviewer", "reviewer", world::REVIEWER_SAYS, at)
+            });
+            self.later(2600, &mate, |_| {
+                completed("trn_room", bingo_sdk::TurnStatus::Completed)
+            });
+        }
+    }
+
+    /// The capture's `after`: waits, typed text and named keys.
+    fn play(&mut self, capture: &Capture) {
+        for step in &capture.entry.after {
+            if let Some(ms) = step.as_i64() {
+                self.wait(ms);
+            } else if let Some(text) = step.get(0).and_then(|text| text.as_str()) {
+                text.chars().for_each(|c| self.press(typed(c)));
+            } else if let Some(chord) = step.as_str().filter(|s| !s.starts_with("shot:")) {
+                self.press(chord_key(chord));
+            }
+        }
+    }
+
+    fn shot(&mut self, capture: &Capture) {
+        let screen = self.draw();
+        ember::assert_regions(
+            capture,
+            Band::Frame,
+            screen.buffer(),
+            &self.ui.shown.regions,
+        );
+    }
+}
+
+fn chord_key(chord: &str) -> KeyEvent {
+    match chord {
+        "enter" => key(KeyCode::Enter),
+        "esc" => key(KeyCode::Esc),
+        "tab" => key(KeyCode::Tab),
+        "ctrl+g" => ctrl('g'),
+        _ => panic!("{chord}"),
+    }
+}
+
+#[test]
+fn m200_room_frame_follows_the_prototype() {
+    let capture = Capture::load("room");
+    capture.render(|| {
+        let mut drive = Drive::new(room_world(), &capture);
+        drive.show(&world::id("design"));
+        drive.wait(capture.entry.moment_ms);
+        drive.shot(&capture);
+    });
+}
+
+#[test]
+fn m200_room_frames_follow_the_prototype_keys() {
+    for (name, spinners) in [
+        ("room-mention", vec![]),
+        ("room-waiting", vec![(26, 14)]),
+        ("room-answered", vec![]),
+        ("room-home", vec![]),
+    ] {
+        let capture = Capture::load(name).spinners(&spinners);
+        capture.render(|| {
+            let mut drive = Drive::new(room_world(), &capture);
+            drive.show(&world::id("design"));
+            drive.play(&capture);
+            assert_eq!(drive.t, capture.entry.moment_ms, "{name}");
+            drive.shot(&capture);
+        });
+    }
+}

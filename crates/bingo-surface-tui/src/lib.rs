@@ -57,6 +57,8 @@ mod commands;
 mod complete;
 mod component;
 mod composer;
+#[cfg(test)]
+mod crew_frames;
 mod detail;
 mod dialog;
 mod dock;
