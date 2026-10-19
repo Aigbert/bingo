@@ -1,4 +1,4 @@
-M199 round 2 (bricks 1, 2, 3, 5, 6). ANTHROPIC_API_KEY and OPENAI_API_KEY unset.
+M199 round 3 (bricks 4, 7, resume toast) on 6a45057ed. ANTHROPIC_API_KEY and OPENAI_API_KEY unset.
 
 How to re-export the edges fixture
 node docs/verification/m199/fixtures.cjs   (writes test_support/ember/edges.json, curated keys only)
@@ -10,24 +10,20 @@ Discipline: discipline ok
 Budget: dependencies (unique, normal): 423 (max 423); budget ok (target/debug soft-limit warning)
 Deny: advisories ok, bans ok, licenses ok, sources ok
 
-Tests: cargo test --workspace --locked --no-fail-fast (default threads)
-final run: 6614 passed; 0 failed; 0 ignored (130 result lines)
-earlier runs on the same code, failures outside the change, each passed alone once:
-  acp::the_restore_ladder_climbs_resume_then_load_then_a_file (1 passed alone)
-  schedules_panel::bare_wake_selects_its_panel_row_and_d_ends_only_the_wake (1 passed alone)
-  schedules::tests::shutdown_keeps_ownership_until_in_flight_dispatch_finishes (1 passed alone)
-  receipt::exit_receipt_matches_the_prototype_rows_byte_for_byte timed out waiting for the
-  resume toast; it now waits on the drawn transcript (pty 21 passed).
+Tests: cargo test --workspace --locked (one cargo job)
+135 result lines: 6659 passed; 0 failed
+bingo-surface-tui after the last commit: 1481 passed; 0 failed
 
 Each commit builds
-git -c core.hooksPath=/dev/null rebase -x 'cargo fmt --all -- --check && cargo check --workspace --all-targets --locked' acb299e0
--> Successfully rebased and updated refs/heads/m199-edges
+unset $(git rev-parse --local-env-vars); git -c core.hooksPath=/dev/null rebase -x 'cargo fmt --all -- --check && cargo check --workspace --all-targets --locked' 6a45057ed
+-> 18 commits executed, Successfully rebased and updated refs/heads/m199-edges
 
 Windows: cargo check -p <crate> --all-targets --target x86_64-pc-windows-msvc
-bingo-sdk, bingo-core, bingo-context, bingo-mod-sessions: exit 0
-bingo-surface-tui, bingo: owed to CI (aws-lc-sys: stdlib.h / windows.h not found)
+bingo-sdk, bingo-core, bingo-context, bingo-skills, bingo-mod-sessions, bingo-mod-models,
+bingo-provider-fake, bingo-schedule: Finished
+bingo-surface-tui, bingo: owed to CI (aws-lc-sys and tree-sitter custom builds fail on this host)
 
 Drive: python3 docs/verification/m199/drive.py (tmux -L m199-drive, temporary HOME/data/cwd, fake provider)
-PASS 100x32 / PASS 80x24: fresh, recent/resume, retry/recovery, compact, background, receipt
-CLEAN at both sizes; no server left on m199-drive.
-PTY smoke: TUI_SMOKE_SOCKET_PREFIX=m199-drive-smoke scripts/tui-smoke.sh -> tui-smoke ok
+PASS 100x32 / PASS 80x24: fresh, recent/resume, retry/recovery, compact, background, receipt,
+signed out -> /login (device WDJB-MJHT) -> resent answer, /wake -> wakes in 6s -> wake-up turn
+CLEAN at both sizes; no server running on /private/tmp/tmux-501/m199-drive.
