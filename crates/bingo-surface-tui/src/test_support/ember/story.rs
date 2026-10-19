@@ -75,6 +75,10 @@ pub fn script(state: &mut SessionState, name: &str, title: &str, start: Timestam
 pub fn script_timeline(name: &str, title: &str, start: Timestamp) -> Vec<(i64, Event)> {
     let mut timeline = vec![];
     for (at, end, item) in script_steps(name, title, start) {
+        if let ItemBody::Assistant { text } = &item.body {
+            timeline.extend(answered(at, &item, text));
+            continue;
+        }
         let mut running = item.clone();
         running.status = ItemStatus::Running;
         stamp(&mut running, at, None);
@@ -84,6 +88,69 @@ pub fn script_timeline(name: &str, title: &str, start: Timestamp) -> Vec<(i64, E
         }
     }
     timeline
+}
+
+/// Characters a second the prototype reveals an answer at (`RATE_R`).
+const ANSWER_RATE: i64 = 150;
+
+/// An answer arrives as the prototype reveals it: its blocks' text at
+/// `RATE_R`, list marks and block breaks free.
+fn answered(at: i64, item: &Item, text: &str) -> Vec<(i64, Event)> {
+    let cuts = visible_cuts(text);
+    let mut events = vec![];
+    for (n, cut) in std::iter::once(0).chain(cuts.iter().copied()).enumerate() {
+        let mut running = item.clone();
+        running.status = ItemStatus::Running;
+        running.body = ItemBody::Assistant {
+            text: text[..cut].into(),
+        };
+        stamp(&mut running, at, None);
+        let when = at + reveal(n);
+        events.push(if n == 0 {
+            (when, Event::ItemStarted { item: running })
+        } else {
+            (when, Event::ItemUpdated { item: running })
+        });
+    }
+    let end = at + reveal(cuts.len());
+    let mut done = item.clone();
+    stamp(&mut done, at, Some(end));
+    events.push((end, Event::ItemCompleted { item: done }));
+    events
+}
+
+/// Milliseconds after its start the answer's `n`th character shows.
+fn reveal(n: usize) -> i64 {
+    (n as i64 * 1000 + ANSWER_RATE - 1) / ANSWER_RATE
+}
+
+/// The byte offset after each character the prototype counts: a line's
+/// list mark and the line breaks are not text it reveals.
+fn visible_cuts(text: &str) -> Vec<usize> {
+    let mut cuts = vec![];
+    let mut offset = 0;
+    for line in text.split_inclusive('\n') {
+        let body = line.trim_end_matches('\n');
+        let mark = list_mark(body);
+        for (at, ch) in body[mark..].char_indices() {
+            cuts.push(offset + mark + at + ch.len_utf8());
+        }
+        offset += line.len();
+    }
+    cuts
+}
+
+/// The length of a `1. ` or `- ` mark that opens a line.
+fn list_mark(line: &str) -> usize {
+    if line.starts_with("- ") {
+        return 2;
+    }
+    let digits = line.chars().take_while(char::is_ascii_digit).count();
+    if digits > 0 && line[digits..].starts_with(". ") {
+        digits + 2
+    } else {
+        0
+    }
 }
 
 /// Every item of a script, finished, with the moments it starts and ends.

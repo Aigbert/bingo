@@ -38,6 +38,9 @@ pub(crate) async fn draw(capture: &Capture) -> ratatui::buffer::Buffer {
     let size = capture.size();
     let now = stage.scene.run.now();
     let run = &mut stage.scene.run;
+    // A still is the frame at its moment, as the prototype's is: a block the
+    // last tick drew is not held until its next frame.
+    run.ui.shown.blocks = Default::default();
     let backend = fixture::drawn(size.width, size.height, &run.session.tree, &mut run.ui, now);
     backend.buffer().clone()
 }
