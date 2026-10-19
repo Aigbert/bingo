@@ -10,6 +10,7 @@ mod lifecycle;
 mod live;
 mod opening;
 mod refresh;
+pub mod rows;
 pub mod state;
 use bingo_sdk::{
     CommandFold, Contribution, ErrorCode, KernelError, Plugin, PluginError, PluginManifest,
@@ -76,6 +77,11 @@ impl Plugin for Crew {
             placement: plugin::Placement::Builtin,
             external: None,
             link: Arc::new(draw::Drawing(self.shared.clone())),
+        });
+        registrar.add(Contribution::Interceptor {
+            placement: plugin::Placement::Outer,
+            external: None,
+            link: Arc::new(rows::Rows),
         });
         registrar.add(Contribution::Lifecycle(Arc::new(lifecycle::Disable(
             self.shared.clone(),
