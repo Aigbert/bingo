@@ -57,15 +57,22 @@ pub struct Sheet {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Shape {
     Sheet,
-    List,
+    List(Tally),
 }
 impl Shape {
     fn reserved(self) -> usize {
         match self {
             Self::Sheet => 4,
-            Self::List => 3,
+            Self::List(_) => 3,
         }
     }
+}
+/// Whether a list says `N of M` under a window that leaves rows out: the `/`
+/// palette does, the `@` mentions do not.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Tally {
+    Counted,
+    Uncounted,
 }
 
 impl Sheet {
@@ -103,9 +110,10 @@ impl Sheet {
         columns: u16,
         rows: u16,
         max: usize,
+        tally: Tally,
         glyphs: crate::glyph::GlyphSet,
     ) -> View {
-        self.build(columns, rows, max, glyphs, Shape::List)
+        self.build(columns, rows, max, glyphs, Shape::List(tally))
     }
     fn build(
         &self,
@@ -122,7 +130,7 @@ impl Sheet {
                 pick::pick_line(&self.head(), false, columns, glyphs),
                 blank(),
             ],
-            Shape::List => vec![],
+            Shape::List(_) => vec![],
         };
         children.extend(self.top.iter().cloned().map(|v| inset(v, columns)));
         children.extend(
@@ -130,10 +138,12 @@ impl Sheet {
                 .clone()
                 .map(|i| pick::pick_line(&self.rows[i], self.pick && i == at, columns, glyphs)),
         );
-        if let Some(count) = pick::count(window, self.rows.len()) {
+        if let Some(count) = pick::count(window, self.rows.len())
+            && shape != Shape::List(Tally::Uncounted)
+        {
             children.push(inset(count, columns));
         }
-        if !self.foot.is_empty() || shape == Shape::List {
+        if !self.foot.is_empty() || matches!(shape, Shape::List(_)) {
             children.push(blank());
             children.extend(self.foot.iter().cloned().map(|v| inset(v, columns)));
         }
@@ -325,7 +335,7 @@ mod tests {
     }
     #[test]
     fn a_list_has_no_head_keeps_three_rows_back_and_ends_on_a_blank() {
-        let list = sheet().list(100, 10, 8, Default::default());
+        let list = sheet().list(100, 10, 8, Tally::Counted, Default::default());
         let View::Box { children, .. } = &list else {
             panic!("a list is a box");
         };
@@ -333,15 +343,26 @@ mod tests {
         assert!(list.fold().contains("7 of 20"));
         assert_eq!(children.len(), 9);
         assert_eq!(children.last().map(View::fold), Some(String::new()));
-        let mentions = sheet().list(100, 40, 6, Default::default());
+        let mentions = sheet().list(100, 40, 6, Tally::Counted, Default::default());
         assert!(mentions.fold().contains("6 of 20"));
         let mut empty = sheet();
         empty.rows.clear();
         empty.top = vec![pick::text("nothing matches", "dim")];
-        let View::Box { children, .. } = empty.list(100, 40, 8, Default::default()) else {
+        let View::Box { children, .. } = empty.list(100, 40, 8, Tally::Counted, Default::default())
+        else {
             panic!("a list is a box");
         };
         assert_eq!(children.len(), 2);
+    }
+    #[test]
+    fn an_uncounted_list_leaves_the_count_out_and_keeps_its_window() {
+        let View::Box { children, .. } =
+            sheet().list(100, 40, 6, Tally::Uncounted, Default::default())
+        else {
+            panic!("a list is a box");
+        };
+        assert_eq!(children.len(), 7);
+        assert!(!children.iter().any(|child| child.fold().contains(" of ")));
     }
     #[test]
     fn unpicked_pages_scroll_without_a_pick_ground() {

@@ -124,7 +124,13 @@ pub(crate) fn tree(
         foot: Vec::new(),
         pick: true,
     };
-    let mut view = sheet.list(viewport.columns, viewport.rows, LIST_MAX, viewport.glyphs);
+    let mut view = sheet.list(
+        viewport.columns,
+        viewport.rows,
+        LIST_MAX,
+        sheet::Tally::Counted,
+        viewport.glyphs,
+    );
     if let View::Box { layout, .. } = &mut view {
         layout.hints = Some(chrome(props, listing));
         layout.on_key = Some(Action {
