@@ -234,8 +234,10 @@ fn m193_edge_comet_end_mode_and_reduced_have_deadlines() {
     assert!(edge(&state, &ui, later(capture.now(), 900)).1.is_none());
 }
 
+/// `footerLine()` with M200's `small-crew`: the first fact holds, the keys
+/// come next, and the facts after the first are cut with an ellipsis.
 #[test]
-fn m193_narrow_footer_drops_keys_then_facts_and_keeps_the_model() {
+fn a_narrow_footer_keeps_the_lead_then_the_keys_and_cuts_the_facts() {
     let (ui, now) = scene();
     let state = folded(vec![frame(1, permission_view("plan"))]);
     let tree = solo(&state);
@@ -243,10 +245,8 @@ fn m193_narrow_footer_drops_keys_then_facts_and_keeps_the_model() {
         super::draw(&tree, &ui, &mut Default::default(), width, still(now)).lines[0].to_string()
     };
     assert!(at(80).contains("/ commands"));
-    assert!(!at(25).contains("? keys"));
-    assert!(at(25).contains("plan"));
-    assert!(at(12).contains("fake-1"));
-    assert!(!at(12).contains("plan"));
+    assert_eq!(at(25), "   fake-1 · p…   ? keys");
+    assert_eq!(at(12), "   fake-1…");
 }
 
 #[test]

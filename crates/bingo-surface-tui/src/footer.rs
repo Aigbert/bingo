@@ -17,25 +17,23 @@ mod view;
 pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, width: usize, now: Now) -> Drawing {
     let available = width.saturating_sub(grid::TX + grid::RM);
     let is_toast = crate::toast::current(ui, tree.viewed(), now).is_some();
-    let ambient = if is_toast {
-        Drawing::default()
+    let facts = if is_toast {
+        Vec::new()
     } else {
         ambient(tree, ui, frame, available, now)
     };
-    let reserved = if is_toast {
-        0
-    } else {
-        ambient.lines.first().map_or(0, Line::width)
-    };
-    let right = crate::keybar::draw(
-        tree,
-        ui,
-        frame,
-        available.saturating_sub(reserved + usize::from(reserved > 0) * 3),
-        now,
-    );
+    // The keys come before every fact but the first, as `footerLine()` has
+    // them; the facts after it are cut short with an ellipsis.
+    let lead = facts
+        .iter()
+        .filter_map(|fact| fact.lines.first())
+        .map(Line::width)
+        .find(|width| *width > 0)
+        .map_or(0, |width| width + 3);
+    let right = crate::keybar::draw(tree, ui, frame, available.saturating_sub(lead), now);
     let right_width = right.lines.first().map_or(0, Line::width);
     let room = available.saturating_sub(right_width + usize::from(right_width > 0) * 3);
+    let ambient = fit(facts, room);
     let mut left = toast::draw(tree.viewed(), ui, frame, room, now).unwrap_or(ambient);
     let line = left.lines.pop().unwrap_or_default();
     let mut spans = vec![Span::raw(" ".repeat(grid::TX.min(width)))];
@@ -60,7 +58,7 @@ pub fn draw(tree: &Tree, ui: &Ui, frame: &mut Layout, width: usize, now: Now) ->
     }
 }
 
-fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> Drawing {
+fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> Vec<Drawing> {
     crate::layout::count::band(3);
     let mut site = Site {
         state: tree.viewed(),
@@ -81,7 +79,7 @@ fn ambient(tree: &Tree, ui: &Ui, frame: &mut Layout, room: usize, now: Now) -> D
         parts.push(crew(tree, now));
     }
     parts.extend(slots(tree.viewed(), now));
-    fit(parts, room)
+    parts
 }
 
 fn model(state: &bingo_sdk::SessionState, site: &mut Site<'_>) -> Drawing {
@@ -285,32 +283,27 @@ fn slots(state: &bingo_sdk::SessionState, now: Now) -> Vec<Drawing> {
         .collect()
 }
 
+/// The facts in order, a separator between each, cut with an ellipsis
+/// where the row ends (`fitSegs()`).
 fn fit(parts: Vec<Drawing>, width: usize) -> Drawing {
-    let mut out = Drawing {
-        next: parts.iter().filter_map(|part| part.next).min(),
-        ..Default::default()
-    };
+    let next = parts.iter().filter_map(|part| part.next).min();
     let mut line = Line::default();
     for part in parts {
-        let Some(next) = part.lines.into_iter().next().filter(|l| l.width() > 0) else {
+        let Some(part) = part.lines.into_iter().next().filter(|l| l.width() > 0) else {
             continue;
         };
-        let gap = usize::from(line.width() > 0) * 3;
-        if line.width() + gap + next.width() > width {
-            if line.width() == 0 {
-                line = grid::fit(next, width);
-            }
-            break;
-        }
-        if gap > 0 {
+        if line.width() > 0 {
             line.spans
                 .push(Span::styled(theme::glyphs::get("sep"), ink("faint")));
         }
-        line.spans.extend(next.spans);
+        line.spans.extend(part.spans);
     }
-    out.lines.push(line);
-    out
+    Drawing {
+        lines: vec![grid::fit(line, width)],
+        next,
+    }
 }
+
 pub(super) fn ink(name: &str) -> ratatui::style::Style {
     theme::foreground(name).unwrap_or_default()
 }
