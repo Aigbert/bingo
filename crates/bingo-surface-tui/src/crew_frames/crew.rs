@@ -5,7 +5,8 @@ use super::script::{Beat, Turn};
 use super::world::{self, id};
 use crate::test_support::*;
 use bingo_sdk::{
-    AnswerSpec, Event, Interaction, InteractionId, InteractionKind, ItemId, SessionId, TurnId,
+    AnswerSpec, Event, Interaction, InteractionId, InteractionKind, ItemId, Preview, SessionId,
+    TurnId,
 };
 
 /// `CREW_P` in p8-page.js.
@@ -151,6 +152,7 @@ fn report(name: &str, text: &str, at: i64) -> Event {
 
 /// The reviewer's `B.ask(1400, 'bash', …)`: a run waits on you.
 fn asked(call: &str, at: i64) -> Interaction {
+    let home = crate::paths::home().unwrap_or("/home/me");
     Interaction {
         id: InteractionId::from_raw("int_reviewer"),
         session: id("reviewer"),
@@ -162,11 +164,21 @@ fn asked(call: &str, at: i64) -> Interaction {
         kind: InteractionKind::Permission {
             tool: "bash".into(),
             summary: TEST.into(),
-            preview: None,
-            session_scope: None,
+            preview: Some(Box::new(Preview::Command {
+                command: TEST.into(),
+                cwd: format!("{home}/bingo-improve"),
+                description: Some("checks the fix before I sign off".into()),
+                stakes: None,
+            })),
+            session_scope: Some("Bash(cargo test:*)".into()),
             caution: None,
             input: Default::default(),
         },
-        answers: vec![AnswerSpec::AllowOnce, AnswerSpec::Deny],
+        answers: vec![
+            AnswerSpec::AllowOnce,
+            AnswerSpec::AllowSession,
+            AnswerSpec::Deny,
+            AnswerSpec::AllowChanged,
+        ],
     }
 }

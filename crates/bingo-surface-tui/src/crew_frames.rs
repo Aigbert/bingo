@@ -396,14 +396,14 @@ fn crew_frame(name: &str, agent: bool) {
 
 #[test]
 fn m200_crew_frames_follow_the_prototype_keys() {
-    for name in ["crew-allowed", "crew-home"] {
+    for name in ["crew-reviewer", "crew-allowed", "crew-home"] {
         crew_frame(name, false);
     }
 }
 
 #[test]
 fn m200_agent_frames_follow_the_prototype_keys() {
-    for name in ["agent-allowed", "agent-home"] {
+    for name in ["agent-reviewer", "agent-allowed", "agent-home"] {
         crew_frame(name, true);
     }
 }
