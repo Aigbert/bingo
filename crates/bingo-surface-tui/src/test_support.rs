@@ -732,6 +732,12 @@ pub fn pending_wake(at: &str) -> Event {
     }
 }
 
+/// The schedule plugin's frame when the wake fires: the pending wake and
+/// its countdown slot are gone.
+pub fn fired_wake() -> Event {
+    extended("bingo.schedule", "wake", Value::Null)
+}
+
 /// What the permission policy publishes for a session: the mode, the list
 /// it may be cycled through, the rules it accepted.
 pub fn permission_view(mode: &str) -> Event {

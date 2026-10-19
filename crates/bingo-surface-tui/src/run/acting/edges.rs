@@ -98,7 +98,7 @@ async fn woken(scene: &mut Scene, capture: &Capture) {
         woken["prompt"].as_str().unwrap(),
         bingo_sdk::Origin::surface("wake").voiced(bingo_sdk::Voice::Note),
     );
-    let fired = std::iter::once(fixture::extended("bingo.schedule", "wake", Value::Null))
+    let fired = std::iter::once(fixture::fired_wake())
         .chain(
             answers::sent("ember-2", bingo_sdk::IntentId::from_raw("wake"), &input, at)
                 .into_iter()
