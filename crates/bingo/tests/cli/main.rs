@@ -845,6 +845,11 @@ mod checkpoints;
 mod compaction_prefix;
 mod context;
 mod experience;
+/// The gateway is unix's (ADR-0020): it asks `kill` and `ps` about its pid,
+/// installs into launchd or systemd, and on Windows a detached child keeps the
+/// handles of whoever read `gateway start`'s output, so that reader waits
+/// for the gateway to exit.
+#[cfg(unix)]
 mod gateway;
 mod hooks;
 mod images;

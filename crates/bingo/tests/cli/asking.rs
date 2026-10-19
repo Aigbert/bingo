@@ -110,6 +110,23 @@ impl AtTheTerminal {
             seen,
             home,
         }
+        .console_answered()
+    }
+
+    /// A ConPTY asked to inherit the cursor, as portable-pty asks it to,
+    /// passes nothing on until the terminal says where that cursor is.
+    #[cfg(windows)]
+    fn console_answered(mut self) -> Self {
+        self.until("\x1b[6n");
+        self.writer.write_all(b"\x1b[1;1R").unwrap();
+        self.writer.flush().unwrap();
+        self
+    }
+
+    /// A unix pty is the kernel's own, and asks nothing.
+    #[cfg(not(windows))]
+    fn console_answered(self) -> Self {
+        self
     }
 
     /// Everything written so far, once it holds `needle`.
@@ -171,7 +188,9 @@ fn spelled(script: &str, prompt: &str, home: &tempfile::TempDir) -> CommandBuild
     .unwrap();
     let mut command = super::isolated::pty();
     command.args(["--print", "--cwd", &home.path().to_string_lossy(), prompt]);
-    command.env("HOME", home.path());
+    for (name, value) in super::home_env(home.path()) {
+        command.env(name, value);
+    }
     command.env("BINGO_FAKE_SCRIPT", &path);
     command.env("TERM", "xterm-256color");
     command.env_remove("ANTHROPIC_API_KEY");

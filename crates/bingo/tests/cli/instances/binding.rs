@@ -16,6 +16,12 @@ fn project(home: &std::path::Path, value: Value) -> std::path::PathBuf {
     root
 }
 
+/// Where the project's override is once it has crossed to TOML: the file the
+/// remedy names.
+fn overlay_file(root: &std::path::Path) -> std::path::PathBuf {
+    root.join(".bingo").join("settings.toml")
+}
+
 fn at(home: &std::path::Path, root: &std::path::Path, provider: &str) -> Command {
     let mut cmd = bingo();
     cmd.envs(home_env(home)).args(["--cwd"]).arg(root).args([
@@ -72,7 +78,7 @@ async fn overridden(family: &str, name: &str, field: &str) {
         "{notice}"
     );
     assert!(
-        notice.contains(&root.join(".bingo/settings.json").display().to_string()),
+        notice.contains(&overlay_file(&root).display().to_string()),
         "{notice}"
     );
     assert!(!notice.contains("stored-test-key"), "{notice}");
@@ -227,7 +233,7 @@ async fn foreign_owner_notice_names_both_families_and_the_override() {
         "{notice}"
     );
     assert!(
-        notice.contains(&root.join(".bingo/settings.json").display().to_string()),
+        notice.contains(&overlay_file(&root).display().to_string()),
         "{notice}"
     );
     assert!(notice.contains("rename or delete"), "{notice}");

@@ -303,7 +303,8 @@ fn an_interrupt_drops_a_bridged_call_and_the_child_serves_the_next_turn() {
         "turns": [
             {
                 "mcp": [{ "tool": "Bash", "arguments": {
-                    "command": format!("touch {} && sleep 30", running.display())
+                    // Quoted: a Windows path's backslashes are escapes to bash.
+                    "command": format!("touch '{}' && sleep 30", running.display())
                 }}],
                 "updates": [chunk("Back.")],
                 "stopReason": "end_turn"

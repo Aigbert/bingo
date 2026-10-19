@@ -8,11 +8,11 @@ use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
 fn settings_file(home: &std::path::Path) -> std::path::PathBuf {
-    home.join(".bingo/settings.toml")
+    home.join(".bingo").join("settings.toml")
 }
 
 fn auth_json(home: &std::path::Path) -> std::path::PathBuf {
-    home.join(".bingo/data/auth.json")
+    home.join(".bingo").join("data").join("auth.json")
 }
 
 fn settings(home: &std::path::Path) -> serde_json::Value {
@@ -155,7 +155,7 @@ fn an_anthropic_instance_needs_neither_an_endpoint_nor_a_key() {
 fn a_settings_json_left_from_an_older_bingo_crosses_on_the_first_run() {
     let home = tempfile::tempdir().unwrap();
     std::fs::create_dir_all(home.path().join(".bingo")).unwrap();
-    let json = home.path().join(".bingo/settings.json");
+    let json = home.path().join(".bingo").join("settings.json");
     let before = "// mine\n{ \"openai\": { \"apiKey\": \"sk-mine\" } }\n";
     std::fs::write(&json, before).unwrap();
 

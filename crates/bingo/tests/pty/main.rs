@@ -205,6 +205,11 @@ impl Ground {
     }
 }
 
+/// Where the cursor is. The surface never asks it; a ConPTY told to inherit
+/// the cursor, as portable-pty tells it to, asks it first and passes nothing
+/// on until it is answered.
+const CURSOR_QUERY: &[u8] = b"\x1b[6n";
+
 /// The colour question, as it appears in the child's output: the probe's own
 /// (`terminal_colorsaurus` asks for the ink, the ground and DA1 in one write)
 /// and every one the run puts afterwards (M71).
@@ -375,6 +380,14 @@ impl Terminal {
                     if let Some(rest) = answers.late() {
                         answer_late(Arc::clone(&back), Arc::clone(&done), rest);
                     }
+                }
+                // Only what just arrived, and the bytes before it that a
+                // question split across two reads would have started in.
+                let fresh = log.len().saturating_sub(read + CURSOR_QUERY.len() - 1);
+                for _ in 0..counted(&log[fresh..], CURSOR_QUERY) {
+                    let mut out = back.lock().unwrap();
+                    out.write_all(b"\x1b[1;1R").unwrap();
+                    out.flush().unwrap();
                 }
                 // The colour question, answered every time it is put, with the
                 // ground the scene is in now (M71).

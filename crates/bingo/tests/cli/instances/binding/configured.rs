@@ -22,11 +22,11 @@ async fn configured_override(family: &str, environment: bool, local: bool) {
         json!({family:{"instances":{name:endpoint}}})
     };
     let root = project(home.path(), overlay);
-    let mut file = root.join(".bingo/settings.json");
+    let dir = root.join(".bingo");
+    let mut file = dir.join("settings.toml");
     if local {
-        let destination = root.join(".bingo/settings.local.json");
-        std::fs::rename(&file, &destination).unwrap();
-        file = destination;
+        std::fs::rename(dir.join("settings.json"), dir.join("settings.local.json")).unwrap();
+        file = dir.join("settings.local.toml");
     }
     let mut cmd = at(home.path(), &root, name);
     if environment {
