@@ -77,7 +77,7 @@ fn proxy(address: &Address, token: &str) -> tokio::process::Command {
 #[tokio::test]
 async fn an_agent_reaches_the_shared_tools_through_the_spawned_proxy() {
     let home = tempfile::tempdir().expect("a temporary home");
-    let address = Address::of_run(&Env::rooted(home.path()), std::process::id());
+    let address = Address::fresh(&Env::rooted(home.path()));
     let bridge = Bridge::at(address.clone()).expect("it listens");
     let doors = Arc::new(Echo {
         seen: Mutex::new(Vec::new()),
@@ -144,7 +144,7 @@ async fn an_agent_reaches_the_shared_tools_through_the_spawned_proxy() {
 #[tokio::test]
 async fn a_proxy_with_a_token_this_run_never_minted_gets_nothing() {
     let home = tempfile::tempdir().expect("a temporary home");
-    let address = Address::of_run(&Env::rooted(home.path()), std::process::id());
+    let address = Address::fresh(&Env::rooted(home.path()));
     let _bridge = Bridge::at(address.clone()).expect("it listens");
 
     let transport = TokioChildProcess::new(proxy(&address, "not-a-token")).expect("it spawns");
@@ -164,7 +164,7 @@ async fn a_proxy_with_a_token_this_run_never_minted_gets_nothing() {
 #[tokio::test]
 async fn a_proxy_ends_when_its_bridge_does_though_its_stdin_is_open() {
     let home = tempfile::tempdir().expect("a temporary home");
-    let address = Address::of_run(&Env::rooted(home.path()), std::process::id());
+    let address = Address::fresh(&Env::rooted(home.path()));
     let mut listener = socket::Listener::bind(&address).expect("it listens");
 
     let mut command = proxy(&address, "spoken-for");

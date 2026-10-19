@@ -9,6 +9,8 @@
 //! on Windows — because it travels through an environment variable to a
 //! process that only has to dial it.
 
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use bingo_sdk::Env;
 
 use crate::error::AcpError;
@@ -19,30 +21,45 @@ use crate::error::AcpError;
 #[cfg(unix)]
 const DIRECTORY: &str = "acp";
 
+/// How many addresses this process has handed out. A process may open more
+/// than one bridge, and the pid alone would put the second on the first.
+static SERIAL: AtomicU64 = AtomicU64::new(0);
+
 /// Where the bridge listens: a filesystem path on unix, a named-pipe name on
 /// Windows. Whatever it is, it is what the proxy reads from its environment.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Address(String);
 
 impl Address {
-    /// This run's own address. The pid makes it this process's, so a second
-    /// bingo on the same data directory listens somewhere else.
+    /// An address no other bridge of this process or of another bingo on
+    /// this machine holds.
+    pub fn fresh(env: &Env) -> Self {
+        Self::of_run(
+            env,
+            std::process::id(),
+            SERIAL.fetch_add(1, Ordering::Relaxed),
+        )
+    }
+
+    /// The `serial`th address of the run with this pid. The pid keeps a
+    /// second bingo on the same data directory apart, the serial a second
+    /// bridge in the same process.
     #[cfg(unix)]
-    pub fn of_run(env: &Env, pid: u32) -> Self {
+    pub fn of_run(env: &Env, pid: u32, serial: u64) -> Self {
         Self(
             env.data_dir
                 .join(DIRECTORY)
-                .join(format!("{pid}.sock"))
+                .join(format!("{pid}-{serial}.sock"))
                 .display()
                 .to_string(),
         )
     }
 
-    /// The pipe namespace is flat and process-wide, so the name carries the
+    /// The pipe namespace is flat and machine-wide, so the name carries the
     /// pid where the unix path carries a directory.
     #[cfg(windows)]
-    pub fn of_run(_env: &Env, pid: u32) -> Self {
-        Self(format!(r"\\.\pipe\bingo-acp-{pid}"))
+    pub fn of_run(_env: &Env, pid: u32, serial: u64) -> Self {
+        Self(format!(r"\\.\pipe\bingo-acp-{pid}-{serial}"))
     }
 
     /// An address that already exists: the one the proxy was handed.
@@ -223,23 +240,25 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn a_run_listens_under_its_own_data_directory() {
-        let address = Address::of_run(&Env::rooted("/home/me"), 4321);
-        assert_eq!(address.as_str(), "/home/me/.bingo/data/acp/4321.sock");
+        let address = Address::of_run(&Env::rooted("/home/me"), 4321, 7);
+        assert_eq!(address.as_str(), "/home/me/.bingo/data/acp/4321-7.sock");
         assert!(address.as_str().len() < 104);
     }
 
     #[cfg(windows)]
     #[test]
     fn a_run_listens_on_a_pipe_of_its_own() {
-        let address = Address::of_run(&Env::rooted("C:\\Users\\me"), 4321);
-        assert_eq!(address.as_str(), r"\\.\pipe\bingo-acp-4321");
+        let address = Address::of_run(&Env::rooted("C:\\Users\\me"), 4321, 7);
+        assert_eq!(address.as_str(), r"\\.\pipe\bingo-acp-4321-7");
     }
 
-    /// Two runs on one data directory do not collide.
+    /// Two runs on one data directory do not collide, nor two bridges in
+    /// one run.
     #[test]
     fn two_runs_do_not_share_an_address() {
         let env = Env::rooted("/home/me");
-        assert_ne!(Address::of_run(&env, 1), Address::of_run(&env, 2));
+        assert_ne!(Address::of_run(&env, 1, 0), Address::of_run(&env, 2, 0));
+        assert_ne!(Address::fresh(&env), Address::fresh(&env));
     }
 
     #[tokio::test]
@@ -247,7 +266,7 @@ mod tests {
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
         let home = tempfile::tempdir().expect("a temporary home");
-        let address = Address::of_run(&Env::rooted(home.path()), std::process::id());
+        let address = Address::fresh(&Env::rooted(home.path()));
         let mut listener = Listener::bind(&address).expect("it listens");
         let dialling = tokio::spawn({
             let address = address.clone();
@@ -269,7 +288,7 @@ mod tests {
     #[tokio::test]
     async fn dialling_an_address_nobody_listens_on_fails() {
         let home = tempfile::tempdir().expect("a temporary home");
-        let address = Address::of_run(&Env::rooted(home.path()), 999_999);
+        let address = Address::of_run(&Env::rooted(home.path()), 999_999, 0);
         assert!(dial(&address).await.is_err());
     }
 
@@ -278,7 +297,7 @@ mod tests {
     #[tokio::test]
     async fn a_dropped_listener_stops_answering() {
         let home = tempfile::tempdir().expect("a temporary home");
-        let address = Address::of_run(&Env::rooted(home.path()), std::process::id());
+        let address = Address::fresh(&Env::rooted(home.path()));
         let listener = Listener::bind(&address).expect("it listens");
         drop(listener);
         assert!(dial(&address).await.is_err());

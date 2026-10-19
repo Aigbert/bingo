@@ -112,7 +112,7 @@ impl Rendezvous {
         let home = tempfile::tempdir().expect("a temporary home");
         // The address is derived exactly as a run derives it, so what these
         // tests bind is what a run binds — length and all.
-        let address = Address::of_run(&Env::rooted(home.path()), std::process::id());
+        let address = Address::fresh(&Env::rooted(home.path()));
         let bridge = Bridge::at(address.clone()).expect("it listens");
         Self {
             _home: home,
@@ -389,7 +389,7 @@ async fn a_dismissed_conversation_is_no_longer_an_address() {
 #[tokio::test]
 async fn a_dropped_bridge_stops_listening() {
     let home = tempfile::tempdir().expect("a temporary home");
-    let address = Address::of_run(&Env::rooted(home.path()), std::process::id());
+    let address = Address::fresh(&Env::rooted(home.path()));
     let bridge = Bridge::at(address.clone()).expect("it listens");
     let token = bridge
         .admit(Fake::with(vec![spec("Shout")], Answer::Refuse("x".into())))
