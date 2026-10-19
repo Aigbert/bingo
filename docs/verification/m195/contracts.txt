@@ -1,0 +1,7 @@
+Contracts before implementation:
+View::Code.of additive/absent old wire: 0 passed; 1 failed (R2).
+New-file Write all-added display: 0 passed; 1 failed (R3).
+After implementation: tool-fs 95 passed; 0 failed.
+Read parts fixture unchanged; tab content and shared character-budget cut pass.
+R2 schema regeneration: BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-sdk --locked: exit 0.
+BINGO_UPDATE_SCHEMA=1 cargo test -p bingo-mods -p bingo-plugin-rpc -p bingo-surface-rpc --locked: exit 0.

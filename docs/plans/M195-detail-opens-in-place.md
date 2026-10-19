@@ -46,8 +46,8 @@ well shows what the tool's owner drew. Find marks every match in the stream from
      - **Empty:** `no output`, or `did not run` for a skipped step.
    - The tier picks head or tail: a lookup keeps its head (`Tier::Lookup`).
 4. **Read draws its code.**
-   - `View::Code` gains `start: Option<u32>`. It is additive and skipped when absent; the
-     schemas regenerate.
+   - `View::Code` gains `start: Option<u32>` and `of: Option<u32>`. Both are additive,
+     skipped when absent; the schemas regenerate.
    - `Read` sets `display` to the lines it returned and the line they began at. The text the
      model reads is unchanged.
 5. **The ledger scene.**
@@ -77,20 +77,21 @@ well shows what the tool's owner drew. Find marks every match in the stream from
 - New `src/well.rs` (wells only) and `src/detail.rs` (selection and keys).
 - `crates/bingo-sdk/src/view/mod.rs` (`start`), `crates/bingo-tool-fs/src/read.rs`, regenerated
   schemas.
+- `ui.rs` adds `Open::Reader` for memory pages, retaining their own layer.
 
 ## Exit criteria
 
-- [ ] `done-detail`, `done-well`, `done-folded`, `ledger`, `ledger-up`, `find`, `find-up` and
+- [x] `done-detail`, `done-well`, `done-folded`, `ledger`, `ledger-up`, `find`, `find-up` and
       `find-back` pass full-frame through the harness, keys driven as `index.json` lists them.
-- [ ] Unit tests:
+- [x] Unit tests:
   - well cuts: head 12, tail 12, the notes;
   - diff line numbers across two hunks;
   - word spans;
   - a find hit on a wide character;
   - the esc of find going back to the old scroll.
-- [ ] `Read` returns the same `parts` as before (its fixture test is unchanged), and its
+- [x] `Read` returns the same `parts` as before (its fixture test is unchanged), and its
       `display` carries `start`.
-- [ ] Gates and checks as in M192. tmux drive: `ctrl+o` on a done turn, ↑↓, ⏎ on a diff, a
+- [x] Gates and checks as in M192. tmux drive: `ctrl+o` on a done turn, ↑↓, ⏎ on a diff, a
       command and a read, esc; `ctrl+f`, typing, ↑, esc.
 
 ## Non-goals
@@ -104,3 +105,41 @@ own scroll (it shows 12 lines; the rest is in Browse).
   the whole output: Browse, named in the keys sheet (M198).
 - **Find over drawn cells only finds what is drawn.** A folded thought is found only in detail.
   This is accepted, and the prototype does the same.
+
+## Verified
+
+Evidence in `docs/verification/m195/`: `gates.txt`, `contracts.txt`, `snapshots.txt`, `history.txt`,
+`drive.log`, and the drive's text/ANSI captures.
+
+- [x] Frames: `m195_full_frames_follow_the_prototype_keys ... ok` (done-detail/well/folded,
+  ledger/up, find/up/back), keys as `index.json` lists them.
+- [x] Units: well head/tail 12, two-hunk line numbers, word spans, a wide-character hit and find's
+  esc going back all pass. The ledger test builds two failed steps and opens the first.
+- [x] Read: the `parts` fixture is unchanged; `display` carries `start`/`of` and is sliced from the
+  count the shared join kept. A new file's Write returns an all-added diff (fails before, passes after).
+  Scene displays come from running the real Read, Write and Edit tools.
+- [x] Scroll: one `Layout::below()`; the renderer writes no UI state. Detail pins once on open and
+  closes into `Held`. `closing_detail_holds_the_drawn_place_when_more_rows_arrive` and
+  `closing_detail_follows_when_the_folded_stream_fits` pass; the second fails without its fix.
+- [x] Gates (`gates.txt`): fmt exit 0; check and clippy `-D warnings` finished; `cargo test
+  --workspace --locked` 6571 passed, 0 failed, 0 ignored (TUI 1427, PTY 19); `discipline ok`;
+  budget 423 of 423, `budget ok`; `cargo deny check` all ok.
+- [x] Drive: `python3 docs/verification/m195/drive.py` gives `PASS`/`CLEAN` at 100x32 and 80x24
+  (ctrl+o, up/down, enter on a diff, a command and a read, esc; ctrl+f, typing, up, esc).
+  `scripts/tui-smoke.sh`: `tui-smoke ok`.
+- [x] Windows: sdk and schedule `cargo check --target x86_64-pc-windows-msvc` exit 0.
+- [ ] Windows tool-fs, TUI, Feishu, bin: owed to CI: aws-lc-sys headers (`stdlib.h`/`windows.h`
+  are not on this machine).
+- [x] History: a `rebase -x` fmt and check run over every commit (`history.txt`).
+- Snapshots: 17 modified, 1 added, 5 deleted, each with a reason in `snapshots.txt`. Six are
+  palette changes from the ctrl+o key row. The permission text snapshots are unchanged.
+
+Departures:
+- The diff renderer has one parser and one pairing pass. `DiffStyle` picks the look; `Well` adds
+  the gutter and drops headers. The permission card shares the character-run emphasis, which
+  removes one unchanged character from `inked_diff`'s emphasis.
+- Find's esc gives back the whole `Scroll` it found, not only an offset.
+- `message_tools` is drawn at 80x32 so the openroom row stays visible.
+- Closing detail follows the tail when the folded stream reaches it, even if detail was scrolled
+  up; otherwise it holds the drawn place.
+- `dialog.expanded` stays, because ctrl+e and the permission preview use it. No dependency, merge or push.

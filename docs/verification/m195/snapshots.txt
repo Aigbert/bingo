@@ -1,0 +1,33 @@
+Snapshot changes from d00ff6c7: 17 modified, 1 added, 5 deleted.
+M	crates/bingo-surface-tui/src/palette/snapshots/bingo_surface_tui__palette__tests__palette_keys_108x30.snap
+M	crates/bingo-surface-tui/src/palette/snapshots/bingo_surface_tui__palette__tests__palette_keys_80x24.snap
+M	crates/bingo-surface-tui/src/palette/snapshots/bingo_surface_tui__palette__tests__palette_skills_0_search_108x30.snap
+M	crates/bingo-surface-tui/src/palette/snapshots/bingo_surface_tui__palette__tests__palette_skills_0_search_80x24.snap
+M	crates/bingo-surface-tui/src/palette/snapshots/bingo_surface_tui__palette__tests__palette_skills_20_search_108x30.snap
+M	crates/bingo-surface-tui/src/palette/snapshots/bingo_surface_tui__palette__tests__palette_skills_3_search_108x30.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__ascii_turn_expanded.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__inked_diff.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__message_tools_120x40.snap
+D	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__message_tools_80x24.snap
+A	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__message_tools_80x32.snap
+D	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__pager_sheet_120x40.snap
+D	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__pager_sheet_80x24.snap
+D	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__reasoning_sheet_120x40.snap
+D	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__reasoning_sheet_80x24.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__shell_lines_120x40.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__shell_lines_80x24.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__shell_lines_ascii.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__shell_ran_120x40.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__shell_ran_80x24.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__turn_expanded_120x40.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__screens__turn_expanded_80x24.snap
+M	crates/bingo-surface-tui/src/snapshots/bingo_surface_tui__view__tests__ctrl_f_searches_the_transcript_and_esc_gives_the_status_line_back.snap
+Why each changed:
+palette_keys / palette_skills (6): the keys sheet row for ctrl+o now reads "details of the last turn".
+shell_lines / shell_ran (5): the inline peek cut is gone; output sits in a well from column 5 with pad rows.
+turn_expanded / ascii_turn_expanded (3): the chosen well is the edit diff (gutter, signs, no header).
+message_tools: 80x24 replaced by 80x32 to keep openroom visible; 120x40 follows the per-item turns.
+ctrl_f view snapshot: find lives in the dock and lands on the newest hit, centred.
+inked_diff: shared character-run emphasis excludes the unchanged semicolon.
+pager_sheet / reasoning_sheet (4 deleted): the pager and the reasoning sheet are gone (brick 7).
+Permission text snapshots: unchanged.

@@ -1,0 +1,4 @@
+PASS 100x32: detail, read/diff/command wells, find, escape; fake provider
+CLEAN 100x32: owned server stopped; temporary HOME/data/cwd removed
+PASS 80x24: detail, read/diff/command wells, find, escape; fake provider
+CLEAN 80x24: owned server stopped; temporary HOME/data/cwd removed

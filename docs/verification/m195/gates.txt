@@ -1,0 +1,18 @@
+cargo fmt --all -- --check: exit 0
+cargo check --workspace --all-targets --locked: Finished dev profile; exit 0
+cargo clippy --workspace --all-targets --locked -- -D warnings: Finished dev profile; exit 0
+cargo test --workspace --locked: 127 result lines; 6571 passed; 0 failed; 0 ignored
+TUI: 1427 passed; 0 failed. PTY: 19 passed; 0 failed.
+scripts/check_discipline.sh: discipline ok
+scripts/budget.sh:
+dependencies (unique, normal): 423 (max  423)
+warm cargo check -p bingo-core: 0s (max  20s)
+relink isolation: touching the TUI recompiled 0 crates for core (must be 0)
+target/debug: 15 GB (soft max  5)
+warn: target/debug exceeds the soft limit
+test binaries: 198
+budget ok
+cargo deny check: advisories ok, bans ok, licenses ok, sources ok
+cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc: Finished dev profile; exit 0
+cargo check -p bingo-schedule --all-targets --target x86_64-pc-windows-msvc: Finished dev profile; exit 0
+owed to CI: aws-lc-sys headers (tool-fs, TUI, Feishu and binary dependency tree); known local limit, not retried.

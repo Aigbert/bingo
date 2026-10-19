@@ -1,0 +1,4 @@
+Own history autosquashed onto d00ff6c7; no merge, no push.
+unset $(git rev-parse --local-env-vars)
+git -c core.hooksPath=/dev/null rebase -x 'cargo fmt --all -- --check && cargo check --workspace --all-targets --locked' d00ff6c7
+Result: every commit fmt-clean and Finished dev profile; Successfully rebased.

@@ -16,8 +16,8 @@
 
 
 
-   ⢀
- ⠐   ⠠
+    ⠄
+ ⠈    ⠄
 
 ▍  Read, edit, and print the source lines.
    ¶ read    note.txt                                                                     30 lines
