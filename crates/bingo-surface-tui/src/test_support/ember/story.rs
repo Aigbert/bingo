@@ -3,6 +3,15 @@ use crate::test_support::*;
 use bingo_sdk::{CatalogEntry, Reads, ToolLook, ToolTraits, TurnStatus, Upshot};
 
 pub fn scene(name: &str) -> (SessionState, crate::tool_rows::Looks) {
+    let turns = turns(name);
+    let mut state = state();
+    for (at, turn) in turns.iter().enumerate() {
+        fold_turn(&mut state, at, turn);
+    }
+    (state, crate::tool_rows::Looks::of(&catalogue()))
+}
+
+pub fn turns(name: &str) -> Vec<Value> {
     let data = match name {
         "done" | "ascii-done" | "small-done" | "mode" | "mode-later" => include_str!("done.json"),
         "stop" => include_str!("stop.json"),
@@ -14,11 +23,7 @@ pub fn scene(name: &str) -> (SessionState, crate::tool_rows::Looks) {
     for turn in &mut turns {
         clock_origin(turn);
     }
-    let mut state = state();
-    for (at, turn) in turns.iter().enumerate() {
-        fold_turn(&mut state, at, turn);
-    }
-    (state, crate::tool_rows::Looks::of(&catalogue()))
+    turns
 }
 
 fn clock_origin(value: &mut Value) {
@@ -47,7 +52,7 @@ fn emit(state: &mut SessionState, at: i64, event: Event) {
     state.apply(&frame);
 }
 
-pub(super) fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
+pub fn fold_turn(state: &mut SessionState, n: usize, turn: &Value) {
     let id = format!("ember-{n}");
     let t0 = turn["t0"].as_i64().unwrap();
     emit(state, t0, started(&id));
@@ -139,12 +144,12 @@ fn fold_reply(state: &mut SessionState, id: &str, turn: &Value) {
     }
 }
 
-fn stamp(item: &mut Item, at: i64, end: Option<i64>) {
+pub(super) fn stamp(item: &mut Item, at: i64, end: Option<i64>) {
     item.started_at = Timestamp::from_millisecond(at).unwrap();
     item.completed_at = end.map(|ms| Timestamp::from_millisecond(ms).unwrap());
 }
 
-fn from_data(id: &str, data: &Value) -> Item {
+pub(super) fn from_data(id: &str, data: &Value) -> Item {
     match data["k"].as_str().unwrap() {
         "narr" => assistant(id, data["text"].as_str().unwrap(), ItemStatus::Completed),
         "think" => item(
@@ -256,4 +261,73 @@ fn markdown(blocks: &[Value]) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n\n")
+}
+
+/// Provider-owned items only; keys supply prompts, steers and interruptions.
+pub fn provider_events(n: usize, turn: &Value) -> Vec<(i64, Event)> {
+    let id = format!("ember-{n}");
+    let mut events = Vec::new();
+    for (index, data) in turn["items"].as_array().unwrap().iter().enumerate() {
+        if data["k"] == "you" {
+            continue;
+        }
+        let mut item = from_data(&format!("{id}-{index}"), data);
+        item.turn = Some(TurnId::from_raw(&id));
+        let at = data["at"].as_i64().unwrap();
+        let end = data["end"]
+            .as_i64()
+            .or_else(|| item.status.is_terminal().then_some(at));
+        stamp(&mut item, at, end);
+        if item.status == ItemStatus::Interrupted {
+            item.status = ItemStatus::Running;
+            item.completed_at = None;
+            if let ItemBody::ToolCall { output, .. } = &mut item.body {
+                *output = None;
+            }
+            events.push((at, Event::ItemStarted { item }));
+        } else if data["k"] == "step" && item.is_terminal() {
+            let mut running = item.clone();
+            running.status = ItemStatus::Running;
+            running.completed_at = None;
+            if let ItemBody::ToolCall { output, .. } = &mut running.body {
+                *output = None;
+            }
+            events.push((at, Event::ItemStarted { item: running }));
+            events.push((end.unwrap(), Event::ItemCompleted { item }));
+        } else {
+            let event = if item.is_terminal() {
+                Event::ItemCompleted { item }
+            } else {
+                Event::ItemStarted { item }
+            };
+            events.push((at, event));
+        }
+    }
+    let mut reply = state();
+    fold_reply(&mut reply, &id, turn);
+    for item in reply.transcript.items() {
+        let event = if item.is_terminal() {
+            Event::ItemCompleted {
+                item: item.as_ref().clone(),
+            }
+        } else {
+            Event::ItemStarted {
+                item: item.as_ref().clone(),
+            }
+        };
+        events.push((
+            item.completed_at
+                .unwrap_or(item.started_at)
+                .as_millisecond(),
+            event,
+        ));
+    }
+    if turn["state"] == "done" {
+        events.push((
+            turn["endAt"].as_f64().unwrap() as i64,
+            completed(&id, TurnStatus::Completed),
+        ));
+    }
+    events.sort_by_key(|(at, _)| *at);
+    events
 }

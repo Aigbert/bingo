@@ -937,6 +937,9 @@ pub(crate) fn typed_line(ui: &mut Ui, tree: &Tree, now: Now, line: String) -> Ve
 /// `⏎` steers a running turn at its next barrier, `tab` waits for it to end.
 fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect> {
     let text = ui.composer.take();
+    if delivery == Delivery::Wake && !text.trim().is_empty() {
+        ui.clear_notice();
+    }
     ui.history.remember(&text);
     ui.edited();
     send(ui, tree, now, text, |text| own_line(text, delivery))

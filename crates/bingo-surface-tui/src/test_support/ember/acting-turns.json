@@ -1,0 +1,835 @@
+{
+  "live-steered": [
+    {
+      "kind": "turn",
+      "id": 2,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9997400,
+      "state": "live",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9997400,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9998200,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9998300,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9998500,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9998600,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9998750,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 9998900,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 9999200,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 9999450,
+          "tool": "write",
+          "arg": "crates/bingo-core/tests/queue_steer.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": "+",
+              "n": 1,
+              "t": "use bingo_core::session::Queue;"
+            },
+            {
+              "s": "+",
+              "n": 2,
+              "t": "use bingo_sdk::Message;"
+            },
+            {
+              "s": "+",
+              "n": 3,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 4,
+              "t": "#[test]"
+            },
+            {
+              "s": "+",
+              "n": 5,
+              "t": "fn steer_then_queue_keeps_both() {"
+            },
+            {
+              "s": "+",
+              "n": 6,
+              "t": "    let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 7,
+              "t": "    q.steer(Message::text(\"first\"));"
+            },
+            {
+              "s": "+",
+              "n": 8,
+              "t": "    q.push(Message::user(\"second\"));"
+            },
+            {
+              "s": "+",
+              "n": 9,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"first\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 10,
+              "t": "    q.reset();"
+            },
+            {
+              "s": "+",
+              "n": 11,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"second\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 12,
+              "t": "}"
+            },
+            {
+              "s": "+",
+              "n": 13,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 14,
+              "t": "#[test]"
+            },
+            {
+              "s": "+",
+              "n": 15,
+              "t": "fn a_second_steer_replaces_the_first() {"
+            },
+            {
+              "s": "+",
+              "n": 16,
+              "t": "    let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 17,
+              "t": "    q.steer(Message::text(\"old\"));"
+            },
+            {
+              "s": "+",
+              "n": 18,
+              "t": "    q.steer(Message::text(\"new\"));"
+            },
+            {
+              "s": "+",
+              "n": 19,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"new\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 20,
+              "t": "}"
+            }
+          ],
+          "end": 9999800,
+          "res": "",
+          "add": 20,
+          "del": 0
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "fail",
+          "tail": [
+            "   Compiling bingo-core v0.6.3 (crates/bingo-core)",
+            "error[E0599]: no function or associated item named `user` found for enum `Message`",
+            " --> crates/bingo-core/tests/queue_steer.rs:8:21"
+          ],
+          "end": 10001500,
+          "res": "exit 101",
+          "out": [
+            "   Compiling bingo-core v0.6.3 (crates/bingo-core)",
+            "error[E0599]: no function or associated item named `user` found for enum `Message`",
+            " --> crates/bingo-core/tests/queue_steer.rs:8:21",
+            "  |",
+            "8 |     q.push(Message::user(\"second\"));",
+            "  |                     ^^^^ function or associated item not found in `Message`",
+            "error: could not compile `bingo-core` (test \"queue_steer\") due to 1 previous error"
+          ]
+        },
+        {
+          "k": "narr",
+          "at": 10001700,
+          "text": "测试里的构造函数写错了，应该是 Message::text。"
+        },
+        {
+          "k": "you",
+          "at": 10002000,
+          "text": "测试名字用英文",
+          "note": "steered"
+        },
+        {
+          "k": "step",
+          "at": 10002000,
+          "tool": "edit",
+          "arg": "crates/bingo-core/tests/queue_steer.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 7,
+              "t": "    q.steer(Message::text(\"first\"));"
+            },
+            {
+              "s": "-",
+              "n": 8,
+              "t": "    q.push(Message::user(\"second\"));"
+            },
+            {
+              "s": "+",
+              "n": 8,
+              "t": "    q.push(Message::text(\"second\"));"
+            },
+            {
+              "s": " ",
+              "n": 9,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"first\".into()));"
+            }
+          ],
+          "end": 10002300,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10002500,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "run",
+          "tail": []
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 19,
+      "paused": false,
+      "pauseAt": 0,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null,
+      "title": "steer 吞掉排队消息"
+    }
+  ],
+  "live-stopped": [
+    {
+      "kind": "turn",
+      "id": 4,
+      "prompt": "修好它，加一个回归测试",
+      "chips": [],
+      "t0": 9997400,
+      "state": "stopped",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 9997400,
+          "ms": 700,
+          "text": "原因上一轮找到了：reset() 每轮开始时清空了队列。只重置 steer 就行，再写一个测试复现「steer 之后排队的那条被吞」。"
+        },
+        {
+          "k": "narr",
+          "at": 9998200,
+          "text": "先改 reset()，再补一个回归测试。"
+        },
+        {
+          "k": "step",
+          "at": 9998300,
+          "tool": "read",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9998500,
+          "res": "214 lines",
+          "code": {
+            "start": 1,
+            "of": 214,
+            "lines": [
+              "use std::collections::VecDeque;",
+              "",
+              "use bingo_sdk::Message;",
+              "",
+              "/// What you type while a turn runs: one steer slot, then the queue.",
+              "#[derive(Debug, Default)]",
+              "pub struct Queue {",
+              "    steer: Option<Message>,",
+              "    queue: VecDeque<Message>,",
+              "}",
+              "",
+              "impl Queue {"
+            ]
+          }
+        },
+        {
+          "k": "step",
+          "at": 9998600,
+          "tool": "glob",
+          "arg": "crates/bingo-core/tests/*.rs",
+          "st": "ok",
+          "tail": [],
+          "end": 9998750,
+          "res": "6 files",
+          "out": [
+            "crates/bingo-core/tests/compact.rs",
+            "crates/bingo-core/tests/journal.rs",
+            "crates/bingo-core/tests/permissions.rs",
+            "crates/bingo-core/tests/replay.rs",
+            "crates/bingo-core/tests/session.rs",
+            "crates/bingo-core/tests/turn_loop.rs"
+          ]
+        },
+        {
+          "k": "step",
+          "at": 9998900,
+          "tool": "edit",
+          "arg": "crates/bingo-core/src/session/queue.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 86,
+              "t": "    /// Called when a turn starts."
+            },
+            {
+              "s": " ",
+              "n": 87,
+              "t": "    pub fn reset(&mut self) {"
+            },
+            {
+              "s": "-",
+              "n": 88,
+              "t": "        self.queue.clear();"
+            },
+            {
+              "s": "+",
+              "n": 88,
+              "t": "        // queued lines belong to the next turn; only the steer slot resets"
+            },
+            {
+              "s": " ",
+              "n": 89,
+              "t": "        self.steer = None;"
+            },
+            {
+              "s": " ",
+              "n": 90,
+              "t": "    }"
+            }
+          ],
+          "end": 9999200,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 9999450,
+          "tool": "write",
+          "arg": "crates/bingo-core/tests/queue_steer.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": "+",
+              "n": 1,
+              "t": "use bingo_core::session::Queue;"
+            },
+            {
+              "s": "+",
+              "n": 2,
+              "t": "use bingo_sdk::Message;"
+            },
+            {
+              "s": "+",
+              "n": 3,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 4,
+              "t": "#[test]"
+            },
+            {
+              "s": "+",
+              "n": 5,
+              "t": "fn steer_then_queue_keeps_both() {"
+            },
+            {
+              "s": "+",
+              "n": 6,
+              "t": "    let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 7,
+              "t": "    q.steer(Message::text(\"first\"));"
+            },
+            {
+              "s": "+",
+              "n": 8,
+              "t": "    q.push(Message::user(\"second\"));"
+            },
+            {
+              "s": "+",
+              "n": 9,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"first\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 10,
+              "t": "    q.reset();"
+            },
+            {
+              "s": "+",
+              "n": 11,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"second\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 12,
+              "t": "}"
+            },
+            {
+              "s": "+",
+              "n": 13,
+              "t": ""
+            },
+            {
+              "s": "+",
+              "n": 14,
+              "t": "#[test]"
+            },
+            {
+              "s": "+",
+              "n": 15,
+              "t": "fn a_second_steer_replaces_the_first() {"
+            },
+            {
+              "s": "+",
+              "n": 16,
+              "t": "    let mut q = Queue::default();"
+            },
+            {
+              "s": "+",
+              "n": 17,
+              "t": "    q.steer(Message::text(\"old\"));"
+            },
+            {
+              "s": "+",
+              "n": 18,
+              "t": "    q.steer(Message::text(\"new\"));"
+            },
+            {
+              "s": "+",
+              "n": 19,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"new\".into()));"
+            },
+            {
+              "s": "+",
+              "n": 20,
+              "t": "}"
+            }
+          ],
+          "end": 9999800,
+          "res": "",
+          "add": 20,
+          "del": 0
+        },
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "fail",
+          "tail": [
+            "   Compiling bingo-core v0.6.3 (crates/bingo-core)",
+            "error[E0599]: no function or associated item named `user` found for enum `Message`",
+            " --> crates/bingo-core/tests/queue_steer.rs:8:21"
+          ],
+          "end": 10001500,
+          "res": "exit 101",
+          "out": [
+            "   Compiling bingo-core v0.6.3 (crates/bingo-core)",
+            "error[E0599]: no function or associated item named `user` found for enum `Message`",
+            " --> crates/bingo-core/tests/queue_steer.rs:8:21",
+            "  |",
+            "8 |     q.push(Message::user(\"second\"));",
+            "  |                     ^^^^ function or associated item not found in `Message`",
+            "error: could not compile `bingo-core` (test \"queue_steer\") due to 1 previous error"
+          ]
+        },
+        {
+          "k": "narr",
+          "at": 10001700,
+          "text": "测试里的构造函数写错了，应该是 Message::text。"
+        },
+        {
+          "k": "you",
+          "at": 10002000,
+          "text": "测试名字用英文",
+          "note": "steered"
+        },
+        {
+          "k": "step",
+          "at": 10002000,
+          "tool": "edit",
+          "arg": "crates/bingo-core/tests/queue_steer.rs",
+          "st": "ok",
+          "tail": [],
+          "diff": [
+            {
+              "s": " ",
+              "n": 7,
+              "t": "    q.steer(Message::text(\"first\"));"
+            },
+            {
+              "s": "-",
+              "n": 8,
+              "t": "    q.push(Message::user(\"second\"));"
+            },
+            {
+              "s": "+",
+              "n": 8,
+              "t": "    q.push(Message::text(\"second\"));"
+            },
+            {
+              "s": " ",
+              "n": 9,
+              "t": "    assert_eq!(q.drain().map(|m| m.text()), Some(\"first\".into()));"
+            }
+          ],
+          "end": 10002300,
+          "res": "",
+          "add": 1,
+          "del": 1
+        },
+        {
+          "k": "step",
+          "at": 10002500,
+          "tool": "bash",
+          "arg": "cargo test -p bingo-core queue",
+          "st": "cut",
+          "tail": [],
+          "res": "stopped",
+          "end": 10002520
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 24,
+      "paused": false,
+      "pauseAt": 0,
+      "pausedMs": 0,
+      "endAt": 10002520,
+      "answer": null,
+      "title": "steer 吞掉排队消息"
+    }
+  ],
+  "stop-resent": [
+    {
+      "kind": "turn",
+      "id": 7,
+      "prompt": "做完以后更新一下 CHANGELOG",
+      "chips": [],
+      "t0": 10002900,
+      "state": "live",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 10002900,
+          "ms": 500,
+          "text": "原型里的回答是预先写好的。"
+        }
+      ],
+      "reply": {
+        "at": 10003500,
+        "blocks": [
+          {
+            "p": "收到「做完以后更新一下 CHANGELOG」。这是原型，回答是预先写好的；试试「修好它，加一个回归测试」，看完整的一轮：读文件、改代码、跑测试、失败、修好。"
+          }
+        ],
+        "revealed": 39
+      },
+      "error": null,
+      "si": 2,
+      "paused": false,
+      "pauseAt": 0,
+      "pausedMs": 0,
+      "endAt": 0,
+      "answer": null
+    }
+  ],
+  "shell": [
+    {
+      "kind": "turn",
+      "id": 9,
+      "prompt": "!git status --short",
+      "chips": [],
+      "t0": 10000000,
+      "state": "done",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "git status --short",
+          "st": "ok",
+          "tail": [
+            " M crates/bingo-core/src/session/queue.rs",
+            "?? crates/bingo-core/tests/queue_steer.rs",
+            "?? docs/adr/0097-ember-tui.md"
+          ],
+          "end": 10000320,
+          "res": "3 lines",
+          "out": [
+            " M crates/bingo-core/src/session/queue.rs",
+            "?? crates/bingo-core/tests/queue_steer.rs",
+            "?? docs/adr/0097-ember-tui.md"
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 6,
+      "paused": false,
+      "pauseAt": 0,
+      "pausedMs": 0,
+      "endAt": 10000380,
+      "answer": null,
+      "shell": true
+    }
+  ],
+  "shell-ls": [
+    {
+      "kind": "turn",
+      "id": 11,
+      "prompt": "!git status --short",
+      "chips": [],
+      "t0": 10000000,
+      "state": "done",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "step",
+          "at": 10000000,
+          "tool": "bash",
+          "arg": "git status --short",
+          "st": "ok",
+          "tail": [
+            " M crates/bingo-core/src/session/queue.rs",
+            "?? crates/bingo-core/tests/queue_steer.rs",
+            "?? docs/adr/0097-ember-tui.md"
+          ],
+          "end": 10000320,
+          "res": "3 lines",
+          "out": [
+            " M crates/bingo-core/src/session/queue.rs",
+            "?? crates/bingo-core/tests/queue_steer.rs",
+            "?? docs/adr/0097-ember-tui.md"
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 6,
+      "paused": false,
+      "pauseAt": 0,
+      "pausedMs": 0,
+      "endAt": 10000380,
+      "answer": null,
+      "shell": true
+    },
+    {
+      "kind": "turn",
+      "id": 12,
+      "prompt": "!ls",
+      "chips": [],
+      "t0": 10000980,
+      "state": "done",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "step",
+          "at": 10000980,
+          "tool": "bash",
+          "arg": "ls",
+          "st": "ok",
+          "tail": [
+            "ARCHITECTURE.md  Cargo.lock  Cargo.toml  crates  docs  scripts"
+          ],
+          "end": 10001220,
+          "res": "1 line",
+          "out": [
+            "ARCHITECTURE.md  Cargo.lock  Cargo.toml  crates  docs  scripts"
+          ]
+        }
+      ],
+      "reply": null,
+      "error": null,
+      "si": 4,
+      "paused": false,
+      "pauseAt": 0,
+      "pausedMs": 0,
+      "endAt": 10001280,
+      "answer": null,
+      "shell": true
+    }
+  ],
+  "image-sent": [
+    {
+      "kind": "turn",
+      "id": 15,
+      "prompt": "这个报错什么意思",
+      "chips": [
+        "image 1"
+      ],
+      "t0": 10000300,
+      "state": "done",
+      "open": false,
+      "row": -1,
+      "well": -1,
+      "items": [
+        {
+          "k": "think",
+          "at": 10000300,
+          "ms": 900,
+          "text": "截图是 cargo 的报错：借用活得比被借的值还久。"
+        }
+      ],
+      "reply": {
+        "at": 10001300,
+        "blocks": [
+          {
+            "p": "截图里是一个借用错误：`drain()` 返回的引用，活得比 `self.queue` 还久。"
+          },
+          {
+            "p": "把返回值改成拥有所有权的 `Message` 就行，`pop_front()` 本来就把所有权交给你；或者在调用处先 `clone()`。"
+          }
+        ]
+      },
+      "error": null,
+      "si": 2,
+      "paused": false,
+      "pauseAt": 0,
+      "pausedMs": 0,
+      "endAt": 10002073.333333334,
+      "answer": null
+    }
+  ]
+}

@@ -5,6 +5,7 @@ use ratatui::{buffer::Buffer, layout::Rect};
 use serde::Deserialize;
 use std::path::PathBuf;
 pub mod acting;
+pub mod answers;
 mod compare;
 mod parse;
 pub mod story;

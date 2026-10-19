@@ -375,6 +375,11 @@ impl Ui {
         alert
     }
 
+    pub fn clear_notice(&mut self) {
+        self.notice = None;
+        self.placed.toasts.discard();
+    }
+
     /// The local toast, while one is being said.
     pub fn notice(&self) -> Option<&Notice> {
         self.notice.as_ref()
