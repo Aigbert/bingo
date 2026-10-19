@@ -88,6 +88,8 @@ bingo-mod-browse.workspace = true
 bingo-mod-models.workspace = true
 # The built-in owner of a turn's rows, answering in the marks it is handed.
 bingo-mod-ledger.workspace = true
+# The crew's rows, answering a teammate's step in its voice (M200).
+bingo-mod-crew.workspace = true
 bingo-sdk = { workspace = true, features = ["testing"] }
 # The pictures the transcript's tests hand over, drawn by the crate that
 # reads them back rather than pasted into a source file.

@@ -7,6 +7,8 @@ use bingo_sdk::{Event, Input, SessionId};
 use crossterm::event::{KeyCode, KeyEvent};
 use world::World;
 
+mod crew;
+mod script;
 mod world;
 
 fn ui() -> Ui {
@@ -25,6 +27,23 @@ fn room_world() -> World {
     world.mate("ada", world::SETUP - 598_000);
     world.design_room();
     world
+}
+
+/// `S.mode = 1; past(); designRoom(); startTurn(CREW_P, crewScript())`:
+/// each hire lands at the first 50 ms tick after its beat.
+fn crew_beats(world: &World) -> Vec<script::Beat> {
+    crew::crew(
+        world.tree.root_id(),
+        0,
+        crew::Hire {
+            opened: 750,
+            t0: 750,
+        },
+        crew::Hire {
+            opened: 1050,
+            t0: 1050,
+        },
+    )
 }
 
 /// What the kernel does later on its own: an event on a session, at a
@@ -65,7 +84,17 @@ impl Drive {
         drive
     }
 
+    /// A frame, with each ledger row it pulls answered by the crew's rows,
+    /// which hand every other step on to the ledger's own drawing.
     fn draw(&mut self) -> ratatui::backend::TestBackend {
+        let screen = self.drawn();
+        if self.answer_pulls() {
+            return self.drawn();
+        }
+        screen
+    }
+
+    fn drawn(&mut self) -> ratatui::backend::TestBackend {
         drawn(
             self.size.0,
             self.size.1,
@@ -73,6 +102,46 @@ impl Drive {
             &mut self.ui,
             self.now,
         )
+    }
+
+    fn answer_pulls(&mut self) -> bool {
+        let mut answered = false;
+        for key in self.ui.shown.pulls.clone() {
+            let parsed = bingo_sdk::component::Props::parse(
+                key.request.component,
+                key.request.props.clone(),
+            );
+            let Ok(bingo_sdk::component::Props::Ledger(props)) = parsed else {
+                continue;
+            };
+            if !self.ui.placed.pulled.request(&key) {
+                continue;
+            }
+            let width = usize::from(key.request.viewport.columns);
+            self.ui
+                .placed
+                .pulled
+                .answer(key, bingo_mod_crew::rows::ledger(&props, width));
+            answered = true;
+        }
+        answered
+    }
+
+    /// A script's beats: what is already past folds now, the rest when due.
+    fn script(&mut self, beats: Vec<script::Beat>) {
+        for beat in beats {
+            if beat.t <= self.t {
+                self.world
+                    .emit(&beat.session, world::SETUP + beat.t, beat.event);
+            } else {
+                let event = beat.event;
+                self.due.push(Due {
+                    at: beat.t,
+                    session: beat.session,
+                    event: Box::new(move |_| event),
+                });
+            }
+        }
     }
 
     /// What the loop does with `Effect::View`.
@@ -219,6 +288,22 @@ fn m200_room_frames_follow_the_prototype_keys() {
             drive.show(&world::id("design"));
             drive.play(&capture);
             assert_eq!(drive.t, capture.entry.moment_ms, "{name}");
+            drive.shot(&capture);
+        });
+    }
+}
+
+#[test]
+fn m200_crew_frames_follow_the_prototype() {
+    for name in ["crew", "small-crew"] {
+        let capture = Capture::load(name);
+        capture.render(|| {
+            let mut world = World::accepting_edits();
+            world.design_room();
+            let beats = crew_beats(&world);
+            let mut drive = Drive::new(world, &capture);
+            drive.script(beats);
+            drive.wait(capture.entry.moment_ms);
             drive.shot(&capture);
         });
     }

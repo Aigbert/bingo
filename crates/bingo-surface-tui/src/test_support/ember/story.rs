@@ -316,8 +316,13 @@ fn call(id: &str, data: &Value) -> Item {
         output,
         status,
     );
-    if let ItemBody::ToolCall { progress, .. } = &mut item.body {
+    if let ItemBody::ToolCall {
+        progress, call_id, ..
+    } = &mut item.body
+    {
         *progress = (!tail.is_empty()).then_some(tail);
+        // A provider names each call once; the drawing a row pulls is keyed by it.
+        *call_id = format!("call_{id}").into();
     }
     item
 }

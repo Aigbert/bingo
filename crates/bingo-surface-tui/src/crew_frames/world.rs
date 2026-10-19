@@ -26,11 +26,24 @@ pub fn id(name: &str) -> SessionId {
 impl World {
     /// `past()`: the two finished turns of the done scene, at home.
     pub fn home() -> Self {
+        Self::past(None)
+    }
+
+    /// `S.mode = 1; past()`: home in the mode that lets edits run.
+    pub fn accepting_edits() -> Self {
+        Self::past(Some("acceptEdits"))
+    }
+
+    fn past(mode: Option<&str>) -> Self {
         let (mut state, _) = story::scene("done");
         let mut summary = state.summary.clone();
         summary.model = Some("opus-5.5".into());
         summary.effort = Some(Effort::High);
         state.apply(&frame(state.seq.0 + 1, Event::SessionUpdated { summary }));
+        if let Some(mode) = mode {
+            state.apply(&frame(state.seq.0 + 1, permission_view(mode)));
+        }
+        state.config.kernel["render"] = json!({"Ledger": [{}]});
         Self {
             tree: Tree::new(state),
         }
@@ -54,29 +67,56 @@ impl World {
 
     /// A teammate from the roster, hired at `at`: the order its ink follows.
     pub fn mate(&mut self, name: &str, at: i64) {
-        let row = crate::test_support::ember::world::rows("roster")
-            .into_iter()
-            .find(|row| row["name"] == name)
-            .unwrap();
-        let summary = SessionSummary {
-            id: id(name),
-            title: Some(name.into()),
-            parent: Some(ParentLink {
-                session: self.tree.root_id().clone(),
-                item: None,
-            }),
-            created_at: Timestamp::from_millisecond(at).unwrap(),
-            updated_at: Timestamp::from_millisecond(at).unwrap(),
-            ..summary()
-        };
-        let mut summary = summary;
-        summary.model = row["model"]["id"].as_str().map(str::to_string);
-        summary.effort = row["model"]["eff"]
-            .as_str()
-            .and_then(|eff| serde_json::from_value(json!(eff)).ok());
-        self.emit(&id(name), at, Event::SessionUpdated { summary });
+        let event = hired(self.tree.root_id(), name, at, None);
+        self.emit(&id(name), at, event);
     }
 
+    pub fn post(&mut self, room: &SessionId, item: &str, by: &str, text: &str, at: i64) {
+        self.emit(room, at, post_event(item, by, text, at));
+    }
+}
+
+/// A roster teammate's session, opened at `at` by the call `item` of home,
+/// or by none.
+pub fn hired(home: &SessionId, name: &str, at: i64, item: Option<&str>) -> Event {
+    let row = crate::test_support::ember::world::rows("roster")
+        .into_iter()
+        .find(|row| row["name"] == name)
+        .unwrap();
+    let summary = SessionSummary {
+        id: id(name),
+        title: Some(name.into()),
+        parent: Some(ParentLink {
+            session: home.clone(),
+            item: item.map(bingo_sdk::ItemId::from_raw),
+        }),
+        created_at: Timestamp::from_millisecond(at).unwrap(),
+        updated_at: Timestamp::from_millisecond(at).unwrap(),
+        ..summary()
+    };
+    let mut summary = summary;
+    summary.model = row["model"]["id"].as_str().map(str::to_string);
+    summary.effort = row["model"]["eff"]
+        .as_str()
+        .and_then(|eff| serde_json::from_value(json!(eff)).ok());
+    Event::SessionUpdated { summary }
+}
+
+/// The role `openAgent()` writes under a teammate's name, as the agents
+/// plugin publishes it.
+pub fn role(name: &str) -> Event {
+    let row = crate::test_support::ember::world::rows("roster")
+        .into_iter()
+        .find(|row| row["name"] == name)
+        .unwrap();
+    extended(
+        bingo_collab::role::PLUGIN,
+        bingo_collab::role::KIND,
+        bingo_collab::role::payload(row["role"].as_str().unwrap()),
+    )
+}
+
+impl World {
     /// `designRoom()`: opened nine minutes before the scene, with its four posts.
     pub fn design_room(&mut self) {
         let at = SETUP - 9 * 60_000;
@@ -137,10 +177,6 @@ impl World {
         {
             self.post(&room, &format!("room-{n}"), by, text, at + after);
         }
-    }
-
-    pub fn post(&mut self, room: &SessionId, item: &str, by: &str, text: &str, at: i64) {
-        self.emit(room, at, post_event(item, by, text, at));
     }
 }
 
