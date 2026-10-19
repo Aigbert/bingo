@@ -627,12 +627,17 @@ mod tests {
         case.lock("schedules", "runner.lock", 4242);
         case.lock("channels", "feishu-cli_a1.lock", 9999);
         let said = case.report(&Fake::of(&[(4242, "bingo")]), false);
+        let live = Path::new("schedules").join("runner.lock");
+        let dead = Path::new("channels").join("feishu-cli_a1.lock");
         assert!(
-            said.contains("[ok]   schedules/runner.lock — held by pid 4242"),
+            said.contains(&format!("[ok]   {} — held by pid 4242", live.display())),
             "{said}"
         );
         assert!(
-            said.contains("[bad]  channels/feishu-cli_a1.lock — held by pid 9999, which is gone"),
+            said.contains(&format!(
+                "[bad]  {} — held by pid 9999, which is gone",
+                dead.display()
+            )),
             "{said}"
         );
         assert!(
