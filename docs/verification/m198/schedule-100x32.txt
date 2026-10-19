@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+
+   Schedule                                                                              1 running
+
+ ▎ ●  every 30m       Check the drive fixture                                          next in 29m
+
+   /schedule every 30m <prompt> adds one
+
+   fake-1                                        ↑↓ schedule   space pause   ⏎ run now   esc close

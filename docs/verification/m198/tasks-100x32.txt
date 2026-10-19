@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+
+   Tasks                                                                               0 of 2 done
+
+   ◌  Test fixture                                                                           bingo
+ ▎ ◌  Review fixture                                                                         bingo
+
+   fake-1                                                                      ↑↓ task   esc close

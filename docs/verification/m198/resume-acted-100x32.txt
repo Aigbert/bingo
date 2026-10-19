@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+
+   ▍Reply, or / for commands
+
+   ✓ resumed · Check the Ember palette.                       ctrl+o details   / commands   ? keys

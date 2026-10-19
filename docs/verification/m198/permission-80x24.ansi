@@ -1,0 +1,24 @@
+
+
+[48;2;239;234;232m   Check the Ember palette.
+[49m
+   Ember primitives are ready.
+
+[38;2;176;76;20m⇄[38;2;163;158;154m fake-1 · fake · thinking off · this session[39m
+
+[38;2;43;125;60m[48;2;239;234;232m▍[39m  Check the drive fixture
+[49m
+   The scheduled fixture ran at home.
+
+[48;2;239;234;232m
+ [38;2;239;122;44m [39m [1mPermission mode[0m[48;2;239;234;232m                                                 [38;2;163;158;154m⇧tab cycles[39m
+
+ [38;2;239;122;44m  [38;2;119;113;109mdefault        [38;2;163;158;154mtrusted read-only tools run; everything else asks[39m    [38;2;119;113;109mcurrent[39m
+ [38;2;239;122;44m[48;2;239;215;200m▎ [1m[38;2;116;69;192maccept edits   [0m[38;2;163;158;154m[48;2;239;215;200medits inside the working directories run without a prompt[39m    [48;2;239;234;232m
+ [38;2;239;122;44m  [38;2;119;113;109mplan           [38;2;163;158;154mnothing that is not read-only runs at all[39m
+ [38;2;239;122;44m  [38;2;119;113;109mbypass         [38;2;163;158;154meverything runs except what only a person may decide[39m
+
+   [38;2;163;158;154mallowed for this session[39m
+   [38;2;163;158;154m  none yet; "Yes, allow … for this session" adds one[39m
+
+[49m   [38;2;43;125;60m✓ [38;2;119;113;109mforgot · fixture[39m                              [38;2;119;113;109m↑↓[38;2;163;158;154m mode[39m   [38;2;119;113;109m⏎[38;2;163;158;154m use[39m   [38;2;119;113;109mesc[38;2;163;158;154m close[39m

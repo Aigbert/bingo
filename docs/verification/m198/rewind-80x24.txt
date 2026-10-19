@@ -1,0 +1,24 @@
+
+
+
+
+
+   Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+▍  Check the drive fixture
+
+   The scheduled fixture ran at home.
+
+
+   Rewind                                              to just before a prompt
+
+   the conversation and the files both go back
+
+ ▎ Check the drive fixture                                            no files
+   Check the Ember palette.                                           no files
+
+   ✓ wakes in 1m                              ↑↓ prompt   ⏎ rewind   esc close

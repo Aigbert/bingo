@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+▍  Check the drive fixture
+
+   The scheduled fixture ran at home.
+
+
+   Memory                                                                               0 memories
+
+ ▎ instructions  /private/var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/m198-drive-XXXXXXXX/cwd…
+
+   ✓ forgot · fixture                                                          ↑↓ item   esc close

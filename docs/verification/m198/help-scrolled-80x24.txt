@@ -1,0 +1,24 @@
+
+
+
+▍  Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+
+   Keys                                              /help lists every command
+
+   esc esc    rewind
+
+   switch
+   ⇧tab       permission mode
+   alt+m      model
+   alt+t      effort
+   ctrl+r     sessions
+   ctrl+t     tasks
+   ctrl+c     stop, twice to quit
+   9 of 28
+
+   ✓ resumed · Check the Ember palette.                              esc close

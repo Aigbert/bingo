@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+   Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+▍  Check the drive fixture
+
+   The scheduled fixture ran at home.
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands
+
+   paused · Check the drive fixture       ctrl+o details   / commands   ? keys

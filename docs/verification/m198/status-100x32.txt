@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+▍  Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+
+   Status                                                                 Check the Ember palette.
+
+   model       fake-1 off · fake
+ ▎ mode        default · trusted read-only tools run; everything else asks
+   context     ━───────────────────  7% of 191k
+   directory   /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/m198-drive-XXXXXXXX/cwd
+   plugins     38 on
+   rules       none yet
+
+   ✓ fake-1 off                                                       ↑↓ line   ⏎ open   esc close

@@ -1,0 +1,24 @@
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+▍  Check the drive fixture
+
+   The scheduled fixture ran at home.
+
+
+   /mcp▍
+
+   commands
+ ❯ /plugins   plugins on and off, and their trust
+   skills
+   guide › mcp        The Model Context Protocol servers a session dials:…
+   guide › plugins…   Switch plugins, review trust and manage MCP servers.
+
+
+
+
+
+
+
+   ✓ wakes in 1m                     ↑↓ pick   ⏎ run   tab fill in   esc close

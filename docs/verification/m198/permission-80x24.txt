@@ -1,0 +1,24 @@
+
+
+   Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+▍  Check the drive fixture
+
+   The scheduled fixture ran at home.
+
+
+   Permission mode                                                 ⇧tab cycles
+
+   default        trusted read-only tools run; everything else asks    current
+ ▎ accept edits   edits inside the working directories run without a prompt
+   plan           nothing that is not read-only runs at all
+   bypass         everything runs except what only a person may decide
+
+   allowed for this session
+     none yet; "Yes, allow … for this session" adds one
+
+   ✓ forgot · fixture                              ↑↓ mode   ⏎ use   esc close

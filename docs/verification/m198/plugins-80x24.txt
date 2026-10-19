@@ -1,0 +1,24 @@
+
+
+
+
+▍  Check the Ember palette.
+
+   Ember primitives are ready.
+
+⇄ fake-1 · fake · thinking off · this session
+
+
+   Plugins                                                         38 of 38 on
+
+   ✓  bingo.provider.fake                                             built in
+ ▎ ✓  bingo.provider.anthropic                                        built in
+   ✓  bingo.provider.openai                                           built in
+   ✓  bingo.acp                                                       built in
+   ✓  bingo.permissions                                               built in
+   ✓  ask                                                             built in
+   ✓  bingo.mod.palette                                               built in
+   ✓  bingo.mod.sessions                                              built in
+   8 of 38
+
+   ✓ fake-1 off                           ↑↓ plugin   space switch   esc close

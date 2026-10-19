@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ─── rewound, 11 items dropped ─────────────────────────────────────────────────
+
+
+   Check the Ember palette.▍
+
+   ✓ rewound                                               ⏎ send   ⇧⏎ newline

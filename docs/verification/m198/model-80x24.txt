@@ -1,0 +1,24 @@
+
+
+
+
+▍  Check the Ember palette.
+
+   Ember primitives are ready.
+
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+
+   fake-1         fake                                                  in use
+ ▎ claude-fable-5 anthropic   1M     reads images
+   claude-fable-5-1anthropic   1M     reads images
+   claude-haiku-4-5anthropic   200k   reads images
+   claude-haiku-5-5anthropic   1M     reads images
+   claude-opus-4-5anthropic   200k   reads images
+   claude-opus-4-6anthropic   1M     reads images
+   claude-opus-4-7anthropic   1M     reads images
+   8 of 60
+
+   effort   low  medium  high  xhigh  max
+   thinks before most answers
+
+   scheduled wcgxm1hx: every 30m,…    ↑↓ model   ←→ effort   ⏎ use   esc close
