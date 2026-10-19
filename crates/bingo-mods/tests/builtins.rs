@@ -294,6 +294,7 @@ async fn palette_request(host: &Host, attachment: &Attachment) -> render::Render
             args: json!({"handler":"palette"}),
         },
         catalogs: Default::default(),
+        here: Default::default(),
     };
     render::RenderRequest {
         component: render::Component::Palette,

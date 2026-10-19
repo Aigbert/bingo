@@ -6408,6 +6408,22 @@
       ],
       "description": "The actor's factual observation; only the RPC server can add a\nconnection-scoped availability token after pinning an immutable Item."
     },
+    "PaletteHere": {
+      "type": "object",
+      "properties": {
+        "driver": {
+          "$ref": "#/$defs/Driver"
+        },
+        "closed": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": [
+        "driver"
+      ],
+      "description": "The session on screen as the list needs it: what answers it, and whether\nit still takes input."
+    },
     "PaletteOpen": {
       "type": "string",
       "enum": [
@@ -6470,6 +6486,14 @@
             }
           },
           "description": "Only the catalogues the query's command completes from, once the\nquery reaches its arguments: every press carries them, and a model\ncatalogue is the largest thing it would otherwise carry."
+        },
+        "here": {
+          "$ref": "#/$defs/PaletteHere",
+          "description": "What the session on screen is, so the list offers what works there.",
+          "default": {
+            "driver": "model",
+            "closed": false
+          }
         }
       },
       "required": [

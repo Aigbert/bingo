@@ -102,6 +102,15 @@ fn props(ui: &Ui, tree: &Tree, open: &Opened, now: Now) -> PaletteProps {
             args: json!({"handler":open.id}),
         },
         catalogs,
+        here: here(state),
+    }
+}
+
+/// What the list is told of the session on screen.
+fn here(state: &bingo_sdk::SessionState) -> bingo_sdk::component::PaletteHere {
+    bingo_sdk::component::PaletteHere {
+        driver: state.summary.driver,
+        closed: bingo_collab::room::closed_of(state),
     }
 }
 /// Keys this client answers itself, by the command each stands for, so the

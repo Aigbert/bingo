@@ -934,6 +934,11 @@ export type OversizedItem = {
   "totalBytes": number;
   [key: string]: unknown;
 };
+/**
+ * The session on screen as the list needs it: what answers it, and whether
+ * it still takes input.
+ */
+export type PaletteHere = { "closed"?: boolean; "driver": Driver; [key: string]: unknown; };
 export type PaletteOpen = ("commands" | "keys" | "sessions");
 export type PaletteProps = {
   "action": Action;
@@ -946,6 +951,8 @@ export type PaletteProps = {
   "catalogs": { [key: string]: Array<CatalogEntry>; };
   "commands": Array<CatalogEntry>;
   "conversation": Array<PaletteSession>;
+  /** What the session on screen is, so the list offers what works there. */
+  "here"?: PaletteHere;
   "keyHints": { [key: string]: string; };
   "open": PaletteOpen;
   "query": string;

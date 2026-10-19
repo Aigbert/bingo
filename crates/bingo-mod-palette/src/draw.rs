@@ -63,7 +63,7 @@ pub(crate) fn listing(props: &PaletteProps) -> Listing {
         return sessions(props, query);
     }
     Listing {
-        rows: crate::rows::commands(&props.commands, &props.bindings, query),
+        rows: crate::rows::commands(&props.commands, &props.bindings, query, props.here),
         initial: 0,
         title: None,
     }

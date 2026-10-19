@@ -1,11 +1,16 @@
 //! What the list holds: the commands and skills a `/` ranks, the sessions a
 //! `/resume` reopens, and the arguments of a command being typed.
-use bingo_sdk::{CatalogEntry, CommandSpec, component::PaletteSession, rank};
+use bingo_sdk::component::{PaletteHere, PaletteSession};
+use bingo_sdk::{CatalogEntry, CommandSpec, Driver, rank};
 use std::collections::BTreeMap;
 
 /// The family prefix every skill command carries, `skill/<shelf>`: the one
 /// word of contract between the skills plugin and this list.
 pub const SKILL_FAMILY: &str = "skill/";
+
+/// The family of the commands that act on the room on screen: listed in an
+/// open room and nowhere else.
+pub const ROOM_FAMILY: &str = "rooms/here";
 
 /// The order a bare `/` lists the commands in; the rest follow in the
 /// catalogue's order, then the skills.
@@ -66,8 +71,9 @@ pub fn commands(
     entries: &[CatalogEntry],
     bindings: &BTreeMap<String, String>,
     query: &str,
+    here: PaletteHere,
 ) -> Vec<Row> {
-    let listed = listed(entries);
+    let listed = listed(entries, here);
     rank::ranked(query, &listed, |spec| &spec.name)
         .into_iter()
         .map(|(spec, fuzzy)| command(spec, fuzzy.hits, bindings))
@@ -76,12 +82,12 @@ pub fn commands(
 }
 
 /// The specs a `/` lists, in the order it lists them.
-fn listed(entries: &[CatalogEntry]) -> Vec<CommandSpec> {
+fn listed(entries: &[CatalogEntry], here: PaletteHere) -> Vec<CommandSpec> {
     let mut specs = entries
         .iter()
         .filter(|entry| entry.meta["foldedInto"].as_str().is_none())
         .filter_map(|entry| serde_json::from_value::<CommandSpec>(entry.meta.clone()).ok())
-        .filter(|spec| !spec.hidden)
+        .filter(|spec| !spec.hidden && works_here(spec, here))
         .collect::<Vec<_>>();
     specs.sort_by_key(|spec| {
         (
@@ -93,6 +99,16 @@ fn listed(entries: &[CatalogEntry]) -> Vec<CommandSpec> {
         )
     });
     specs
+}
+
+/// Whether a command does anything in the session on screen: a room takes no
+/// skill, and only an open room takes the commands that act on it.
+fn works_here(spec: &CommandSpec, here: PaletteHere) -> bool {
+    let room = here.driver == Driver::Log;
+    match spec.family.as_str() {
+        ROOM_FAMILY => room && !here.closed,
+        family => !(room && family.starts_with(SKILL_FAMILY)),
+    }
 }
 
 /// The commands found only by an alias, or by a command folded into them:

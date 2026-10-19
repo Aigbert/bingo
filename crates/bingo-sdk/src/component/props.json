@@ -308,7 +308,11 @@
       "catalogs": {},
       "keyHints": {},
       "session": "s",
-      "conversation": []
+      "conversation": [],
+      "here": {
+        "driver": "model",
+        "closed": false
+      }
     }
   },
   {
