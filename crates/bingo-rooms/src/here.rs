@@ -90,9 +90,6 @@ async fn viewed(
 ) -> Result<(SessionId, Room, SessionState), KernelError> {
     let summary = door::own(host, session).await?;
     let outside = || KernelError::new(ErrorCode::InvalidInput, "this works inside a room");
-    if summary.driver != Driver::Log {
-        return Err(outside());
-    }
     let room = Room::of(&summary).ok_or_else(outside)?;
     let state = room::read(host, session).await.ok_or_else(|| {
         KernelError::new(
