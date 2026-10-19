@@ -51,15 +51,6 @@ pub fn label(below: usize, width: usize) -> Option<(String, Option<&'static str>
 }
 
 #[cfg(test)]
-pub fn below(ui: &crate::ui::Ui, now: crate::clock::Now) -> Option<usize> {
-    if ui.scroll.following() {
-        return None;
-    }
-    let (total, rows) = ui.transcript();
-    Some(total.saturating_sub(ui.scroll.top(total, rows, now.instant) + rows))
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
