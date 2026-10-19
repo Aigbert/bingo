@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ ▎ /model            model, thinking and providers                                           alt+m
+   /think            how hard it thinks                                                      alt+t
+   /compact          summarise older turns
+   /status           session, context and cost
+   /resume           reopen a session                                                       ctrl+r
+   /permission       what it may do without asking                                            ⇧tab
+   /schedule         what fires later, and whether anything will fire it
+   /plugins          plugins on and off, and their trust
+   8 of 49
+
+   /▍
+
+   fake-1                                                         ↑↓ choose   ⏎ run   tab complete

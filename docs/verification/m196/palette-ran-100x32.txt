@@ -1,0 +1,32 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   Status                                                                             this session
+
+ ▎ model       fake-1 off · fake
+   mode        default · trusted read-only tools run; everything else asks
+   context
+   directory   <drive>/cwd
+   plugins     38 on
+   rules       none yet
+
+   fake-1                                                             ↑↓ line   ⏎ open   esc close

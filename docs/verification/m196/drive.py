@@ -15,6 +15,19 @@ BIN = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target")) / "debug/bingo"
 SOCKET = "m196-drive"
 
 
+def repository(cwd, env):
+    """A repository whose `@` list has one modified file and one new one."""
+    git = lambda *args: subprocess.check_call(["git", "-c", "user.name=drive", "-c", "user.email=drive@example.invalid", *args], cwd=cwd, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    (cwd / "src").mkdir(exist_ok=True)
+    (cwd / "src/queue.rs").write_text("pub fn reset() {}\n")
+    (cwd / "Cargo.toml").write_text("[package]\nname = \"drive\"\n")
+    git("init", "-q")
+    git("add", "src/queue.rs", "Cargo.toml")
+    git("commit", "-q", "-m", "start")
+    (cwd / "src/queue.rs").write_text("pub fn reset() { /* keep the queue */ }\n")
+    (cwd / "src/queue_steer.rs").write_text("#[test]\nfn steer() {}\n")
+
+
 def drive(width, height):
     with tempfile.TemporaryDirectory(prefix="m196-drive-") as temporary:
         work = Path(temporary)
@@ -115,7 +128,7 @@ def drive(width, height):
             capture("rewind")
             keys("Escape")
             type_text("?")
-            wait("keys")
+            wait("Keys")
             capture("keys")
             keys("Escape")
             type_text("look at this")
@@ -165,7 +178,34 @@ def drive(width, height):
             assert "draft" in pane() and "second line" in pane()
             capture("multiline")
             keys("C-c", "C-d")
-            print(f"PASS {width}x{height}: enter/tab/up/down/esc/esc esc/ctrl+c/ctrl+d/!/ctrl+b/ctrl+v/?")
+
+            repository(work / "cwd", env)
+            open_session("dock", [{"steps": [{"text": "Read the queue."}]}])
+            type_text("/")
+            wait("tab complete")
+            capture("palette")
+            type_text("st")
+            wait("/status")
+            keys("Down", "Up")
+            keys("Tab")
+            wait("/status ▍")
+            keys("Enter")
+            wait("Status")
+            capture("palette-ran")
+            keys("Escape")
+            wait("or / for commands")
+            type_text("look at @que")
+            wait("modified")
+            text = wait("tab insert")
+            assert "new" in text and "src/queue_steer.rs" in text, text
+            capture("mention")
+            keys("Down", "Up", "Tab")
+            wait("look at @src/queue.rs ")
+            capture("mention-inserted")
+            keys("Enter")
+            wait("Read the queue.")
+            keys("C-c", "C-d")
+            print(f"PASS {width}x{height}: enter/tab/up/down/esc/esc esc/ctrl+c/ctrl+d/!/ctrl+b/ctrl+v/?/palette/@")
         finally:
             if started:
                 tmux("kill-server")

@@ -1,0 +1,24 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+   Status                                                         this session
+
+ ▎ model       fake-1 off · fake
+   mode        default · trusted read-only tools run; everything else asks
+   context
+   directory   /var/folders/5d/ylkbk1nx6mvgq8zgnsjf8lwr0000gn/T/m196-drive-t5…
+   plugins     38 on
+   rules       none yet
+
+   fake-1                                         ↑↓ line   ⏎ open   esc close
