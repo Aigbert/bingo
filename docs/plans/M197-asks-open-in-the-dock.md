@@ -109,13 +109,13 @@ When bingo needs a yes, the dock asks in the input's place:
 
 ## Exit criteria
 
-- [ ] Full frame through the harness: `ask-edit`, `ask-edit-down`, `ask-edit-allowed`,
+- [x] Full frame through the harness: `ask-edit`, `ask-edit-down`, `ask-edit-allowed`,
       `ask-bash`, `ask-bash-change`, `ask-bash-editing`, `caution`, `caution-no`, `question`,
       `question-preview`, `question-ticked`, `question-second`, `question-answered`,
       `small-ask-edit` and `ascii-ask-edit`.
 - [x] Contract tests: a permission with a string caution and with a `Caution` both read, and
       `Stakes` round-trips. An old journal fixture loads.
-- [ ] Unit tests:
+- [x] Unit tests:
   - the guard swallows ⏎ at 399 ms and takes it at 400;
   - typing on the list starts `No, and tell it why`;
   - a caution starts on No and offers no session rung;
@@ -123,7 +123,7 @@ When bingo needs a yes, the dock asks in the input's place:
   - the force-push stakes from a temporary repository, and none when git fails.
 - [x] Black-box: `--print` and RPC still answer permissions as before. The added fields are
       additive in the schemas.
-- [ ] Gates and checks as in M192. tmux drive at 100×32 and 80×24: an edit ask, a bash ask
+- [x] Gates and checks as in M192. tmux drive at 100×32 and 80×24: an edit ask, a bash ask
       changed first, a no with a reason, a force push in a temporary repository, and a two-tab
       question.
 
@@ -247,3 +247,36 @@ verification below uses that same environment isolation.
 The budget's disk limit is soft. Discipline retains non-fatal function/record/snapshot
 warnings, including this appended verification record's length. The full test run also
 passes all 19 existing PTY smoke tests; no Ember capture was generated or edited.
+
+## Verified
+
+Base `11d46a5a4`; 14 commits. Proof: `rebase -x 'cargo fmt --all -- --check && cargo check
+--workspace --all-targets --locked' 11d46a5a4` printed `ok` after each of the first 13.
+
+- [x] Captures: `m197_permission_frames_are_answered_by_keys`, `..._allowed_edit_...`,
+  `m197_question_frames_are_answered_by_keys`, `..._answered_question_...`: all 15 pass full frame.
+- [x] Units: `the_guard_swallows_a_key_at_399_ms_and_takes_it_at_400`,
+  `a_key_before_the_guard_sends_nothing`, `change_prefills_then_submits_and_typing_starts_the_no`,
+  `a_caution_starts_on_no_and_offers_no_session_rung`, four `ask::scope` tests;
+  `bingo-tool-bash stakes::` 7 passed; `bingo-mod-ask` 8 passed.
+- [x] Gates, one at a time: fmt 0; check 0; clippy `-D warnings` 0;
+  `env -u OPENAI_API_KEY cargo test --workspace --locked`: 6626 passed, 0 failed, 133 binaries;
+  `check_discipline.sh`: `discipline ok`; `budget.sh`: `budget ok`; `cargo deny check`:
+  `advisories ok, bans ok, licenses ok, sources ok`.
+- [x] Windows: `bingo-mod-ask` Finished, exit 0. `bingo-mods` and `bingo-surface-tui` exit 101:
+  aws-lc-sys `'stdlib.h'`/`'windows.h' file not found` (no Windows SDK on this Mac).
+- [x] tmux: `python3 docs/verification/m197/drive.py` printed PASS and CLEAN at 100x32 and
+  80x24 (`tmux -L m197-drive`, temporary HOME/data/cwd, fake provider, server killed).
+- [x] PTY smoke rewritten for the dock: `TUI_SMOKE_SOCKET=m197-drive scripts/tui-smoke.sh`
+  printed `tui-smoke ok`. The sealed fixtures now prove they draw nothing over the dock.
+
+Departures from plan or prototype:
+- The kernel gates a changed call again, so `Change it first` asks once more (the prototype
+  runs it). The drive answers that second ask.
+- A path rule reads as the prototype's `pathTail(dir,3)`: two directories and a separator.
+- Esc on a question stops the turn (ADR-0095 said skip). The guard holds esc, not ctrl+c.
+- An ask opening while the person types no longer waits aside; the guard replaces that.
+- A tall ask keeps its last rows (`body.slice(-cap)`), so its title can scroll off at 80x24.
+- Left: form.rs fallback still shows digits; the keys help still names `1-9 · y/a/n` and
+  `ctrl+e` (palette snapshots are another job's); sign-in keeps its sealed card.
+
