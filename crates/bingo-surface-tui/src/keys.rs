@@ -131,25 +131,30 @@ pub const BINDINGS: &[Binding] = &[
 
 // ---- the three ordered stacks (design §7) -------------------------------
 
+/// The place both closing gestures leave, selected by the key policy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Close {
+    Sheet,
+    Card,
+    Dropdown,
+    Pane,
+    Search,
+    Back,
+}
+
 /// What `esc` closes, innermost first. It is a table rather than a chain of
 /// conditions so that the order is one thing, tested once and printed in the
 /// help exactly as it is obeyed.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Escape {
-    /// A sheet over the whole frame: help, the resume picker.
-    Sheet,
-    /// The card that is asking: leaving it is its own cancel or denial.
-    Card,
-    /// The command dropdown.
-    Dropdown,
+    /// Leave the selected place with its own close or cancel action.
+    Close(Close),
     /// Nothing is open, so the turn is what `esc` stops.
     Interrupt,
     /// Save the draft in history and empty the input.
     Clear,
     /// Return the transcript to its newest row.
     Latest,
-    /// An idle sub-session with an empty composer returns to its parent.
-    Back,
     /// The second empty escape opens the rewind picker.
     Rewind,
     /// The first empty escape says how to rewind.
@@ -158,13 +163,13 @@ pub enum Escape {
 
 /// The stack, in the order it is closed, with the word the help prints.
 pub const ESCAPES: &[(Escape, &str)] = &[
-    (Escape::Sheet, "sheet"),
-    (Escape::Card, "card"),
-    (Escape::Dropdown, "dropdown"),
+    (Escape::Close(Close::Sheet), "sheet"),
+    (Escape::Close(Close::Card), "card"),
+    (Escape::Close(Close::Dropdown), "dropdown"),
     (Escape::Interrupt, "interrupt"),
     (Escape::Clear, "clear"),
     (Escape::Latest, "latest"),
-    (Escape::Back, "back"),
+    (Escape::Close(Close::Back), "back"),
     (Escape::Rewind, "rewind"),
     (Escape::Arm, "arm rewind"),
 ];
@@ -175,6 +180,8 @@ pub struct Open {
     pub sheet: bool,
     pub card: bool,
     pub dropdown: bool,
+    pub pane: bool,
+    pub search: bool,
     pub busy: bool,
     pub subsession: bool,
     pub typing: bool,
@@ -186,15 +193,17 @@ pub struct Open {
 impl Open {
     fn has(self, rung: Escape) -> bool {
         match rung {
-            Escape::Sheet => self.sheet,
-            Escape::Card => self.card,
-            Escape::Dropdown => self.dropdown,
+            Escape::Close(Close::Sheet) => self.sheet,
+            Escape::Close(Close::Card) => self.card,
+            Escape::Close(Close::Dropdown) => self.dropdown,
+            Escape::Close(Close::Pane) => self.pane,
+            Escape::Close(Close::Search) => self.search,
             Escape::Interrupt => self.busy && !self.subsession,
             Escape::Clear => self.typing,
             Escape::Latest => self.scrolled,
             Escape::Rewind => self.rewind && self.armed,
             Escape::Arm => self.rewind,
-            Escape::Back => self.subsession,
+            Escape::Close(Close::Back) => self.subsession,
         }
     }
 }
@@ -202,9 +211,10 @@ impl Open {
 /// The innermost thing `esc` closes, and nothing at all when a person has
 /// nothing open and nothing running.
 pub fn escape(open: Open) -> Option<Escape> {
-    ESCAPES
-        .iter()
-        .map(|(rung, _)| *rung)
+    // Pane and search owners consume Esc before the composer's stack.
+    [Escape::Close(Close::Pane), Escape::Close(Close::Search)]
+        .into_iter()
+        .chain(ESCAPES.iter().map(|(rung, _)| *rung))
         .find(|rung| open.has(*rung))
 }
 
@@ -264,7 +274,7 @@ pub fn tab(at: Tabbed) -> Option<Tab> {
 pub enum Interrupt {
     /// A turn is running: stop it, and leave the composer alone.
     Turn,
-    Close,
+    Close(Close),
     Fold,
     /// Something is half-typed: clear it.
     Clear,
@@ -277,10 +287,8 @@ pub enum Interrupt {
 /// What is true when `ctrl+c` is pressed.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Pressed {
-    pub busy: bool,
-    pub dock: bool,
+    pub open: Open,
     pub detail: bool,
-    pub typing: bool,
     /// A first `ctrl+c` inside the window said how to leave.
     pub armed: bool,
 }
@@ -297,34 +305,23 @@ pub fn twice(
     first.is_some_and(|first| now.saturating_duration_since(first) < window)
 }
 
-const INTERRUPTS: &[Interrupt] = &[
-    Interrupt::Turn,
-    Interrupt::Close,
-    Interrupt::Fold,
-    Interrupt::Clear,
-    Interrupt::Exit,
-    Interrupt::Arm,
-];
-
-impl Pressed {
-    fn has(self, rung: Interrupt) -> bool {
-        match rung {
-            Interrupt::Turn => self.busy,
-            Interrupt::Close => self.dock,
-            Interrupt::Fold => self.detail,
-            Interrupt::Clear => self.typing,
-            Interrupt::Exit => self.armed,
-            Interrupt::Arm => true,
-        }
-    }
-}
-
 pub fn interrupt(at: Pressed) -> Interrupt {
-    INTERRUPTS
-        .iter()
-        .copied()
-        .find(|rung| at.has(*rung))
-        .unwrap_or(Interrupt::Arm)
+    let close = match escape(at.open) {
+        Some(Escape::Close(place)) => Some(Interrupt::Close(place)),
+        _ => None,
+    };
+    [
+        at.open.busy.then_some(Interrupt::Turn),
+        close,
+        at.detail.then_some(Interrupt::Fold),
+        at.open.typing.then_some(Interrupt::Clear),
+        at.armed.then_some(Interrupt::Exit),
+        Some(Interrupt::Arm),
+    ]
+    .into_iter()
+    .flatten()
+    .next()
+    .unwrap_or(Interrupt::Arm)
 }
 
 #[cfg(test)]
@@ -372,23 +369,26 @@ mod tests {
                 subsession: true,
                 ..Open::default()
             }),
-            Some(Escape::Back)
+            Some(Escape::Close(Close::Back))
         );
         let mut pressed = Pressed {
-            busy: true,
-            dock: true,
+            open: Open {
+                busy: true,
+                sheet: true,
+                typing: true,
+                ..Open::default()
+            },
             detail: true,
-            typing: true,
             armed: true,
         };
         assert_eq!(interrupt(pressed), Interrupt::Turn);
-        pressed.busy = false;
-        assert_eq!(interrupt(pressed), Interrupt::Close);
-        pressed.dock = false;
+        pressed.open.busy = false;
+        assert_eq!(interrupt(pressed), Interrupt::Close(Close::Sheet));
+        pressed.open.sheet = false;
         assert_eq!(interrupt(pressed), Interrupt::Fold);
         pressed.detail = false;
         assert_eq!(interrupt(pressed), Interrupt::Clear);
-        pressed.typing = false;
+        pressed.open.typing = false;
         assert_eq!(interrupt(pressed), Interrupt::Exit);
         pressed.armed = false;
         assert_eq!(interrupt(pressed), Interrupt::Arm);
@@ -417,13 +417,13 @@ mod tests {
             subsession: true,
             ..Open::default()
         };
-        assert_eq!(escape(all), Some(Escape::Sheet));
+        assert_eq!(escape(all), Some(Escape::Close(Close::Sheet)));
         assert_eq!(
             escape(Open {
                 sheet: false,
                 ..all
             }),
-            Some(Escape::Card)
+            Some(Escape::Close(Close::Card))
         );
         assert_eq!(
             escape(Open {
@@ -431,7 +431,7 @@ mod tests {
                 card: false,
                 ..all
             }),
-            Some(Escape::Dropdown)
+            Some(Escape::Close(Close::Dropdown))
         );
         assert_eq!(
             escape(Open {
@@ -445,7 +445,7 @@ mod tests {
                 subsession: true,
                 ..Open::default()
             }),
-            Some(Escape::Back)
+            Some(Escape::Close(Close::Back))
         );
         assert_eq!(escape(Open::default()), None, "and nothing to close");
     }
@@ -511,8 +511,11 @@ mod tests {
     fn ctrl_c_stops_a_turn_clears_a_line_and_then_leaves() {
         let pressed = |busy, typing, armed| {
             interrupt(Pressed {
-                busy,
-                typing,
+                open: Open {
+                    busy,
+                    typing,
+                    ..Open::default()
+                },
                 armed,
                 ..Pressed::default()
             })

@@ -21,14 +21,9 @@ pub(super) fn draw(head: &bingo_sdk::Headline, at: i64, width: usize, now: Now) 
         crate::tone::Content::Markdown,
         Some((motion.clone(), now)),
     ));
-    label.spans.insert(
-        0,
-        Span::styled(" ", theme::foreground("muted").unwrap_or_default()),
-    );
-    label.spans.push(Span::styled(
-        " ",
-        theme::foreground("muted").unwrap_or_default(),
-    ));
+    let muted = theme::foreground("muted").unwrap_or_default();
+    label.spans.insert(0, Span::styled(" ", muted));
+    label.spans.push(Span::styled(" ", muted));
     let faint = theme::foreground("faint").unwrap_or_default();
     let thin = theme::glyphs::get("thin");
     let mut line = Line::from(vec![

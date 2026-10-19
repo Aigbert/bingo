@@ -476,15 +476,9 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     use crate::focus::Owner;
     let owner = crate::focus::owner(ui, tree);
     let pressed = keys::Pressed {
-        busy: tree.viewed().busy(),
-        dock: !matches!(ui.focus.open(), Open::Pager(_))
-            && matches!(
-                owner,
-                Owner::Layer | Owner::Search | Owner::Pane | Owner::Interaction | Owner::Menu
-            ),
+        open: open(ui, tree, now),
         detail: matches!(owner, Owner::Select | Owner::Row)
             || matches!(ui.focus.open(), Open::Pager(_)),
-        typing: !ui.composer.is_empty(),
         armed: ui.exit_armed(now.instant),
     };
     let rung = keys::interrupt(pressed);
@@ -493,7 +487,7 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     }
     match rung {
         keys::Interrupt::Turn => return ask_to_stop(ui, tree.viewed()),
-        keys::Interrupt::Close => return close_focused(ui, tree, owner, now),
+        keys::Interrupt::Close(place) => return close(ui, tree, place, now),
         keys::Interrupt::Fold => {
             ui.focus = crate::focus::Focus::Composer;
             ui.folds.clear();
@@ -513,15 +507,13 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     Vec::new()
 }
 
-fn close_focused(ui: &mut Ui, tree: &Tree, owner: crate::focus::Owner, now: Now) -> Vec<Effect> {
-    use crate::focus::Owner;
-    let rung = match owner {
-        Owner::Layer => keys::Escape::Sheet,
-        Owner::Search => {
-            ui.focus = crate::focus::Focus::Composer;
-            return Vec::new();
-        }
-        Owner::Pane => {
+fn close(ui: &mut Ui, tree: &Tree, place: keys::Close, now: Now) -> Vec<Effect> {
+    match place {
+        keys::Close::Sheet => ui.focus.close(now.instant),
+        keys::Close::Card => return cancel(ui, tree),
+        keys::Close::Dropdown => ui.menu.dismissed = true,
+        keys::Close::Search => ui.focus = crate::focus::Focus::Composer,
+        keys::Close::Pane => {
             // A plugin pane owns its close action and exposes it through Esc.
             return crate::pane::key(
                 ui,
@@ -529,19 +521,15 @@ fn close_focused(ui: &mut Ui, tree: &Tree, owner: crate::focus::Owner, now: Now)
                 KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
             );
         }
-        Owner::Interaction => keys::Escape::Card,
-        _ if tree.open_interaction().is_some() => keys::Escape::Card,
-        _ => keys::Escape::Dropdown,
-    };
-    close(ui, tree, rung, now)
-}
-
-fn close(ui: &mut Ui, tree: &Tree, rung: keys::Escape, now: Now) -> Vec<Effect> {
-    match rung {
-        keys::Escape::Sheet => ui.focus.close(now.instant),
-        keys::Escape::Card => return cancel(ui, tree),
-        keys::Escape::Dropdown => ui.menu.dismissed = true,
-        _ => {}
+        keys::Close::Back => {
+            let parent = tree
+                .viewed()
+                .summary
+                .parent
+                .as_ref()
+                .map_or_else(|| tree.root_id().clone(), |parent| parent.session.clone());
+            return vec![Effect::View(parent)];
+        }
     }
     Vec::new()
 }
@@ -552,19 +540,15 @@ fn clear_draft(ui: &mut Ui) {
     ui.history.remember(&text);
 }
 
-/// Esc closes the innermost thing that is open and then interrupts, in the
-/// order of [`keys::ESCAPES`]. Leaving a card is the card's own answer, so
-/// that rung goes back to the dialog.
-fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
-    if ui.focus.row().is_some() {
-        ui.focus = crate::focus::Focus::Composer;
-    }
+fn open(ui: &Ui, tree: &Tree, now: Now) -> keys::Open {
     let owner = crate::focus::owner(ui, tree);
-    let open = keys::Open {
+    keys::Open {
         // One layer is open at a time, whichever form it takes.
-        sheet: owner == crate::focus::Owner::Layer,
+        sheet: owner == crate::focus::Owner::Layer && !matches!(ui.focus.open(), Open::Pager(_)),
         card: tree.is_root(tree.view()) && tree.open_interaction().is_some(),
         dropdown: !suggestions(ui, tree).is_empty(),
+        pane: owner == crate::focus::Owner::Pane && tree.open_interaction().is_none(),
+        search: owner == crate::focus::Owner::Search && tree.open_interaction().is_none(),
         busy: tree.viewed().busy(),
         subsession: !tree.is_root(tree.view()),
         typing: !ui.composer.is_empty(),
@@ -572,16 +556,24 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         rewind: rewind::offered(&ui.commands())
             && !bingo_sdk::transcript::turns(&tree.viewed().transcript).is_empty(),
         armed: keys::twice(ui.escaped_at, now.instant, keys::ESC_WINDOW),
-    };
+    }
+}
+
+/// Esc closes the innermost thing that is open and then interrupts, in the
+/// order of [`keys::ESCAPES`]. Leaving a card is the card's own answer, so
+/// that rung goes back to the dialog.
+fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    if ui.focus.row().is_some() {
+        ui.focus = crate::focus::Focus::Composer;
+    }
+    let open = open(ui, tree, now);
     // An `esc` that closed something is not half of a gesture.
     let rung = keys::escape(open);
     if rung != Some(keys::Escape::Rewind) {
         ui.escaped_at = None;
     }
     match rung {
-        Some(rung @ (keys::Escape::Sheet | keys::Escape::Card | keys::Escape::Dropdown)) => {
-            return close(ui, tree, rung, now);
-        }
+        Some(keys::Escape::Close(place)) => return close(ui, tree, place, now),
         Some(keys::Escape::Interrupt) => return ask_to_stop(ui, tree.viewed()),
         Some(keys::Escape::Clear) => {
             clear_draft(ui);
@@ -605,15 +597,6 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
                 keys::ESC_WINDOW,
                 now.instant,
             );
-        }
-        Some(keys::Escape::Back) => {
-            let parent = tree
-                .viewed()
-                .summary
-                .parent
-                .as_ref()
-                .map_or_else(|| tree.root_id().clone(), |parent| parent.session.clone());
-            return vec![Effect::View(parent)];
         }
         // The stack was empty, so this `esc` is one of `esc esc`.
         None => {}
@@ -975,6 +958,12 @@ fn submit(ui: &mut Ui, tree: &Tree, now: Now, delivery: Delivery) -> Vec<Effect>
 /// The pictures — the tokens the line still names and the `@word`s in it —
 /// are files, read by the loop, which knows the directory and what is held
 /// (`run::submit`). The loop also writes the line to the history file.
+fn clears_toast(effect: &Effect) -> bool {
+    matches!(effect, Effect::Submit(Input::Text {
+        text, delivery: Delivery::Wake, ..
+    }) if !text.trim().is_empty())
+}
+
 fn own_line(text: String, delivery: Delivery) -> Effect {
     Effect::Submit(Input::Text {
         headline: None,
@@ -1012,8 +1001,7 @@ fn send(
         Some(Local::Exit) => vec![Effect::Exit],
         None => {
             let effect = line(text);
-            if matches!(&effect, Effect::Submit(Input::Text { text, delivery: Delivery::Wake, .. }) if !text.trim().is_empty())
-            {
+            if clears_toast(&effect) {
                 // p7-input.js:84 clears a sent line's toast after slash dispatch.
                 ui.clear_notice();
             }
@@ -2013,6 +2001,23 @@ mod tests {
             }],
             "the root's handle routes it back to whoever asked"
         );
+    }
+
+    #[test]
+    fn ctrl_c_and_escape_leave_the_same_child_with_an_open_interaction() {
+        let mut tree = with_child(vec![child_frame(2, opened(child_permission()))]);
+        tree.show(&child_id());
+        let (mut esc_ui, now) = scene();
+        let (mut ctrl_ui, _) = scene();
+        let escaped = press_tree(&mut esc_ui, &tree, key(KeyCode::Esc), now);
+        let interrupted = press_tree(
+            &mut ctrl_ui,
+            &tree,
+            KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+            now,
+        );
+        assert_eq!(escaped, vec![Effect::View(tree.root_id().clone())]);
+        assert_eq!(interrupted, escaped);
     }
 
     #[test]

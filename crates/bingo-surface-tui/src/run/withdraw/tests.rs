@@ -230,7 +230,7 @@ async fn stopping_withdraws_two_lines_before_completion_can_drain_them() {
     })
     .await
     .unwrap();
-    // Attach is a mailbox round trip after TurnFinished's drain_queue, so
+    // Attach is a mailbox round trip after CompletionReady's drain_queue, so
     // its sequence includes any turn the drain opened after TurnCompleted.
     let synced = host.read(&attached.session).await.unwrap();
     while attached.snapshot.seq < synced.seq {
