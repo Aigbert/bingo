@@ -137,7 +137,6 @@ mod tests {
         assert!(selections.lock().unwrap().is_empty());
         let drawing = crate::draw::Drawing {
             selections: selections.clone(),
-            started: now,
         };
         let cx = HookContext {
             session: id.clone(),
@@ -165,7 +164,7 @@ mod tests {
             serde_json::from_value::<View>(answer)
                 .unwrap()
                 .fold()
-                .contains("❯ model")
+                .contains("model")
         );
         let seen = selections.lock().unwrap()[&id].seen;
         tick(

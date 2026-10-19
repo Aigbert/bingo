@@ -77,12 +77,12 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
     };
     let selections = Selections::default();
     let handler = keys::Handler(selections.clone());
-    for row in rows::rows(&(&state).into(), &[], &[], None)
+    for row in rows::rows(&(&state).into(), &[], &[], None, Default::default())
         .into_iter()
         .filter(|r| {
             r.command
                 .as_deref()
-                .is_some_and(|command| !matches!(command, "rename" | "permission"))
+                .is_some_and(|command| command != "rename")
         })
     {
         selections
@@ -122,51 +122,6 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
 }
 
 #[tokio::test]
-async fn editable_rows_prefill_instead_of_submitting_bare_commands() {
-    let Event::SessionUpdated { summary } = serde_json::from_str(include_str!(
-        "../../bingo-sdk/fixtures/record/event/sessionUpdated.json"
-    ))
-    .unwrap() else {
-        panic!("summary")
-    };
-    let state = SessionState::new(summary);
-    let inputs = Arc::new(Mutex::new(Vec::new()));
-    let host = host(state.clone(), inputs.clone());
-    let cx = CommandContext {
-        surface: None,
-        session: state.summary.id.clone(),
-        cwd: "/unused".into(),
-        host: host.handle(),
-        cancel: Default::default(),
-    };
-    let selections = Selections::default();
-    for (label, text) in [("session", "/rename "), ("permission", "/permission ")] {
-        selections
-            .lock()
-            .unwrap()
-            .insert(cx.session.clone(), label.into());
-        let outcome = keys::Handler(selections.clone())
-            .run(
-                &json!({"handler":"status","event":"press","value":{"key":"enter"},"selected":label}).to_string(),
-                &cx,
-            )
-            .await
-            .unwrap();
-        assert_eq!(
-            outcome,
-            CommandOutcome::Surface {
-                action: Action {
-                    name: "Composer".into(),
-                    args: json!({"text":text})
-                },
-                fallback: Some(text.into())
-            }
-        );
-        assert!(inputs.lock().unwrap().is_empty());
-    }
-}
-
-#[tokio::test]
 async fn a_visible_key_resumes_an_expired_card_from_bounded_host_facts() {
     let state = crate::tests::state();
     let host = host(state.clone(), Default::default());
@@ -187,7 +142,7 @@ async fn a_visible_key_resumes_an_expired_card_from_bounded_host_facts() {
         .await
         .unwrap();
     assert_eq!(outcome, CommandOutcome::Handled { handled: true });
-    assert_eq!(selections.lock().unwrap()[&cx.session].label, "context");
+    assert_eq!(selections.lock().unwrap()[&cx.session].label, "mode");
     assert!(host.calls().iter().any(
         |call| matches!(call, testing::HostCall::Open { options, .. }
         if options.max_snapshot_bytes == Some(64 * 1024))
@@ -223,12 +178,7 @@ async fn client_commands_and_unknown_row_ids_cannot_dispatch() {
             .run(&args.to_string(), &cx)
             .await
             .unwrap();
-        if label == "permission" {
-            assert!(matches!(outcome, CommandOutcome::Surface { action, .. }
-                if action.args["text"] == "/permission "));
-        } else {
-            assert_eq!(outcome, CommandOutcome::Handled { handled: true });
-        }
+        assert_eq!(outcome, CommandOutcome::Handled { handled: true });
         assert!(inputs.lock().unwrap().is_empty());
     }
 }

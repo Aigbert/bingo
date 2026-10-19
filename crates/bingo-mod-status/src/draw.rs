@@ -2,14 +2,12 @@ use crate::{
     ID, REQUEST, Selections, error,
     rows::{Row, Tone},
 };
-use bingo_sdk::view::{BoxStyle, Direction, TextChild, TextStyle};
 use bingo_sdk::*;
 use serde_json::{Value, json};
 use std::time::Instant;
 
 pub struct Drawing {
     pub(crate) selections: Selections,
-    pub(crate) started: Instant,
 }
 #[async_trait::async_trait]
 impl Interceptor for Drawing {
@@ -35,21 +33,22 @@ impl Interceptor for Drawing {
             Some(facts) => facts,
             None => (&crate::snapshot(&cx.host, &cx.session).await?.snapshot).into(),
         };
-        let rows = read(&cx.host, &facts).await?;
+        let rows = read(&cx.host, &facts, request.viewport.glyphs).await?;
         let selected = {
             let mut selections = self.selections.lock().map_err(error)?;
             let selection = selections
                 .entry(cx.session.clone())
-                .or_insert_with(|| props.selected.as_deref().unwrap_or("session").into());
+                .or_insert_with(|| props.selected.as_deref().unwrap_or("model").into());
             selection.seen = Instant::now();
             selection.label.clone()
         };
-        let tree = tree(
+        let tree = tree_named(
             &rows,
             &selected,
             request.viewport.columns,
             request.viewport.rows,
-            self.started.elapsed().as_secs(),
+            facts.summary.title.as_deref().unwrap_or("this session"),
+            request.viewport.glyphs,
         );
         serde_json::to_value(tree).map_err(error)
     }
@@ -57,6 +56,7 @@ impl Interceptor for Drawing {
 pub(crate) async fn read(
     host: &HostHandle,
     state: &component::StatusFacts,
+    glyphs: glyph::GlyphSet,
 ) -> Result<Vec<Row>, KernelError> {
     let plugins = host.catalog(CatalogKind::Plugins).await?;
     let models = host.catalog(CatalogKind::Models).await?;
@@ -74,140 +74,74 @@ pub(crate) async fn read(
         Some(service) => service.rows().await,
         None => vec![],
     };
-    let mut rows = crate::rows::rows(state, &plugins.entries, &servers, price);
-    let pending = match bingo_services::schedule::find(host) {
-        Some(service) => service.pending(state.summary.id.clone()).await?,
-        None => None,
-    };
-    if let Some(wake) = crate::rows::wake(pending.as_ref(), jiff::Timestamp::now()) {
-        rows.insert(3, wake);
-    }
+    let rows = crate::rows::rows(state, &plugins.entries, &servers, price, glyphs);
+
     Ok(rows)
 }
-pub fn tree(rows: &[Row], selected: &str, columns: u16, height: u16, uptime: u64) -> View {
+pub fn tree(
+    rows: &[Row],
+    selected: &str,
+    columns: u16,
+    height: u16,
+    glyphs: bingo_sdk::glyph::GlyphSet,
+) -> View {
+    tree_named(rows, selected, columns, height, "this session", glyphs)
+}
+fn tree_named(
+    rows: &[Row],
+    selected: &str,
+    columns: u16,
+    height: u16,
+    title: &str,
+    glyphs: bingo_sdk::glyph::GlyphSet,
+) -> View {
+    use bingo_sdk::{pick, sheet::Sheet};
     let selected = crate::keys::selected(rows, selected);
-    let mut children = vec![heading(columns, uptime)];
-    let budget = usize::from(height.saturating_sub(1)).max(1);
-    let start = start(rows, selected, budget);
-    let mut used = 0;
-    for (index, row) in rows.iter().enumerate().skip(start) {
-        if used >= budget {
-            break;
-        }
-        children.push(draw_row(row, index == selected, columns));
-        used += 1;
-        if let Some(detail) = &row.detail
-            && used < budget
-        {
-            children.push(text(&format!("               {detail}"), Tone::Dim));
-            used += 1;
-        }
-    }
-    View::Box {
-        children,
-        layout: Box::new(BoxStyle {
-            hints: Some(
-                component::SiteHints::new([
-                    component::KeyPair::new("↑↓", "pick"),
-                    component::KeyPair::new("⏎", rows.get(selected).map_or("change", hint)),
-                    component::KeyPair::new("esc", "close"),
-                ])
-                .composer("/status", ""),
-            ),
-            on_key: Some(Action {
-                name: format!("{ID}:ui"),
-                args: json!({"handler":REQUEST,"event":"press","selected":rows.get(selected).map(|row| &row.label)}),
-            }),
-            ..Default::default()
-        }),
-    }
-}
-fn heading(columns: u16, uptime: u64) -> View {
-    pair(
-        vec![text(" status", Tone::Ok), text("   live", Tone::Dim)],
-        &format!("bingo {} · up {}m ", env!("CARGO_PKG_VERSION"), uptime / 60),
-        columns,
-    )
-}
-fn hint(row: &Row) -> &str {
-    match row.label.as_str() {
-        "session" => "rename",
-        "model" => "change",
-        "context" => "compact now",
-        "permission" => "change mode",
-        "plugins" => "/plugins",
-        "mcp" => "/mcp",
-        "wake" => "/wake off",
-        _ => "revoke",
-    }
-}
-fn start(rows: &[Row], selected: usize, budget: usize) -> usize {
-    if rows.is_empty() {
-        return 0;
-    }
-    let mut start = 0;
-    while rows[start..=selected]
+    let list = rows
         .iter()
-        .map(|r| 1 + usize::from(r.detail.is_some()))
-        .sum::<usize>()
-        > budget
-        && start < selected
-    {
-        start += 1;
+        .map(|row| {
+            let mut spans = vec![pick::pad(pick::text(&row.label, "dim"), 12)];
+            spans.extend(row.value.iter().map(|span| {
+                pick::text(
+                    &span.text,
+                    match span.tone {
+                        Tone::Ok => "fg",
+                        Tone::Warn => "amber",
+                        Tone::Bad => "bad",
+                        Tone::Dim => "dim",
+                        Tone::Muted => "muted",
+                        Tone::Auto => "auto",
+                        Tone::Plan => "plan",
+                        Tone::Glow => "glow",
+                        Tone::Faint => "faint",
+                        Tone::Code => "code",
+                    },
+                )
+            }));
+            pick::Row::new(&row.label, pick::line(spans))
+        })
+        .collect();
+    let mut view = Sheet {
+        head: "Status".into(),
+        fact: Some(pick::text(title, "dim")),
+        top: vec![],
+        rows: list,
+        selected: rows.get(selected).map(|r| r.label.clone()),
+        foot: vec![],
+        pick: true,
     }
-    start
-}
-fn draw_row(row: &Row, selected: bool, _columns: u16) -> View {
-    let rule = row.label.starts_with("allow ");
-    let label = if rule { "  allow" } else { &row.label };
-    let prefix = format!(" {} {:11}", if selected { "❯" } else { " " }, label);
-    let mut spans = vec![text(&prefix, if selected { Tone::Ok } else { Tone::Dim })];
-    spans.extend(row.value.iter().map(|span| text(&span.text, span.tone)));
-    line(spans)
-}
-fn pair(left: Vec<View>, right: &str, columns: u16) -> View {
-    // Let the surface measure and truncate Unicode cells inside the left column.
-    View::Box {
-        children: vec![
-            View::Box {
-                children: vec![line(left)],
-                layout: Box::new(BoxStyle {
-                    width: Some(columns.saturating_sub(right.chars().count() as u16)),
-                    ..Default::default()
-                }),
-            },
-            text(right, Tone::Dim),
-        ],
-        layout: Box::new(BoxStyle {
-            flex_direction: Some(Direction::Row),
-            height: Some(1),
-            ..Default::default()
-        }),
+    .view(columns, height, glyphs);
+    if let View::Box { layout, .. } = &mut view {
+        let mut pairs = vec![component::KeyPair::new("↑↓", "line")];
+        if rows.get(selected).is_some_and(|r| r.command.is_some()) {
+            pairs.push(component::KeyPair::new("⏎", "open"));
+        }
+        pairs.push(component::KeyPair::new("esc", "close"));
+        layout.hints = Some(component::SiteHints::new(pairs));
+        layout.on_key = Some(Action {
+            name: format!("{ID}:ui"),
+            args: json!({"handler":REQUEST,"event":"press","selected":rows.get(selected).map(|row| &row.label)}),
+        });
     }
-}
-fn line(children: Vec<View>) -> View {
-    View::Text {
-        children: children
-            .into_iter()
-            .map(|view| TextChild::Node(Box::new(view)))
-            .collect(),
-        style: TextStyle {
-            wrap: Some("truncate".into()),
-            ..Default::default()
-        },
-    }
-}
-fn text(value: &str, tone: Tone) -> View {
-    View::Text {
-        children: vec![TextChild::String(value.into())],
-        style: TextStyle {
-            color: match tone {
-                Tone::Warn => Some("yellow".into()),
-                Tone::Bad => Some("red".into()),
-                _ => None,
-            },
-            dim_color: (tone == Tone::Dim).then_some(true),
-            ..Default::default()
-        },
-    }
+    bingo_sdk::sheet::clicks(view)
 }

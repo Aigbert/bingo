@@ -22,7 +22,7 @@ fn publication(asked: bool) -> Event {
 }
 
 fn hub_publication() -> Event {
-    let rows = bingo_mod_status::rows::rows(&(&state()).into(), &[], &[], None);
+    let rows = bingo_mod_status::rows::rows(&(&state()).into(), &[], &[], None, Default::default());
     let view = bingo_mod_status::draw::tree(&rows, "session", 108, 14, Default::default());
     let Event::Signal { mut payload, .. } = publication(true) else {
         unreachable!()

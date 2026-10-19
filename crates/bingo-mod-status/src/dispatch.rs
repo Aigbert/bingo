@@ -5,6 +5,8 @@ pub async fn run(command: &str, cx: &CommandContext) -> Result<CommandOutcome, K
     let mut attachment = crate::snapshot(&cx.host, &cx.session).await?;
     let intent = IntentId::mint();
     let (name, args) = command.split_once(' ').unwrap_or((command, ""));
+    let mut origin = Origin::surface(format!("plugin:{}", crate::ID));
+    origin.render_surface = cx.surface;
     attachment.handle.submit(
         intent.clone(),
         // Signed as this mod's, never the person's: a row runs no verb
@@ -14,7 +16,7 @@ pub async fn run(command: &str, cx: &CommandContext) -> Result<CommandOutcome, K
                 name: name.into(),
                 args: Value::String(args.into()),
             },
-            Origin::surface(format!("plugin:{}", crate::ID)),
+            origin,
         ),
     );
     // The instant site command holds no actor queue. Return the nested command's

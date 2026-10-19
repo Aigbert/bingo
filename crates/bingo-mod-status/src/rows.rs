@@ -1,6 +1,6 @@
 use bingo_sdk::spent::{Price, spent};
 use bingo_sdk::{CatalogEntry, component::StatusFacts};
-use bingo_services::mcp::{ServerRow, Status};
+use bingo_services::mcp::ServerRow;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tone {
@@ -8,6 +8,12 @@ pub enum Tone {
     Warn,
     Bad,
     Dim,
+    Muted,
+    Auto,
+    Plan,
+    Glow,
+    Faint,
+    Code,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Span {
@@ -37,206 +43,242 @@ pub fn rows(
     plugins: &[CatalogEntry],
     servers: &[ServerRow],
     price: Option<Price>,
+    glyphs: bingo_sdk::glyph::GlyphSet,
 ) -> Vec<Row> {
     let summary = &state.summary;
     let mut rows = vec![
-        row(
-            "session",
-            format!(
-                "{} · {} · {}",
-                summary.title.as_deref().unwrap_or("untitled"),
-                summary.id,
-                summary.cwd
-            ),
-            Some("rename"),
-        ),
-        row(
-            "model",
-            format!(
-                "{} · {}",
-                summary.model.as_deref().unwrap_or("unknown"),
-                summary.provider.as_deref().unwrap_or("unknown")
-            ),
-            Some("model"),
-        ),
-        context(state),
-        spent_row(state, price),
-        permission(state),
+        model(state, glyphs),
+        permission(state, glyphs),
+        context(state, glyphs),
     ];
-    for rule in rules(state) {
-        rows.push(row(
-            &format!("allow {rule}"),
-            rule.into(),
-            Some(&format!("permission forget {rule}")),
-        ));
+    if let Some(cost) = spent(state.summary.usage, price).usd {
+        let mut cost_row = row("cost", format!("${cost:.2}"), None);
+        cost_row.value.push(Span {
+            text: " this session".into(),
+            tone: Tone::Dim,
+        });
+        rows.push(cost_row);
     }
-    rows.push(plugin_row(plugins));
-    rows.push(server_row(servers));
+    rows.push(row("directory", summary.cwd.clone(), None));
+    rows.push(plugin_row(plugins, servers, glyphs));
+    let rules = rules(state);
+    let mut rule = row(
+        "rules",
+        if rules.is_empty() {
+            "none yet".into()
+        } else {
+            rules.join(", ")
+        },
+        Some("permission"),
+    );
+    rule.value[0].tone = if rules.is_empty() {
+        Tone::Dim
+    } else {
+        Tone::Code
+    };
+    rows.push(rule);
     rows
 }
+
 fn rules(state: &StatusFacts) -> Vec<&str> {
     state
         .config
-        .plugins
-        .get("bingo.permissions")
-        .and_then(|p| p["rules"].as_array())
+        .policy()
+        .and_then(|(_, p)| p["rules"].as_array())
         .into_iter()
         .flatten()
         .filter_map(|v| v.as_str())
         .collect()
 }
-fn permission(state: &StatusFacts) -> Row {
-    let mode = state
-        .config
-        .plugins
-        .get("bingo.permissions")
-        .and_then(|p| p["mode"].as_str())
-        .unwrap_or("default");
-    row(
-        "permission",
-        format!("{mode} · {} rules this session", rules(state).len()),
-        Some("permission"),
-    )
-}
-fn spent_row(state: &StatusFacts, price: Option<Price>) -> Row {
-    let spent = spent(state.summary.usage, price);
-    let cost = spent
-        .usd
-        .map(|n| format!("~${n:.2} at current rates"))
-        .unwrap_or_else(|| "price unknown".into());
-    let mut result = row(
-        "spent",
-        format!(
-            "{} in · {} out · cache read {}% · {cost}",
-            compact(spent.input),
-            compact(spent.output),
-            spent.cache_share
-        ),
-        None,
+fn model(state: &StatusFacts, glyphs: bingo_sdk::glyph::GlyphSet) -> Row {
+    let summary = &state.summary;
+    let mut row = row(
+        "model",
+        summary.model.clone().unwrap_or_default(),
+        Some("model"),
     );
-    result.value[0].tone = Tone::Dim;
-    result
+    row.value.push(Span {
+        text: format!(" {}", bingo_sdk::Effort::word(summary.effort)),
+        tone: Tone::Muted,
+    });
+    if let Some(provider) = &summary.provider {
+        row.value.extend([
+            Span {
+                text: bingo_sdk::glyph::Glyph::Sep.spell(glyphs).into(),
+                tone: Tone::Faint,
+            },
+            Span {
+                text: provider.clone(),
+                tone: Tone::Dim,
+            },
+        ]);
+    }
+    row
 }
-fn context(state: &StatusFacts) -> Row {
+fn permission(state: &StatusFacts, glyphs: bingo_sdk::glyph::GlyphSet) -> Row {
+    let mut row = row("mode", String::new(), Some("permission"));
+    if let Some((current, modes)) = bingo_sdk::slot::described_config(&state.config)
+        .into_iter()
+        .filter(|placed| {
+            state
+                .config
+                .policy()
+                .is_some_and(|(id, _)| placed.plugin == id)
+        })
+        .find_map(|placed| match placed.slot {
+            bingo_sdk::slot::Slot::Mode { current, modes } => Some((current, modes)),
+            _ => None,
+        })
+    {
+        row.value[0].text = bingo_sdk::slot::mode_label(&current, &modes).into();
+        row.value[0].tone = match current.as_str() {
+            "acceptEdits" => Tone::Auto,
+            "plan" => Tone::Plan,
+            "bypassPermissions" => Tone::Bad,
+            _ => Tone::Ok,
+        };
+        if let Some(meaning) =
+            bingo_sdk::slot::mode_at(&current, &modes).and_then(|at| modes[at].meaning.clone())
+        {
+            row.value.extend([
+                Span {
+                    text: bingo_sdk::glyph::Glyph::Sep.spell(glyphs).into(),
+                    tone: Tone::Faint,
+                },
+                Span {
+                    text: meaning,
+                    tone: Tone::Dim,
+                },
+            ]);
+        }
+    } else if let Some(mode) = state.config.policy().and_then(|(_, p)| p["mode"].as_str()) {
+        row.value[0].text = mode.into();
+    }
+    row
+}
+
+fn context(state: &StatusFacts, glyphs: bingo_sdk::glyph::GlyphSet) -> Row {
     let Some(c) = &state.context else {
-        return row("context", "not measured yet".into(), Some("compact"));
+        return row("context", String::new(), Some("compact"));
     };
-    let cells = ((u128::from(c.used) * 20) / u128::from(c.window.max(1))).min(20) as usize;
-    let mut result = row(
-        "context",
-        format!(
-            "{}{} {} of {} · {}% · compacts at {}",
-            "▰".repeat(cells),
-            "▱".repeat(20 - cells),
-            compact(c.used),
-            compact(c.window),
-            c.percent(),
-            compact(c.trigger)
-        ),
-        Some("compact"),
-    );
-    if c.used >= c.trigger && c.trigger > 0 {
-        result.value[0].tone = Tone::Warn;
+    let cells = ((c.used as f64 / c.window.max(1) as f64 * 20.0).round() as usize).min(20);
+    let ink = if c.percent() >= 80 {
+        Tone::Warn
+    } else {
+        Tone::Glow
+    };
+    Row {
+        label: "context".into(),
+        value: vec![
+            Span {
+                text: bingo_sdk::glyph::Glyph::Heavy.spell(glyphs).repeat(cells),
+                tone: ink,
+            },
+            Span {
+                text: bingo_sdk::glyph::Glyph::Thin
+                    .spell(glyphs)
+                    .repeat(20 - cells),
+                tone: Tone::Faint,
+            },
+            Span {
+                text: format!("  {}% of {}", c.percent(), compact(c.window)),
+                tone: if c.percent() >= 80 {
+                    Tone::Warn
+                } else {
+                    Tone::Muted
+                },
+            },
+        ],
+        detail: None,
+        command: Some("compact".into()),
     }
-    if let Some(parts) = &c.parts {
-        result.detail = Some(format!(
-            "about {}",
-            parts
-                .iter()
-                .filter(|p| p.tokens > 0)
-                .map(|p| format!("{} {}", p.name, compact(p.tokens)))
-                .collect::<Vec<_>>()
-                .join(" · ")
-        ));
-    }
-    result
 }
+
 pub fn compact(n: u64) -> String {
     if n >= 1_000_000 {
-        format!("{:.1}m", n as f64 / 1_000_000.0)
+        format!("{}M", n / 1_000_000)
     } else if n >= 1_000 {
         format!("{}k", n / 1_000)
     } else {
         n.to_string()
     }
 }
-fn problem(row: &mut Row, names: &[&str], suffix: &str, tone: Tone) {
-    let Some(first) = names.first() else {
-        return;
-    };
-    let others = if names.len() > 1 {
-        format!(" +{}", names.len() - 1)
-    } else {
-        String::new()
-    };
-    row.value.push(Span {
-        text: format!(" · {first}{others} {suffix}"),
-        tone,
-    });
-}
-fn plugin_row(plugins: &[CatalogEntry]) -> Row {
+fn plugin_row(
+    plugins: &[CatalogEntry],
+    servers: &[ServerRow],
+    glyphs: bingo_sdk::glyph::GlyphSet,
+) -> Row {
     use bingo_sdk::PluginState;
-    let (mut on, mut off) = (0, 0);
-    let (mut failed, mut waiting, mut pending, mut unknown) = (vec![], vec![], vec![], vec![]);
-    for plugin in plugins {
-        let name = plugin.id.as_str();
-        match serde_json::from_value::<PluginState>(plugin.meta["state"].clone()) {
-            Ok(PluginState::On) => on += 1,
-            Ok(PluginState::Off { .. }) => off += 1,
-            Ok(PluginState::Failed { .. }) => failed.push(name),
-            Ok(PluginState::Waiting { .. }) => waiting.push(name),
-            Ok(PluginState::Registering) => pending.push(name),
-            Ok(PluginState::Pending { now, .. }) => {
-                if now {
-                    on += 1;
-                } else {
-                    off += 1;
-                }
-                pending.push(name);
-            }
-            Err(_) => unknown.push(name),
-        }
+    let states = plugins
+        .iter()
+        .filter(|plugin| !plugin.id.starts_with("mcp:"))
+        .map(|p| {
+            (
+                p,
+                serde_json::from_value::<PluginState>(p.meta["state"].clone()).ok(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let on = states
+        .iter()
+        .filter(|(_, s)| {
+            matches!(
+                s,
+                Some(PluginState::On | PluginState::Pending { now: true, .. })
+            )
+        })
+        .count();
+    let on = on + servers.iter().filter(|server| server.forwardable()).count();
+    let mut result = row("plugins", format!("{on} on"), Some("plugins"));
+    if let Some((plugin, state)) = states.iter().find(|(_, s)| {
+        matches!(
+            s,
+            Some(PluginState::Failed { .. } | PluginState::Waiting { .. }) | None
+        )
+    }) {
+        let why = match state {
+            Some(PluginState::Failed { why }) => why.as_str(),
+            Some(PluginState::Waiting { .. }) => "waits for you",
+            _ => "state unavailable",
+        };
+        result.value.push(Span {
+            text: bingo_sdk::glyph::Glyph::Sep.spell(glyphs).into(),
+            tone: Tone::Faint,
+        });
+        result.value.push(Span {
+            text: format!("{} {why}", plugin.id),
+            tone: Tone::Warn,
+        });
     }
-    let mut result = row("plugins", format!("{on} on · {off} off"), Some("plugins"));
-    for (names, label, tone) in [
-        (failed, "failed", Tone::Bad),
-        (waiting, "from this repo waits for you", Tone::Warn),
-        (pending, "pending", Tone::Warn),
-        (unknown, "state unavailable", Tone::Warn),
-    ] {
-        problem(&mut result, &names, label, tone);
+    if result.value.len() == 1
+        && let Some(problem) = servers.iter().find_map(server_problem)
+    {
+        result.value.extend([
+            Span {
+                text: bingo_sdk::glyph::Glyph::Sep.spell(glyphs).into(),
+                tone: Tone::Faint,
+            },
+            Span {
+                text: problem,
+                tone: Tone::Warn,
+            },
+        ]);
     }
     result
 }
-fn server_row(servers: &[ServerRow]) -> Row {
-    let connected = servers
-        .iter()
-        .filter(|s| matches!(s.status, Status::Connected { .. }))
-        .collect::<Vec<_>>();
-    let mut result = row(
-        "mcp",
-        format!(
-            "{} connected · {} tools",
-            connected.len(),
-            connected.iter().map(|s| s.tools()).sum::<usize>()
-        ),
-        Some("mcp"),
-    );
-    for (problem_state, tone) in [
-        (Status::NeedsAuth { why: String::new() }, Tone::Warn),
-        (Status::Failed { why: String::new() }, Tone::Bad),
-        (Status::Connecting, Tone::Dim),
-        (Status::SigningIn, Tone::Dim),
-        (Status::Waiting { changed: false }, Tone::Warn),
-    ] {
-        let names = servers
-            .iter()
-            .filter(|s| std::mem::discriminant(&s.status) == std::mem::discriminant(&problem_state))
-            .map(|s| s.name.as_str())
-            .collect::<Vec<_>>();
-        problem(&mut result, &names, problem_state.said(), tone);
-    }
-    result
+
+fn server_problem(server: &ServerRow) -> Option<String> {
+    use bingo_services::mcp::Status;
+    let why = match &server.status {
+        Status::Failed { why } | Status::NeedsAuth { why } => why.as_str(),
+        Status::Waiting { .. } => "waits for you",
+        _ => return None,
+    };
+    Some(format!(
+        "{} {}",
+        server.name,
+        why.lines().next().unwrap_or_default()
+    ))
 }
 
 pub fn wake(

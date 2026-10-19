@@ -24,16 +24,16 @@ impl Interceptor for Open {
     ) -> Result<Value, KernelError> {
         let command: catalogue::CommandRun =
             serde_json::from_value(input.clone()).map_err(error)?;
-        if !matches!(
-            command.surface,
-            Some(render::SurfaceName::Terminal | render::SurfaceName::Desktop)
-        ) {
+        if !command
+            .surface
+            .is_some_and(render::SurfaceName::shows_sheets)
+        {
             return next.run(input).await;
         }
         self.0
             .lock()
             .map_err(error)?
-            .insert(cx.session.clone(), "session".into());
+            .insert(cx.session.clone(), "model".into());
         cx.host
             .invalidate(&cx.session, vec![REQUEST.into()])
             .await?;
@@ -62,7 +62,7 @@ pub fn slot() -> Value {
             close_on_escape: true,
             hold_toasts: true,
             asked: true,
-            place: slot::above(),
+            place: vec![slot::Place::Dock],
             size,
             view: Shown::Pull {
                 request: render::PullRequest {

@@ -35,19 +35,10 @@ impl From<&str> for Selection {
     }
 }
 
+#[derive(Default)]
 pub struct Status {
     selections: Selections,
-    started: Instant,
     stop: CancellationToken,
-}
-impl Default for Status {
-    fn default() -> Self {
-        Self {
-            selections: Default::default(),
-            started: Instant::now(),
-            stop: Default::default(),
-        }
-    }
 }
 static MANIFEST: PluginManifest = PluginManifest {
     id: ID,
@@ -76,7 +67,6 @@ impl Plugin for Status {
             Arc::new(command::Open(self.selections.clone())) as Arc<dyn Interceptor>,
             Arc::new(draw::Drawing {
                 selections: self.selections.clone(),
-                started: self.started,
             }),
         ];
         for link in links {
@@ -111,7 +101,7 @@ async fn snapshot(host: &HostHandle, session: &SessionId) -> Result<Attachment, 
         },
         ClientIdentity {
             name: ID.into(),
-            surface: "terminal".into(),
+            surface: String::new(),
         },
         OpenOptions {
             max_snapshot_bytes: Some(64 * 1024),

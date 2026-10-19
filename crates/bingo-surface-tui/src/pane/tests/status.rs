@@ -9,6 +9,7 @@ use serde_json::json;
 
 fn scenario(which: &str) -> (SessionState, Vec<CatalogEntry>) {
     let mut state = state();
+    state.config.kernel[ConfigView::POLICY] = json!("bingo.permissions");
     state.summary.title = Some("The release".into());
     state.context = Some(serde_json::from_value(json!({"used":42000,"window":200000,"trigger":180000,"parts":[{"name":"system","tokens":3000},{"name":"tools","tokens":6000},{"name":"chat","tokens":33000},{"name":"pictures","tokens":0}]})).unwrap());
     state.config.plugins.insert(
@@ -51,7 +52,7 @@ fn put(state: &mut SessionState, view: View, height: u16) {
         close_on_escape: true,
         hold_toasts: true,
         asked: true,
-        place: slot::above(),
+        place: vec![slot::Place::Dock],
         size,
         view: Shown::View(view),
     };
@@ -83,7 +84,13 @@ fn status_scenarios_match_at_both_terminal_sizes() {
                 cache_read: Some(0.3),
                 cache_write: None,
             });
-            let rows = rows::rows(&(&state).into(), &plugins, &servers, price);
+            let rows = rows::rows(
+                &(&state).into(),
+                &plugins,
+                &servers,
+                price,
+                Default::default(),
+            );
             let selected = match which {
                 "long" => "context",
                 "failed" | "waiting" => "plugins",
@@ -92,7 +99,7 @@ fn status_scenarios_match_at_both_terminal_sizes() {
             };
             put(
                 &mut state,
-                draw::tree(&rows, selected, width, (height - 4) / 2, 2520),
+                draw::tree(&rows, selected, width, (height - 4) / 2, Default::default()),
                 height,
             );
             let (mut ui, now) = scene();
@@ -107,8 +114,12 @@ fn status_scenarios_match_at_both_terminal_sizes() {
 #[test]
 fn status_keys_preserve_escape_and_live_config_preserves_the_row() {
     let (mut state, plugins) = scenario("overview");
-    let rows = rows::rows(&(&state).into(), &plugins, &[], None);
-    put(&mut state, draw::tree(&rows, "permission", 80, 11, 0), 24);
+    let rows = rows::rows(&(&state).into(), &plugins, &[], None, Default::default());
+    put(
+        &mut state,
+        draw::tree(&rows, "mode", 80, 11, Default::default()),
+        24,
+    );
     let (mut ui, now) = scene();
     ui.focus = crate::focus::Focus::Pane(format!("{}/bingo.mod.status/status", state.summary.id));
     draw_tree(80, 24, &solo(&state), &mut ui, now);
@@ -129,10 +140,14 @@ fn status_keys_preserve_escape_and_live_config_preserves_the_row() {
         json!({"mode":"plan","rules":[]}),
     );
     state.apply(&frame(1, Event::ConfigChanged { config }));
-    let rows = rows::rows(&(&state).into(), &plugins, &[], None);
-    put(&mut state, draw::tree(&rows, "permission", 80, 11, 0), 24);
+    let rows = rows::rows(&(&state).into(), &plugins, &[], None, Default::default());
+    put(
+        &mut state,
+        draw::tree(&rows, "mode", 80, 11, Default::default()),
+        24,
+    );
     let screen = draw_tree(80, 24, &solo(&state), &mut ui, now);
-    assert!(screen.contains("❯ permission plan"), "{screen}");
+    assert!(screen.contains("▎ mode        plan"), "{screen}");
     let escape = KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE);
     let effects = crate::input::on_key(&mut ui, &solo(&state), escape, now);
     assert!(
@@ -162,7 +177,7 @@ fn bingo_mod_status_slot() -> serde_json::Value {
             close_on_escape: true,
             hold_toasts: true,
             asked: true,
-            place: slot::above(),
+            place: vec![slot::Place::Dock],
             size: PaneSize::from_rows(12),
             view: Shown::Pull {
                 request: render::PullRequest {
@@ -179,38 +194,4 @@ fn bingo_mod_status_slot() -> serde_json::Value {
             },
         }],
     )
-}
-
-#[test]
-fn wake_row_counts_down_in_the_status_card_and_disappears() {
-    for (width, height) in [(108, 30), (80, 24)] {
-        let (mut state, plugins) = scenario("overview");
-        let (mut ui, mut now) = scene();
-        ui.focus =
-            crate::focus::Focus::Pane(format!("{}/bingo.mod.status/status", state.summary.id));
-        let pending = bingo_services::schedule::Pending {
-            at: (now.wall + jiff::SignedDuration::from_mins(4)).to_string(),
-            note: "check CI".into(),
-        };
-        for (seconds, expected) in [(0, "in 4m"), (20, "in 3m 40s")] {
-            now.wall += jiff::SignedDuration::from_secs(seconds);
-            let mut rows = rows::rows(&(&state).into(), &plugins, &[], None);
-            rows.insert(3, rows::wake(Some(&pending), now.wall).unwrap());
-            put(
-                &mut state,
-                draw::tree(&rows, "wake", width, (height - 4) / 2, 0),
-                height,
-            );
-            let screen = draw_tree(width, height, &solo(&state), &mut ui, now);
-            assert!(screen.contains(expected), "{screen}");
-            assert!(screen.contains("/wake off"), "{screen}");
-        }
-        let rows = rows::rows(&(&state).into(), &plugins, &[], None);
-        put(
-            &mut state,
-            draw::tree(&rows, "wake", width, (height - 4) / 2, 0),
-            height,
-        );
-        assert!(!draw_tree(width, height, &solo(&state), &mut ui, now).contains("check CI"));
-    }
 }

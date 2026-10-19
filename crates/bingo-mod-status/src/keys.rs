@@ -2,24 +2,16 @@ use crate::{REQUEST, Selections, error, rows::Row};
 use bingo_sdk::*;
 use serde_json::Value;
 pub struct Handler(pub Selections);
-pub fn selected(rows: &[Row], label: &str) -> usize {
+fn picks(rows: &[Row]) -> Vec<pick::Row> {
     rows.iter()
-        .position(|r| r.label == label && r.command.is_some())
-        .or_else(|| rows.iter().position(|r| r.command.is_some()))
-        .unwrap_or(0)
+        .map(|row| pick::Row::new(&row.label, pick::text("", "fg")))
+        .collect()
+}
+pub fn selected(rows: &[Row], label: &str) -> usize {
+    pick::selected(&picks(rows), Some(label))
 }
 pub fn moved(rows: &[Row], label: &str, down: bool) -> String {
-    let picks = rows
-        .iter()
-        .filter(|r| r.command.is_some())
-        .collect::<Vec<_>>();
-    let at = picks.iter().position(|r| r.label == label).unwrap_or(0);
-    let at = if down {
-        at.saturating_add(1).min(picks.len().saturating_sub(1))
-    } else {
-        at.saturating_sub(1)
-    };
-    picks.get(at).map(|r| r.label.clone()).unwrap_or_default()
+    pick::moved(&picks(rows), Some(label), down).unwrap_or_default()
 }
 #[async_trait::async_trait]
 impl Command for Handler {
@@ -35,17 +27,24 @@ impl Command for Handler {
             crate::command::close(&cx.host, &cx.session, &self.0).await?;
             return Ok(CommandOutcome::Handled { handled: true });
         }
-        let key = args["value"]["key"].as_str().unwrap_or_default();
+        let press = sheet::pressed(&args);
+        if press.is_none() {
+            return Ok(CommandOutcome::Handled { handled: false });
+        }
+        let clicked = press.as_ref().and_then(sheet::Press::picked);
+        let key = press
+            .as_ref()
+            .and_then(sheet::Press::key)
+            .unwrap_or("enter");
         if args["event"] != "press" || !["up", "down", "enter"].contains(&key) {
             return Ok(CommandOutcome::Handled { handled: false });
         }
-        let label = args["selected"].as_str().unwrap_or_default();
+        let label = clicked
+            .or_else(|| args["selected"].as_str())
+            .unwrap_or_default();
         let facts = (&crate::snapshot(&cx.host, &cx.session).await?.snapshot).into();
-        let rows = crate::draw::read(&cx.host, &facts).await?;
-        if !rows
-            .iter()
-            .any(|row| row.label == label && row.command.is_some())
-        {
+        let rows = crate::draw::read(&cx.host, &facts, Default::default()).await?;
+        if !rows.iter().any(|row| row.label == label) {
             return Ok(CommandOutcome::Handled { handled: true });
         }
         if key == "enter" {
@@ -73,7 +72,7 @@ async fn enter(
         .and_then(|r| r.command.as_ref());
     if let Some(command) = command {
         crate::command::close(&cx.host, &cx.session, selections).await?;
-        if matches!(command.as_str(), "rename" | "permission" | "wake off") {
+        if matches!(command.as_str(), "rename" | "wake off") {
             let text = if command == "wake off" {
                 "/wake off".into()
             } else {
@@ -96,7 +95,7 @@ async fn enter(
 mod tests {
     use super::*;
     #[test]
-    fn selection_follows_labels_and_skips_information() {
+    fn selection_follows_labels_including_information_rows() {
         let rows = [
             "session",
             "spent",
@@ -111,8 +110,8 @@ mod tests {
             detail: None,
             command: (label != "spent").then(|| label.into()),
         });
-        assert_eq!(moved(&rows, "session", true), "permission");
-        assert_eq!(moved(&rows, "permission", false), "session");
+        assert_eq!(moved(&rows, "session", true), "spent");
+        assert_eq!(moved(&rows, "permission", false), "spent");
         assert_eq!(moved(&rows, "mcp", true), "mcp");
         assert_eq!(moved(&rows, "session", false), "session");
         let without_rule = rows

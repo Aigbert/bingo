@@ -20,6 +20,15 @@ fn request(state: &SessionState) -> RenderRequest {
         },
     }
 }
+fn picked(view: &View) -> Option<String> {
+    if let View::Box { children, layout } = view {
+        if layout.ground.as_deref() == Some("pick") {
+            return Some(view.fold());
+        }
+        return children.iter().find_map(picked);
+    }
+    None
+}
 async fn command(attachment: &mut Attachment, text: &str) -> IntentOutcome {
     let intent = IntentId::mint();
     attachment.handle.submit(
@@ -37,7 +46,7 @@ async fn key(attachment: &mut Attachment, tree: &View, key: &str) -> IntentOutco
     let intent = IntentId::mint();
     attachment.handle.submit(
         intent.clone(),
-        Input::action(action, Origin::surface("test")),
+        Input::action(action, Origin::surface("test").on(SurfaceName::Terminal)),
     );
     let outcome = ack_for(attachment, &intent).await;
     assert!(matches!(outcome, IntentOutcome::Applied { .. }));
@@ -60,31 +69,40 @@ async fn status_opens_updates_dispatches_and_closes_over_rpc() {
         .render(&id, request(&attachment.snapshot))
         .await
         .unwrap();
-    assert!(tree.fold().contains("❯ session"), "{tree:?}");
+    assert!(
+        picked(&tree).is_some_and(|row| row.contains("model")),
+        "{}",
+        tree.fold()
+    );
     key(&mut attachment, &tree, "down").await;
     let tree = host
         .render(&id, request(&attachment.snapshot))
         .await
         .unwrap();
-    assert!(tree.fold().contains("❯ model"));
+    assert!(picked(&tree).is_some_and(|row| row.contains("mode")));
     command(&mut attachment, "/rename Updated").await;
     let tree = host
         .render(&id, request(&attachment.snapshot))
         .await
         .unwrap();
     assert!(tree.fold().contains("Updated"));
-    assert!(tree.fold().contains("❯ model"));
+    assert!(picked(&tree).is_some_and(|row| row.contains("mode")));
     let outcome = key(&mut attachment, &tree, "enter").await;
-    assert!(serde_json::to_value(outcome).unwrap()["result"]["view"].is_object());
+    assert_eq!(
+        serde_json::to_value(outcome).unwrap()["result"]["surface"]["name"],
+        bingo_sdk::sheet::PERMISSION_MODE
+    );
     command(&mut attachment, "/status").await;
     let tree = host
         .render(&id, request(&attachment.snapshot))
         .await
         .unwrap();
     let outcome = key(&mut attachment, &tree, "enter").await;
+    let result = serde_json::to_value(outcome).unwrap();
+    assert_eq!(result["result"]["surface"]["name"], "Pane");
     assert_eq!(
-        serde_json::to_value(outcome).unwrap()["result"]["surface"],
-        json!({"name":"Composer","args":{"text":"/rename "}})
+        result["result"]["surface"]["args"]["plugin"],
+        "bingo.mod.models"
     );
     assert!(
         !slot::placed(&attachment.snapshot)
@@ -138,7 +156,7 @@ async fn an_outside_mod_can_wrap_or_replace_the_status_tree() {
     for (body, expected) in [
         (
             "const tree = await next(e); return {...tree,children:[h('Text',{},'Outside'), ...tree.children]};",
-            "Outside\n status",
+            "Outside\n",
         ),
         ("return h('Text',{},'Replacement');", "Replacement"),
     ] {
@@ -257,7 +275,7 @@ async fn a_declared_desktop_rpc_client_gets_a_card_with_unmodified_props() {
     request.viewport.columns = 80;
     request.viewport.rows = 12;
     let tree = host.render(&attachment.session, request).await.unwrap();
-    assert!(tree.fold().contains("❯ session"));
+    assert!(picked(&tree).is_some_and(|row| row.contains("model")));
     host.shutdown().await.unwrap();
     assert!(server.child.wait().await.unwrap().success());
 }

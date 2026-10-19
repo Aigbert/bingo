@@ -413,7 +413,7 @@ fn status_id() -> &'static str {
 }
 
 fn status_pane(state: &mut SessionState) {
-    let rows = bingo_mod_status::rows::rows(&(&*state).into(), &[], &[], None);
+    let rows = bingo_mod_status::rows::rows(&(&*state).into(), &[], &[], None, Default::default());
     let view = bingo_mod_status::draw::tree(&rows, "session", 108, 12, Default::default());
     let pane: bingo_sdk::slot::Slot = serde_json::from_value(json!({
         "kind":"pane", "id":"status", "title":"", "focus":true, "asked":true,

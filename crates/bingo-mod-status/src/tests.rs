@@ -11,96 +11,26 @@ pub(crate) fn state() -> SessionState {
     SessionState::new(summary)
 }
 #[test]
-fn rows_match_the_prototype_scenarios() {
-    let mut state = state();
-    state.config.plugins.insert(
-        "bingo.permissions".into(),
-        json!({"mode":"acceptEdits","rules":["Edit(src/**)","Bash(cargo:*)"]}),
+fn status_uses_the_shared_builder_and_omits_missing_facts() {
+    let rows = rows::rows(&(&state()).into(), &[], &[], None, Default::default());
+    assert!(!rows.iter().any(|r| r.label == "cost"));
+    assert_eq!(
+        rows.iter().map(|r| r.label.as_str()).collect::<Vec<_>>(),
+        ["model", "mode", "context", "directory", "plugins", "rules"]
     );
-    for (kind, word, tone) in [
-        (PluginState::On, "1 on", rows::Tone::Ok),
-        (
-            PluginState::Failed {
-                why: "failed".into(),
-            },
-            "failed",
-            rows::Tone::Bad,
-        ),
-        (
-            PluginState::Waiting { changed: false },
-            "waits for you",
-            rows::Tone::Warn,
-        ),
-        (PluginState::Registering, "pending", rows::Tone::Warn),
-        (
-            PluginState::Pending {
-                now: true,
-                at: plugin::NextStart::AfterTurn,
-            },
-            "1 on",
-            rows::Tone::Ok,
-        ),
-        (
-            PluginState::Pending {
-                now: false,
-                at: plugin::NextStart::NextStart,
-            },
-            "1 off",
-            rows::Tone::Ok,
-        ),
-    ] {
-        let plugins = vec![CatalogEntry {
-            id: "fixture".into(),
-            label: "fixture".into(),
-            meta: json!({"state":kind}),
-        }];
-        let rows = rows::rows(
-            &(&state).into(),
-            &plugins,
-            &[serde_json::from_value(json!({
-                "name": "remote",
-                "transport": {"type": "http", "url": "https://mcp.example.com"},
-                "status": {"kind": "needsAuth", "why": "signed out"}
-            }))
-            .unwrap()],
-            None,
-        );
-        let plugin = rows.iter().find(|r| r.label == "plugins").unwrap();
-        assert!(
-            plugin
-                .value
-                .iter()
-                .any(|s| s.text.contains(word) && s.tone == tone)
-        );
-        assert!(
-            rows.last()
-                .unwrap()
-                .value
-                .iter()
-                .any(|s| s.text.contains("remote needs sign-in"))
-        );
-        assert_eq!(
-            rows.iter()
-                .filter_map(|r| r.command.as_deref())
-                .collect::<Vec<_>>(),
-            [
-                "rename",
-                "model",
-                "compact",
-                "permission",
-                "permission forget Edit(src/**)",
-                "permission forget Bash(cargo:*)",
-                "plugins",
-                "mcp"
-            ]
-        );
-    }
+    let tree = draw::tree(&rows, "plugins", 100, 18, Default::default());
+    assert!(tree.fold().contains("Status"));
+    assert!(
+        serde_json::to_string(&tree)
+            .unwrap()
+            .contains("\"ground\":\"pick\"")
+    );
 }
 #[test]
 fn drawing_is_a_valid_status_answer_with_an_owned_root_handler() {
-    let rows = rows::rows(&(&state()).into(), &[], &[], None);
+    let rows = rows::rows(&(&state()).into(), &[], &[], None, Default::default());
     for (width, height) in [(108, 15), (80, 12)] {
-        let tree = draw::tree(&rows, "context", width, height, 2520);
+        let tree = draw::tree(&rows, "context", width, height, Default::default());
         assert!(view::answer_ok(render::Component::Status, &json!({}), ID, None, &tree).is_ok());
         bingo_sdk::testing::assert_separate_hints(&tree);
     }
@@ -143,24 +73,6 @@ async fn config_frames_invalidate_an_open_card_without_changing_selection() {
         "plugins"
     );
 }
-#[test]
-fn a_server_row_reads_the_state_the_plugins_panel_reads() {
-    let servers: Vec<bingo_services::mcp::ServerRow> = serde_json::from_value(json!([
-        {"name": "github", "transport": {"type": "http", "url": "https://mcp.example.com"},
-         "status": {"kind": "connected", "tools": 8}},
-        {"name": "local", "transport": {"type": "stdio", "command": "npx"},
-         "origin": "this project · /work", "status": {"kind": "waiting", "changed": false}}
-    ]))
-    .unwrap();
-    let rows = rows::rows(&(&state()).into(), &[], &servers, None);
-    let mcp = rows.iter().find(|r| r.label == "mcp").unwrap();
-    assert_eq!(mcp.value[0].text, "1 connected · 8 tools");
-    let waiting = servers[1].status.said();
-    assert_eq!(waiting, "waiting for your yes");
-    assert_eq!(mcp.value[1].text, format!(" · local {waiting}"));
-    assert_eq!(mcp.value[1].tone, rows::Tone::Warn);
-}
-
 #[tokio::test]
 async fn rendering_uses_supplied_facts_without_opening_a_session() {
     let state = state();
@@ -182,7 +94,6 @@ async fn rendering_uses_supplied_facts_without_opening_a_session() {
     };
     let drawing = draw::Drawing {
         selections: Default::default(),
-        started: Instant::now(),
     };
     let input = json!({"component":"Status","requestId":"status","surface":"terminal",
         "props":{"summary":state.summary,"config":state.config,"context":state.context},
@@ -200,7 +111,7 @@ async fn rendering_uses_supplied_facts_without_opening_a_session() {
         serde_json::from_value::<View>(answer)
             .unwrap()
             .fold()
-            .contains("session")
+            .contains("Status")
     );
     assert!(
         !host
@@ -217,7 +128,7 @@ fn malformed_plugin_states_are_reported_as_unavailable() {
         label: "invalid".into(),
         meta: json!({"state":{"kind":"failed"}}),
     };
-    let rows = rows::rows(&(&state()).into(), &[entry], &[], None);
+    let rows = rows::rows(&(&state()).into(), &[entry], &[], None, Default::default());
     let plugins = rows.iter().find(|row| row.label == "plugins").unwrap();
     assert!(
         plugins
@@ -248,7 +159,6 @@ async fn an_unmodified_pull_slot_renders_from_a_bounded_attachment() {
     };
     let drawing = draw::Drawing {
         selections: Default::default(),
-        started: Instant::now(),
     };
     let input = json!({"component":"Status","requestId":"status","surface":"desktop",
         "props":{},"viewport":{"columns":80,"rows":12}});
@@ -265,7 +175,7 @@ async fn an_unmodified_pull_slot_renders_from_a_bounded_attachment() {
         serde_json::from_value::<View>(answer)
             .unwrap()
             .fold()
-            .contains("❯ session")
+            .contains("Status")
     );
     assert!(host.calls().iter().any(
         |call| matches!(call, testing::HostCall::Open { options, .. }
@@ -303,4 +213,48 @@ async fn opener_returns_a_pane_receipt_each_time() {
             json!({"name":"Pane","args":{"plugin":ID,"id":REQUEST}})
         );
     }
+}
+
+#[test]
+fn mode_and_rules_come_only_from_the_configured_policy() {
+    let mut state = state();
+    state.config.kernel[ConfigView::POLICY] = json!("local.policy");
+    state.config.plugins.insert(
+        "bingo.permissions".into(),
+        json!({"mode":"wrong","rules":["wrong"]}),
+    );
+    state.config.plugins.insert(
+        "local.policy".into(),
+        json!({"mode":"local","rules":["Read(local/**)"]}),
+    );
+    let rows = rows::rows(&(&state).into(), &[], &[], None, Default::default());
+    assert_eq!(
+        rows.iter().find(|r| r.label == "mode").unwrap().value[0].text,
+        "local"
+    );
+    assert_eq!(
+        rows.iter().find(|r| r.label == "rules").unwrap().value[0].text,
+        "Read(local/**)"
+    );
+}
+
+#[test]
+fn a_broken_server_appears_in_the_plugins_row() {
+    let servers: Vec<bingo_services::mcp::ServerRow> = serde_json::from_value(json!([{
+        "name":"github", "transport":{"type":"http","url":"https://example.test"},
+        "status":{"kind":"needsAuth","why":"token expired"}
+    }]))
+    .unwrap();
+    let rows = rows::rows(&(&state()).into(), &[], &servers, None, Default::default());
+    let plugins = rows.iter().find(|r| r.label == "plugins").unwrap();
+    assert_eq!(plugins.value[0].text, "1 on");
+    assert_eq!(plugins.value[2].text, "github token expired");
+    assert_eq!(plugins.value[2].tone, rows::Tone::Warn);
+}
+
+#[test]
+fn status_spells_all_separators_with_the_ascii_glyph_set() {
+    let rows = rows::rows(&(&state()).into(), &[], &[], None, glyph::GlyphSet::Ascii);
+    let view = draw::tree(&rows, "model", 100, 18, glyph::GlyphSet::Ascii);
+    assert!(view.fold().is_ascii(), "{}", view.fold());
 }
