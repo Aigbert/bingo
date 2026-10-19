@@ -12,9 +12,12 @@ fn look(terminal: &mut Terminal) {
 
 /// Open the finished turn whose answer is the picture's. What is waited for
 /// next is the picture or its chip: a tall picture scrolls the turn's own
-/// line out of sight.
+/// line out of sight. The answer's words are on the screen before the turn
+/// ends, and `ctrl+o` skips a turn still running: the key is sent once the
+/// bar offers it.
 fn open_the_turn(terminal: &mut Terminal) {
     terminal.wait_for("That is the picture.");
+    terminal.wait_for("ctrl+o details");
     terminal.send(&[0x0f]);
     terminal.wait_for("esc close");
     terminal.send(b"\r");
