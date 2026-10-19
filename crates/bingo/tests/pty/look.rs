@@ -93,11 +93,6 @@ impl Terminal {
     }
 }
 
-/// One row of the terminal's screen, as text.
-fn row_text(screen: &vt100::Screen, row: u16) -> String {
-    screen.contents_between(row, 0, row, COLS)
-}
-
 /// Whether a colour of this weight is the light palette's. Its raised tint is
 /// one step down from paper and the dark palette's is one step up from night
 /// (`docs/design/tui.md` §4), so which side of the middle a tint falls on is
@@ -118,6 +113,10 @@ const FOCUS_GAINED: &[u8] = b"\x1b[I";
 ///
 /// The completed answer uses the terminal's ink in both palettes. Its streaming
 /// tail can still be coloured when the words first appear, so check after it settles.
+///
+/// Unix only: a ConPTY parses what the terminal sends before the surface reads
+/// it, and an answer to the colour question is not a key it passes on.
+#[cfg(unix)]
 #[test]
 fn a_terminal_whose_ground_turns_light_is_followed_within_one_focus() {
     let mut terminal = Terminal::under(&[], SCRIPT, Answers::Da1Only, Ground::Answered);
@@ -179,6 +178,10 @@ fn a_named_look_is_never_asked_what_ground_the_terminal_has() {
 /// it sit in the buffer until one of them makes a sequence it can call a DA1
 /// reply — and the whole lot goes with it. A terminal that was asked to report
 /// its scheme would cost a person their keyboard, so bingo never asks.
+///
+/// Unix only: on Windows crossterm reads the console's key records, and the
+/// ConPTY in front of it has already dropped a report it has no key for.
+#[cfg(unix)]
 #[test]
 fn a_theme_report_holds_crossterms_parser_and_swallows_what_follows() {
     let mut terminal = Terminal::open(&[]);

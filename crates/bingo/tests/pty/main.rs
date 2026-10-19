@@ -443,6 +443,13 @@ impl Terminal {
         self.parser.lock().unwrap().screen().contents()
     }
 
+    /// One row of the screen. `screen` joins a row the terminal wrapped onto
+    /// the next one, and a ConPTY paints whole rows, so counting its lines
+    /// does not find a row.
+    fn row(&self, y: u16) -> String {
+        row_text(self.parser.lock().unwrap().screen(), y)
+    }
+
     fn send(&mut self, bytes: &[u8]) {
         let mut writer = self.writer.lock().unwrap();
         writer.write_all(bytes).unwrap();
@@ -752,6 +759,11 @@ fn contains(haystack: &[u8], needle: &[u8]) -> bool {
     count(haystack, needle) > 0
 }
 
+/// One row of the terminal's screen, as text.
+fn row_text(screen: &vt100::Screen, row: u16) -> String {
+    screen.contents_between(row, 0, row, COLS)
+}
+
 fn count(haystack: &[u8], needle: &[u8]) -> usize {
     haystack
         .windows(needle.len())
@@ -770,9 +782,12 @@ fn stopping_returns_a_queued_line_to_the_input() {
     terminal.wait_for("edit queued");
     terminal.send(&[0x1b]);
     terminal.wait_for("what you queued is back in the input");
-    let screen = terminal.screen();
-    let input = screen.lines().nth(usize::from(ROWS - 3)).unwrap();
-    assert!(input.contains("then update CHANGELOG"), "{screen}");
+    let input = terminal.row(ROWS - 3);
+    assert!(
+        input.contains("then update CHANGELOG"),
+        "{}",
+        terminal.screen()
+    );
     terminal.send(&[0x15, 0x04]);
     terminal.leave();
 }
