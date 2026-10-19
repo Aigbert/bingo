@@ -60,8 +60,9 @@ Departures (the prototype or a real run decided)
 - The schedule journal payload gained the `wakes` status slot (additive); the countdown
   changes each second under an hour, each minute past it.
 
-Owed / found
-- Not signed out, mod-models' bare /login still runs the login before its picker.
-- The palette's once-per-install key hint (bingo-mod-palette lifecycle.rs) is a placed toast;
-  when it lands after the resume toast it supersedes it, and on a loaded first run with
-  --resume its own window can close before a paint, so no toast shows. The pty receipt test seeds the hint as seen; the product race is unchanged.
+Owed / found (both resolved in brick 8, see the plan's Verified)
+- Not signed out, mod-models' bare /login ran the login before its picker: it now leaves the
+  terminal's bare /login to the sign-in sheet (fix(models): Leave a bare /login ...).
+- The palette's key hint superseded the resume toast: a resumed toast now keeps its slot over
+  the hint (fix(tui): Let the resume toast keep its slot over the hint). The pty receipt test
+  still seeds the hint as seen, to keep that test about the receipt.
