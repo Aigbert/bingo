@@ -87,7 +87,10 @@ pub fn ask(interaction: &Interaction, reading: &Reading<'_>) -> Option<Ask> {
                 None => right,
             };
             let act = caution.as_ref().and_then(|caution| caution.act.as_deref());
-            let options = permission_options(interaction, session_scope.as_deref(), act, reading);
+            // A shell call's rule names a command; the preview says which it is.
+            let command = matches!(preview.as_deref(), Some(Preview::Command { .. }));
+            let scope = scope::words(session_scope.as_deref().unwrap_or_default(), command);
+            let options = permission_options(interaction, scope, act, reading);
             let start = if danger {
                 options
                     .iter()
@@ -159,7 +162,7 @@ fn previewed(preview: &Preview, reading: &Reading<'_>) -> (String, Vec<Run>, Bod
 
 fn permission_options(
     interaction: &Interaction,
-    session_scope: Option<&str>,
+    scope: scope::Scope,
     act: Option<&str>,
     reading: &Reading<'_>,
 ) -> Vec<Opt> {
@@ -173,7 +176,7 @@ fn permission_options(
                     Does::Send(Answer::AllowOnce),
                 )
             },
-            Answer::AllowSession { .. } => session(session_scope, rung.answer),
+            Answer::AllowSession { .. } => session(scope.clone(), rung.answer),
             Answer::Deny { .. } => Opt {
                 hint: Some(format!("type to tell {} why", reading.worker)),
                 ..plain("No, and tell it why".into(), Does::Deny)
@@ -193,8 +196,7 @@ fn permission_options(
     options
 }
 
-fn session(rule: Option<&str>, answer: Answer) -> Opt {
-    let words = scope::words(rule.unwrap_or_default());
+fn session(words: scope::Scope, answer: Answer) -> Opt {
     let label = match words.lead {
         Some(lead) => format!("Yes, allow {lead}"),
         None => "Yes, allow".into(),

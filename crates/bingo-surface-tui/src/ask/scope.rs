@@ -11,15 +11,17 @@ pub struct Scope {
 
 /// A command rule reads as its command, a path rule as the directory's last
 /// two parts, a domain rule as the host; any other rule reads as written.
-pub fn words(rule: &str) -> Scope {
+/// Whether the rule names a command is the caller's to say: the surface
+/// knows a shell call by its preview, never by the tool's name.
+pub fn words(rule: &str, command: bool) -> Scope {
     let plain = |code: &str| Scope {
         lead: None,
         code: code.to_owned(),
     };
-    let Some((tool, content)) = parts(rule) else {
+    let Some(content) = parts(rule) else {
         return plain(rule);
     };
-    if tool == "Bash" {
+    if command {
         return plain(content.strip_suffix(":*").unwrap_or(content).trim());
     }
     if let Some(host) = content.strip_prefix("domain:") {
@@ -37,10 +39,10 @@ pub fn words(rule: &str) -> Scope {
     plain(rule)
 }
 
-/// `Tool(content)` split at its parentheses.
-fn parts(rule: &str) -> Option<(&str, &str)> {
-    let (tool, rest) = rule.split_once('(')?;
-    Some((tool, rest.strip_suffix(')')?))
+/// What `Tool(content)` holds between its parentheses.
+fn parts(rule: &str) -> Option<&str> {
+    let (_, rest) = rule.split_once('(')?;
+    rest.strip_suffix(')')
 }
 
 /// The separator a directory rule ends with, which is what makes it one.
@@ -59,7 +61,7 @@ mod tests {
     use super::*;
 
     fn read(rule: &str) -> (Option<&'static str>, String) {
-        let scope = words(rule);
+        let scope = words(rule, rule.starts_with("Bash("));
         (scope.lead, scope.code)
     }
 
