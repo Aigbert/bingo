@@ -71,7 +71,6 @@ fn probe(
 async fn opens(name: &str, args: &str, cx: &HookContext) -> Result<bool, KernelError> {
     match name {
         "think" | "models" | "provider" | "logout" => Ok(args.is_empty()),
-        "login" if args.is_empty() => Ok(!refused(cx).await?),
         "model" if args.is_empty() => Ok(true),
         "model" if filters(args) => {
             let models = cx.host.catalog(CatalogKind::Models).await?.entries;
@@ -81,15 +80,6 @@ async fn opens(name: &str, args: &str, cx: &HookContext) -> Result<bool, KernelE
         }
         _ => Ok(false),
     }
-}
-/// The session's last turn was refused for its credentials: a bare `/login`
-/// then means the provider that refused it.
-async fn refused(cx: &HookContext) -> Result<bool, KernelError> {
-    let attached = crate::bridge::attach(&cx.host, &cx.session).await?;
-    Ok(matches!(
-        attached.snapshot.last_status(),
-        Some(TurnStatus::Failed { error }) if error.code == ErrorCode::AuthRequired
-    ))
 }
 /// A `provider/model` argument names a model outright, listed or not, so it
 /// is the kernel's to switch. A bare word or a `provider/` with nothing after
@@ -262,6 +252,8 @@ mod tests {
             ("models", "", Some("text")),
             ("provider", "", Some("chat")),
             ("provider", "", None),
+            // Signed in or not, a bare `/login` is the kernel's sign-in sheet.
+            ("login", "", Some("terminal")),
         ] {
             let input = json!({"command":name,"args":args,"surface":surface});
             let expected = input.clone();
@@ -281,37 +273,6 @@ mod tests {
         }
     }
 
-    /// The signed-out line says `/login` signs you in again: to the provider
-    /// that refused the turn, which is the kernel's command, not a list.
-    #[tokio::test]
-    async fn a_bare_login_after_a_refused_turn_signs_in_again() {
-        let (host, command) = crate::test_support::host();
-        host.on_open(|_, _, _| async {
-            Ok(crate::test_support::attachment(
-                crate::test_support::signed_out(),
-            ))
-        });
-        let cx = HookContext {
-            session: command.session,
-            cwd: command.cwd,
-            host: command.host,
-            item: None,
-            turn: None,
-            provider: None,
-            model: None,
-        };
-        let reply = Commands(crate::Shared::default())
-            .chain(
-                catalogue::COMMAND_RUN,
-                &cx,
-                json!({"command":"login","args":"","surface":"terminal"}),
-                Next::new(|_| Box::pin(async { Ok(json!({"text":"signed in"})) })),
-            )
-            .await
-            .unwrap();
-        assert_eq!(reply, json!({"text":"signed in"}));
-    }
-
     #[test]
     fn a_bare_word_or_a_provider_prefix_filters_and_a_path_switches() {
         assert!(filters("opus"));
@@ -323,7 +284,7 @@ mod tests {
         assert!(!filters("/gpt-5"));
     }
     #[tokio::test]
-    async fn login_opens_the_model_list_and_one_escape_closes_it() {
+    async fn one_escape_closes_the_model_list() {
         let (host, command) = crate::test_support::host();
         let (models, mut providers) = crate::test_support::entries();
         providers.push(CatalogEntry {
@@ -348,15 +309,8 @@ mod tests {
             provider: None,
             model: None,
         };
-        let (picker, _) = opening("login", "", &cx).await.unwrap();
+        let (picker, _) = opening("model", "", &cx).await.unwrap();
         assert!(picker.sheet.is_none());
-        assert!(
-            !picker
-                .props
-                .selected
-                .as_deref()
-                .is_some_and(|id| id.starts_with("provider:"))
-        );
         let shared = crate::Shared::default();
         shared
             .lock()

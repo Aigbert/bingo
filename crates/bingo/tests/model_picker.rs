@@ -132,7 +132,7 @@ async fn signin_key_is_absent_from_frames_and_the_journal() {
         .open(create(server.cwd()), who(), OpenOptions::default())
         .await
         .unwrap();
-    command(&mut session, "login", json!("")).await;
+    command(&mut session, "model", json!("")).await;
     let req = request(&kernel, &mut session).await;
     let id = req.request_id.clone();
     let model = kernel
