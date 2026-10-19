@@ -492,11 +492,18 @@ async fn a_child_is_spawned_in_the_directory_and_environment_it_was_given() {
 
     let tool = tool_named(&manager, "mcp__test__whereami").await;
     let output = call(&tool, json!({ "text": "" })).await;
+    let said = text_of(&output);
+    let Some((cwd, marker)) = said.split_once('\n') else {
+        panic!("whereami answers a directory and a marker: {said:?}");
+    };
+    // The child spells its directory the system's way, which on Windows need
+    // not be the spelling it was given: the two are compared as places.
     assert_eq!(
-        text_of(&output),
-        format!("{}\nseen", work_path.display()),
-        "the child ran where it was told, with the environment it was given"
+        Path::new(cwd).canonicalize().ok(),
+        Some(work_path),
+        "the child ran where it was told: {said:?}"
     );
+    assert_eq!(marker, "seen", "with the environment it was given");
 }
 
 #[tokio::test]
@@ -772,9 +779,12 @@ async fn deadline_call(seconds: Option<u64>) {
             .await
             .is_pending()
     );
-    let result = tokio::time::timeout(Duration::from_secs(2), &mut running).await;
-    drop(running);
+    // Advanced by hand: on Windows the child's pipe is read on a blocking
+    // thread, and a paused clock does not move on its own while one runs.
+    tokio::time::advance(Duration::from_secs(2)).await;
     tokio::time::resume();
+    let result = tokio::time::timeout(Duration::from_secs(60), &mut running).await;
+    drop(running);
     let Ok(Err(error)) = result else {
         panic!("MCP calls must return a timeout: {result:?}");
     };
