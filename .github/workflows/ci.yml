@@ -77,7 +77,9 @@ jobs:
       # and a Windows build breaking is the build breaking: a unix-only API
       # written without its counterpart fails here and nowhere else.
       - run: cargo check --workspace --all-targets --locked
-      - run: cargo test --workspace --locked -- --test-threads=2
+      # No developer runs these, so a run names every failure, not only the
+      # first failing binary's.
+      - run: cargo test --workspace --locked --no-fail-fast -- --test-threads=2
   deny:
     timeout-minutes: 15
     runs-on: ubuntu-latest
