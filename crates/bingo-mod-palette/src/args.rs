@@ -1,4 +1,4 @@
-use crate::rows::{Row, Target, matched};
+use crate::rows::{Row, Target, marks};
 use bingo_sdk::{ArgSpec, AuthStatus, CatalogEntry, CommandSpec};
 use std::collections::BTreeMap;
 
@@ -136,7 +136,6 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
             },
             alert: None,
             marks: vec![],
-            hint_marks: vec![],
             target: Target::Run(format!("{prefix}{query}").trim_end().into()),
         }],
         ArgSpec::None => vec![Row {
@@ -145,7 +144,6 @@ fn offered(args: &ArgSpec, prefix: &str, query: &str, offer: &Offer) -> Vec<Row>
             now: String::new(),
             alert: None,
             marks: vec![],
-            hint_marks: vec![],
             target: Target::Run(format!("{prefix}{query}").trim_end().into()),
         }],
         ArgSpec::Options { args, .. } => offered(args, prefix, query, offer),
@@ -206,7 +204,7 @@ fn choice(
     current: &str,
     more: bool,
 ) -> Option<Row> {
-    let marks = matched(label, query).or_else(|| matched(value, query))?;
+    let marks = marks(label, query).or_else(|| marks(value, query))?;
     let line = format!("{prefix}{value}");
     Some(Row {
         label: label.into(),
@@ -218,7 +216,6 @@ fn choice(
         },
         alert: None,
         marks,
-        hint_marks: vec![],
         target: if more {
             Target::Edit(format!("{line} "))
         } else {
@@ -265,7 +262,6 @@ fn choices_first(mut rows: Vec<Row>, prefix: &str, query: &str) -> (Vec<Row>, us
         now: String::new(),
         alert: None,
         marks: vec![],
-        hint_marks: vec![],
         target,
     });
     (rows, 0)

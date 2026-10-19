@@ -340,12 +340,14 @@ async fn a_js_command_and_its_keys_appear_inside_a_wrapped_palette() {
         schema = json!({"properties":{"nested":schema}});
     }
     request.props["catalogs"]["plugins"] = json!([{"id":"demo", "label":"demo", "meta":schema}]);
+    request.props["open"] = json!("commands");
+    request.props["query"] = json!("/sample");
     let tree = host.render(&attachment.session, request).await.unwrap();
     assert!(tree.fold().contains("Outside frame"));
     let payload = serde_json::to_value(&tree).unwrap();
     assert_eq!(
         payload["onKey"]["args"],
-        json!({"handler":"palette","event":"press","query":""}),
+        json!({"handler":"palette","event":"press","query":"/sample"}),
         "a press names its query; the drawn props stay with the palette"
     );
     assert!(tree.fold().contains("alt+z"));

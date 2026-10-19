@@ -2,7 +2,7 @@ use bingo_sdk::{Contribution, Page, Pages, Registrar};
 use std::sync::Arc;
 static PAGES: Pages = Pages(&[Page {
     name: "palette",
-    description: "Search commands, keys and sessions in one palette.",
+    description: "Search commands, skills and sessions in one palette.",
     body: include_str!("guide.md"),
 }]);
 pub fn contribution(registrar: &Registrar) -> Contribution {

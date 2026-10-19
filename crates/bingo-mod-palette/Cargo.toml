@@ -6,7 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
 publish.workspace = true
-description = "One palette for commands, keys and sessions"
+description = "One palette for commands, skills and sessions"
 
 [lints]
 workspace = true

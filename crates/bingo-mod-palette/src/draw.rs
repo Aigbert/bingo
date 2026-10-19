@@ -1,5 +1,8 @@
-use crate::{Shared, rows::Group};
-use bingo_sdk::{component::PaletteProps, *};
+use crate::{Shared, rows::Row};
+use bingo_sdk::{
+    component::{PaletteOpen, PaletteProps},
+    *,
+};
 use serde_json::{Value, json};
 
 pub(crate) struct Drawing(pub Shared);
@@ -24,10 +27,10 @@ impl Interceptor for Drawing {
         let request: render::RenderRequest = serde_json::from_value(value).map_err(crate::error)?;
         let props: PaletteProps = serde_json::from_value(request.props).map_err(crate::error)?;
         let mut shared = self.0.lock().map_err(crate::error)?;
-        let (cursor, groups) = shared.walk(&cx.session, &request.request_id, &props);
+        let (cursor, listing) = shared.walk(&cx.session, &request.request_id, &props);
         let view = tree(
             &props,
-            &groups,
+            &listing,
             cursor.selected,
             &request.request_id,
             &request.viewport,
@@ -36,206 +39,218 @@ impl Interceptor for Drawing {
         serde_json::to_value(view).map_err(crate::error)
     }
 }
-pub(crate) fn groups(
-    props: &PaletteProps,
-    recent: &[String],
-    expanded: &std::collections::BTreeSet<String>,
-) -> (Vec<Group>, usize) {
+
+/// What one drawing lists: the rows, the row a fresh drawing starts on, and
+/// the command whose arguments they are.
+pub(crate) struct Listing {
+    pub rows: Vec<Row>,
+    pub initial: usize,
+    pub title: Option<String>,
+}
+
+pub(crate) fn listing(props: &PaletteProps) -> Listing {
     if let Some(args) = crate::resume::arguments(props)
         .or_else(|| crate::args::arguments(&props.query, &props.commands, &props.catalogs))
     {
-        return (
-            vec![Group {
-                name: args.title,
-                rows: args.rows,
-            }],
-            args.selected,
-        );
+        return Listing {
+            rows: args.rows,
+            initial: args.selected,
+            title: Some(args.title),
+        };
     }
     let query = props.query.strip_prefix('/').unwrap_or(&props.query);
-    let mut groups = crate::rows::rows(
-        props.open,
-        query,
-        &props.commands,
-        &props.bindings,
-        &props.sessions,
-        recent,
-        props.session.as_str(),
-    );
-    let conversation =
-        crate::rows::conversation(&props.conversation, query, props.session.as_str());
-    let at = if props.open == component::PaletteOpen::Sessions {
-        0
-    } else {
-        groups
-            .iter()
-            .position(|g| g.name == "sessions")
-            .unwrap_or(groups.len())
-    };
-    crate::skills::fold(&mut groups, query, expanded);
-    if !conversation.is_empty()
-        && (!query.is_empty() || props.open == component::PaletteOpen::Sessions)
-    {
-        groups.insert(
-            at,
-            Group {
-                name: "this conversation".into(),
-                rows: conversation,
-            },
-        );
+    if props.open == PaletteOpen::Sessions {
+        return sessions(props, query);
     }
-    all_sessions(&mut groups, props.open, query);
-    crate::hints::append(&mut groups, props, query);
-    let selected = if props.open == component::PaletteOpen::Sessions && query.is_empty() {
-        groups.iter().flat_map(|g| &g.rows).position(|row| matches!(&row.target, crate::rows::Target::View(id) if id == props.session.as_str())).unwrap_or(0)
-    } else {
-        0
-    };
-    (groups, selected)
-}
-fn all_sessions(groups: &mut Vec<Group>, open: component::PaletteOpen, query: &str) {
-    if open == component::PaletteOpen::Sessions
-        || (!query.is_empty() && "all sessions".contains(&query.to_lowercase()))
-    {
-        let row = crate::rows::all_sessions();
-        if let Some(group) = groups.iter_mut().find(|g| g.name == "sessions") {
-            group.rows.push(row);
-        } else {
-            groups.push(Group {
-                name: "sessions".into(),
-                rows: vec![row],
-            });
-        }
+    Listing {
+        rows: crate::rows::commands(&props.commands, &props.bindings, query),
+        initial: 0,
+        title: None,
     }
 }
 
-pub fn tree(
+/// This conversation's sessions, then the stored ones, then the door to
+/// every session; a fresh drawing rests on the session in view.
+fn sessions(props: &PaletteProps, query: &str) -> Listing {
+    let current = props.session.as_str();
+    let rows = crate::rows::conversation(&props.conversation, query, current)
+        .into_iter()
+        .chain(
+            props
+                .sessions
+                .iter()
+                .map(|summary| crate::rows::session(summary, current))
+                .filter_map(|row| crate::rows::filter(row, query)),
+        )
+        .chain(crate::rows::filter(crate::rows::all_sessions(), query))
+        .collect::<Vec<_>>();
+    let initial = rows
+        .iter()
+        .position(|row| matches!(&row.target, crate::rows::Target::View(id) if id == current))
+        .unwrap_or(0);
+    Listing {
+        rows,
+        initial,
+        title: None,
+    }
+}
+
+pub(crate) fn tree(
     props: &PaletteProps,
-    groups: &[Group],
+    listing: &Listing,
     selected: usize,
     request: &str,
     viewport: &render::Viewport,
 ) -> View {
-    let columns = crate::line::Columns::of(groups, usize::from(viewport.columns));
-    let mut lines = Vec::new();
-    let mut index = 0;
-    let mut at = 0;
-    for group in groups {
-        lines.push(crate::line::heading(&group.name));
-        for row in &group.rows {
-            if index == selected {
-                at = lines.len();
-            }
-            lines.push(crate::line::row(row, index == selected, columns));
-            index += 1;
-        }
-    }
-    if lines.is_empty() {
-        let query = props.query.trim_start_matches('/');
-        lines.push(crate::line::note(&format!(
-            "nothing matches “{query}” in commands, skills, sessions or keys"
-        )));
-    }
-    let footer = footer(props);
-    let room = usize::from(viewport.rows)
-        .saturating_sub(usize::from(footer.is_some()))
-        .max(1);
-    let start = at
-        .saturating_sub(room / 2)
-        .min(lines.len().saturating_sub(room));
-    let children = lines
-        .into_iter()
-        .skip(start)
-        .take(room)
-        .chain(footer)
+    let columns = crate::line::Columns::of(&listing.rows, viewport.columns);
+    let rows = listing
+        .rows
+        .iter()
+        .enumerate()
+        .map(|(at, row)| crate::line::row(row, at == selected, columns, viewport.glyphs))
         .collect::<Vec<_>>();
-    View::Box {
-        children,
-        layout: Box::new(view::BoxStyle {
-            hints: Some(chrome(props, groups)),
-            on_key: Some(Action {
-                name: "palette:ui".into(),
-                args: json!({"handler":request,"event":"press","query":props.query}),
-            }),
-            ..Default::default()
-        }),
+    let top = listing
+        .title
+        .iter()
+        .map(|title| crate::line::note(title))
+        .chain(rows.is_empty().then(|| crate::line::note(&empty(props))))
+        .collect();
+    let sheet = sheet::Sheet {
+        head: String::new(),
+        fact: None,
+        top,
+        selected: rows.get(selected).map(|row| row.id.clone()),
+        rows,
+        foot: Vec::new(),
+        pick: true,
+    };
+    let mut view = sheet.list(viewport.columns, viewport.rows, LIST_MAX, viewport.glyphs);
+    if let View::Box { layout, .. } = &mut view {
+        layout.hints = Some(chrome(props, listing));
+        layout.on_key = Some(Action {
+            name: "palette:ui".into(),
+            args: json!({"handler":request,"event":"press","query":props.query}),
+        });
+    }
+    view
+}
+
+/// The most rows the list shows at once.
+const LIST_MAX: usize = 8;
+
+/// What an empty list says.
+fn empty(props: &PaletteProps) -> String {
+    let query = props.query.trim_start_matches('/');
+    match props.open {
+        PaletteOpen::Sessions => format!("no session matches {query}"),
+        _ => format!("no command matches {}", props.query.trim()),
     }
 }
 
-/// What a bare `/` says under its list: that typing searches it all.
-fn footer(props: &PaletteProps) -> Option<View> {
-    (props.open == component::PaletteOpen::Commands
-        && props.query.trim_start_matches('/').is_empty())
-    .then(|| crate::line::note("type to search commands, skills, sessions and keys together"))
+fn chrome(props: &PaletteProps, listing: &Listing) -> component::SiteHints {
+    use component::{KeyPair as Pair, SiteHints};
+    if listing.title.is_none() && props.open != PaletteOpen::Sessions {
+        return SiteHints::new([
+            Pair::new("↑↓", "choose"),
+            Pair::new("⏎", "run"),
+            Pair::new("tab", "complete"),
+        ])
+        .composer("", "");
+    }
+    if let Some(name) = free_argument(props) {
+        return SiteHints::new([Pair::new("⏎", name), Pair::new("esc", "cancel")]).composer("", "");
+    }
+    let resume = props.open == PaletteOpen::Sessions && listing.title.is_none();
+    SiteHints::new([
+        Pair::new("↑↓", "choose"),
+        Pair::new("⏎", if resume { "resume" } else { "choose" }),
+        Pair::new("esc", if resume { "close" } else { "back" }),
+    ])
+    .composer(if resume { "⟲ " } else { "" }, "")
 }
 
-fn chrome(props: &PaletteProps, groups: &[Group]) -> component::SiteHints {
-    use component::{KeyPair as Pair, PaletteOpen, SiteHints};
-    let arguments = props.query.starts_with('/') && props.query.contains(' ');
-    let empty = groups.iter().all(|group| group.rows.is_empty());
-    if arguments
-        && let Some(name) = props
-            .query
-            .strip_prefix('/')
-            .and_then(|q| q.split_once(' '))
-            .map(|(name, _)| name)
-    {
-        let free = props
-            .commands
-            .iter()
-            .find(|entry| entry.id == name)
-            .and_then(|entry| serde_json::from_value::<CommandSpec>(entry.meta.clone()).ok())
-            .is_some_and(|spec| matches!(spec.args, ArgSpec::Free { .. }));
-        if free {
-            return SiteHints::new([Pair::new("⏎", name), Pair::new("esc", "cancel")])
-                .composer("", "");
-        }
-    }
-
-    let mut pairs = vec![Pair::new("↑↓", "pick")];
-    pairs.push(Pair::new(
-        "⏎",
-        if empty {
-            "nothing"
-        } else if arguments {
-            "choose"
-        } else {
-            match props.open {
-                PaletteOpen::Commands => "run",
-                PaletteOpen::Keys => "do it",
-                PaletteOpen::Sessions => "resume",
-            }
-        },
-    ));
-    if !arguments && !empty && props.open == PaletteOpen::Commands {
-        pairs.push(Pair::new("tab", "fill in"));
-    }
-    pairs.push(Pair::new("esc", if arguments { "back" } else { "close" }));
-    SiteHints::new(pairs).composer(
-        match props.open {
-            PaletteOpen::Commands => "",
-            PaletteOpen::Keys => "? ",
-            PaletteOpen::Sessions => "⟲ ",
-        },
-        "",
-    )
+/// The command being typed, when what follows it is free text.
+fn free_argument(props: &PaletteProps) -> Option<&str> {
+    let (name, _) = props.query.strip_prefix('/')?.split_once(' ')?;
+    props
+        .commands
+        .iter()
+        .find(|entry| entry.id == name)
+        .and_then(|entry| serde_json::from_value::<CommandSpec>(entry.meta.clone()).ok())
+        .is_some_and(|spec| matches!(spec.args, ArgSpec::Free { .. }))
+        .then_some(name)
 }
 
 #[cfg(test)]
-mod chrome_tests {
+mod tests {
     use super::*;
-    #[test]
-    fn palette_keeps_contextual_hints_out_of_the_body() {
-        let props = crate::keys::review_tests::props();
-        let (groups, selected) = groups(&props, &[], &Default::default());
-        let viewport = render::Viewport {
+
+    fn viewport(rows: u16) -> render::Viewport {
+        render::Viewport {
             glyphs: Default::default(),
             place: None,
-            columns: 80,
-            rows: 20,
+            columns: 100,
+            rows,
+        }
+    }
+
+    fn props(query: &str, names: &[&str]) -> PaletteProps {
+        let mut props = crate::keys::review_tests::props();
+        props.open = PaletteOpen::Commands;
+        props.query = query.into();
+        props.commands = names
+            .iter()
+            .map(|name| CatalogEntry {
+                id: (*name).into(),
+                label: (*name).into(),
+                meta: json!({"name":name,"hint":format!("{name} hint"),"args":{"kind":"none"},"family":"session"}),
+            })
+            .collect();
+        props
+    }
+
+    fn drawn(props: &PaletteProps, rows: u16) -> View {
+        let listing = listing(props);
+        tree(props, &listing, 0, "palette", &viewport(rows))
+    }
+
+    #[test]
+    fn the_list_has_no_head_and_counts_what_the_window_leaves_out() {
+        let names = [
+            "model", "think", "compact", "status", "resume", "rewind", "agents", "tasks", "room",
+            "team",
+        ];
+        let text = drawn(&props("/", &names), 22).fold();
+        assert!(text.trim_start().starts_with("▎\n/model"), "{text}");
+        assert!(text.contains("8 of 10"), "{text}");
+        assert!(!text.contains("/room"), "{text}");
+        let small = drawn(&props("/", &names), 6).fold();
+        assert!(small.contains("3 of 10"), "{small}");
+    }
+
+    #[test]
+    fn nothing_matching_says_so_and_keeps_the_keys() {
+        let props = props("/zz", &["model"]);
+        let view = drawn(&props, 22);
+        assert!(view.fold().contains("no command matches /zz"));
+        let View::Box { layout, .. } = &view else {
+            panic!("a box")
         };
-        bingo_sdk::testing::assert_separate_hints(&tree(
-            &props, &groups, selected, "palette", &viewport,
-        ));
+        let words = layout.hints.as_ref().map(|hints| {
+            hints
+                .pairs
+                .iter()
+                .map(|pair| pair.action.clone())
+                .collect::<Vec<_>>()
+        });
+        assert_eq!(
+            words,
+            Some(vec!["choose".into(), "run".into(), "complete".into()])
+        );
+    }
+
+    #[test]
+    fn palette_keeps_contextual_hints_out_of_the_body() {
+        bingo_sdk::testing::assert_separate_hints(&drawn(&props("/", &["model"]), 20));
     }
 }

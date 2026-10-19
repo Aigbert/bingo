@@ -1,320 +1,187 @@
-//! One row of the list as it is drawn: a name column as wide as the widest
-//! name of its kind, a description cut on a word, and the value set right.
+//! One row of the list as it is drawn: the name with the letters typed in
+//! glow, the description at the name column, and the value set right.
 
-use crate::rows::{Group, Row, Target};
-use bingo_sdk::view::{self, View};
+use crate::rows::{Row, Target};
+use bingo_sdk::{
+    View,
+    component::row::cut,
+    glyph::{self, Glyph, GlyphSet},
+    pick,
+};
 
-/// The widest a name column grows; a longer name ends in `…`.
-const NAME_CAP: usize = 16;
-/// Between the name column and the description.
+/// The widest the name column grows.
+const NAME_CAP: usize = 18;
+/// Between the longest name and the description.
 const GAP: usize = 3;
-/// The cursor's column, or its blank.
-const LEAD: usize = 3;
-/// After the value, so it does not touch the edge.
-const TAIL: usize = 2;
+/// What `pick_line` keeps between the left run's end and the value.
+const BEFORE_VALUE: usize = 3;
 
-/// The name column of each kind of row, measured over the whole list so it
-/// holds still while the cursor walks.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// The name column, measured over the whole list so it holds still while
+/// the cursor walks; `width` is the frame's.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Columns {
-    width: usize,
-    command: usize,
-    skill: usize,
-    key: usize,
+    pub width: u16,
+    pub name: usize,
 }
 
 impl Columns {
-    pub fn of(groups: &[Group], width: usize) -> Self {
-        let widest = |kind: Kind| {
-            groups
-                .iter()
-                .flat_map(|group| &group.rows)
-                .filter(|row| Kind::of(&row.target) == Some(kind))
-                .map(|row| row.label.chars().count())
-                .max()
-                .unwrap_or(0)
-                .min(NAME_CAP)
-        };
+    pub fn of(rows: &[Row], width: u16) -> Self {
+        let widest = rows
+            .iter()
+            .map(|row| pick::cells(&row.label))
+            .max()
+            .unwrap_or(0);
         Self {
             width,
-            command: widest(Kind::Command),
-            skill: widest(Kind::Skill),
-            key: widest(Kind::Key),
-        }
-    }
-
-    fn name(&self, target: &Target) -> Option<usize> {
-        Some(match Kind::of(target)? {
-            Kind::Command => self.command,
-            Kind::Skill => self.skill,
-            Kind::Key => self.key,
-        })
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Kind {
-    Command,
-    Skill,
-    Key,
-}
-
-impl Kind {
-    fn of(target: &Target) -> Option<Self> {
-        match target {
-            Target::Command(_) => Some(Self::Command),
-            Target::Skill(_) => Some(Self::Skill),
-            Target::Key(_) | Target::Inert => Some(Self::Key),
-            _ => None,
+            name: NAME_CAP.min(widest + GAP),
         }
     }
 }
 
-/// A group's name, dim, or an argument level's title: the command in glow
-/// and what it does dim.
-pub fn heading(name: &str) -> View {
-    match name.split_once("  ").filter(|_| name.starts_with('/')) {
-        Some((command, hint)) => View::Box {
-            children: vec![
-                styled(format!("   {command}  "), Some("glow"), false),
-                styled(hint.into(), None, true),
-            ],
-            layout: Box::new(view::BoxStyle {
-                flex_direction: Some(view::Direction::Row),
-                height: Some(1),
-                ..Default::default()
-            }),
-        },
-        None => styled(format!("   {name}"), None, true),
-    }
-}
-
-/// A line of the list's own words, in ash.
+/// A line of the list's own words, dim.
 pub fn note(text: &str) -> View {
-    styled(format!("   {text}"), Some("ash"), false)
+    pick::text(text, "dim")
 }
 
-/// One row: cursor, name, description, value.
-pub fn row(row: &Row, selected: bool, columns: Columns) -> View {
-    let inert = matches!(row.target, Target::Inert);
-    let selected = selected && !inert;
-    let name = columns.name(&row.target);
-    let label = match name {
-        Some(width) => cut_name(&row.label, width),
-        None => row.label.clone(),
-    };
-    let label_width = name.map_or(label.chars().count() + 2, |width| width + GAP);
-    let room = columns
-        .width
-        .saturating_sub(LEAD + label_width + row.now.chars().count() + TAIL + 1);
-    let mut children = vec![
-        styled(
-            (if selected { " ❯ " } else { "   " }).into(),
-            Some("glow"),
-            false,
-        ),
-        View::Box {
-            children: vec![name_view(row, &label, inert)],
-            layout: Box::new(view::BoxStyle {
-                width: u16::try_from(label_width).ok(),
-                ..Default::default()
-            }),
-        },
-        marked(&cut(&row.hint, room), &row.hint_marks, Style::dim()),
-    ];
-    if let Some(alert) = &row.alert {
-        children.push(styled(format!(" · {alert}"), Some("yellow"), false));
-    }
-    View::Box {
-        children: vec![
-            View::Box {
-                children,
-                layout: Box::new(view::BoxStyle {
-                    flex_direction: Some(view::Direction::Row),
-                    flex_grow: Some(1),
-                    ..Default::default()
-                }),
-            },
-            value(row),
-        ],
-        layout: Box::new(view::BoxStyle {
-            flex_direction: Some(view::Direction::Row),
-            justify_content: Some(view::Justify::SpaceBetween),
-            height: Some(1),
-            ..Default::default()
-        }),
-    }
+/// One row, picked or not.
+pub fn row(row: &Row, picked: bool, columns: Columns, glyphs: GlyphSet) -> pick::Row {
+    let right = value(row, glyphs);
+    let room = usize::from(columns.width.saturating_sub(2))
+        .saturating_sub(pick::width(&right) + BEFORE_VALUE);
+    let name = name(row, picked);
+    let used = pick::width(&name).max(columns.name.saturating_sub(1)) + 1;
+    let hint = described(
+        &row.hint,
+        room.saturating_sub(used + BEFORE_VALUE),
+        picked,
+        glyphs,
+    );
+    pick::Row::new(id(row), pick::line([pick::pad(name, used), hint])).right(right)
 }
 
-fn name_view(row: &Row, label: &str, inert: bool) -> View {
-    let style = match row.target {
-        Target::Key(_) => Style {
-            color: Some("glow"),
-            bold: true,
-            dim: false,
-        },
-        _ => Style {
-            color: None,
-            bold: false,
-            dim: inert,
-        },
-    };
-    marked(label, &row.marks, style)
-}
-
-/// The value at the row's end: a skill's shelf in ash, the current argument
-/// in glow, anything else dim.
-fn value(row: &Row) -> View {
-    let text = format!("{}  ", row.now);
+/// A command or skill reads as typed, after a `/`; anything else as is.
+fn name(row: &Row, picked: bool) -> View {
+    let ink = if picked { "fg" } else { "muted" };
+    let label = pick::marked(&row.label, &row.marks, "glow", |_| ink);
     match row.target {
-        Target::Skill(_) => styled(text, Some("ash"), false),
-        _ if row.now == "now" => styled(text, Some("glow"), false),
-        _ => styled(text, None, true),
-    }
-}
-
-/// A name cut to its column, ending in `…` when it is longer.
-fn cut_name(name: &str, width: usize) -> String {
-    if name.chars().count() <= width {
-        return name.into();
-    }
-    let mut kept = name
-        .chars()
-        .take(width.saturating_sub(1))
-        .collect::<String>();
-    kept.push('…');
-    kept
-}
-
-/// A description cut to `width` on a word, ending in `…` when anything was
-/// left out; a first word longer than the room is cut where it ends.
-pub fn cut(text: &str, width: usize) -> String {
-    if text.chars().count() <= width {
-        return text.into();
-    }
-    if width == 0 {
-        return String::new();
-    }
-    let room = width - 1;
-    let head = text.chars().take(room + 1).collect::<String>();
-    let kept = match head.rfind(' ') {
-        Some(at) if at > 0 => head[..at].trim_end(),
-        _ => {
-            &head[..head
-                .char_indices()
-                .nth(room)
-                .map_or(head.len(), |(at, _)| at)]
+        Target::Command(_) | Target::Skill(_) => {
+            pick::line([pick::text("/", if picked { "glow" } else { "dim" }), label])
         }
+        _ => label,
+    }
+}
+
+fn described(hint: &str, room: usize, picked: bool, glyphs: GlyphSet) -> View {
+    let ink = if picked { "muted" } else { "dim" };
+    pick::line(
+        cut(
+            vec![(hint.to_owned(), ink)],
+            room,
+            Glyph::Ell.spell(glyphs),
+            "dim",
+            &pick::cells,
+        )
+        .into_iter()
+        .map(|(text, ink)| pick::text(text, ink)),
+    )
+}
+
+/// The value at the row's end: a command's key, a skill's shelf, a
+/// session's age, or what needs the person's attention, in amber.
+fn value(row: &Row, glyphs: GlyphSet) -> View {
+    if let Some(alert) = &row.alert {
+        return pick::text(alert, "amber");
+    }
+    let text = match row.target {
+        Target::Command(_) => glyph::chord(&row.now, glyphs),
+        Target::Skill(_) => format!("skill{}{}", Glyph::Sep.spell(glyphs), row.now),
+        _ => row.now.clone(),
     };
-    format!("{kept}…")
+    pick::text(text, if row.now == "now" { "glow" } else { "dim" })
 }
 
-#[derive(Clone, Copy)]
-struct Style {
-    color: Option<&'static str>,
-    bold: bool,
-    dim: bool,
-}
-
-impl Style {
-    fn dim() -> Self {
-        Self {
-            color: None,
-            bold: false,
-            dim: true,
-        }
-    }
-}
-
-fn styled(text: String, color: Option<&str>, dim: bool) -> View {
-    View::Text {
-        children: vec![view::TextChild::String(text)],
-        style: view::TextStyle {
-            color: color.map(str::to_owned),
-            dim_color: dim.then_some(true),
-            ..Default::default()
-        },
-    }
-}
-
-/// `text` with the letters at `marks` in bold.
-fn marked(text: &str, marks: &[usize], style: Style) -> View {
-    let mut runs: Vec<(String, bool)> = Vec::new();
-    for (index, character) in text.chars().enumerate() {
-        let hit = marks.contains(&index);
-        match runs.last_mut() {
-            Some((run, previous)) if *previous == hit => run.push(character),
-            _ => runs.push((character.to_string(), hit)),
-        }
-    }
-    View::Text {
-        children: runs
-            .into_iter()
-            .map(|(text, hit)| {
-                view::TextChild::Node(Box::new(View::Text {
-                    children: vec![view::TextChild::String(text)],
-                    style: view::TextStyle {
-                        bold: Some(hit || style.bold),
-                        ..Default::default()
-                    },
-                }))
-            })
-            .collect(),
-        style: view::TextStyle {
-            color: style.color.map(str::to_owned),
-            dim_color: Some(style.dim),
-            ..Default::default()
-        },
-    }
+/// The row's identity: what choosing it does, so a redraw keeps the pick.
+pub fn id(row: &Row) -> String {
+    format!("{:?}", row.target)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn row(label: &str, target: Target) -> Row {
+    fn row(label: &str, hint: &str, now: &str, target: Target) -> Row {
         Row {
             label: label.into(),
-            hint: String::new(),
+            hint: hint.into(),
             alert: None,
-            now: String::new(),
+            now: now.into(),
             marks: vec![],
-            hint_marks: vec![],
             target,
         }
     }
 
+    fn drawn(row: &Row, picked: bool, width: u16, glyphs: GlyphSet) -> String {
+        let columns = Columns::of(std::slice::from_ref(row), width);
+        super::row(row, picked, columns, glyphs).left.fold()
+    }
+
     #[test]
-    fn each_kind_measures_its_own_widest_name_up_to_the_cap() {
-        let groups = vec![Group {
-            name: "commands".into(),
-            rows: vec![
-                row("/model", Target::Command("model".into())),
-                row("/permission", Target::Command("permission".into())),
-                row("shift+tab", Target::Key("/permission".into())),
-                row(
-                    "/a-very-long-skill-name",
-                    Target::Skill("a-very-long-skill-name".into()),
-                ),
-            ],
-        }];
-        let columns = Columns::of(&groups, 100);
-        assert_eq!(columns.name(&Target::Command(String::new())), Some(11));
-        assert_eq!(columns.name(&Target::Key(String::new())), Some(9));
-        assert_eq!(columns.name(&Target::Skill(String::new())), Some(NAME_CAP));
-        assert_eq!(columns.name(&Target::Session(String::new())), None);
+    fn the_name_column_is_the_widest_name_and_three_up_to_eighteen() {
+        let rows = [
+            row("model", "", "", Target::Command("model".into())),
+            row("experience", "", "", Target::Command("experience".into())),
+        ];
+        assert_eq!(Columns::of(&rows, 100).name, 13);
+        let long = [row(
+            "a-very-long-skill-name",
+            "",
+            "",
+            Target::Skill("x".into()),
+        )];
+        assert_eq!(Columns::of(&long, 100).name, NAME_CAP);
+    }
+
+    #[test]
+    fn a_command_reads_slash_name_then_its_description_at_the_column() {
+        let model = row(
+            "model",
+            "switch model and effort",
+            "alt+m",
+            Target::Command("model".into()),
+        );
         assert_eq!(
-            cut_name("/a-very-long-skill-name", NAME_CAP),
-            "/a-very-long-sk…"
+            drawn(&model, false, 100, GlyphSet::Unicode),
+            "/model  switch model and effort"
         );
     }
 
     #[test]
-    fn a_description_is_cut_on_a_word() {
-        assert_eq!(cut("summarise older turns", 40), "summarise older turns");
-        assert_eq!(cut("summarise older turns", 16), "summarise older…");
-        assert_eq!(cut("summarise older turns", 15), "summarise…");
-        assert_eq!(cut("unbreakableword", 6), "unbre…");
-        assert_eq!(cut("anything", 0), "");
+    fn a_description_too_long_ends_in_the_sets_ellipsis() {
+        let long = row(
+            "permission",
+            "mode and rules for what runs without asking",
+            "shift+tab",
+            Target::Command("permission".into()),
+        );
+        let unicode = drawn(&long, false, 40, GlyphSet::Unicode);
+        assert!(unicode.ends_with('…'), "{unicode}");
+        assert!(!unicode.contains(" …"), "{unicode}");
+        let ascii = drawn(&long, false, 40, GlyphSet::Ascii);
+        assert!(ascii.ends_with("..."), "{ascii}");
+    }
+
+    #[test]
+    fn the_value_is_the_key_as_the_set_spells_it_or_the_skills_shelf() {
+        let permission = row(
+            "permission",
+            "",
+            "shift+tab",
+            Target::Command("permission".into()),
+        );
+        assert_eq!(value(&permission, GlyphSet::Unicode).fold(), "⇧tab");
+        assert_eq!(value(&permission, GlyphSet::Ascii).fold(), "shift+tab");
+        let review = row("review", "", "project", Target::Skill("review".into()));
+        assert_eq!(value(&review, GlyphSet::Unicode).fold(), "skill · project");
+        assert_eq!(value(&review, GlyphSet::Ascii).fold(), "skill - project");
     }
 }

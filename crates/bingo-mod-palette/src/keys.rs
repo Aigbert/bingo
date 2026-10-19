@@ -88,27 +88,22 @@ impl Handler {
         props: &PaletteProps,
     ) -> Result<CommandOutcome, KernelError> {
         let mut shared = self.0.lock().map_err(crate::error)?;
-        let (cursor, groups) = shared.walk(&props.session, request, props);
-        let rows = groups
-            .iter()
-            .flat_map(|group| &group.rows)
-            .collect::<Vec<_>>();
-        let target = rows.get(cursor.selected).map(|row| row.target.clone());
-        let (handled, operation) = operation(cursor, &rows, target, key, props);
+        let (cursor, listing) = shared.walk(&props.session, request, props);
+        let target = listing
+            .rows
+            .get(cursor.selected)
+            .map(|row| row.target.clone());
+        let (handled, operation) = operation(cursor, &listing.rows, target, key, props);
         if !handled {
             return Ok(CommandOutcome::Handled { handled: false });
         }
         let Some(operation) = operation else {
             return Ok(CommandOutcome::Handled { handled: true });
         };
-        if let Some(line) = operation["run"].as_str() {
-            shared.uses.count(line).map_err(crate::error)?;
-        }
         if operation.get("close").is_some()
             || operation.get("run").is_some()
             || operation.get("resume").is_some()
             || operation.get("view").is_some()
-            || operation.get("key").is_some()
         {
             shared
                 .cursors
@@ -154,17 +149,13 @@ fn activate(target: Target, props: &PaletteProps) -> Value {
             }
         }
         Target::Skill(name) => skill(&name, props),
-        Target::Key(line) if line.starts_with("@key:") => {
-            json!({"key":line.trim_start_matches("@key:")})
-        }
-        Target::Key(line) | Target::Run(line) => json!({"run":line}),
+        Target::Run(line) => json!({"run":line}),
         Target::Edit(line) => json!({"edit":line}),
         Target::Session(id) | Target::View(id) if id == props.session.as_str() => {
             json!({"message":"this session is already in view"})
         }
         Target::Session(id) => json!({"resume":id}),
         Target::View(id) => json!({"view":id}),
-        Target::Inert | Target::Expand(_) => Value::Null,
     }
 }
 
@@ -238,27 +229,18 @@ fn holds(text: &str, words: &[&str]) -> bool {
 
 fn operation(
     cursor: &mut crate::Cursor,
-    rows: &[&crate::rows::Row],
+    rows: &[crate::rows::Row],
     target: Option<Target>,
     key: &str,
     props: &PaletteProps,
 ) -> (bool, Option<Value>) {
     let operation = match key {
         "up" => {
-            if let Some(at) = (0..cursor.selected)
-                .rev()
-                .find(|at| !matches!(rows[*at].target, Target::Inert))
-            {
-                cursor.selected = at;
-            }
+            cursor.selected = cursor.selected.saturating_sub(1);
             None
         }
         "down" => {
-            if let Some(at) = (cursor.selected + 1..rows.len())
-                .find(|at| !matches!(rows[*at].target, Target::Inert))
-            {
-                cursor.selected = at;
-            }
+            cursor.selected = (cursor.selected + 1).min(rows.len().saturating_sub(1));
             None
         }
         "ctrl+c" => Some(json!({"close":true})),
@@ -268,12 +250,6 @@ fn operation(
                 .unwrap_or_else(|| json!({"close":true})),
         ),
         "backspace" if props.query.is_empty() || props.query == "/" => Some(json!({"close":true})),
-        "tab" | "enter" if matches!(target, Some(Target::Expand(_))) => {
-            if let Some(Target::Expand(fold)) = target {
-                cursor.expanded.insert(fold);
-            }
-            None
-        }
         "tab" => target.and_then(|target| match target {
             Target::Command(name) | Target::Skill(name) => {
                 Some(json!({"edit":format!("/{name} ")}))
@@ -281,9 +257,8 @@ fn operation(
             _ => None,
         }),
         "enter" => target
-            .filter(|target| !matches!(target, Target::Inert))
             .map(|target| activate(target, props))
-            .map(|operation| shown(rows.get(cursor.selected).copied(), operation, props))
+            .map(|operation| shown(rows.get(cursor.selected), operation, props))
             .or_else(|| {
                 (props.query.starts_with('/') && props.query.len() > 1)
                     .then(|| json!({"run":props.query.trim()}))
@@ -322,36 +297,9 @@ pub(crate) mod review_tests {
         );
     }
     #[test]
-    fn informational_and_interrupt_keys_are_not_actionable() {
-        let mut props = props();
-        for key in [
-            "ctrl+a/e",
-            "esc esc",
-            "up/down",
-            "alt+b/f",
-            "1-9 · y/a/n",
-            "v · drag",
-            "click",
-            "esc",
-            "ctrl+c",
-            "ctrl+d",
-        ] {
-            props.key_hints.insert(key.into(), "informational".into());
-        }
-        let (groups, _) = crate::draw::groups(&props, &[], &Default::default());
-        assert!(
-            groups
-                .iter()
-                .flat_map(|g| &g.rows)
-                .all(|row| !matches!(row.target, Target::Key(_)))
-        );
-    }
-    #[test]
     fn ctrl_c_clears_the_closed_openings_cursor() {
-        let home = tempfile::tempdir().unwrap();
         let props = props();
         let state = Arc::new(Mutex::new(crate::State {
-            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
         state.lock().unwrap().cursors.insert(
@@ -370,13 +318,13 @@ pub(crate) mod review_tests {
     /// judges it against the props that drawing came from.
     #[test]
     fn a_press_is_judged_against_the_drawing_of_its_own_query() {
-        let home = tempfile::tempdir().unwrap();
         let mut props = props();
         props.query = "/mo".into();
-        let (groups, selected) = crate::draw::groups(&props, &[], &Default::default());
+        let listing = crate::draw::listing(&props);
+        let selected = listing.initial;
         let View::Box { layout, .. } = crate::draw::tree(
             &props,
-            &groups,
+            &listing,
             selected,
             "opening",
             &render::Viewport {
@@ -393,7 +341,6 @@ pub(crate) mod review_tests {
             json!({"handler":"opening","event":"press","query":"/mo"})
         );
         let state = Arc::new(Mutex::new(crate::State {
-            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
         state.lock().unwrap().cursors.insert(
@@ -402,7 +349,6 @@ pub(crate) mod review_tests {
                 query: props.query.clone(),
                 selected,
                 drawn: Some(Arc::new(props.clone())),
-                expanded: Default::default(),
             },
         );
         let handler = Handler(state);
@@ -421,21 +367,28 @@ pub(crate) mod review_tests {
         );
     }
     #[test]
-    fn arrow_navigation_skips_inert_rows_and_enter_releases_its_cursor() {
-        let home = tempfile::tempdir().unwrap();
+    fn arrows_walk_the_rows_and_enter_releases_the_cursor() {
         let mut props = props();
-        for key in ["shift+tab", "esc", "ctrl+o", "ctrl+c"] {
-            props.key_hints.insert(key.into(), key.into());
-        }
+        props.open = bingo_sdk::component::PaletteOpen::Commands;
+        props.query = "/".into();
+        props.commands = ["status", "model"]
+            .map(|name| CatalogEntry {
+                id: name.into(),
+                label: name.into(),
+                meta: json!({"name":name,"hint":"","family":"session","args":{"kind":"none"}}),
+            })
+            .to_vec();
         let state = Arc::new(Mutex::new(crate::State {
-            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
         let handler = Handler(state.clone());
-        handler.press("opening", "down", &props).unwrap();
+        for key in ["down", "down", "up", "down"] {
+            handler.press("opening", key, &props).unwrap();
+        }
         let outcome = handler.press("opening", "enter", &props).unwrap();
         assert!(
-            matches!(outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["key"] == "ctrl+o")
+            matches!(&outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["run"] == "/status"),
+            "{outcome:?}"
         );
         assert!(state.lock().unwrap().cursors.is_empty());
     }
@@ -446,56 +399,35 @@ pub(crate) mod review_tests {
             meta: json!({"name":name,"hint":"a skill","family":"skill/project","args":{"kind":"free","hint":hint}}),
         }
     }
-    /// Every skill is reachable from a bare `/`: Enter opens the fold the
-    /// cursor rests on, and a skill without an argument runs at once.
+    /// A skill runs as soon as it is chosen; one that asks for an argument
+    /// waits in the box for it, and tab completes either.
     #[test]
-    fn enter_unfolds_the_skills_and_runs_one_that_asks_nothing() {
-        let home = tempfile::tempdir().unwrap();
+    fn enter_runs_a_skill_that_asks_nothing_and_tab_completes_one() {
         let mut props = props();
         props.open = bingo_sdk::component::PaletteOpen::Commands;
         props.query = "/".into();
         props.commands = vec![skill("deploy", ""), skill("standup", "[days]")];
-        let state = Arc::new(Mutex::new(crate::State {
-            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
-            cursors: Default::default(),
-        }));
-        let handler = Handler(state.clone());
-        let outcome = handler.press("opening", "enter", &props).unwrap();
-        assert_eq!(
-            outcome,
-            CommandOutcome::Handled { handled: true },
-            "unfolded"
-        );
-        let unfolded = state
-            .lock()
-            .unwrap()
-            .cursors
-            .values()
-            .next()
-            .unwrap()
-            .expanded
-            .clone();
-        assert!(unfolded.contains(crate::skills::SKILLS));
-        let outcome = handler.press("opening", "enter", &props).unwrap();
-        assert!(
-            matches!(&outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["run"] == "/deploy"),
-            "{outcome:?}"
-        );
-        assert_eq!(state.lock().unwrap().uses.top(), ["deploy"]);
-        // `deploy` is recent now; the fold under it holds the other.
-        handler.press("opening", "down", &props).unwrap();
-        handler.press("opening", "enter", &props).unwrap();
-        let outcome = handler.press("opening", "enter", &props).unwrap();
-        assert!(
-            matches!(&outcome, CommandOutcome::Surface { action, .. } if action.args["value"]["edit"] == "/standup "),
-            "a skill that asks for an argument waits for it: {outcome:?}"
-        );
+        let press = |keys: &[&str]| {
+            let handler = Handler(Arc::new(Mutex::new(crate::State {
+                cursors: Default::default(),
+            })));
+            let (last, before) = keys.split_last().unwrap();
+            for key in before {
+                handler.press("opening", key, &props).unwrap();
+            }
+            match handler.press("opening", last, &props).unwrap() {
+                CommandOutcome::Surface { action, .. } => action.args["value"].clone(),
+                outcome => panic!("{outcome:?}"),
+            }
+        };
+        assert_eq!(press(&["enter"]), json!({"run":"/deploy"}));
+        assert_eq!(press(&["down", "enter"]), json!({"edit":"/standup "}));
+        assert_eq!(press(&["tab"]), json!({"edit":"/deploy "}));
     }
     /// A link that fills the plugin catalogue names the id `evil` "good".
     /// The trust row shows `evil`, and a row that hides it runs nothing.
     #[test]
     fn a_person_only_row_runs_only_the_argument_it_shows() {
-        let home = tempfile::tempdir().unwrap();
         let mut props = props();
         props.open = bingo_sdk::component::PaletteOpen::Commands;
         props.commands = vec![CatalogEntry {
@@ -513,11 +445,10 @@ pub(crate) mod review_tests {
         );
         props.query = "/plugins trust ".into();
         let state = Arc::new(Mutex::new(crate::State {
-            uses: crate::uses::Uses::load(crate::uses::path(home.path())),
             cursors: Default::default(),
         }));
-        let (groups, _) = crate::draw::groups(&props, &[], &Default::default());
-        let row = &groups[0].rows[0];
+        let listing = crate::draw::listing(&props);
+        let row = &listing.rows[0];
         assert_eq!((row.label.as_str(), row.hint.as_str()), ("evil", "good"));
         let outcome = Handler(state).press("opening", "enter", &props).unwrap();
         assert!(
@@ -530,7 +461,6 @@ pub(crate) mod review_tests {
             alert: None,
             now: String::new(),
             marks: vec![],
-            hint_marks: vec![],
             target: Target::Run("/plugins trust evil".into()),
         };
         let run = json!({"run":"/plugins trust evil"});
@@ -542,7 +472,6 @@ pub(crate) mod review_tests {
     /// value it runs stands beside the label.
     #[test]
     fn a_labelled_person_only_word_runs_from_its_row() {
-        let home = tempfile::tempdir().unwrap();
         let mut props = props();
         props.open = bingo_sdk::component::PaletteOpen::Commands;
         let modes = [
@@ -562,7 +491,6 @@ pub(crate) mod review_tests {
         props.query = "/permission ".into();
         for (at, value) in modes.iter().enumerate() {
             let handler = Handler(Arc::new(Mutex::new(crate::State {
-                uses: crate::uses::Uses::load(crate::uses::path(home.path())),
                 cursors: Default::default(),
             })));
             for _ in 0..at {
@@ -592,7 +520,6 @@ pub(crate) mod review_tests {
             alert: None,
             now: String::new(),
             marks: vec![],
-            hint_marks: vec![],
             target: Target::Run("/plugins approve evil full".into()),
         };
         let run = json!({"run":"/plugins approve evil full"});
@@ -689,17 +616,14 @@ mod fold_tests {
 
     fn enter(query: &str) -> Value {
         let props = props(query);
-        let (groups, selected) = crate::draw::groups(&props, &[], &Default::default());
-        let rows = groups
-            .iter()
-            .flat_map(|group| &group.rows)
-            .collect::<Vec<_>>();
-        let target = rows.get(selected).map(|row| row.target.clone());
+        let listing = crate::draw::listing(&props);
+        let selected = listing.initial;
+        let target = listing.rows.get(selected).map(|row| row.target.clone());
         let mut cursor = crate::Cursor {
             selected,
             ..Default::default()
         };
-        operation(&mut cursor, &rows, target, "enter", &props)
+        operation(&mut cursor, &listing.rows, target, "enter", &props)
             .1
             .unwrap()
     }
@@ -740,9 +664,9 @@ mod fold_tests {
             "dontAsk"
         ]);
         entry.meta["now"] = json!("plan");
-        let (groups, selected) = crate::draw::groups(&props, &[], &Default::default());
-        assert_eq!(groups[0].rows.len(), 5);
-        assert_eq!(groups[0].rows[selected].label, "plan");
-        assert_eq!(groups[0].rows[selected].now, "now");
+        let listing = crate::draw::listing(&props);
+        assert_eq!(listing.rows.len(), 5);
+        assert_eq!(listing.rows[listing.initial].label, "plan");
+        assert_eq!(listing.rows[listing.initial].now, "now");
     }
 }
