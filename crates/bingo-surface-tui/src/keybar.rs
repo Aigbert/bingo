@@ -50,6 +50,52 @@ fn resting(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
             KeyPair::new("ctrl+f", "find"),
         ];
     }
+    if !tree.is_root(tree.view()) {
+        return away(tree, ui);
+    }
+    let pairs = home(tree, ui);
+    if tree.needers().next().is_none() || !ui.composer.is_empty() {
+        return pairs;
+    }
+    let mut answer = vec![KeyPair::new("ctrl+g", "answer")];
+    answer.extend(pairs.into_iter().rev().take(2).rev());
+    answer
+}
+
+/// In a teammate's session or a room: esc is the way home, ctrl+c the way
+/// to stop.
+fn away(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
+    let state = tree.viewed();
+    let room = state.summary.driver == bingo_sdk::Driver::Log;
+    if !ui.composer.is_empty() {
+        if state.busy() {
+            return vec![
+                KeyPair::new("⏎", "steer"),
+                KeyPair::new("tab", "queue"),
+                KeyPair::new("esc", "clear"),
+            ];
+        }
+        let send = if room { "post" } else { "send" };
+        return vec![KeyPair::new("⏎", send), KeyPair::new("esc", "clear")];
+    }
+    let mut pairs = vec![KeyPair::new("esc", "back")];
+    if tree.needers().next().is_some() {
+        pairs.push(KeyPair::new("ctrl+g", "answer"));
+    }
+    if state.busy() {
+        pairs.push(KeyPair::new("ctrl+c", "stop"));
+    }
+    pairs.push(if room && !state.closed {
+        KeyPair::new("@", "call on")
+    } else {
+        KeyPair::new("/", "commands")
+    });
+    pairs.truncate(3);
+    pairs
+}
+
+/// At home: what the turn and the draft allow.
+fn home(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
     if tree.viewed().busy() {
         if !ui.composer.is_empty() {
             return vec![

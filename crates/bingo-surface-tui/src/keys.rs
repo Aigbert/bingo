@@ -158,6 +158,12 @@ pub const BINDINGS: &[Binding] = &[
         working: None,
     },
     Binding {
+        keys: "ctrl+g",
+        description: "whoever needs you",
+        group: Some(Group::Switch),
+        working: None,
+    },
+    Binding {
         keys: "ctrl+c",
         description: "stop, twice to quit",
         group: Some(Group::Switch),

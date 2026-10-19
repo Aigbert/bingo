@@ -92,10 +92,7 @@ async fn the_top_palette_owns_keys_when_an_ask_arrives_after_idle() {
                     .tree
                     .fold
                     .apply(&child_frame(1, announced("asking child")));
-                run.session
-                    .tree
-                    .fold
-                    .apply(&child_frame(2, opened(ask.clone())));
+                run.session.tree.fold.apply(&frame(50, opened(ask.clone())));
                 interactions::refocus(&mut run);
                 assert!(
                     run.ui.dialog.aside,

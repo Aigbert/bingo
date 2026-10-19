@@ -213,11 +213,7 @@ async fn escape_leaves_aside_and_words_first_and_otherwise_stops_permission_asks
             } else {
                 frame(2, event)
             });
-            run.session.tree.show(&if child_asks {
-                state().summary.id
-            } else {
-                child_id()
-            });
+            run.session.tree.show(&owner);
             run.session
                 .handles
                 .insert(child_id(), SessionHandle(child.clone()));
@@ -454,6 +450,7 @@ async fn escape_interrupts_even_without_an_offered_cancellation_answer() {
             child_frame(2, started("child-turn")),
             child_frame(3, opened(open)),
         ]);
+        run.session.tree.show(&child_id());
         if cached {
             run.session
                 .handles
@@ -512,11 +509,8 @@ fn cross_session_question(run: &mut Run, child_asks: bool) -> bingo_sdk::Interac
         ),
         stamp(3, opened(open.clone())),
     ]);
-    run.session.tree.show(&if child_asks {
-        state().summary.id
-    } else {
-        child_id()
-    });
+    // An ask is answered where it waits: in its own session.
+    run.session.tree.show(&open.session);
     interactions::refocus(run);
     open
 }
@@ -563,7 +557,7 @@ async fn answer_across_sessions(child_asks: bool, cached: bool) {
 }
 
 #[tokio::test(start_paused = true)]
-async fn a_root_question_accepts_keys_while_viewing_a_child_without_a_writer() {
+async fn a_root_question_accepts_keys_without_a_writer() {
     answer_across_sessions(false, false).await;
 }
 

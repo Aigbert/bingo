@@ -230,3 +230,44 @@ fn a_mod_can_replace_how_a_toast_is_drawn() {
     ui.placed.pulled.answer(key, View::text("drawn by a mod"));
     assert!(draw_tree(108, 30, &tree, &mut ui, now).contains("drawn by a mod"));
 }
+
+fn crew_tree(mut frames: Vec<bingo_sdk::Frame>) -> Tree {
+    frames.insert(0, child_frame(1, announced("reviewer")));
+    folded_tree(frames)
+}
+
+fn pairs(pairs: Vec<KeyPair>) -> Vec<(String, String)> {
+    pairs.into_iter().map(|p| (p.keys, p.action)).collect()
+}
+
+fn named(list: &[(&str, &str)]) -> Vec<(String, String)> {
+    list.iter()
+        .map(|(k, a)| (k.to_string(), a.to_string()))
+        .collect()
+}
+
+#[test]
+fn at_home_a_waiting_teammate_puts_ctrl_g_first() {
+    let tree = crew_tree(vec![child_frame(2, opened(child_permission()))]);
+    let (ui, _) = scene();
+    assert_eq!(
+        pairs(resting(&tree, &ui)),
+        named(&[("ctrl+g", "answer"), ("@", "files"), ("?", "keys")])
+    );
+}
+
+#[test]
+fn away_from_home_esc_is_back_and_ctrl_c_is_stop() {
+    let mut tree = crew_tree(vec![child_frame(2, started("trn_9"))]);
+    tree.show(&child_id());
+    let (mut ui, now) = scene();
+    assert_eq!(
+        pairs(resting(&tree, &ui)),
+        named(&[("esc", "back"), ("ctrl+c", "stop"), ("/", "commands")])
+    );
+    write(&mut ui, tree.viewed(), "x", now);
+    assert_eq!(
+        pairs(resting(&tree, &ui)),
+        named(&[("⏎", "steer"), ("tab", "queue"), ("esc", "clear")])
+    );
+}

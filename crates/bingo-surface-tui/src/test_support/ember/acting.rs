@@ -93,12 +93,9 @@ fn m198_rewound_band_waits_for_m199_welcome() {
     sheet_rows("rewind-rewound", &[(27..32, 27)]);
 }
 
-/// M200 owes `ctrl+g whoever needs you`: until it lands, `ctrl+c` closes the
-/// switch group, every row fits and the sheet has no `15 of 16` to say, so
-/// it stands one row shorter.
 #[test]
-fn m198_keys_band_waits_for_m200_ctrl_g() {
-    sheet_rows("keys", &[(12..28, 13), (30..32, 30)]);
+fn m200_keys_frame_names_ctrl_g() {
+    sheet_frame("keys", &[]);
 }
 
 #[test]

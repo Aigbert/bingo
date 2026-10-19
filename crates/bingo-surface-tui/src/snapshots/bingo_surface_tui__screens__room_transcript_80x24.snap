@@ -1,6 +1,6 @@
 ---
 source: crates/bingo-surface-tui/src/screens.rs
-expression: "draw_tree(80, 24, tree, ui, now)"
+expression: "draw_tree(80, small, tree, ui, now)"
 ---
 "                                                                                "
 "                                                                                "
@@ -25,4 +25,4 @@ expression: "draw_tree(80, 24, tree, ui, now)"
 "                                                                                "
 "   ▍Post to #design, @ to call on someone                                       "
 "                                                                                "
-"                                          ctrl+o details   / commands   ? keys  "
+"                                                          esc back   @ call on  "

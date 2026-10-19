@@ -1210,15 +1210,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_permission_a_child_raised_is_answered_through_the_root_handle() {
+    async fn a_permission_a_child_raised_is_answered_where_it_waits() {
         let mut harness = Harness::new();
         let frames = vec![
             child_frame(1, announced("reviewer")),
             child_frame(2, opened(child_permission())),
         ];
-        let (_, session) = harness
-            .go(frames, vec![key(KeyCode::Enter), ctrl('d')], None)
-            .await;
+        let keys = vec![ctrl('g'), key(KeyCode::Enter), ctrl('d')];
+        let (_, session) = harness.go(frames, keys, None).await;
         assert_eq!(
             session.answers(),
             vec![(
@@ -1226,16 +1225,7 @@ mod tests {
                 bingo_sdk::Answer::AllowOnce,
                 bingo_sdk::Activation::Keyboard,
             )],
-            "the tree's handle routes an answer to whoever asked"
-        );
-        assert!(
-            harness
-                .recorder
-                .frames
-                .iter()
-                .any(|frame| frame.contains("reviewer needs you")),
-            "the dock names the child: {}",
-            harness.recorder.last()
+            "ctrl+g walks to the ask and its handle takes the answer"
         );
     }
 

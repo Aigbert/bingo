@@ -395,7 +395,11 @@ fn needs_you_replaces_crew_lamps_before_the_model() {
         "{line}"
     );
     assert!(!line.contains("agents"));
-    assert!(!line.contains("ctrl+g"));
+    assert!(
+        line.trim_end()
+            .ends_with("ctrl+g answer   @ files   ? keys"),
+        "{line}"
+    );
 }
 
 #[test]

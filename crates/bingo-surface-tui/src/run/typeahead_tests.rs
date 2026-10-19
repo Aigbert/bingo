@@ -210,10 +210,7 @@ async fn keys_typed_before_a_dialog_opened_are_never_entered_into_it() {
             .tree
             .fold
             .apply(&child_frame(1, announced("asking child")));
-        run.session
-            .tree
-            .fold
-            .apply(&child_frame(2, opened(ask.clone())));
+        run.session.tree.fold.apply(&frame(50, opened(ask.clone())));
         interactions::refocus(&mut run);
         let handler = crate::palette::request(&run.ui).unwrap().to_owned();
         let result = json!({"surface":{"name":"surface:palette","args":{"handler":handler,"value":{"close":true}}}});

@@ -121,12 +121,38 @@ impl Tree {
         self.fold.mark_read(&id);
     }
 
-    /// One ask at a time, ordered by arrival across the tree.
-    /// The handle routes the answer back to the session that opened it.
+    /// The viewed session's ask, the oldest first: a teammate's ask waits in
+    /// its own session and never takes the dock of the one you look at.
     pub fn open_interaction(&self) -> Option<(&SessionState, &Interaction)> {
-        self.sessions()
-            .flat_map(|state| state.interactions.iter().map(move |open| (state, open)))
-            .min_by_key(|(_, open)| (open.opened_at, open.id.clone()))
+        let state = self.viewed();
+        state
+            .interactions
+            .iter()
+            .min_by_key(|open| (open.opened_at, open.id.clone()))
+            .map(|open| (state, open))
+    }
+
+    /// Every session with an ask open, in the tree's order.
+    pub fn waiting(&self) -> impl Iterator<Item = &SessionState> {
+        self.sessions().filter(|state| asking(state))
+    }
+
+    /// Every other session with an ask open: who the footer says needs you.
+    pub fn needers(&self) -> impl Iterator<Item = &SessionState> {
+        self.waiting()
+            .filter(|state| &state.summary.id != self.view())
+    }
+
+    /// The next session after the viewed one that waits on you, wrapping;
+    /// with none, home.
+    pub fn next_need(&self) -> Option<&SessionId> {
+        let order: Vec<&SessionId> = self.sessions().map(|state| &state.summary.id).collect();
+        let at = order.iter().position(|id| *id == self.view()).unwrap_or(0);
+        let after = order.iter().skip(at + 1).chain(order.iter().take(at));
+        after
+            .copied()
+            .find(|id| self.state(id).is_some_and(asking))
+            .or_else(|| (!self.is_root(self.view())).then(|| self.root_id()))
     }
 
     /// The children the viewed session spawned, by the tool call that did it;
@@ -410,21 +436,74 @@ mod tests {
     }
 
     #[test]
-    fn the_tally_counts_who_is_waiting_and_the_dialog_takes_the_root_first() {
+    fn an_ask_stays_in_its_own_session_and_the_tally_counts_it() {
         let mut tree = Tree::new(state());
         tree.fold.apply(&child_frame(1, announced("reviewer")));
         tree.fold.apply(&child_frame(2, opened(child_permission())));
         assert_eq!(tree.rows().iter().filter(|row| row.attention).count(), 1);
+        assert!(
+            tree.open_interaction().is_none(),
+            "a teammate's ask never takes the home composer"
+        );
+        assert_eq!(tree.waiting().count(), 1);
+        tree.show(&child_id());
         let (owner, _) = tree.open_interaction().expect("the child's prompt");
         assert_eq!(owner.summary.id, child_id());
+    }
 
-        tree.fold.apply(&frame(1, opened(permission(None, None))));
-        let (owner, _) = tree.open_interaction().expect("the root's prompt");
+    /// Three teammates after home; `ses_2` and `ses_4` wait on you.
+    fn waiting_crew() -> Tree {
+        let mut tree = Tree::new(state());
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.fold
+            .apply(&agent_frame(3, 3, agent_announced(3, "scout")));
+        tree.fold
+            .apply(&agent_frame(4, 4, agent_announced(4, "ada")));
+        tree.fold.apply(&child_frame(5, opened(child_permission())));
+        let ask = Interaction {
+            id: bingo_sdk::InteractionId::from_raw("int_4"),
+            session: agent_id(4),
+            ..child_permission()
+        };
+        tree.fold.apply(&agent_frame(4, 6, opened(ask)));
+        tree
+    }
+
+    #[test]
+    fn ctrl_g_walks_to_the_next_session_that_waits_and_wraps() {
+        let mut tree = waiting_crew();
         assert_eq!(
-            owner.summary.id,
-            tree.root_id().clone(),
-            "the root is first"
+            tree.next_need(),
+            Some(&child_id()),
+            "home goes to the first"
         );
+        tree.show(&child_id());
+        assert_eq!(
+            tree.next_need(),
+            Some(&agent_id(4)),
+            "it skips who waits on nobody"
+        );
+        tree.show(&agent_id(4));
+        assert_eq!(tree.next_need(), Some(&child_id()), "and wraps past home");
+        tree.show(&agent_id(3));
+        assert_eq!(tree.next_need(), Some(&agent_id(4)));
+    }
+
+    #[test]
+    fn with_nobody_else_waiting_ctrl_g_goes_home_and_at_home_stays() {
+        let mut tree = Tree::new(state());
+        tree.fold.apply(&child_frame(1, announced("reviewer")));
+        tree.fold.apply(&child_frame(2, opened(child_permission())));
+        tree.show(&child_id());
+        assert_eq!(
+            tree.next_need(),
+            Some(tree.root_id()),
+            "its own ask is not elsewhere"
+        );
+        tree.show(&tree.root_id().clone());
+        assert_eq!(tree.next_need(), Some(&child_id()));
+        let quiet = Tree::new(state());
+        assert_eq!(quiet.next_need(), None, "at home with nobody waiting");
     }
 
     #[test]

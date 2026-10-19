@@ -84,12 +84,30 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if key.code == KeyCode::Esc && tree.open_interaction().is_some() {
         return escape(ui, tree, now);
     }
-    if key == KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL) && ui.dialog.aside {
-        ui.dialog.aside = false;
-        return Vec::new();
+    // An ask's open words keep `ctrl+g` to close them (dialog.rs, M197's).
+    if key == KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)
+        && !(ui.dialog.words.is_some() && tree.open_interaction().is_some())
+    {
+        return whoever_needs_you(ui, tree, now);
     }
     let owner = crate::focus::owner(ui, tree);
     owned_keys(ui, tree, key, now, owner)
+}
+
+/// `ctrl+g`: an ask set aside comes back first; otherwise the next session
+/// after this one that waits on you, wrapping, then home.
+fn whoever_needs_you(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    if ui.dialog.aside {
+        ui.dialog.aside = false;
+        return Vec::new();
+    }
+    match tree.next_need() {
+        Some(id) => vec![Effect::View(id.clone())],
+        None => {
+            ui.notify(Level::Info, "nobody is waiting on you", now.instant);
+            Vec::new()
+        }
+    }
 }
 
 fn owned_keys(
@@ -1915,9 +1933,12 @@ mod tests {
     }
 
     #[test]
-    fn a_prompt_a_child_raised_is_answered_from_the_root_view() {
-        let tree = with_child(vec![child_frame(2, opened(child_permission()))]);
+    fn a_prompt_a_child_raised_is_answered_in_its_own_session() {
+        let mut tree = with_child(vec![child_frame(2, opened(child_permission()))]);
         let (mut ui, now) = scene();
+        assert!(press_tree(&mut ui, &tree, typed('y'), now).is_empty());
+        ui.composer.clear();
+        tree.show(&child_id());
         ui.dialog
             .focus_on(tree.open_interaction().map(|(_, open)| open));
         assert_eq!(
@@ -1927,7 +1948,7 @@ mod tests {
                 answer: Answer::AllowOnce,
                 activation: Activation::Keyboard,
             }],
-            "the root's handle routes it back to whoever asked"
+            "the asking session's handle takes the answer"
         );
     }
 
@@ -1991,6 +2012,23 @@ mod tests {
             vec![Effect::Stop {
                 withdraw: Vec::new()
             }]
+        );
+    }
+
+    #[test]
+    fn ctrl_g_walks_to_whoever_waits_and_says_when_nobody_does() {
+        let ctrl_g = KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL);
+        let tree = with_child(vec![child_frame(2, opened(child_permission()))]);
+        let (mut ui, now) = scene();
+        assert_eq!(
+            press_tree(&mut ui, &tree, ctrl_g, now),
+            vec![Effect::View(child_id())]
+        );
+        let quiet = with_child(vec![]);
+        assert!(press_tree(&mut ui, &quiet, ctrl_g, now).is_empty());
+        assert_eq!(
+            ui.notice().unwrap().plain().unwrap().text,
+            "nobody is waiting on you"
         );
     }
 
