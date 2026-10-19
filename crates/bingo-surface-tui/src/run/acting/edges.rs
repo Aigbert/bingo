@@ -85,6 +85,37 @@ async fn signed_out(scene: &mut Scene, capture: &Capture) {
     timeline::advance(scene, capture.entry.moment_ms).await;
 }
 
+/// The CI turn set a wake that is still pending; it fires on its own, with
+/// the model's own words and nobody at the keyboard.
+async fn woken(scene: &mut Scene, capture: &Capture) {
+    let turns = scene.turns.clone();
+    fold(scene, &turns[..2]);
+    let woken = &turns[2];
+    let fires = woken["t0"].as_i64().unwrap();
+    let at = jiff::Timestamp::from_millisecond(fires).unwrap();
+    scene.emit(fixture::pending_wake(&at.to_string()));
+    let input = Input::text(
+        woken["prompt"].as_str().unwrap(),
+        bingo_sdk::Origin::surface("wake").voiced(bingo_sdk::Voice::Note),
+    );
+    let fired = std::iter::once(fixture::extended("bingo.schedule", "wake", Value::Null))
+        .chain(
+            answers::sent("ember-2", bingo_sdk::IntentId::from_raw("wake"), &input, at)
+                .into_iter()
+                .filter(|event| !matches!(event, Event::IntentAck { .. })),
+        )
+        .map(|event| (fires, event))
+        .chain(story::provider_events(2, woken));
+    scene.timeline.extend(fired.map(|(at, event)| {
+        (
+            at - CLOCK_ORIGIN_MS,
+            timeline::Answer::Frame(Box::new(event)),
+        )
+    }));
+    follow(scene, capture).await;
+    timeline::advance(scene, capture.entry.moment_ms).await;
+}
+
 fn command(name: &str) -> bingo_sdk::CommandSpec {
     bingo_sdk::CommandSpec {
         name: name.into(),
@@ -151,6 +182,8 @@ pub(super) async fn draw(capture: &Capture) {
             let turns = scene.turns.clone();
             fold(&mut scene, &turns[..1]);
             signed_out(&mut scene, capture).await;
+        } else if capture.entry.scene == "wake" {
+            woken(&mut scene, capture).await;
         } else {
             let turns = scene.turns.clone();
             fold(&mut scene, &turns);
@@ -360,6 +393,8 @@ fn edges_full_frames_match_the_prototype() {
         "narrow",
         "signedout",
         "signedout-login",
+        "wake",
+        "wake-later",
     ] {
         let spinners: &[(u16, u16)] = match name {
             "welcome-sent" => &[(25, 3)],
