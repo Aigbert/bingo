@@ -552,6 +552,9 @@ pub enum ItemBody {
         before: u64,
         after: u64,
         duration_ms: u64,
+        /// The context window at the cut, so a later model change keeps its percentages.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        window: Option<u64>,
     },
     Rewind {
         to_turn: TurnId,

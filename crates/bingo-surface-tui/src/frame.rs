@@ -223,6 +223,7 @@ mod m183 {
                     [bingo_sdk::slot::Slot::Location {
                         cwd: state.summary.cwd.clone(),
                         branch: Some("main".into()),
+                        changed: None,
                     }],
                 ),
             );

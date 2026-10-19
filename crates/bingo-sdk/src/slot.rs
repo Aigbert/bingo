@@ -41,6 +41,8 @@ pub enum Slot {
     Location {
         cwd: String,
         branch: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        changed: Option<usize>,
     },
     Status {
         text: String,
@@ -439,3 +441,19 @@ mod pull_contract {
 
 #[cfg(test)]
 mod pane_tests;
+
+#[cfg(test)]
+mod location_contract {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn location_keeps_changed_count_and_reads_older_slots() {
+        let old = json!({"kind":"location","cwd":"/work","branch":"dev"});
+        let slot: Slot = serde_json::from_value(old.clone()).unwrap();
+        assert_eq!(serde_json::to_value(slot).unwrap(), old);
+        let current = json!({"kind":"location","cwd":"/work","branch":"dev","changed":3});
+        let slot: Slot = serde_json::from_value(current.clone()).unwrap();
+        assert_eq!(serde_json::to_value(slot).unwrap(), current);
+    }
+}

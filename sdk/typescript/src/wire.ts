@@ -236,7 +236,7 @@ export type Compaction = {
   "usage"?: Usage;
   [key: string]: unknown;
 };
-export type CompactionProps = { "after": number; "before": number; "durationMs": number; "replaced": number; "summary": string; [key: string]: unknown; };
+export type CompactionProps = { "after": number; "before": number; "durationMs": number; "replaced": number; "summary": string; "window"?: (number | null); [key: string]: unknown; };
 export type CompactorCompactParams = {
   "context": CompactorContext;
   /** Which of the compactors the handshake declared is being asked. */
@@ -757,7 +757,17 @@ export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<Conte
   "progress"?: (string | null);
   "quiet"?: boolean;
   [key: string]: unknown;
-} | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | { "after": number; "before": number; "durationMs": number; "kind": "compaction"; "replaced": number; "summary": string; [key: string]: unknown; } | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "askedAt"?: (string | null); "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "askedAt"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "askedAt"?: (string | null); "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
+} | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | {
+  "after": number;
+  "before": number;
+  "durationMs": number;
+  "kind": "compaction";
+  "replaced": number;
+  "summary": string;
+  /** The context window at the cut, so a later model change keeps its percentages. */
+  "window"?: (number | null);
+  [key: string]: unknown;
+} | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "askedAt"?: (string | null); "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "askedAt"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "askedAt"?: (string | null); "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
 /** One unit in the transcript order. */
 export type ItemId = string;
 export type ItemStatus = ("pending" | "running" | "completed" | "failed" | "interrupted");
@@ -1316,7 +1326,7 @@ export type SignInProps = { "flow": LoginFlow; "interactionId": InteractionId; "
 export type SiteHints = { "composer"?: (ComposerProps | null); "pairs"?: Array<KeyPair>; [key: string]: unknown; };
 export type SiteScroll = { "bodyRows": number; "offset": number; [key: string]: unknown; };
 export type SiteView = { "agentId"?: (string | null); [key: string]: unknown; };
-export type Slot = ({ "branch"?: (string | null); "cwd": string; "kind": "location"; [key: string]: unknown; } | { "kind": "status"; "text": string; "tone": Tone; "until"?: (string | null); [key: string]: unknown; } | { "kind": "activity"; "verb"?: (string | null); "view": Shown; [key: string]: unknown; } | { "kind": "rail"; "title": string; "view": Shown; [key: string]: unknown; } | { "kind": "panel"; "title": string; "view": Shown; [key: string]: unknown; } | { "asked": boolean; "closeOnEscape": boolean; "focus": boolean; "hints"?: (SiteHints | null); "holdToasts": boolean; "id": string; "kind": "pane"; "place"?: Array<PanePlace>; "size"?: PaneSize; "title": string; "view": Shown; [key: string]: unknown; } | {
+export type Slot = ({ "branch"?: (string | null); "changed"?: (number | null); "cwd": string; "kind": "location"; [key: string]: unknown; } | { "kind": "status"; "text": string; "tone": Tone; "until"?: (string | null); [key: string]: unknown; } | { "kind": "activity"; "verb"?: (string | null); "view": Shown; [key: string]: unknown; } | { "kind": "rail"; "title": string; "view": Shown; [key: string]: unknown; } | { "kind": "panel"; "title": string; "view": Shown; [key: string]: unknown; } | { "asked": boolean; "closeOnEscape": boolean; "focus": boolean; "hints"?: (SiteHints | null); "holdToasts": boolean; "id": string; "kind": "pane"; "place"?: Array<PanePlace>; "size"?: PaneSize; "title": string; "view": Shown; [key: string]: unknown; } | {
   "alert": boolean;
   "kind": "toast";
   /** Plain strings draw muted; a `Text` node keeps its own ink. */

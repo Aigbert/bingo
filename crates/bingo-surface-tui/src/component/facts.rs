@@ -13,13 +13,14 @@ pub fn props(item: &Item) -> Option<Props> {
             before,
             after,
             duration_ms,
-            ..
+            window,
         } => Some(Props::Compaction(CompactionProps {
             summary: summary.clone(),
             replaced: *replaced,
             before: *before,
             after: *after,
             duration_ms: *duration_ms,
+            window: *window,
         })),
         ItemBody::Rewind {
             to_turn, dropped, ..
@@ -102,6 +103,7 @@ pub fn change(item: &mut Item, props: &Props) {
                 before: props.before,
                 after: props.after,
                 duration_ms: props.duration_ms,
+                window: props.window,
             };
         }
         Props::Rewind(props) => {

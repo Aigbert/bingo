@@ -214,6 +214,7 @@ impl Accumulator {
                 before,
                 after,
                 duration_ms: 0,
+                window: None,
             },
             ItemStatus::Completed,
         );
@@ -507,6 +508,7 @@ mod tests {
                 before: 967_000,
                 after: 120_000,
                 duration_ms: 0,
+                window: None,
             }
         );
         assert_eq!(item.status, ItemStatus::Completed);

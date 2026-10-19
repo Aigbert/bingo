@@ -1423,7 +1423,17 @@ export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<Conte
   "progress"?: (string | null);
   "quiet"?: boolean;
   [key: string]: unknown;
-} | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | { "after": number; "before": number; "durationMs": number; "kind": "compaction"; "replaced": number; "summary": string; [key: string]: unknown; } | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "askedAt"?: (string | null); "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "askedAt"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "askedAt"?: (string | null); "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
+} | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | {
+  "after": number;
+  "before": number;
+  "durationMs": number;
+  "kind": "compaction";
+  "replaced": number;
+  "summary": string;
+  /** The context window at the cut, so a later model change keeps its percentages. */
+  "window"?: (number | null);
+  [key: string]: unknown;
+} | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "askedAt"?: (string | null); "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "askedAt"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "askedAt"?: (string | null); "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
 /** One unit in the transcript order. */
 export type ItemId = string;
 export type ItemStatus = ("pending" | "running" | "completed" | "failed" | "interrupted");
@@ -2311,7 +2321,17 @@ export type ItemBody = ({ "kind": "user"; "origin": Origin; "parts": Array<Conte
   "progress"?: (string | null);
   "quiet"?: boolean;
   [key: string]: unknown;
-} | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | { "after": number; "before": number; "durationMs": number; "kind": "compaction"; "replaced": number; "summary": string; [key: string]: unknown; } | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "askedAt"?: (string | null); "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "askedAt"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "askedAt"?: (string | null); "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
+} | { "command": string; "cwd": string; "exit"?: (number | null); "kind": "shell"; "output": string; [key: string]: unknown; } | { "args"?: unknown; "kind": "action"; "name": string; "result"?: unknown; [key: string]: unknown; } | {
+  "after": number;
+  "before": number;
+  "durationMs": number;
+  "kind": "compaction";
+  "replaced": number;
+  "summary": string;
+  /** The context window at the cut, so a later model change keeps its percentages. */
+  "window"?: (number | null);
+  [key: string]: unknown;
+} | { "dropped": number; "kind": "rewind"; "toTurn": TurnId; [key: string]: unknown; } | { "askedAt"?: (string | null); "kind": "interruption"; "marker": string; [key: string]: unknown; } | { "code": string; "kind": "notice"; "level": Level; "text": string; [key: string]: unknown; } | { "answer": string; "askedAt"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "questionAnswer"; "question": string; [key: string]: unknown; } | { "askedAt"?: (string | null); "decision": DecisionKind; "feedback"?: (string | null); "interaction": InteractionId; "item"?: (ItemId | null); "kind": "permissionReceipt"; "tool": string; [key: string]: unknown; } | { "asset": string; "kind": "asset"; "label"?: (string | null); [key: string]: unknown; } | { [key: string]: unknown; });
 /** One unit in the transcript order. */
 export type ItemId = string;
 export type Justify = ("flex-start" | "center" | "flex-end" | "space-between" | "space-around" | "space-evenly");

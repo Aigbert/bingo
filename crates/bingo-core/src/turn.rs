@@ -833,6 +833,7 @@ impl Turn<'_> {
             before: c.before,
             after: c.after,
             duration_ms: took.as_millis() as u64,
+            window: Some(self.ruler.lines.effective),
         });
         let generation = self.transcript.generation() + 1;
         emit_and_fold(

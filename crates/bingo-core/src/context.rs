@@ -811,6 +811,7 @@ mod tests {
                             before: 0,
                             after: 0,
                             duration_ms: 0,
+                            window: None,
                         },
                     ),
                 }
@@ -947,6 +948,7 @@ mod tests {
                     before: 400_000,
                     after: 120_000,
                     duration_ms: 0,
+                    window: None,
                 },
             ));
             proptest::prop_assert_eq!(
@@ -1032,6 +1034,7 @@ mod tests {
                             before: 100,
                             after: 20,
                             duration_ms: 1,
+                            window: None,
                         },
                     ),
                 },
@@ -1069,6 +1072,7 @@ mod tests {
                     before: 100,
                     after: 20,
                     duration_ms: 0,
+                    window: None,
                 },
             )
         };

@@ -950,33 +950,6 @@ async fn a_source_s_hook_composes_where_a_second_registered_hook_would() {
     );
 }
 
-#[tokio::test]
-async fn compaction_hooks_bracket_the_cut() {
-    let provider = ScriptedProvider::new(vec![]);
-    let mut cfg = config(provider, vec![]);
-    cfg.compactor =
-        CompactorSet::fixed(Some(ScriptedCompactor::new(vec![ScriptedCompactor::cut(
-            "itm_none", 9_000, 100,
-        )])));
-    let hook = RecordingHook::new(false);
-    cfg.hooks = HookSet::fixed(vec![hook.clone()]);
-    let host = RecordingHost::new();
-    run_turn(
-        &cfg,
-        TurnRun {
-            hooks: Default::default(),
-            turn: TurnId::from_raw("trn_1"),
-            transcript: transcript(&history("hello")),
-            cancel: CancellationToken::new(),
-            kind: TurnKind::Compact { instructions: None },
-        },
-        &host,
-    )
-    .await;
-    assert_eq!(hook.calls(), vec!["compact:Start", "compact:End"]);
-    assert!(host.kinds().contains(&"compacted".to_string()));
-}
-
 fn transcript(frames: &[Frame]) -> Transcript {
     let mut transcript = Transcript::new();
     for frame in frames {
@@ -997,3 +970,6 @@ mod provenance;
 
 mod headline;
 mod round;
+
+#[path = "tests/compaction_notice.rs"]
+mod compaction_notice;

@@ -66,8 +66,39 @@ async fn read(cwd: &Path) -> serde_json::Value {
         [bingo_sdk::slot::Slot::Location {
             cwd: cwd.display().to_string(),
             branch,
+            changed: changed(cwd).await,
         }],
     )
+}
+
+async fn changed(cwd: &Path) -> Option<usize> {
+    let output = tokio::process::Command::new("git")
+        .args(["status", "--porcelain=v1", "-z", "--untracked-files=all"])
+        .current_dir(cwd)
+        .stdin(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true)
+        .output()
+        .await
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| changed_paths(&output.stdout))
+}
+
+fn changed_paths(status: &[u8]) -> usize {
+    let mut paths = status
+        .split(|byte| *byte == 0)
+        .filter(|row| !row.is_empty());
+    let mut count = 0;
+    while let Some(row) = paths.next() {
+        count += 1;
+        if row.first().is_some_and(|code| matches!(code, b'R' | b'C')) {
+            paths.next();
+        }
+    }
+    count
 }
 
 #[async_trait]
@@ -111,13 +142,21 @@ mod tests {
         assert!(branch.moved(&session, Path::new("/elsewhere")), "reopened");
     }
 
+    #[test]
+    fn porcelain_counts_renames_once_and_ignores_newlines_in_names() {
+        assert_eq!(changed_paths(b" M a\0?? b\nname\0R  new\0old\0"), 3);
+        assert_eq!(changed_paths(b""), 0);
+    }
+
     #[tokio::test]
     async fn a_branch_is_a_cwd_fact_and_detached_or_non_git_is_absent() {
         let Some(repo) = crate::git::Repo::init() else {
             return;
         };
         let path = repo.root();
+        repo.write("untracked", "new");
         let fact = read(&path).await;
+        assert_eq!(fact["slots"][0]["changed"], 1);
         assert_eq!(fact["slots"][0]["cwd"], path.to_string_lossy().as_ref());
         assert!(
             fact["slots"][0]["branch"]

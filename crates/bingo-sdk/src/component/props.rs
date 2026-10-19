@@ -107,7 +107,9 @@ props!(CompactionProps {
     replaced: u32,
     before: u64,
     after: u64,
-    duration_ms: u64
+    duration_ms: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    window: Option<u64>
 });
 props!(RewindProps {
     to_turn: crate::TurnId,

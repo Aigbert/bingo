@@ -214,6 +214,23 @@ fn quiet_tool_calls_keep_their_flag_and_old_calls_keep_their_shape() {
 }
 
 #[test]
+fn compactions_keep_their_window_and_old_cuts_parse_without_one() {
+    let old: ItemBody =
+        serde_json::from_str(include_str!("../fixtures/record/item/compaction.json")).unwrap();
+    assert!(matches!(old, ItemBody::Compaction { window: None, .. }));
+    let wire = include_str!("../fixtures/record/compat/compactionWindow.json");
+    let body: ItemBody = serde_json::from_str(wire).unwrap();
+    assert!(matches!(
+        body,
+        ItemBody::Compaction {
+            window: Some(100_000),
+            ..
+        }
+    ));
+    assert_eq!(serde_json::to_string(&body).unwrap(), wire.trim_end());
+}
+
+#[test]
 fn frame_cases_preserve_the_envelope_and_nested_interactions() {
     for (row, wire) in include_str!("../fixtures/record/frames.jsonl")
         .lines()

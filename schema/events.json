@@ -7401,6 +7401,15 @@
                     "format": "uint64",
                     "minimum": 0
                   },
+                  "window": {
+                    "description": "The context window at the cut, so a later model change keeps its percentages.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "format": "uint64",
+                    "minimum": 0
+                  },
                   "kind": {
                     "type": "string",
                     "const": "compaction"
@@ -13475,6 +13484,15 @@
                   },
                   "durationMs": {
                     "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0
+                  },
+                  "window": {
+                    "description": "The context window at the cut, so a later model change keeps its percentages.",
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
                     "format": "uint64",
                     "minimum": 0
                   },

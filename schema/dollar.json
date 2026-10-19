@@ -2706,6 +2706,15 @@
               "format": "uint64",
               "minimum": 0
             },
+            "window": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint64",
+              "minimum": 0,
+              "description": "The context window at the cut, so a later model change keeps its percentages."
+            },
             "kind": {
               "type": "string",
               "const": "compaction"

@@ -232,19 +232,7 @@ impl SessionState {
             Event::SessionUpdated { summary } => self.session_updated(summary),
             Event::SessionClosed { .. } => self.session_closed(),
             Event::TurnStarted { turn, origin, .. } => self.turn_started(turn, *origin, frame.ts),
-            Event::TurnRetrying {
-                attempt,
-                max,
-                delay_ms,
-                reason,
-                ..
-            } => self.turn_retrying(Retry {
-                attempt: *attempt,
-                max: *max,
-                delay_ms: *delay_ms,
-                reason: reason.clone(),
-                started_at: frame.ts,
-            }),
+            Event::TurnRetrying { .. } => self.turn_retrying(frame),
             Event::TurnUsage { usage, context, .. } => self.turn_usage(*usage, *context),
             Event::ContextChanged { context } => self.context_changed(*context),
             Event::UsageCharged { turn, usage, .. } => self.usage_charged(turn.as_ref(), *usage),
@@ -253,8 +241,8 @@ impl SessionState {
                 status,
                 usage,
             } => self.turn_completed(turn, status, *usage, frame.ts),
-            Event::ItemStarted { .. }
-            | Event::ItemUpdated { .. }
+            Event::ItemStarted { item } => self.item_started(item, applied),
+            Event::ItemUpdated { .. }
             | Event::ItemCompleted { .. }
             | Event::ItemDelta { .. }
             | Event::Compacted { .. } => applied,
@@ -393,9 +381,40 @@ impl SessionState {
         Applied::Turn
     }
 
-    fn turn_retrying(&mut self, retry: Retry) -> Applied {
+    /// An item of a new attempt is the stream answering again, so the retry row leaves.
+    fn item_started(&mut self, item: &Item, applied: Applied) -> Applied {
+        if matches!(
+            item.body,
+            ItemBody::Assistant { .. } | ItemBody::Reasoning { .. } | ItemBody::ToolCall { .. }
+        ) && let Some(turn) = self
+            .turn
+            .as_mut()
+            .filter(|turn| item.turn.as_ref() == Some(&turn.id))
+        {
+            turn.retrying = None;
+        }
+        applied
+    }
+
+    fn turn_retrying(&mut self, frame: &Frame) -> Applied {
+        let Event::TurnRetrying {
+            attempt,
+            max,
+            delay_ms,
+            reason,
+            ..
+        } = &frame.event
+        else {
+            return Applied::Nothing;
+        };
         if let Some(t) = self.turn.as_mut() {
-            t.retrying = Some(retry);
+            t.retrying = Some(Retry {
+                attempt: *attempt,
+                max: *max,
+                delay_ms: *delay_ms,
+                reason: reason.clone(),
+                started_at: frame.ts,
+            });
         }
         Applied::Turn
     }

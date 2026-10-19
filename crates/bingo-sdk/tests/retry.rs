@@ -3,19 +3,18 @@ use bingo_sdk::{Event, Frame, SessionState};
 use serde_json::json;
 
 fn fold(retry: serde_json::Value) -> SessionState {
+    fold_all(vec![retry])
+}
+
+fn fold_all(events: Vec<serde_json::Value>) -> SessionState {
     let Event::SessionUpdated { summary } =
         serde_json::from_str(include_str!("../fixtures/record/event/sessionUpdated.json")).unwrap()
     else {
         panic!("summary")
     };
     let mut state = SessionState::new(summary);
-    for (seq, event) in [
-        json!({"type":"turnStarted","turn":"trn_1","inputs":[],"origin":"submit"}),
-        retry,
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    let started = json!({"type":"turnStarted","turn":"trn_1","inputs":[],"origin":"submit"});
+    for (seq, event) in std::iter::once(started).chain(events).enumerate() {
         let frame: Frame = serde_json::from_value(json!({"session":state.summary.id,"seq":seq + 1,"ts":"2026-01-01T00:00:00Z","event":event})).unwrap();
         state.apply(&frame);
     }
@@ -60,4 +59,44 @@ fn receipt_facts_round_trip_without_session_bodies() {
     let wire = json!({"id":"ses_1","title":"hello","turns":2,"durationMs":4900,"editedFiles":1});
     let facts: bingo_sdk::component::ReceiptFacts = serde_json::from_value(wire.clone()).unwrap();
     assert_eq!(serde_json::to_value(facts).unwrap(), wire);
+}
+
+#[test]
+fn retry_leaves_on_the_live_turns_first_provider_item() {
+    let mut state =
+        fold(json!({"type":"turnRetrying","turn":"trn_1","attempt":2,"max":10,"dropped":[]}));
+    let mut item: bingo_sdk::Item =
+        serde_json::from_str(include_str!("../fixtures/headline/item.json")).unwrap();
+    item.turn = Some(bingo_sdk::TurnId::from_raw("unrelated"));
+    let mut frame = Frame {
+        session: state.summary.id.clone(),
+        seq: bingo_sdk::Seq(3),
+        cause: None,
+        ts: jiff::Timestamp::UNIX_EPOCH,
+        event: Event::ItemStarted { item: item.clone() },
+    };
+    state.apply(&frame);
+    assert!(state.turn.as_ref().unwrap().retrying.is_some());
+    item.turn = Some(bingo_sdk::TurnId::from_raw("trn_1"));
+    item.body = bingo_sdk::ItemBody::Assistant {
+        text: String::new(),
+    };
+    frame.seq = bingo_sdk::Seq(4);
+    frame.event = Event::ItemStarted { item };
+    state.apply(&frame);
+    assert!(state.turn.as_ref().unwrap().retrying.is_none());
+}
+
+#[test]
+fn deltas_on_an_item_from_before_the_retry_keep_the_row() {
+    let started: serde_json::Value =
+        serde_json::from_str(include_str!("../fixtures/record/event/itemStarted.json")).unwrap();
+    let delta: serde_json::Value =
+        serde_json::from_str(include_str!("../fixtures/record/event/itemDelta.json")).unwrap();
+    let state = fold_all(vec![
+        started,
+        json!({"type":"turnRetrying","turn":"trn_1","attempt":2,"max":10,"dropped":[]}),
+        delta,
+    ]);
+    assert!(state.turn.unwrap().retrying.is_some());
 }
