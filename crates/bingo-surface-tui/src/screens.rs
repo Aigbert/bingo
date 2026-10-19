@@ -609,16 +609,23 @@ fn a_notice_and_a_context_warning() {
 fn a_view_a_command_answered() {
     let state = folded(answered());
     let (mut ui, now) = scene();
-    ui.block = Some(View::Table {
-        headers: vec!["mode".into(), "meaning".into()],
-        rows: vec![
-            vec!["default".into(), "ask for what is not allowed".into()],
-            vec![
-                "acceptEdits".into(),
-                "edits inside the cwd are allowed".into(),
-            ],
-        ],
-    });
+    ui.focus.show(
+        Open::Result {
+            head: String::new(),
+            at: 0,
+            view: View::Table {
+                headers: vec!["mode".into(), "meaning".into()],
+                rows: vec![
+                    vec!["default".into(), "ask for what is not allowed".into()],
+                    vec![
+                        "acceptEdits".into(),
+                        "edits inside the cwd are allowed".into(),
+                    ],
+                ],
+            },
+        },
+        now.instant,
+    );
     both("view_table", &solo(&state), &mut ui, now);
 }
 
@@ -753,7 +760,10 @@ fn the_rewind_picker() {
     let (mut ui, now) = scene();
     shown(
         &mut ui,
-        Open::Rewind(crate::rewind::Rewind { selected: 1 }),
+        Open::Rewind(crate::rewind::Rewind {
+            selected: 1,
+            ..Default::default()
+        }),
         now,
     );
     both("rewind_picker", &solo(&state), &mut ui, now);

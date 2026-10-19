@@ -652,6 +652,7 @@ impl Run {
             ),
             IntentOutcome::Applied { result } => {
                 surface::receipt(self, result);
+                surface::result_sheet(self, &submission, result);
                 if matches!(submission, Submission::Mode(_)) {
                     self.ui.notify_mode(self.now().instant);
                 }
@@ -2963,3 +2964,6 @@ mod picture_tests;
 
 #[cfg(test)]
 pub(crate) mod acting;
+
+#[cfg(test)]
+mod result_sheet_tests;

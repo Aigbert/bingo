@@ -300,7 +300,6 @@ pub struct Ui {
     /// behind it (ADR-0095 §2).
     pub notice: Option<Notice>,
     pub keyed_at: Instant,
-    pub block: Option<View>,
     pub embers: crate::embers::Embers,
     /// How much of each block a person opened or shut, with `ctrl+o` or a
     /// click (§7). A block that is not in it wears its kind's own start
@@ -352,7 +351,6 @@ impl Ui {
             scroll: Scroll::default(),
             notice: None,
             keyed_at: now,
-            block: None,
             embers: crate::embers::Embers::default(),
             folds: Folds::new(),
             focused: true,

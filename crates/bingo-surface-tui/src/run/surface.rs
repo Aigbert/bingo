@@ -23,11 +23,22 @@ pub(super) fn receipt(run: &mut Run, result: &Value) {
         run.ui
             .notify(Level::Info, message.to_string(), run.now().instant);
     }
+}
+
+pub(super) fn result_sheet(run: &mut Run, submission: &Submission, result: &Value) {
+    let line = match submission {
+        Submission::Ordinary(line) | Submission::Mode(line) => line.as_deref(),
+    };
     if let Some(view) = result
         .get("view")
-        .and_then(|v| serde_json::from_value::<View>(v.clone()).ok())
+        .and_then(|value| serde_json::from_value(value.clone()).ok())
     {
-        run.ui.block = Some(view);
+        let head = line
+            .and_then(crate::commands::split)
+            .map(|(name, _)| format!("/{name}"))
+            .unwrap_or_default();
+        let now = run.now().instant;
+        run.ui.focus.show(Open::Result { head, view, at: 0 }, now);
     }
 }
 

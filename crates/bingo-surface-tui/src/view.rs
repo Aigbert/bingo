@@ -244,28 +244,16 @@ fn layers(
     now: Now,
     tools: &crate::tool_rows::Looks,
 ) {
-    let width = regions.transcript.width as usize;
     let above = regions.above();
-    let block = ui
-        .block
-        .as_ref()
-        .map(|view| views::marked(view, width, &views::Marks::at(now)))
-        .unwrap_or_default();
-    let block = frame.collect(block);
-    over(
-        frame,
-        above,
-        [
-            block,
-            menu(
-                ui,
-                &tree.viewed().summary.cwd,
-                &mentions::targets(tree),
-                MENU_ROWS.min(usize::from(above.height)),
-            ),
-        ]
-        .concat(),
-    );
+    if frame.sheet.is_none() {
+        let lines = menu(
+            ui,
+            &tree.viewed().summary.cwd,
+            &mentions::targets(tree),
+            MENU_ROWS.min(usize::from(above.height)),
+        );
+        over(frame, above, lines);
+    }
     match ui.focus.drawn(now) {
         Some(reveal) => layer(tree, ui, frame, above, reveal, tools, now),
         None if !crate::ask::drawing::inline(tree, ui) => {
@@ -1494,19 +1482,26 @@ mod tests {
     }
 
     #[test]
-    fn a_view_table_sits_above_the_composer() {
+    fn a_result_sheet_replaces_the_composer() {
         let state = state();
         let (mut ui, now) = scene();
-        ui.block = Some(View::Table {
-            headers: vec!["mode".into(), "meaning".into()],
-            rows: vec![
-                vec!["default".into(), "ask for what is not allowed".into()],
-                vec![
-                    "acceptEdits".into(),
-                    "edits inside the cwd are allowed".into(),
-                ],
-            ],
-        });
+        ui.focus.show(
+            Open::Result {
+                head: String::new(),
+                at: 0,
+                view: View::Table {
+                    headers: vec!["mode".into(), "meaning".into()],
+                    rows: vec![
+                        vec!["default".into(), "ask for what is not allowed".into()],
+                        vec![
+                            "acceptEdits".into(),
+                            "edits inside the cwd are allowed".into(),
+                        ],
+                    ],
+                },
+            },
+            now.instant,
+        );
         insta::assert_snapshot!(render(&state, &mut ui, now));
     }
 

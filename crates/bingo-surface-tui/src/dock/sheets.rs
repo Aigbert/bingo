@@ -26,6 +26,7 @@ fn native(
         return None;
     }
     let view = match ui.focus.open() {
+        Open::Result { .. } => return super::result::draw(ui, frame, area.width, cap, now),
         Open::Keys(selected) => crate::keys::sheet::sheet(selected.clone(), area.width, cap),
         Open::Sessions(_) => {
             return Some(crate::sessions::draw(ui, tree, frame, area.width, cap, now));

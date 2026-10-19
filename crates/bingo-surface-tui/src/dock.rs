@@ -9,6 +9,7 @@ use crate::{
 use ratatui::text::{Line, Span};
 use std::time::{Duration, Instant};
 mod edge;
+pub mod result;
 pub mod sheets;
 pub use edge::draw as edge;
 
