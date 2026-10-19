@@ -3,6 +3,9 @@ use super::*;
 use bingo_sdk::{Attachment, Delivery, HostApi};
 use futures::StreamExt;
 
+#[path = "streaming.rs"]
+mod streaming;
+
 struct Kernel {
     host: Arc<bingo_core::Host>,
     attached: Attachment,
@@ -10,15 +13,16 @@ struct Kernel {
 }
 impl Kernel {
     async fn new(responses: Value) -> Self {
-        let home = tempfile::tempdir().unwrap();
         let script = serde_json::from_value(json!({"responses":responses})).unwrap();
+        Self::with_provider(Box::new(bingo_provider_fake::FakePlugin::new(Arc::new(
+            bingo_provider_fake::FakeProvider::new(script),
+        ))))
+        .await
+    }
+    async fn with_provider(provider: Box<dyn bingo_sdk::Plugin>) -> Self {
+        let home = tempfile::tempdir().unwrap();
         let host = bingo_core::Host::build(
-            vec![
-                Box::new(bingo_provider_fake::FakePlugin::new(Arc::new(
-                    bingo_provider_fake::FakeProvider::new(script),
-                ))),
-                Box::new(bingo_tool_bash::BashPlugin::default()),
-            ],
+            vec![provider, Box::new(bingo_tool_bash::BashPlugin::default())],
             bingo_core::HostConfig::new(bingo_sdk::Env::rooted(home.path())),
         )
         .await
@@ -186,7 +190,15 @@ async fn sent_answer_matches_the_kernel() {
 
 #[tokio::test]
 async fn stop_answer_matches_the_kernel() {
-    let mut kernel = Kernel::running().await;
+    let provider = streaming::Streaming(Arc::new(bingo_provider_fake::FakeProvider::demo()));
+    let mut kernel = Kernel::with_provider(Box::new(provider)).await;
+    kernel
+        .attached
+        .handle
+        .submit(IntentId::mint(), Input::text("start", crate::origin()));
+    kernel
+        .until(|e| matches!(e, Event::ItemDelta { data, .. } if data.ends_with('.')))
+        .await;
     let expected = answers::stopped(&kernel.attached.snapshot, jiff::Timestamp::UNIX_EPOCH);
     kernel
         .attached
@@ -199,6 +211,7 @@ async fn stop_answer_matches_the_kernel() {
         .into_iter()
         .filter(|e| matches!(e, Event::ItemCompleted { .. } | Event::TurnCompleted { .. }))
         .collect();
+    assert!(actual.iter().any(|e| matches!(e, Event::ItemCompleted { item } if item.status == bingo_sdk::ItemStatus::Interrupted && matches!(item.body, ItemBody::Assistant { .. }))));
     assert_eq!(normalized(&actual), normalized(&expected));
     kernel.host.shutdown().await;
 }

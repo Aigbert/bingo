@@ -2959,7 +2959,7 @@ mod schedule_scene_tests;
 mod schedule_tests;
 
 #[cfg(test)]
-mod headline_tests;
+mod picture_tests;
 
 #[cfg(test)]
 pub(crate) mod acting;

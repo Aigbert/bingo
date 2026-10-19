@@ -216,7 +216,6 @@ async fn stopping_withdraws_two_lines_before_completion_can_drain_them() {
         crossterm::event::KeyCode::Esc,
     )));
     run.reply(rx.recv().await.unwrap(), &mut None);
-    assert_eq!(run.ui.composer.text(), "first\nsecond");
     let mut starts = 1;
     tokio::time::timeout(std::time::Duration::from_secs(10), async {
         while let Some(frame) = attached.events.next().await {
@@ -231,8 +230,17 @@ async fn stopping_withdraws_two_lines_before_completion_can_drain_them() {
     })
     .await
     .unwrap();
+    // Attach is a mailbox round trip after TurnFinished's drain_queue, so
+    // its sequence includes any turn the drain opened after TurnCompleted.
+    let synced = host.read(&attached.session).await.unwrap();
+    while attached.snapshot.seq < synced.seq {
+        let frame = attached.events.next().await.unwrap();
+        starts += usize::from(matches!(frame.event, Event::TurnStarted { .. }));
+        attached.snapshot.apply(&frame);
+    }
     assert_eq!(starts, 1);
     assert!(attached.snapshot.queue.is_empty());
+    assert_eq!(run.ui.composer.text(), "first\nsecond");
     assert_eq!(
         attached
             .snapshot
