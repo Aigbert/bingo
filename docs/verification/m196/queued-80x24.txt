@@ -14,11 +14,11 @@
 
 
 
+
 ▍  work until stopped
 
 ▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
    steer the work                                             at the next step
-   then update CHANGELOG                                                queued
    ▍Steer, or queue what comes next
 
    fake-1                                             ↑ edit queued   esc stop

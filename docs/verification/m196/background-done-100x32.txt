@@ -12,8 +12,6 @@
 
 
 
-
-
    ! echo shell-landed
 
        shell-landed
@@ -26,7 +24,9 @@
 
    ── ✓ sh check.sh finished in the background · 2 passed ────────────────────────────────────────
 
-▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
-   ▍Steer, or queue what comes next
+   The background tests passed.
 
-   ✓ background job finished · 2 passed                                                   esc stop
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   ▍Reply, or / for commands
+
+   ✓ background job finished · 2 passed                       ctrl+o details   / commands   ? keys

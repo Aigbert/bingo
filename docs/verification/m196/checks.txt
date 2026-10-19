@@ -1,28 +1,31 @@
-M196 part 1, round 3 — command evidence
+M196 part 1, round 4 — command evidence
 Cargo jobs ran serially.
+
+$ GIT_SEQUENCE_EDITOR=true git rebase -i --autosquash fec21d36
+exit 0; fixup removes the core test from badf16b6; a separate test(core) commit restores and extends it.
 
 $ unset $(git rev-parse --local-env-vars)
 exit 0
 
 $ git rebase -x 'cargo check --workspace --all-targets --locked' fec21d36
-23 checks: Finished `dev` profile; exit 0
+28 checks: Finished `dev` profile; exit 0
 Successfully rebased and updated refs/heads/m196-acting-never-moves.
-Before/after ordered commit hashes identical; no amendments.
+Before/after ordered commit hashes identical during the build proof; no failed commits or amendments.
 
 $ cargo fmt --all -- --check
 exit 0
 
 $ cargo check --workspace --all-targets --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.41s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.40s
 exit 0
 
 $ cargo clippy --workspace --all-targets --locked -- -D warnings
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 38.32s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.07s
 exit 0
 
 $ env -u OPENAI_API_KEY -u OPENAI_BASE_URL -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL cargo test --workspace --locked
-126 test-result lines: 6553 passed; 0 failed; 0 ignored.
-TUI: 1435 passed; core: 693 passed; tool-bash: 157 passed; PTY: 20 passed.
+126 test-result lines: 6555 passed; 0 failed; 0 ignored.
+TUI: 1437 passed; core: 693 passed; tool-bash: 157 passed; PTY: 20 passed.
 exit 0
 
 $ scripts/check_discipline.sh
@@ -31,7 +34,7 @@ exit 0
 
 $ scripts/budget.sh
 dependencies (unique, normal): 423 (max  423)
-target/debug: 15 GB (soft max  5)
+target/debug: 16 GB (soft max  5)
 budget ok
 exit 0
 
@@ -40,25 +43,29 @@ advisories ok, bans ok, licenses ok, sources ok
 exit 0
 
 $ cargo check -p bingo-sdk --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.55s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.40s
 exit 0
 
 $ cargo check -p bingo-core --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.54s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 6.10s
 exit 0
 
 $ cargo check -p bingo-tool-bash --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.58s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.13s
 exit 0
 
 $ cargo check -p bingo-surface-tui --all-targets --target x86_64-pc-windows-msvc --locked --keep-going
+cargo:warning=/Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+cargo:warning=/Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/stdalign_check.c:10:10: fatal error: 'stdlib.h' file not found
+cargo:warning=/Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
 error: failed to run custom build command for `aws-lc-sys v0.44.0`
-fatal error: 'stdlib.h' file not found
-fatal error: 'windows.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/c11.c:7:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/tests/compiler_features_tests/stdalign_check.c:10:10: fatal error: 'stdlib.h' file not found
+warning: aws-lc-sys@0.44.0: /Users/yexrob/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/aws-lc-sys-0.44.0/aws-lc/third_party/jitterentropy/jitterentropy-library/arch/jitterentropy-base-windows.h:49:10: fatal error: 'windows.h' file not found
 exit 101
 
 $ cargo build -p bingo --locked
-Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.34s
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 33.71s
 exit 0
 
 $ TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh
@@ -72,39 +79,47 @@ PASS 80x24: enter/tab/up/down/esc/esc esc/ctrl+c/ctrl+d/!/ctrl+b/ctrl+v/?
 CLEAN 80x24: owned server and temporary HOME/data/cwd
 exit 0
 
+$ cargo test -p bingo-core --lib the_provider_reads_text_but_never_the_headline --locked
+Finished `test` profile [unoptimized + debuginfo] target(s) in 21.21s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 692 filtered out; finished in 0.02s
+exit 0
+
+$ cargo test -p bingo-surface-tui --lib stop_answer_matches_the_kernel_for_a_running_tool --locked
+Finished `test` profile [unoptimized + debuginfo] target(s) in 11.39s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1435 filtered out; finished in 0.03s
+exit 0
+
+$ cargo test -p bingo-surface-tui --lib acting_full_frames_match_the_prototype --locked
+Finished `test` profile [unoptimized + debuginfo] target(s) in 0.27s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1435 filtered out; finished in 0.27s
+exit 0
+
 $ cargo test -p bingo-surface-tui --lib --locked
-test result: ok. 1435 passed; 0 failed; 0 ignored.
-All ten keyed full frames, six real-Host proofs, drain and key regressions: ok.
-
-$ cargo test -p bingo-core --locked
-test result: ok. 693 passed; 0 failed; 0 ignored.
-the_provider_reads_text_but_never_the_headline ... ok
-
-$ cargo test -p bingo-tool-bash --locked
-test result: ok. 157 passed; 0 failed; 0 ignored.
-
-$ cargo test -p bingo-surface-tui --lib stopping_withdraws_two_lines_before_completion_can_drain_them --locked
-Mutation: replace Esc/withdrawal/reply with run.interrupt(attached.session.clone()).
-FAILED: assertion left: 2, right: 1 (TurnStarted count); exit 101.
-Restored before the full TUI and workspace test runs; both pass.
-
-$ node docs/verification/m194b/fixtures.cjs
-Exported acting turns only; keys, queues, drafts and toasts stay in the run
+Finished `test` profile [unoptimized + debuginfo] target(s) in 11.85s
+test result: ok. 1437 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.79s
 exit 0
 
-$ git diff --exit-code -- crates/bingo-surface-tui/src/test_support/ember/acting-turns.json
-empty diff; exit 0
+$ Initial running-tool proof (before correcting the scripted command)
+FAILED: Bash rejects a bare foreground sleep; the call completed as Failed before interruption.
+Changed to sleep 60 && echo done; the focused proof and full suites pass.
+This was a fixture error, not a wall-clock failure.
 
-Byte comparison against `git show fec21d36:crates/bingo-tool-bash/src/notify.rs`:
-Extracted each named function through its closing brace and compared literal strings.
-finished and its three tests: byte-identical to fec21d36.
+$ git diff --exit-code -- docs/design/ember/prototype docs/design/ember/scenes
+No prototype or sealed capture changes; live-stopped frame remains identical.
 
-$ cargo check --workspace --all-targets --locked
-Final records tree: Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.07s
+$ cargo check --workspace --all-targets --locked  # final records tree
+Finished `dev` profile [unoptimized + debuginfo] target(s) in 3.67s
 exit 0
 
-$ git diff --check
-exit 0
-
-$ tmux -L m196-drive list-sessions
-No server remains after both drives.
+Round-4 regression lines from the workspace test run:
+test stopping_returns_a_queued_line_to_the_input ... ok
+test host::tests::queue::the_provider_reads_text_but_never_the_headline ... ok
+test input::acting_tests::a_sent_line_clears_the_toast_after_slash_dispatch ... ok
+test input::acting_tests::ctrl_c_and_escape_send_the_same_interaction_cancel ... ok
+test input::tests::ctrl_c_and_escape_leave_the_same_child_with_an_open_interaction ... ok
+test keys::tests::every_acting_rung_obeys_the_policy_order ... ok
+test run::acting::proofs::stop_answer_matches_the_kernel ... ok
+test run::acting::proofs::stop_answer_matches_the_kernel_for_a_running_tool ... ok
+test run::withdraw::tests::stopping_withdraws_two_lines_before_completion_can_drain_them ... ok
+test transcript::notice::tests::a_notice_has_a_divider_and_its_arrival_keeps_a_deadline_without_room ... ok
+test test_support::ember::acting::acting_full_frames_match_the_prototype ... ok

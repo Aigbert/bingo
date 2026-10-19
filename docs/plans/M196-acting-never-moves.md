@@ -119,31 +119,31 @@ Asks and questions (M197); sheets (M198); teammates and rooms (M200); the exit r
 
 ## Verified
 
-- [x] Round 3 history: `unset $(git rev-parse --local-env-vars)` then
-  `git rebase -x 'cargo check --workspace --all-targets --locked' fec21d36`: 23 checks passed;
-  `Successfully rebased`; ordered hashes unchanged, no amendments. Final records checked separately.
-- [x] `cargo test --workspace --locked` (provider credentials unset): `6553 passed; 0 failed; 0 ignored`.
-  TUI `1435 passed`, core `693 passed`, bash `157 passed`; all six real-Host answer proofs pass.
-- [x] All ten keyed part-1 frames: `acting_full_frames_match_the_prototype ... ok`.
-  Exact sends, replies, timing and named spinner exemptions retained; catalogue now enters as a reply.
-- [x] All on_key rungs, clock windows, alt+Enter, images, idle `?`, parts/tone and shell rows pass.
-  `a_sent_line_clears_the_toast_after_slash_dispatch ... ok`; closing uses the selected rung.
-- [x] Drain proof folds beyond completion to a mailbox snapshot; `stopping_withdraws_two_lines_before_completion_can_drain_them ... ok`.
-  Skipping withdrawals fails alone: `left: 2`, `right: 1` starts; restored before passing full suites.
-- [x] Black-box PTY: `stopping_returns_a_queued_line_to_the_input ... ok`; `20 passed; 0 failed`.
-- [x] `node docs/verification/m194b/fixtures.cjs` plus acting-turns.json `git diff --exit-code`: empty diff.
-  Bash `finished` and its three tests remain byte-identical to fec21d36; headline/toast modules split.
+- [x] Round 4 history: fixup splits core's provider test out of the TUI commit; then
+  `unset $(git rev-parse --local-env-vars)` and
+  `git rebase -x 'cargo check --workspace --all-targets --locked' fec21d36`: 28 checks passed.
+  `Successfully rebased`; proof hashes unchanged, no failed commits. Final records checked separately.
+- [x] `cargo test --workspace --locked` (provider credentials unset): `6555 passed; 0 failed; 0 ignored`.
+  TUI `1437 passed`, core `693 passed`, bash `157 passed`; seven real-Host answer proofs pass.
+- [x] All ten keyed frames: `acting_full_frames_match_the_prototype ... ok`; live-stopped unchanged.
+  Running tools keep the kernel's interrupt error, clear progress and set duration; pending input stays alone.
+- [x] `stop_answer_matches_the_kernel_for_a_running_tool ... ok`; streaming proof also passes.
+  Bare foreground sleep is rejected by Bash; the proof uses `sleep 60 && echo done`.
+- [x] One typed close rung: `ctrl_c_and_escape_leave_the_same_child_with_an_open_interaction ... ok`.
+  All on_key rungs, double-press windows, alt+Enter, image, shell, toast and idle-? checks pass.
+- [x] `the_provider_reads_text_but_never_the_headline ... ok`: opening and background Wake delivery.
+- [x] Drain proof and black-box `stopping_returns_a_queued_line_to_the_input ... ok`; PTY `20 passed`.
+  Round-3 withdrawal mutation still documents the failure beyond CompletionReady's drain.
 - [x] `cargo fmt --all -- --check`, workspace all-target check, clippy `-- -D warnings`: exit 0.
 - [x] `scripts/check_discipline.sh`: `discipline ok`; `scripts/budget.sh`: `423 (max 423)`, `budget ok`.
-  Target/debug 15 GB is a soft warning. `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
+  Target/debug 16 GB is a soft warning. `cargo deny check`: `advisories ok, bans ok, licenses ok, sources ok`.
 - [x] `cargo build -p bingo --locked`: exit 0; `TUI_SMOKE_SOCKET=m196-drive scripts/tui-smoke.sh`: `tui-smoke ok`.
-- [x] `python3 docs/verification/m196/drive.py`: `PASS 100x32`, `PASS 80x24`; both `CLEAN` lines confirm cleanup.
+- [x] `python3 docs/verification/m196/drive.py`: `PASS 100x32`, `PASS 80x24`, both `CLEAN`.
+  Background captures now wait for the provider's answer; refreshed terminal captures committed.
 - [x] Windows all-target checks with `--locked --keep-going`: sdk/core/tool-bash pass fully.
-- [ ] Windows TUI: aws-lc-sys native build lacks stdlib.h/windows.h; no Rust diagnostic bypassed.
+- [ ] Windows TUI: aws-lc-sys native build lacks stdlib.h/windows.h; no diagnostic bypassed.
 - [ ] Part 2: bricks 7–8/ranking and the ten named captures in Exit criteria await M198.
-- Departure: stop proof uses an active streaming assistant block. Executing tools retain an interruption
-  output; the instruction's output-clearing premise is false. No kernel behavior changed to fit the proof.
 - No new dependency or package; one kernel fact, ADR-0098: a delivery may carry its headline.
-- Prototype/captures, round-2.md and protected shared sites unchanged. No final wall-clock failures or retries.
-- Item/commit/test evidence and earlier departures: [round 3](../verification/m196/round-3.md),
+- No sealed capture or protected-site changes; no wall-clock retry. Base remains fec21d36 despite dev moving.
+- Evidence/departures: [round 4](../verification/m196/round-4.md), [round 3](../verification/m196/round-3.md),
   [round 2](../verification/m196/round-2.md), [checks](../verification/m196/checks.txt), [handoff](../verification/m196/handoff.md).
