@@ -82,8 +82,14 @@ impl RewindCommand {
             cx.host.rewind(&cx.session, wanted).await?
         };
         let to = listed.iter().find(|turn| &turn.id == wanted);
-        Ok(CommandOutcome::Applied {
-            message: Some(report(mode, to, dropped, &plan, &cx.cwd).join("\n")),
+        let message = Some(report(mode, to, dropped, &plan, &cx.cwd).join("\n"));
+        if mode == "files" {
+            return Ok(CommandOutcome::Applied { message });
+        }
+        let said = restored(plan.put_back.len() + plan.remove.len());
+        Ok(CommandOutcome::Surface {
+            action: said.action(),
+            fallback: message,
         })
     }
 }
@@ -189,6 +195,14 @@ fn report(mode: &str, to: Option<&Turn>, dropped: u32, plan: &Plan, cwd: &Path) 
     lines
 }
 
+fn restored(count: usize) -> bingo_sdk::toast::Say {
+    bingo_sdk::toast::Say::ok(match count {
+        0 => "rewound".into(),
+        1 => "rewound · 1 file restored".into(),
+        count => format!("rewound · {count} files restored"),
+    })
+}
+
 fn items(n: u32) -> String {
     match n {
         1 => "1 item".into(),
@@ -219,8 +233,25 @@ mod tests {
     fn applied(outcome: CommandOutcome) -> String {
         match outcome {
             CommandOutcome::Applied { message } => message.unwrap_or_default(),
+            CommandOutcome::Surface { fallback, .. } => fallback.unwrap_or_default(),
             other => panic!("/rewind <turn> applies, it does not answer {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn the_surface_toast_counts_the_files_actually_restored() {
+        let fixture = Fixture::new();
+        two_edited_turns(&fixture);
+        let CommandOutcome::Surface { action, fallback } = run(&fixture, "trn_1").await.unwrap()
+        else {
+            panic!("a successful rewind carries its toast");
+        };
+        assert_eq!(action.name, bingo_sdk::toast::ACTION);
+        assert_eq!(
+            action.args,
+            serde_json::json!({"parts":["rewound · 2 files restored"],"tone":"good"})
+        );
+        assert!(fallback.unwrap().contains("put back note.md"));
     }
 
     /// A file that was there before the first turn, edited in both, and a

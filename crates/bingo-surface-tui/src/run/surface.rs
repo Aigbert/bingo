@@ -45,6 +45,11 @@ pub(super) fn result_sheet(run: &mut Run, submission: &Submission, result: &Valu
 pub(super) fn action(run: &mut Run, action: bingo_sdk::Action) {
     let now = run.now();
     match action.name.as_str() {
+        bingo_sdk::toast::ACTION => {
+            if let Ok(said) = serde_json::from_value(action.args) {
+                run.ui.tell(said, now.instant);
+            }
+        }
         "Browse" => crate::browse::open(
             &mut run.ui,
             &run.session.tree,
