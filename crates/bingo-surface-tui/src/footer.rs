@@ -224,16 +224,32 @@ fn needs_you(tree: &Tree) -> Drawing {
     Drawing::still(vec![Line::from(spans)])
 }
 
+/// The countdown reads seconds under an hour and minutes past it
+/// (`bingo_sdk::remaining`), so it changes on the next whole unit.
 fn countdown_change(remaining: Duration) -> Duration {
-    let seconds = remaining.as_secs();
-    let unit = match seconds {
-        0..60 => 1,
-        60..3600 => 60,
-        3600..86400 => 3600,
-        _ => 86400,
+    let unit = if remaining < Duration::from_secs(3600) {
+        1
+    } else {
+        60
     };
+    let seconds = remaining.as_secs();
     (remaining - Duration::from_secs(seconds / unit * unit) + Duration::from_nanos(1))
         .min(remaining)
+}
+
+/// `"{text} in {remaining}"` until `at`, and the instant its words change;
+/// nothing once `at` has passed.
+fn countdown(text: &str, at: jiff::Timestamp, now: Now) -> Option<(String, std::time::Instant)> {
+    let left = at.duration_since(now.wall);
+    if !left.is_positive() {
+        return None;
+    }
+    let left = left.unsigned_abs();
+    let millis = i64::try_from(left.as_millis()).unwrap_or(i64::MAX);
+    Some((
+        format!("{text} in {}", bingo_sdk::remaining(millis)),
+        now.instant + countdown_change(left),
+    ))
 }
 
 fn slots(state: &bingo_sdk::SessionState, now: Now) -> Vec<Drawing> {
@@ -244,16 +260,7 @@ fn slots(state: &bingo_sdk::SessionState, now: Now) -> Vec<Drawing> {
                 return None;
             };
             let (text, next) = match until {
-                Some(at) if at > now.wall => (
-                    format!(
-                        "{text} in {}",
-                        clock::span(at.duration_since(now.wall).unsigned_abs())
-                    ),
-                    Some(
-                        now.instant + countdown_change(at.duration_since(now.wall).unsigned_abs()),
-                    ),
-                ),
-                Some(_) => return None,
+                Some(at) => countdown(&text, at, now).map(|(text, next)| (text, Some(next)))?,
                 None => (text, None),
             };
             Some(Drawing {

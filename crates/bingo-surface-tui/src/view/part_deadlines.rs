@@ -186,7 +186,7 @@ fn clipped_ambient_facts_keep_their_deadlines() {
                 json!({}),
                 [bingo_sdk::slot::Slot::Status {
                     text: "wakes".into(),
-                    until: Some(later(now, 125_000).wall),
+                    until: Some(later(now, 125_500).wall),
                     tone: bingo_sdk::Tone::Neutral,
                 }],
             ),
@@ -202,7 +202,7 @@ fn clipped_ambient_facts_keep_their_deadlines() {
         );
         assert_eq!(
             drawing.next,
-            Some(later(now, 5000).instant + std::time::Duration::from_nanos(1)),
+            Some(later(now, 500).instant + std::time::Duration::from_nanos(1)),
             "width {width}"
         );
     }

@@ -724,7 +724,7 @@ pub fn pending_wake(at: &str) -> Event {
         payload: bingo_sdk::slot::with(
             json!({ "at": at, "note": "look at the build again" }),
             [bingo_sdk::slot::Slot::Status {
-                text: "wake".into(),
+                text: "wakes".into(),
                 tone: bingo_sdk::Tone::Neutral,
                 until: Some(at.parse().unwrap()),
             }],

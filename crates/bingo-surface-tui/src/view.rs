@@ -2041,7 +2041,7 @@ mod placement_tests {
                     serde_json::json!({}),
                     [bingo_sdk::slot::Slot::Status {
                         text: "wakes".into(),
-                        until: Some(later(now, 125_000).wall),
+                        until: Some(later(now, 125_500).wall),
                         tone: bingo_sdk::Tone::Neutral,
                     }],
                 ),
@@ -2057,7 +2057,7 @@ mod placement_tests {
         );
         assert_eq!(
             layout.deadline(),
-            Some(later(now, 5000).instant + std::time::Duration::from_nanos(1))
+            Some(later(now, 500).instant + std::time::Duration::from_nanos(1))
         );
     }
 

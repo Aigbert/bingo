@@ -367,10 +367,16 @@ fn the_latest_edge_flash_wins() {
 fn a_countdown_wakes_only_when_its_words_change() {
     use std::time::Duration;
     let epsilon = Duration::from_nanos(1);
-    for (remaining, change) in [(125, 5), (3605, 5), (90_000, 3600), (59, 0)] {
+    for (remaining, change) in [
+        (125_400, 400),
+        (59_000, 0),
+        (3_599_999, 999),
+        (3_605_000, 5_000),
+        (90_000_250, 250),
+    ] {
         assert_eq!(
-            super::countdown_change(Duration::from_secs(remaining)),
-            Duration::from_secs(change) + epsilon
+            super::countdown_change(Duration::from_millis(remaining)),
+            Duration::from_millis(change) + epsilon
         );
     }
 }

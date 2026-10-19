@@ -136,6 +136,6 @@ fn shell_and_wake_follow_plugin_order() {
     let at = now.wall + jiff::SignedDuration::from_secs(240);
     state.apply(&frame(state.seq.0 + 1, pending_wake(&at.to_string())));
     let screen = draw_tree(120, 40, &solo(&state), &mut ui, now);
-    assert!(screen.find("wake in 4m").unwrap() < screen.find("1 shell").unwrap());
+    assert!(screen.find("wakes in 4m 00s").unwrap() < screen.find("1 shell").unwrap());
     both("shell_and_wake", &solo(&state), &mut ui, now);
 }
