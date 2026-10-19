@@ -3,6 +3,7 @@ mod cleanup;
 pub mod drawing;
 mod guide;
 mod handlers;
+mod rows;
 pub mod state;
 use bingo_sdk::*;
 use std::{

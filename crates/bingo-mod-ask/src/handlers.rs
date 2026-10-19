@@ -12,7 +12,7 @@ impl Command for Handler {
         let id = args["handler"].as_str().unwrap_or_default();
         let session: SessionId = serde_json::from_value(args["session"].clone()).map_err(error)?;
         let key = args["value"]["key"].as_str().unwrap_or_default();
-        if args["event"] != "press" || key == "esc" || key == "ctrl+c" {
+        if args["event"] != "press" || key == "ctrl+c" {
             return Ok(handled(false));
         }
         let props: component::QuestionProps =
@@ -27,6 +27,8 @@ impl Command for Handler {
         Ok(answer.map_or_else(|| handled(used), |answer| CommandOutcome::Answer { answer }))
     }
 }
+/// A key on the question; a form's answers go back together, a single
+/// question's on its own.
 fn answer(
     states: &States,
     session: &SessionId,
@@ -34,23 +36,14 @@ fn answer(
     props: &component::QuestionProps,
     key: &str,
 ) -> Result<(bool, Option<Answer>), KernelError> {
-    let questions = &props.questions;
-    let form = props.form;
-    let field_layout =
-        form && crate::state::fields(questions.len(), props.metadata_source.is_some());
     let mut states = states.lock().map_err(error)?;
     let Some(state) = states.get_mut(&(session.clone(), id.into())) else {
         return Ok((false, None));
     };
-    let (used, answer) = state.key(questions, field_layout, key);
-    let answer = answer.map(|answer| {
-        if form && !field_layout {
-            Answer::Form {
-                answers: vec![answer],
-            }
-        } else {
-            answer
-        }
+    let (used, answers) = state.key(&props.questions, key);
+    let answer = answers.and_then(|answers| match props.form {
+        true => Some(Answer::Form { answers }),
+        false => answers.into_iter().next(),
     });
     Ok((used, answer))
 }
@@ -74,7 +67,7 @@ mod tests {
             .lock()
             .unwrap()
             .insert((session.clone(), "q".into()), Default::default());
-        let args = json!({"handler":"q","session":"s","event":"press","request":"q", "value":{"key":"2"},
+        let args = json!({"handler":"q","session":"s","event":"press","request":"q", "value":{"key":"enter"},
             "props":{"tool":"", "questions":[{"question":"Route?", "options":[{"id":"a","label":"Alpha"},{"id":"b","label":"Beta"}],"multi":false,"freeText":false}]}});
         let handler = Handler(states);
         let args = args.to_string();
@@ -93,6 +86,6 @@ mod tests {
             panic!("unexpected host request")
         };
         let result = serde_json::to_value(result.unwrap()).unwrap();
-        assert_eq!(result["answer"], json!({"kind":"choice","ids":["b"]}));
+        assert_eq!(result["answer"], json!({"kind":"choice","ids":["a"]}));
     }
 }

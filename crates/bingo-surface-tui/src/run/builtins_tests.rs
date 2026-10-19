@@ -275,8 +275,12 @@ fn pull_question(run: &mut Run, width: u16, now: crate::clock::Now) {
     let view = bingo_mod_ask::drawing::tree(
         &props,
         &Default::default(),
-        &key.request.request_id,
-        &key.session,
+        &bingo_mod_ask::drawing::Asked {
+            request: &key.request.request_id,
+            session: &key.session,
+            columns: key.request.viewport.columns,
+            glyphs: key.request.viewport.glyphs,
+        },
     );
     run.ui.placed.pulled.request(&key);
     run.ui.placed.pulled.answer(key, view);
@@ -333,11 +337,11 @@ async fn resize_then_down_then_enter_uses_one_cursor() {
         let Input::Action { action, .. } = input else {
             panic!("action")
         };
-        let (handled, answer) = state.key(
+        let (handled, answers) = state.key(
             std::slice::from_ref(&question),
-            false,
             action.args["value"]["key"].as_str().unwrap(),
         );
+        let answer = answers.and_then(|answers| answers.into_iter().next());
         let intent = run.site_keys.keys().next().unwrap().clone();
         run.ack(
             &intent,
@@ -429,11 +433,9 @@ fn answer_key(run: &mut Run, submission: &(IntentId, Input), open: &bingo_sdk::I
     let bingo_sdk::InteractionKind::Question(question) = open.kind.clone() else {
         panic!("question")
     };
-    let (handled, answer) = bingo_mod_ask::state::State::default().key(
-        &[question],
-        false,
-        action.args["value"]["key"].as_str().unwrap(),
-    );
+    let (handled, answers) = bingo_mod_ask::state::State::default()
+        .key(&[question], action.args["value"]["key"].as_str().unwrap());
+    let answer = answers.and_then(|answers| answers.into_iter().next());
     run.ack(
         &submission.0,
         &IntentOutcome::Applied {

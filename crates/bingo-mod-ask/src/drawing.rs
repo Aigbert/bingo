@@ -1,7 +1,4 @@
-use crate::{
-    States,
-    state::{Field, State},
-};
+use crate::{States, rows, state::State};
 use bingo_sdk::*;
 use serde_json::{Value, json};
 
@@ -38,122 +35,50 @@ impl Interceptor for Drawing {
             .entry((cx.session.clone(), id.to_string()))
             .or_default()
             .clone();
-        serde_json::to_value(tree(&props, &state, &request.request_id, &cx.session)).map_err(error)
+        let asked = Asked {
+            request: &request.request_id,
+            session: &cx.session,
+            columns: request.viewport.columns,
+            glyphs: request.viewport.glyphs,
+        };
+        serde_json::to_value(tree(&props, &state, &asked)).map_err(error)
     }
 }
 fn error(error: impl std::fmt::Display) -> KernelError {
     KernelError::new(ErrorCode::Internal, error.to_string())
 }
 
-pub fn tree(
-    props: &component::QuestionProps,
-    state: &State,
-    request: &str,
-    session: &SessionId,
-) -> View {
-    let mut children = Vec::new();
-    for (index, question) in props.questions.iter().enumerate() {
-        let field = state.fields.get(index).cloned().unwrap_or_default();
-        if props.form
-            && crate::state::fields(props.questions.len(), props.metadata_source.is_some())
-        {
-            children.push(View::text(form_row(
-                question,
-                &field,
-                index == state.cursor,
-            )));
-        } else {
-            children.extend(choice_rows(question, &field));
-        }
-    }
+/// The request a question is drawn for and the dock it is drawn in.
+pub struct Asked<'a> {
+    pub request: &'a str,
+    pub session: &'a SessionId,
+    pub columns: u16,
+    pub glyphs: glyph::GlyphSet,
+}
+
+pub fn tree(props: &component::QuestionProps, state: &State, asked: &Asked<'_>) -> View {
+    let sheet = rows::Sheet {
+        questions: &props.questions,
+        state,
+        columns: asked.columns,
+        glyphs: asked.glyphs,
+    };
+    let field = state.field(state.tab);
     View::Box {
-        children,
+        children: rows::rows(&sheet),
         layout: Box::new(view::BoxStyle {
             question: Some(component::QuestionFocus {
-                field: state.cursor,
-                checked: state
-                    .fields
-                    .get(state.cursor)
-                    .map_or(0, |field| field.ticks.len()),
-                writing: state
-                    .fields
-                    .get(state.cursor)
-                    .is_some_and(|field| field.words.is_some()),
+                field: state.tab,
+                checked: field.ticks.len(),
+                writing: state.words.is_some(),
             }),
             on_key: Some(Action {
                 name: "ask:ui".into(),
-                args: json!({"handler":props.interaction_id,"event":"press","request":request,"session":session,"props":props}),
+                args: json!({"handler":props.interaction_id,"event":"press","request":asked.request,"session":asked.session,"props":props}),
             }),
             ..Default::default()
         }),
     }
-}
-fn choice_rows(question: &Question, field: &Field) -> Vec<View> {
-    let mut rows = vec![View::text(format!("     {}", question.question))];
-    for (i, option) in question.options.iter().enumerate() {
-        let cursor = if i == field.selected {
-            "   ❯ "
-        } else {
-            "     "
-        };
-        let mark = if question.multi {
-            if field.ticks.contains(&option.id) {
-                "[x] ".into()
-            } else {
-                "[ ] ".into()
-            }
-        } else {
-            format!("{}  ", i + 1)
-        };
-        rows.push(View::text(format!("{cursor}{mark}{}", option.label)));
-        if let Some(description) = &option.description {
-            rows.push(View::text(format!("        {description}")));
-        }
-    }
-    if question.free_text {
-        let cursor = if field.selected == question.options.len() {
-            "   ❯ "
-        } else {
-            "     "
-        };
-        rows.push(View::text(format!(
-            "{cursor}{}  {}",
-            question.options.len() + 1,
-            field.words.as_deref().unwrap_or("something else…")
-        )));
-    }
-    rows
-}
-fn form_row(question: &Question, field: &Field, focused: bool) -> String {
-    let cursor = if focused { "   ❯ " } else { "     " };
-    let label = question.header.as_deref().unwrap_or(&question.question);
-    let value = if let Some(words) = &field.words {
-        words.clone()
-    } else if question.multi {
-        question
-            .options
-            .iter()
-            .map(|opt| {
-                format!(
-                    "[{}] {}",
-                    if field.ticks.contains(&opt.id) {
-                        "x"
-                    } else {
-                        " "
-                    },
-                    opt.label
-                )
-            })
-            .collect::<Vec<_>>()
-            .join("  ")
-    } else {
-        question
-            .options
-            .get(field.selected)
-            .map(|opt| format!("‹ {} ›", opt.label))
-            .unwrap_or_default()
-    };
-    format!("{cursor}{label:<13} {value}")
 }
 
 #[cfg(test)]
@@ -163,12 +88,14 @@ mod chrome_tests {
     fn questions_and_forms_leave_their_keys_to_the_sealed_host() {
         for form in [false, true] {
             let props = component::QuestionProps { interaction_id: Some(InteractionId::from_raw("ask")), form, tool: "ask".into(), questions: vec![serde_json::from_value(json!({"question":"Choose","options":[{"id":"a","label":"Alpha"}],"multi":true})).unwrap()], metadata_source: None };
-            let view = tree(
-                &props,
-                &State::default(),
-                "ask",
-                &SessionId::from_raw("session"),
-            );
+            let session = SessionId::from_raw("session");
+            let asked = Asked {
+                request: "ask",
+                session: &session,
+                columns: 100,
+                glyphs: Default::default(),
+            };
+            let view = tree(&props, &State::default(), &asked);
             for key in ["↑↓", "⏎", "esc", "tab next"] {
                 assert!(!view.fold().contains(key));
             }

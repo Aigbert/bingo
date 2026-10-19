@@ -75,8 +75,12 @@ fn install_question(
     let view = bingo_mod_ask::drawing::tree(
         &props,
         &Default::default(),
-        &key.request.request_id,
-        &key.session,
+        &bingo_mod_ask::drawing::Asked {
+            request: &key.request.request_id,
+            session: &key.session,
+            columns: key.request.viewport.columns,
+            glyphs: key.request.viewport.glyphs,
+        },
     );
     ui.placed.pulled.request(&key);
     ui.placed.pulled.answer(key, view);

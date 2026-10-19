@@ -235,7 +235,8 @@ async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
         panic!("Box")
     };
     let mut action = layout.on_key.clone().unwrap();
-    action.args["value"] = json!({"key":"2"});
+    // Digits are words since M197; enter takes the choice the cursor is on.
+    action.args["value"] = json!({"key":"enter"});
     let outcome = command(
         &mut attachment,
         Input::action(
@@ -265,7 +266,7 @@ async fn the_ask_handler_returns_an_answer_for_the_surface_to_send() {
             .unwrap()
             .unwrap(),
         Answer::Choice {
-            ids: vec!["b".into()],
+            ids: vec!["a".into()],
             other: None
         }
     );

@@ -4,16 +4,17 @@ Questions and forms belong to the built-in `ask` mod. Their `Question` site
 uses the shared View vocabulary; an outside mod can wrap it with `next`.
 `enabledPlugins: {"ask": false}` restores the surface's fallback.
 
-Use arrows and Enter, or a number, for a choice. Space ticks a multiple
-choice; Enter sends the set. The last row accepts words of your own.
-A form shows all fields: Tab walks them, left/right chooses, Space ticks,
-and Enter sends the form. Esc declines and ends the asking turn.
+A question opens in the dock. Up and down choose, Enter answers and moves to
+the next question left open; the last answer sends them all. With several
+questions, left and right walk the tabs. Space ticks a multiple choice. The
+last row, `Something else`, takes words of your own: type on the list to
+start them, Enter sends, Esc goes back to the list. A wide dock shows the
+picked choice's preview beside the list.
 
 Permissions remain sealed host drawings. An outside mod may frame their
 Engine node, but cannot replace the input, list or answer keys. Cautioned
 calls start on No and offer no session rule. Change it first edits the
 command or replacement text and runs permission checks again.
 
-Typing an unrelated character sets an ask aside in the activity line.
-Ctrl+G returns to it or backs out of the change editor. Esc always declines
-and ends the asking turn. Enter in the composer queues the draft after the turn.
+Keys are held back for 400 ms after an ask opens, and again on each new
+question. Esc on the list stops the asking turn.
