@@ -41,3 +41,17 @@ pub fn who(name: &str, home: &str, rows: &[SessionSummary]) -> &'static str {
             .map_or("muted", |row| ink(&row.id, home, rows)),
     }
 }
+
+/// The teammate of the home tree that signs with `name`: a session the home
+/// started that is not a room.
+pub fn teammate<'a>(
+    name: &str,
+    home: &str,
+    rows: &'a [SessionSummary],
+) -> Option<&'a SessionSummary> {
+    rows.iter().find(|row| {
+        crate::name::of_session(row) == name
+            && row.parent.as_ref().map(|parent| parent.session.as_str()) == Some(home)
+            && crate::room::Room::of(row).is_none()
+    })
+}
