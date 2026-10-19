@@ -73,7 +73,14 @@ fn resting(tree: &Tree, ui: &Ui) -> Vec<KeyPair> {
             KeyPair::new("?", "keys"),
         ];
     }
-    if ui.welcome.resume.is_some() {
+    if matches!(ui.focus, crate::focus::Focus::Welcome(_)) {
+        return vec![
+            KeyPair::new("↑↓", "recent"),
+            KeyPair::new("⏎", "resume"),
+            KeyPair::new("esc", "back"),
+        ];
+    }
+    if tree.viewed().transcript.items().is_empty() && !crate::welcome::recent(ui).is_empty() {
         return vec![
             KeyPair::new("↑", "recent"),
             KeyPair::new("/", "commands"),

@@ -8,12 +8,29 @@ pub fn props(rows: &Rows<'_>) -> Props {
         modes: bingo_sdk::slot::modes(rows.state).collect(),
         update: rows.update.map(str::to_owned),
         resume: rows.entrance.resume.cloned(),
-        started_at_ms: None,
-        out_at_ms: None,
+        started_at_ms: rows.entrance.started_at_ms,
+        out_at_ms: rows
+            .state
+            .transcript
+            .items()
+            .iter()
+            .find_map(|item| bingo_sdk::asked(item).map(|_| item.started_at.as_millisecond())),
         recent: None,
-        selected: None,
-        branch: None,
-        changed: None,
+        selected: rows.entrance.selected,
+        branch: rows.slots.iter().find_map(|placed| {
+            if let bingo_sdk::slot::Slot::Location { branch, .. } = &placed.slot {
+                branch.clone()
+            } else {
+                None
+            }
+        }),
+        changed: rows.slots.iter().find_map(|placed| {
+            if let bingo_sdk::slot::Slot::Location { changed, .. } = &placed.slot {
+                *changed
+            } else {
+                None
+            }
+        }),
     }))
 }
 
@@ -26,7 +43,16 @@ pub fn draw(rows: &Rows<'_>) -> crate::views::Drawing {
         &props,
         rows.width,
         &crate::views::Marks::at(rows.now),
-        |_, _| Vec::new(),
+        |props, width| {
+            let mut props = props.clone();
+            if let Props::Welcome(props) = &mut props {
+                props.selected = rows.entrance.selected;
+                props.out_at_ms = rows.state.transcript.items().iter().find_map(|item| {
+                    bingo_sdk::asked(item).map(|_| item.started_at.as_millisecond())
+                });
+            }
+            crate::welcome::draw(&props, width, rows.now)
+        },
     )
 }
 

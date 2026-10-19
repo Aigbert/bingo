@@ -37,6 +37,9 @@ pub fn on_key(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> 
     if key.kind == KeyEventKind::Release {
         return Vec::new();
     }
+    if let Some(effects) = crate::welcome::key(ui, tree, key) {
+        return effects;
+    }
     ui.prepare(&tree.viewed().summary.cwd);
     if key == KeyEvent::new(KeyCode::Enter, KeyModifiers::ALT) && split_return(ui, tree, key) {
         let mut effects = on_key(

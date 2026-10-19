@@ -81,6 +81,15 @@ pub struct Memo {
     next: u64,
 }
 impl Memo {
+    pub fn answer_for(&self, component: bingo_sdk::render::Component, id: &str) -> Option<&View> {
+        self.entries
+            .iter()
+            .find(|entry| {
+                entry.key.request.component == component && entry.key.request.request_id == id
+            })
+            .and_then(|entry| entry.answer.as_ref())
+            .map(|(_, view)| view)
+    }
     pub fn epoch(&self) -> u64 {
         self.epoch
     }

@@ -9,6 +9,7 @@ use bingo_sdk::ItemId;
 pub enum Focus {
     #[default]
     Composer,
+    Welcome(usize),
     Select(Run),
     Search(Search),
     Detail(ItemId),

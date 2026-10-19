@@ -7,6 +7,7 @@ pub mod rows;
 mod state;
 pub mod title;
 mod verbs;
+mod welcome;
 use bingo_sdk::*;
 use std::sync::{Arc, Mutex};
 #[derive(Default)]
@@ -37,6 +38,7 @@ impl Plugin for Sessions {
         for link in [
             Arc::new(draw::Drawing(shared.clone())) as Arc<dyn Interceptor>,
             Arc::new(title::Title),
+            Arc::new(welcome::Welcome),
         ] {
             registrar.add(Contribution::Interceptor {
                 placement: plugin::Placement::Builtin,

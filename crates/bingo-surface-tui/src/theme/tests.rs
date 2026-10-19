@@ -46,12 +46,9 @@ fn read(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
                         // clothing, and the one place outside this table
                         // that has to spell one.
                         | "graphics/kitty.rs"
-                        // The storyboard turns a drawn cell back into pixels
-                        // and into an escape, so it reads colours off the
-                        // tokens rather than naming any (M69).
-                        | "opening/storyboard.rs"
                         // Sparks blend with the already-painted ground.
                         | "transcript/sparks.rs"
+                        | "welcome/embers.rs"
                         | "identity.rs"
                         | "crew_contract.rs"
                         | "motion.rs"
@@ -177,6 +174,7 @@ fn every_token_is_spent_where_the_design_says() {
                 "views/select.rs",
                 "views/text.rs",
                 "views/tree.rs",
+                "welcome/drawing.rs",
             ],
         ),
         (
@@ -186,6 +184,7 @@ fn every_token_is_spent_where_the_design_says() {
                 "ask/drawing.rs",
                 "ask/receipts.rs",
                 "component/live.rs",
+                "component/retry.rs",
                 "dialog.rs",
                 "form.rs",
                 "highlight.rs",
@@ -220,6 +219,7 @@ fn every_token_is_spent_where_the_design_says() {
                 "views/text.rs",
                 "views/tree.rs",
                 "well.rs",
+                "welcome/drawing.rs",
                 "window.rs",
             ],
         ),

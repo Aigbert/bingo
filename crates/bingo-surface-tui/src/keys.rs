@@ -497,6 +497,34 @@ pub fn find(key: crossterm::event::KeyEvent) -> Option<Find> {
     }
 }
 
+/// The welcome list owns these keys; everything else returns to the input.
+pub const WELCOME: &[Binding] = &[
+    Binding {
+        keys: "up",
+        description: "previous recent session",
+        group: None,
+        working: None,
+    },
+    Binding {
+        keys: "down",
+        description: "next recent session or input",
+        group: None,
+        working: None,
+    },
+    Binding {
+        keys: "enter",
+        description: "resume selected session",
+        group: None,
+        working: None,
+    },
+    Binding {
+        keys: "esc",
+        description: "back to input",
+        group: None,
+        working: None,
+    },
+];
+
 #[cfg(test)]
 mod tests {
 

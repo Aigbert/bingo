@@ -24,8 +24,6 @@ mod interactions;
 mod look;
 /// What the run has to say the moment it opens.
 mod notices;
-/// The opening: whether it plays, and when it started (M70, M72).
-mod opening;
 mod palette;
 #[path = "run/pulling.rs"]
 mod pulling;
@@ -83,7 +81,6 @@ enum Reply {
     Handle(SessionId, SessionHandle),
     SiteKeyOpened(Box<site_keys::Opened>),
 
-    Resume(SessionId, Option<Box<SessionSummary>>),
     /// What the store holds, for the switcher's stored rows.
     Stored(String, Vec<SessionSummary>),
     Commands(u64, Result<Vec<bingo_sdk::CatalogEntry>, KernelError>),
@@ -308,7 +305,6 @@ async fn standing(
     run.detection = detection;
     let now = run.now();
     notices::raise(&mut run.ui, run.detection.notice(), now.instant);
-    opening::find_resume(&mut run);
     Ok((run, events, Some(host.gateway_events())))
 }
 
@@ -923,11 +919,6 @@ impl Run {
             Reply::SiteKeyOpened(opened) => site_keys::opened(self, *opened),
             Reply::Handle(session, handle) => {
                 self.session.handles.insert(session, handle);
-            }
-            Reply::Resume(session, previous) => {
-                if &session == self.session.tree.root_id() {
-                    self.ui.welcome.resume = previous.map(|summary| *summary);
-                }
             }
             Reply::Stored(request, sessions) => palette::fill_palette(self, &request, sessions),
             Reply::Commands(fetch, result) => catalogues::received(self, fetch, result),

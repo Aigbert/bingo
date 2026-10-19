@@ -524,8 +524,13 @@ fn render_transcript(
     .in_tree(tree)
     .components(&ui.placed.pulled)
     .saying(ui.welcome.update.as_deref())
-    .entrance(ui.welcome.resume.as_ref())
     .measuring(ui.measure);
+    rows.entrance.started_at_ms = ui.welcome.started_at_ms;
+    rows.entrance.selected = if let crate::focus::Focus::Welcome(index) = ui.focus {
+        Some(index)
+    } else {
+        None
+    };
     rows.tools = tools.clone();
     rows.stop_asked = ui.stop_asked.as_ref();
     let browse = crate::browse::current(ui).filter(|_| crate::browse::active(ui));

@@ -232,13 +232,6 @@ impl<'a> Rows<'a> {
         Self { update, ..self }
     }
 
-    pub fn entrance(self, resume: Option<&'a bingo_sdk::SessionSummary>) -> Self {
-        Self {
-            entrance: crate::welcome::Entrance { resume },
-            ..self
-        }
-    }
-
     /// The measure a person set for prose, as this run was told it.
     pub fn measuring(self, measure: Option<usize>) -> Self {
         Self { measure, ..self }

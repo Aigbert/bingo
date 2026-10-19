@@ -56,7 +56,22 @@ fn fixture(capture: &Capture) -> (SessionState, Ui) {
     summary.title = Some("steer 吞掉排队消息".into());
     apply(&mut state, -10_000_001, Event::SessionUpdated { summary });
     if capture.entry.scene == "welcome" {
-        ui.welcome.resume = Some(state.summary.clone());
+        state.config.kernel["render"] = serde_json::json!({"Welcome":[{}]});
+        let props = serde_json::json!({"session":state.summary,"effort":null,"modes":[],"update":null,"resume":null});
+        let props =
+            bingo_sdk::component::Props::parse(bingo_sdk::render::Component::Welcome, props)
+                .unwrap();
+        let key = crate::component::key(&state, "Welcome", &props, 100, 1);
+        if let Some(key) = key {
+            ui.placed.pulled.request(&key);
+            ui.placed.pulled.answer(
+                key,
+                bingo_sdk::View::Engine {
+                    component: bingo_sdk::render::Component::Welcome,
+                    props: serde_json::json!({"recent":[state.summary]}),
+                },
+            );
+        }
         return (state, ui);
     }
     let live = matches!(capture.entry.scene.as_str(), "live" | "narrow");
