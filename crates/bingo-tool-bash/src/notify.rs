@@ -6,6 +6,11 @@
 //! a message to an agent uses, so `--print`, RPC, the channels and the TUI all
 //! hear it without any of them knowing this plugin exists.
 
+mod headline;
+mod toast;
+pub use headline::headline;
+pub use toast::{TOAST, toast};
+
 use std::time::Duration;
 
 use bingo_sdk::{Delivery, HostHandle, Input, IntentId, KernelError, Origin, SessionId};
@@ -326,6 +331,14 @@ pub async fn wake(
         .await
 }
 
+pub fn tone(state: State) -> bingo_sdk::Tone {
+    match state {
+        State::Exited { code: 0 } => bingo_sdk::Tone::Good,
+        State::Exited { .. } => bingo_sdk::Tone::Bad,
+        State::Killed | State::Running => bingo_sdk::Tone::Neutral,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -623,105 +636,5 @@ mod tests {
         assert_eq!(said(Duration::from_secs(1)), "1 s");
         assert_eq!(said(Duration::from_millis(16_400)), "16 s");
         assert_eq!(said(Duration::from_secs(125)), "2m 5s");
-    }
-}
-
-/// A completion has its own signal so it cannot replace the running jobs.
-pub const TOAST: &str = "job-finished";
-
-pub fn toast(now: jiff::Timestamp, state: State, outcome: &str) -> serde_json::Value {
-    bingo_sdk::slot::with(
-        serde_json::json!({}),
-        [bingo_sdk::slot::Slot::Toast {
-            text: format!("background job finished · {outcome}"),
-            tone: tone(state),
-            until: now + Duration::from_millis(2400),
-            alert: false,
-        }],
-    )
-}
-
-pub fn tone(state: State) -> bingo_sdk::Tone {
-    match state {
-        State::Exited { code: 0 } => bingo_sdk::Tone::Good,
-        State::Exited { .. } => bingo_sdk::Tone::Bad,
-        State::Killed | State::Running => bingo_sdk::Tone::Neutral,
-    }
-}
-
-pub fn headline(job: &Job, state: State, outcome: &str) -> bingo_sdk::Headline {
-    bingo_sdk::Headline {
-        tone: tone(state),
-        parts: vec![
-            format!(
-                "{} finished in the background",
-                code(&crate::jobs::head(&job.command))
-            ),
-            plain(outcome),
-        ],
-    }
-}
-
-fn code(text: &str) -> String {
-    let longest = text.split(|c| c != '`').map(str::len).max().unwrap_or(0);
-    let fence = "`".repeat(longest + 1);
-    let pad = if text.starts_with('`')
-        || text.ends_with('`')
-        || (text.starts_with(' ') && text.ends_with(' '))
-    {
-        " "
-    } else {
-        ""
-    };
-    format!("{fence}{pad}{text}{pad}{fence}")
-}
-
-fn plain(text: &str) -> String {
-    let mut out = String::new();
-    for ch in text.chars() {
-        if ch.is_ascii_punctuation() {
-            out.push('\\');
-        }
-        out.push(ch);
-    }
-    out
-}
-
-#[cfg(test)]
-mod headline_tests {
-    use super::*;
-    #[test]
-    fn markdown_parts_keep_backticks_and_outcome_punctuation() {
-        assert_eq!(code("echo `date`"), "`` echo `date` ``");
-        assert_eq!(code("`date` now"), "`` `date` now ``");
-        assert_eq!(code(" padded "), "`  padded  `");
-        assert_eq!(plain("2 *ok*_ [done]"), r"2 \*ok\*\_ \[done\]");
-    }
-}
-
-#[cfg(test)]
-mod toast_tests {
-    use super::*;
-    #[test]
-    fn completion_toast_has_its_own_kind_tone_and_fixed_deadline() {
-        let now: jiff::Timestamp = "2026-10-14T12:00:00Z".parse().unwrap();
-        assert_ne!(TOAST, crate::jobs::KIND);
-        for (state, tone) in [
-            (State::Exited { code: 0 }, "good"),
-            (State::Exited { code: 2 }, "bad"),
-            (State::Killed, "neutral"),
-        ] {
-            let payload = toast(now, state, "2 tests failed");
-            let slot = &payload["slots"][0];
-            assert_eq!(slot["text"], "background job finished · 2 tests failed");
-            assert_eq!(slot["until"], "2026-10-14T12:00:02.4Z");
-            assert_eq!(slot["alert"], false);
-            assert_eq!(
-                slot.get("tone")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("neutral"),
-                tone
-            );
-        }
     }
 }
