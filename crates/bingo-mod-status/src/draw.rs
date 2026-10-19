@@ -8,6 +8,8 @@ use std::time::Instant;
 
 pub struct Drawing {
     pub(crate) selections: Selections,
+    /// The home a directory is spelled from.
+    pub(crate) home: std::path::PathBuf,
 }
 #[async_trait::async_trait]
 impl Interceptor for Drawing {
@@ -33,7 +35,7 @@ impl Interceptor for Drawing {
             Some(facts) => facts,
             None => (&crate::snapshot(&cx.host, &cx.session).await?.snapshot).into(),
         };
-        let rows = read(&cx.host, &facts, request.viewport.glyphs).await?;
+        let rows = read(&cx.host, &facts, &self.home, request.viewport.glyphs).await?;
         let selected = {
             let mut selections = self.selections.lock().map_err(error)?;
             let selection = selections
@@ -56,6 +58,7 @@ impl Interceptor for Drawing {
 pub(crate) async fn read(
     host: &HostHandle,
     state: &component::StatusFacts,
+    home: &std::path::Path,
     glyphs: glyph::GlyphSet,
 ) -> Result<Vec<Row>, KernelError> {
     let plugins = host.catalog(CatalogKind::Plugins).await?;
@@ -74,9 +77,30 @@ pub(crate) async fn read(
         Some(service) => service.rows().await,
         None => vec![],
     };
-    let rows = crate::rows::rows(state, &plugins.entries, &servers, price, glyphs);
-
-    Ok(rows)
+    let around = crate::rows::Around {
+        home: home.into(),
+        working: working(host, &state.summary.id).await,
+    };
+    Ok(crate::rows::rows(
+        state,
+        &plugins.entries,
+        &servers,
+        price,
+        &around,
+        glyphs,
+    ))
+}
+/// The session's agents that are not idle. A host that keeps no sessions
+/// has none.
+async fn working(host: &HostHandle, session: &SessionId) -> usize {
+    let filter = SessionFilter {
+        parent: Some(session.clone()),
+        ..Default::default()
+    };
+    host.sessions(filter)
+        .await
+        .map(|agents| agents.iter().filter(|a| a.busy || a.asking).count())
+        .unwrap_or_default()
 }
 pub fn tree(
     rows: &[Row],

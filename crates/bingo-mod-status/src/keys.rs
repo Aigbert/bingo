@@ -1,7 +1,8 @@
 use crate::{REQUEST, Selections, error, rows::Row};
 use bingo_sdk::*;
 use serde_json::Value;
-pub struct Handler(pub Selections);
+/// The rows' selections, and the home their directory is spelled from.
+pub struct Handler(pub Selections, pub std::path::PathBuf);
 fn picks(rows: &[Row]) -> Vec<pick::Row> {
     rows.iter()
         .map(|row| pick::Row::new(&row.label, pick::text("", "fg")))
@@ -43,7 +44,7 @@ impl Command for Handler {
             .or_else(|| args["selected"].as_str())
             .unwrap_or_default();
         let facts = (&crate::snapshot(&cx.host, &cx.session).await?.snapshot).into();
-        let rows = crate::draw::read(&cx.host, &facts, Default::default()).await?;
+        let rows = crate::draw::read(&cx.host, &facts, &self.1, Default::default()).await?;
         if !rows.iter().any(|row| row.label == label) {
             return Ok(CommandOutcome::Handled { handled: true });
         }

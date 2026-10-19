@@ -53,6 +53,8 @@ async fn open(capture: &Capture) -> Stage {
     let mut state = world_state();
     if capture.entry.scene == "mention" {
         state.summary.cwd = repository(scene._home.path());
+    } else {
+        located(&mut state, scene._home.path());
     }
     scene.run.session = Attached::new(state.clone(), SessionHandle(scene.session.clone()));
     let kernel = kernel::Kernel::new(scene.host.clone(), state);
@@ -147,6 +149,23 @@ fn repository(home: &std::path::Path) -> String {
         }
     }
     root.to_string_lossy().into_owned()
+}
+
+/// The prototype's `HERE`: the repository under home, on `dev` with three
+/// files changed, as bingo-context's location slot says it.
+fn located(state: &mut SessionState, home: &std::path::Path) {
+    state.summary.cwd = home.join("bingo-improve").to_string_lossy().into_owned();
+    let location = bingo_sdk::slot::Slot::Location {
+        cwd: state.summary.cwd.clone(),
+        branch: Some("dev".into()),
+        changed: Some(3),
+    };
+    let event = Event::Extension {
+        plugin: "_bingo.context".into(),
+        kind: "location".into(),
+        payload: bingo_sdk::slot::with(json!({}), [location]),
+    };
+    state.apply(&fixture::frame(state.seq.0 + 1, event));
 }
 
 /// A line that names one of the world's skills: bingo-skills turns it into

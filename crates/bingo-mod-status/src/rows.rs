@@ -38,14 +38,21 @@ fn row(label: &str, text: String, command: Option<&str>) -> Row {
         command: command.map(str::to_owned),
     }
 }
+/// What the card reads beyond the session: the home its directory is
+/// spelled from and how many of the session's agents are working.
+#[derive(Clone, Debug, Default)]
+pub struct Around {
+    pub home: std::path::PathBuf,
+    pub working: usize,
+}
 pub fn rows(
     state: &StatusFacts,
     plugins: &[CatalogEntry],
     servers: &[ServerRow],
     price: Option<Price>,
+    around: &Around,
     glyphs: bingo_sdk::glyph::GlyphSet,
 ) -> Vec<Row> {
-    let summary = &state.summary;
     let mut rows = vec![
         model(state, glyphs),
         permission(state, glyphs),
@@ -59,8 +66,9 @@ pub fn rows(
         });
         rows.push(cost_row);
     }
-    rows.push(row("directory", summary.cwd.clone(), None));
+    rows.push(directory(state, &around.home, glyphs));
     rows.push(plugin_row(plugins, servers, glyphs));
+    rows.push(agents(around.working));
     let rules = rules(state);
     let mut rule = row(
         "rules",
@@ -78,6 +86,61 @@ pub fn rows(
     };
     rows.push(rule);
     rows
+}
+
+/// The directory as a person writes it, then the branch and what changed on it.
+fn directory(
+    state: &StatusFacts,
+    home: &std::path::Path,
+    glyphs: bingo_sdk::glyph::GlyphSet,
+) -> Row {
+    let mut row = row("directory", homed(&state.summary.cwd, home), None);
+    if let Some(branch) = &state.branch {
+        row.value.extend([
+            Span {
+                text: " on ".into(),
+                tone: Tone::Dim,
+            },
+            Span {
+                text: branch.clone(),
+                tone: Tone::Muted,
+            },
+        ]);
+    }
+    if let Some(changed) = state.changed {
+        row.value.extend([
+            Span {
+                text: bingo_sdk::glyph::Glyph::Sep.spell(glyphs).into(),
+                tone: Tone::Faint,
+            },
+            Span {
+                text: format!("{changed} changed"),
+                tone: Tone::Muted,
+            },
+        ]);
+    }
+    row
+}
+
+/// `~` for home, as the welcome writes the same directory.
+fn homed(cwd: &str, home: &std::path::Path) -> String {
+    let home = Some(home).filter(|home| !home.as_os_str().is_empty());
+    match home.and_then(|home| std::path::Path::new(cwd).strip_prefix(home).ok()) {
+        Some(rest) if rest.as_os_str().is_empty() => "~".into(),
+        Some(rest) => format!("~{}{}", std::path::MAIN_SEPARATOR, rest.display()),
+        None => cwd.into(),
+    }
+}
+
+fn agents(working: usize) -> Row {
+    let mut row = row("agents", format!("{working} working"), Some("crew"));
+    if working == 0 {
+        row.value[0] = Span {
+            text: "none working".into(),
+            tone: Tone::Dim,
+        };
+    }
+    row
 }
 
 fn rules(state: &StatusFacts) -> Vec<&str> {

@@ -76,15 +76,21 @@ async fn enter_submits_each_rows_command_after_removing_the_card() {
         cancel: Default::default(),
     };
     let selections = Selections::default();
-    let handler = keys::Handler(selections.clone());
-    for row in rows::rows(&(&state).into(), &[], &[], None, Default::default())
-        .into_iter()
-        .filter(|r| {
-            r.command
-                .as_deref()
-                .is_some_and(|command| command != "rename")
-        })
-    {
+    let handler = keys::Handler(selections.clone(), Default::default());
+    for row in rows::rows(
+        &(&state).into(),
+        &[],
+        &[],
+        None,
+        &Default::default(),
+        Default::default(),
+    )
+    .into_iter()
+    .filter(|r| {
+        r.command
+            .as_deref()
+            .is_some_and(|command| command != "rename")
+    }) {
         selections
             .lock()
             .unwrap()
@@ -133,7 +139,7 @@ async fn a_visible_key_resumes_an_expired_card_from_bounded_host_facts() {
         cancel: Default::default(),
     };
     let selections = Selections::default();
-    let outcome = keys::Handler(selections.clone())
+    let outcome = keys::Handler(selections.clone(), Default::default())
         .run(
             &json!({"handler":"status","event":"press","value":{"key":"down"},"selected":"model"})
                 .to_string(),
@@ -174,7 +180,7 @@ async fn client_commands_and_unknown_row_ids_cannot_dispatch() {
             .lock()
             .unwrap()
             .insert(cx.session.clone(), "model".into());
-        let outcome = keys::Handler(selections)
+        let outcome = keys::Handler(selections, Default::default())
             .run(&args.to_string(), &cx)
             .await
             .unwrap();

@@ -10471,6 +10471,22 @@
             }
           ]
         },
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "The branch the location slot's owner last named."
+        },
+        "changed": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0,
+          "description": "How many files differ from that branch's commit."
+        },
         "selected": {
           "type": [
             "string",

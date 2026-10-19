@@ -12,11 +12,26 @@ pub(crate) fn state() -> SessionState {
 }
 #[test]
 fn status_uses_the_shared_builder_and_omits_missing_facts() {
-    let rows = rows::rows(&(&state()).into(), &[], &[], None, Default::default());
+    let rows = rows::rows(
+        &(&state()).into(),
+        &[],
+        &[],
+        None,
+        &Default::default(),
+        Default::default(),
+    );
     assert!(!rows.iter().any(|r| r.label == "cost"));
     assert_eq!(
         rows.iter().map(|r| r.label.as_str()).collect::<Vec<_>>(),
-        ["model", "mode", "context", "directory", "plugins", "rules"]
+        [
+            "model",
+            "mode",
+            "context",
+            "directory",
+            "plugins",
+            "agents",
+            "rules"
+        ]
     );
     let tree = draw::tree(&rows, "plugins", 100, 18, Default::default());
     assert!(tree.fold().contains("Status"));
@@ -28,7 +43,14 @@ fn status_uses_the_shared_builder_and_omits_missing_facts() {
 }
 #[test]
 fn drawing_is_a_valid_status_answer_with_an_owned_root_handler() {
-    let rows = rows::rows(&(&state()).into(), &[], &[], None, Default::default());
+    let rows = rows::rows(
+        &(&state()).into(),
+        &[],
+        &[],
+        None,
+        &Default::default(),
+        Default::default(),
+    );
     for (width, height) in [(108, 15), (80, 12)] {
         let tree = draw::tree(&rows, "context", width, height, Default::default());
         assert!(view::answer_ok(render::Component::Status, &json!({}), ID, None, &tree).is_ok());
@@ -94,6 +116,7 @@ async fn rendering_uses_supplied_facts_without_opening_a_session() {
     };
     let drawing = draw::Drawing {
         selections: Default::default(),
+        home: Default::default(),
     };
     let input = json!({"component":"Status","requestId":"status","surface":"terminal",
         "props":{"summary":state.summary,"config":state.config,"context":state.context},
@@ -128,7 +151,14 @@ fn malformed_plugin_states_are_reported_as_unavailable() {
         label: "invalid".into(),
         meta: json!({"state":{"kind":"failed"}}),
     };
-    let rows = rows::rows(&(&state()).into(), &[entry], &[], None, Default::default());
+    let rows = rows::rows(
+        &(&state()).into(),
+        &[entry],
+        &[],
+        None,
+        &Default::default(),
+        Default::default(),
+    );
     let plugins = rows.iter().find(|row| row.label == "plugins").unwrap();
     assert!(
         plugins
@@ -159,6 +189,7 @@ async fn an_unmodified_pull_slot_renders_from_a_bounded_attachment() {
     };
     let drawing = draw::Drawing {
         selections: Default::default(),
+        home: Default::default(),
     };
     let input = json!({"component":"Status","requestId":"status","surface":"desktop",
         "props":{},"viewport":{"columns":80,"rows":12}});
@@ -227,7 +258,14 @@ fn mode_and_rules_come_only_from_the_configured_policy() {
         "local.policy".into(),
         json!({"mode":"local","rules":["Read(local/**)"]}),
     );
-    let rows = rows::rows(&(&state).into(), &[], &[], None, Default::default());
+    let rows = rows::rows(
+        &(&state).into(),
+        &[],
+        &[],
+        None,
+        &Default::default(),
+        Default::default(),
+    );
     assert_eq!(
         rows.iter().find(|r| r.label == "mode").unwrap().value[0].text,
         "local"
@@ -245,7 +283,14 @@ fn a_broken_server_appears_in_the_plugins_row() {
         "status":{"kind":"needsAuth","why":"token expired"}
     }]))
     .unwrap();
-    let rows = rows::rows(&(&state()).into(), &[], &servers, None, Default::default());
+    let rows = rows::rows(
+        &(&state()).into(),
+        &[],
+        &servers,
+        None,
+        &Default::default(),
+        Default::default(),
+    );
     let plugins = rows.iter().find(|r| r.label == "plugins").unwrap();
     assert_eq!(plugins.value[0].text, "1 on");
     assert_eq!(plugins.value[2].text, "github token expired");
@@ -254,7 +299,14 @@ fn a_broken_server_appears_in_the_plugins_row() {
 
 #[test]
 fn status_spells_all_separators_with_the_ascii_glyph_set() {
-    let rows = rows::rows(&(&state()).into(), &[], &[], None, glyph::GlyphSet::Ascii);
+    let rows = rows::rows(
+        &(&state()).into(),
+        &[],
+        &[],
+        None,
+        &Default::default(),
+        glyph::GlyphSet::Ascii,
+    );
     let view = draw::tree(&rows, "model", 100, 18, glyph::GlyphSet::Ascii);
     assert!(view.fold().is_ascii(), "{}", view.fold());
 }

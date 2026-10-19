@@ -17,7 +17,15 @@ pub(super) fn script(kernel: &Kernel, switched: &Switched) {
         };
         async move { Ok(attached) }
     });
-    host.on_sessions(|_| async { Ok(sessions()) });
+    host.on_sessions(|filter: SessionFilter| async move {
+        Ok(sessions()
+            .into_iter()
+            .filter(|s| {
+                filter.parent.is_none()
+                    || s.parent.as_ref().map(|p| &p.session) == filter.parent.as_ref()
+            })
+            .collect())
+    });
     let k = kernel.clone();
     host.on_signal(move |_, plugin, kind, payload| {
         k.broadcast(Event::Signal {

@@ -89,6 +89,7 @@ fn status_scenarios_match_at_both_terminal_sizes() {
                 &plugins,
                 &servers,
                 price,
+                &Default::default(),
                 Default::default(),
             );
             let selected = match which {
@@ -114,7 +115,14 @@ fn status_scenarios_match_at_both_terminal_sizes() {
 #[test]
 fn status_keys_preserve_escape_and_live_config_preserves_the_row() {
     let (mut state, plugins) = scenario("overview");
-    let rows = rows::rows(&(&state).into(), &plugins, &[], None, Default::default());
+    let rows = rows::rows(
+        &(&state).into(),
+        &plugins,
+        &[],
+        None,
+        &Default::default(),
+        Default::default(),
+    );
     put(
         &mut state,
         draw::tree(&rows, "mode", 80, 11, Default::default()),
@@ -140,7 +148,14 @@ fn status_keys_preserve_escape_and_live_config_preserves_the_row() {
         json!({"mode":"plan","rules":[]}),
     );
     state.apply(&frame(1, Event::ConfigChanged { config }));
-    let rows = rows::rows(&(&state).into(), &plugins, &[], None, Default::default());
+    let rows = rows::rows(
+        &(&state).into(),
+        &plugins,
+        &[],
+        None,
+        &Default::default(),
+        Default::default(),
+    );
     put(
         &mut state,
         draw::tree(&rows, "mode", 80, 11, Default::default()),

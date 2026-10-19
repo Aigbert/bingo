@@ -183,11 +183,26 @@ pub struct StatusFacts {
     pub summary: crate::SessionSummary,
     pub config: crate::ConfigView,
     pub context: Option<crate::ContextUsage>,
+    /// The branch the location slot's owner last named.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// How many files differ from that branch's commit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changed: Option<usize>,
 }
 impl From<&crate::SessionState> for StatusFacts {
     /// The card reads no history; the first ask is a whole message and would
     /// carry the transcript the facts exist to leave behind.
     fn from(state: &crate::SessionState) -> Self {
+        let (branch, changed) = crate::slot::placed(state)
+            .into_iter()
+            .find_map(|placed| match placed.slot {
+                crate::slot::Slot::Location {
+                    branch, changed, ..
+                } => Some((branch, changed)),
+                _ => None,
+            })
+            .unwrap_or_default();
         Self {
             summary: crate::SessionSummary {
                 history: crate::SessionHistory::default(),
@@ -195,6 +210,8 @@ impl From<&crate::SessionState> for StatusFacts {
             },
             config: state.config.clone(),
             context: state.context,
+            branch,
+            changed,
         }
     }
 }

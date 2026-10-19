@@ -60,13 +60,16 @@ impl Plugin for Status {
         &MANIFEST
     }
     fn register(&self, registrar: &mut Registrar) -> Result<(), PluginError> {
+        let home = registrar.env().home.clone();
         registrar.add(Contribution::Command(Arc::new(keys::Handler(
             self.selections.clone(),
+            home.clone(),
         ))));
         let links = vec![
             Arc::new(command::Open(self.selections.clone())) as Arc<dyn Interceptor>,
             Arc::new(draw::Drawing {
                 selections: self.selections.clone(),
+                home,
             }),
         ];
         for link in links {

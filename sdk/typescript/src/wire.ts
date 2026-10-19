@@ -1366,7 +1366,17 @@ export type StateGet = { "key": string; "scope": string; [key: string]: unknown;
 export type StateSet = { "ifVersion"?: (number | null); "key": string; "scope": string; "value": unknown; [key: string]: unknown; };
 export type StateValue = { "value": unknown; "version": number; [key: string]: unknown; };
 /** Optional facts supplied by the asking surface, without transcript bodies. */
-export type StatusProps = { "config"?: ConfigView; "context"?: (ContextUsage | null); "selected"?: (string | null); "summary"?: SessionSummary; [key: string]: unknown; };
+export type StatusProps = {
+  /** The branch the location slot's owner last named. */
+  "branch"?: (string | null);
+  /** How many files differ from that branch's commit. */
+  "changed"?: (number | null);
+  "config"?: ConfigView;
+  "context"?: (ContextUsage | null);
+  "selected"?: (string | null);
+  "summary"?: SessionSummary;
+  [key: string]: unknown;
+};
 /** One tool call of a turn, in the words a row shows. */
 export type Step = {
   /** What the person answered: a question response or `changed by you`. */

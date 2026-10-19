@@ -137,6 +137,7 @@ mod tests {
         assert!(selections.lock().unwrap().is_empty());
         let drawing = crate::draw::Drawing {
             selections: selections.clone(),
+            home: Default::default(),
         };
         let cx = HookContext {
             session: id.clone(),
