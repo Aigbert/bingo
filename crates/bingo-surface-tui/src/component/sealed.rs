@@ -26,7 +26,6 @@ pub fn props(_state: &SessionState, interaction: &Interaction) -> Option<Props> 
 
 pub struct Site<'a> {
     pub state: &'a SessionState,
-    pub tools: &'a crate::tool_rows::Looks,
     pub ui: &'a crate::ui::Ui,
     pub interaction: &'a Interaction,
     pub agent: Option<&'a str>,
@@ -86,7 +85,7 @@ impl Site<'_> {
         bingo_sdk::view::sealed_ok(props.component(), &props.value(), answer).ok()?;
         let engine_options = std::cell::RefCell::new(Vec::new());
         let own = |_, _: &serde_json::Value, width| {
-            let rows = self.own(props, width);
+            let rows = self.own(width);
             *engine_options.borrow_mut() = rows.iter().map(|(_, option)| *option).collect();
             views::Drawing::still(rows.into_iter().map(|(line, _)| line).collect())
         };
@@ -126,33 +125,18 @@ impl Site<'_> {
         })
     }
 
-    fn own(&self, props: &Props, width: usize) -> Rows {
+    fn own(&self, width: usize) -> Rows {
         // A docked sign-in seals the sheet a person would otherwise see.
         if let Some(rows) = self.sheet(width, self.room) {
             return rows;
         }
-        let mut interaction = self.interaction.clone();
-        if let InteractionKind::Permission { preview, .. } = &mut interaction.kind {
-            *preview = None;
-        }
-        let mut rows = dialog::rows(
+        let rows = dialog::rows(
             &self.ui.dialog,
-            &interaction,
+            self.interaction,
             self.agent,
-            &self.state.summary.cwd,
             width,
             self.room,
-            self.tools,
         );
-        if let Props::Permission(props) = props {
-            let input = serde_json::to_string_pretty(&props.input).unwrap_or_default();
-            rows.splice(
-                1..1,
-                input
-                    .lines()
-                    .map(|line| (Line::from(line.to_owned()), None)),
-            );
-        }
         rows.into_iter()
             .flat_map(|(line, option)| {
                 wrap::wrap_all(&[line], width)
@@ -176,10 +160,8 @@ impl Site<'_> {
                 &self.ui.dialog,
                 self.interaction,
                 self.agent,
-                &self.state.summary.cwd,
                 self.width,
                 self.room,
-                self.tools,
             )
         });
         rows.push((

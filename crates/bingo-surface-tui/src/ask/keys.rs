@@ -35,7 +35,6 @@ pub fn on_key(
 
 /// Leave the words row and go back to the list, keeping the pick.
 pub fn back(ui: &mut Ui) -> bool {
-    ui.dialog.changing = None;
     ui.dialog.words.take().is_some()
 }
 
@@ -61,7 +60,6 @@ fn choose(ui: &mut Ui, interaction: &Interaction, ask: &Ask, now: Now) -> Vec<Ef
             let mut words = Composer::default();
             words.set(changed_text(input).unwrap_or_default());
             ui.dialog.words = Some(words);
-            ui.dialog.changing = Some(input.clone());
             Vec::new()
         }
     }
@@ -75,8 +73,7 @@ fn typing(ui: &mut Ui, interaction: &Interaction, ask: &Ask, key: KeyEvent) -> V
         return Vec::new();
     }
     let text = words.text().trim().to_owned();
-    let changing = ask.options.get(ui.dialog.focus).map(|o| &o.does) == Some(&Does::Change);
-    match ui.dialog.changing.clone().filter(|_| changing) {
+    match changing(interaction, ask, ui.dialog.focus) {
         Some(_) if text.is_empty() => {
             back(ui);
             Vec::new()
@@ -113,13 +110,21 @@ fn allowed(ui: &mut Ui, scope: &str, now: Now) {
 
 fn send(ui: &mut Ui, interaction: &Interaction, answer: Answer) -> Vec<Effect> {
     ui.dialog.words = None;
-    ui.dialog.changing = None;
     ui.dialog.answered = true;
     vec![Effect::Answer {
         interaction: interaction.id.clone(),
         answer,
         activation: Activation::Keyboard,
     }]
+}
+
+/// The call's input, when the words being typed are the change made to it.
+fn changing(interaction: &Interaction, ask: &Ask, focus: usize) -> Option<serde_json::Value> {
+    let InteractionKind::Permission { input, .. } = &interaction.kind else {
+        return None;
+    };
+    let does = ask.options.get(focus).map(|o| &o.does);
+    (does == Some(&Does::Change)).then(|| input.clone())
 }
 
 /// The field a change replaces: the command, or the new text of an edit.

@@ -21,10 +21,8 @@ pub fn sheet(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Option<Vec<L
     }
     let area = frame.area();
     let agent = (owner.summary.id != *tree.view()).then(|| tree::name(owner));
-    let tools = crate::tool_rows::Looks::in_ui(ui);
     let site = Site {
         state: owner,
-        tools: &tools,
         ui,
         interaction,
         agent: agent.as_deref(),

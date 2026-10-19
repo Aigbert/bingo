@@ -68,18 +68,6 @@ fn in_view_ink(drawing: &mut crate::views::Drawing, accent: &str) {
     }
 }
 
-pub(crate) fn asked(step: &Step, width: usize) -> Line<'static> {
-    crate::views::marked(
-        &step.drawing(&crate::turns::marks(), width),
-        width,
-        &Default::default(),
-    )
-    .lines
-    .into_iter()
-    .next()
-    .unwrap_or_default()
-}
-
 fn ledger(props: &Props, width: usize, now: Now) -> crate::views::Drawing {
     let Props::Ledger(ledger) = props else {
         return Default::default();

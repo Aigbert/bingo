@@ -6,10 +6,9 @@
 //! interaction is still in `state.interactions`, so the dialog stays on screen
 //! with a `…` marker until `InteractionResolved` removes it.
 
-use bingo_sdk::component::{Step, StepState};
 use bingo_sdk::{
     Activation, Answer, AnswerSpec, Interaction, InteractionId, InteractionKind, LoginFlow,
-    Preview, Question,
+    Question,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::text::{Line, Span};
@@ -18,7 +17,7 @@ use crate::clock::Now;
 use crate::composer::Composer;
 use crate::effect::Effect;
 use crate::form::{self, Form};
-use crate::{layers, preview, theme};
+use crate::{layers, theme};
 
 pub use crate::ask::options::{Choice, Opt};
 
@@ -29,8 +28,6 @@ pub struct Dialog {
     current: Option<InteractionId>,
     pub focus: usize,
     pub aside: bool,
-    pub changing: Option<serde_json::Value>,
-    pub expanded: bool,
     /// The feedback or free-text row, open once the answer needs words.
     pub words: Option<Composer>,
     pub chosen: Vec<String>,
@@ -77,16 +74,9 @@ impl Dialog {
         if key.code != KeyCode::Esc && (self.answered || guarded(interaction, now)) {
             return Vec::new();
         }
-        if matches!(key.code, KeyCode::Char('e' | 'o'))
-            && key.modifiers.contains(KeyModifiers::CONTROL)
-        {
-            self.expanded = !self.expanded;
-            return Vec::new();
-        }
         if key == KeyEvent::new(KeyCode::Char('g'), KeyModifiers::CONTROL)
             && self.words.take().is_some()
         {
-            self.changing = None;
             return Vec::new();
         }
         if key.code == KeyCode::Esc {
@@ -115,18 +105,8 @@ impl Dialog {
             .take()
             .map(|w| w.text().to_string())
             .unwrap_or_default();
-        let answer = if let Some(mut input) = self.changing.take() {
-            let field = if input["command"].is_string() {
-                "command"
-            } else {
-                "new_string"
-            };
-            input[field] = serde_json::Value::String(text);
-            Answer::AllowChanged { input }
-        } else {
-            words_answer(interaction, text)
-        };
-        self.send(interaction, Some(answer))
+        let text = text.trim().to_string();
+        self.send(interaction, Some(Answer::Text { text }))
     }
 
     fn choosing(&mut self, interaction: &Interaction, key: KeyEvent) -> Vec<Effect> {
@@ -212,16 +192,6 @@ pub(crate) fn words_key(words: &mut Composer, key: KeyEvent) -> bool {
     false
 }
 
-fn words_answer(interaction: &Interaction, text: String) -> Answer {
-    let text = text.trim().to_string();
-    match interaction.kind {
-        InteractionKind::Permission { .. } => Answer::Deny {
-            feedback: (!text.is_empty()).then_some(text),
-        },
-        _ => Answer::Text { text },
-    }
-}
-
 /// Leaving a permission prompt is the refusal; leaving anything else cancels.
 pub(crate) fn cancel(interaction: &Interaction) -> Option<Answer> {
     if interaction.answers.contains(&AnswerSpec::Deny) {
@@ -249,8 +219,7 @@ pub use crate::ask::options::options;
 /// around it, the dimming behind it and its reveal are the frame's.
 ///
 /// `width` bounds nothing here; the caller wraps. `agent` names the
-/// sub-session that asked, when it was not the one on screen (ADR-0010 §3);
-/// `cwd` is that session's directory, which is what makes a path short.
+/// sub-session that asked, when it was not the one on screen (ADR-0010 §3).
 ///
 /// Every row comes with the option it belongs to, so one walk lays the card
 /// out and a click lands where the eye is.
@@ -258,10 +227,8 @@ pub fn rows(
     dialog: &Dialog,
     interaction: &Interaction,
     agent: Option<&str>,
-    cwd: &str,
     width: usize,
     room: usize,
-    tools: &crate::tool_rows::Looks,
 ) -> Vec<(Line<'static>, Option<usize>)> {
     if let InteractionKind::Form { questions, title } = &interaction.kind {
         let mut out = form::rows(
@@ -278,18 +245,9 @@ pub fn rows(
         out.extend(answering(dialog));
         return out;
     }
-    let mut out = vec![(title(interaction, agent, cwd, width, tools), None)];
-    let mut preview = body(dialog, interaction);
-    let limit = room.saturating_sub(options(interaction).len() + 5).max(3);
-    if preview.len() > limit {
-        preview.truncate(limit.saturating_sub(1));
-        preview.push(Line::from(Span::styled(
-            "     ╰ … ctrl+o whole diff",
-            theme::dim(),
-        )));
-    }
-    out.extend(preview.into_iter().map(|line| (line, None)));
-    if let Some(question) = question(interaction, cwd) {
+    let mut out = vec![(Line::from(form::head(&named(interaction), agent)), None)];
+    out.extend(body(interaction).into_iter().map(|line| (line, None)));
+    if let Some(question) = question(interaction) {
         out.push((Line::default(), None));
         out.push((question, None));
     }
@@ -324,44 +282,9 @@ fn answering(dialog: &Dialog) -> Vec<(Line<'static>, Option<usize>)> {
     )]
 }
 
-/// What kind of card this is, in the words a person reads first. A
-/// permission is the row of the step that asks, which is where it opened; a
-/// form draws its own head, which is the tab row (see [`form::rows`]).
-fn title(
-    interaction: &Interaction,
-    agent: Option<&str>,
-    cwd: &str,
-    width: usize,
-    tools: &crate::tool_rows::Looks,
-) -> Line<'static> {
-    if let InteractionKind::Permission { tool, input, .. } = &interaction.kind {
-        return crate::transcript::asked(&asking(tool, input, agent, cwd, tools), width);
-    }
-    Line::from(form::head(&named(interaction), agent))
-}
-
-/// The step a permission asks about, in its row's words.
-fn asking(
-    tool: &str,
-    input: &serde_json::Value,
-    agent: Option<&str>,
-    cwd: &str,
-    tools: &crate::tool_rows::Looks,
-) -> Step {
-    let mut step = crate::tool_rows::resolve(tool, input, tools, theme::bullet().is_ascii());
-    let target = shorten(step.target.lines().next().unwrap_or_default(), cwd);
-    step.target = match agent {
-        Some(name) if target.is_empty() => format!("· {name}"),
-        Some(name) => format!("{target} · {name}"),
-        None => target,
-    };
-    step.state = StepState::Asked;
-    step
-}
-
 fn named(interaction: &Interaction) -> String {
     match &interaction.kind {
-        InteractionKind::Permission { tool, .. } => tool.clone(),
+        InteractionKind::Permission { .. } => String::new(),
         InteractionKind::Question(Question { header, .. }) => {
             header.clone().unwrap_or_else(|| "Question".to_string())
         }
@@ -371,22 +294,15 @@ fn named(interaction: &Interaction) -> String {
     }
 }
 
-/// The one line that asks. A permission asks about the call the kernel
-/// summarised; a question and a confirmation carry their own words.
-fn question(interaction: &Interaction, cwd: &str) -> Option<Line<'static>> {
+/// The one line that asks: a question and a confirmation carry their own
+/// words. A permission is the dock's (`ask`), never this card's.
+fn question(interaction: &Interaction) -> Option<Line<'static>> {
     let text = match &interaction.kind {
-        InteractionKind::Permission {
-            summary, preview, ..
-        } => match preview.as_deref() {
-            Some(Preview::Command { .. }) => "Do you want to run this command?".into(),
-            Some(Preview::Url { .. }) => "Do you want to fetch this page?".into(),
-            Some(Preview::Diff { .. }) => format!("Do you want to {}?", shorten(summary, cwd)),
-            None => format!("Do you want to allow {}?", shorten(summary, cwd)),
-        },
         InteractionKind::Question(Question { question, .. }) => question.clone(),
-        InteractionKind::Form { .. } => return None,
         InteractionKind::Confirm { detail, .. } => detail.clone(),
-        InteractionKind::Login { .. } => return None,
+        InteractionKind::Permission { .. }
+        | InteractionKind::Form { .. }
+        | InteractionKind::Login { .. } => return None,
     };
     Some(Line::from(Span::styled(
         format!("     {text}"),
@@ -394,43 +310,11 @@ fn question(interaction: &Interaction, cwd: &str) -> Option<Line<'static>> {
     )))
 }
 
-fn shorten(text: &str, cwd: &str) -> String {
-    crate::paths::shorten_in(text, cwd, crate::paths::home())
-}
-
-fn body(dialog: &Dialog, interaction: &Interaction) -> Vec<Line<'static>> {
+fn body(interaction: &Interaction) -> Vec<Line<'static>> {
     match &interaction.kind {
-        InteractionKind::Permission {
-            preview: Some(preview),
-            ..
-        } => preview_lines(preview, dialog.expanded),
         InteractionKind::Login { flow, .. } => login_lines(flow),
         _ => Vec::new(),
     }
-}
-
-/// The diff or the command, on the tints of what it does.
-fn preview_lines(preview: &Preview, expanded: bool) -> Vec<Line<'static>> {
-    let (rows, hidden) = preview::lines(preview, expanded);
-    let mut out = vec![Line::from(Span::styled(
-        format!("     {}", theme::glyphs().border.top_left),
-        theme::dim(),
-    ))];
-    out.extend(rows.into_iter().map(|line| {
-        let mut spans = vec![Span::styled(
-            format!("     {} ", theme::glyphs().border.vertical_left),
-            theme::dim(),
-        )];
-        spans.extend(line.spans);
-        Line::from(spans)
-    }));
-    let tail = if hidden > 0 {
-        format!("     ╰ … +{hidden} lines")
-    } else {
-        "     ╰".into()
-    };
-    out.push(Line::from(Span::styled(tail, theme::dim())));
-    out
 }
 
 fn login_lines(flow: &LoginFlow) -> Vec<Line<'static>> {
@@ -452,17 +336,12 @@ fn option_lines(dialog: &Dialog, index: usize, option: &Opt, secret: bool) -> Ve
     let focused = index == dialog.focus;
     let style = if focused { theme::text() } else { theme::dim() };
     let label = if let Some(words) = dialog.words.as_ref().filter(|_| focused) {
-        let prefix = if dialog.changing.is_some() || !option.label.starts_with("No,") {
-            ""
-        } else {
-            "No, because "
-        };
         let text = if secret {
             concealed(words.text())
         } else {
             words.text().to_owned()
         };
-        format!("{prefix}{text}{}", theme::caret())
+        format!("{text}{}", theme::caret())
     } else {
         format!("{}{}", box_mark(dialog, option), option.label)
     };
@@ -512,32 +391,6 @@ fn link(url: &str) -> Line<'static> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn permission_steps_keep_the_declared_look_and_target() {
-        for (name, input, look, _, target) in crate::tool_rows::cases() {
-            let tools = crate::tool_rows::declared(name, look.clone());
-            let step = asking(name, &input, None, "/work", &tools);
-            assert_eq!(step.target, target);
-            assert_eq!(step.verb, look.verb);
-            assert_eq!(step.mark, look.mark);
-            assert_eq!(step.reads, look.target.map(|t| t.reads));
-            assert_eq!(step.tier, bingo_sdk::component::Tier::Lookup);
-            assert_eq!(step.state, StepState::Asked);
-        }
-    }
-
-    #[test]
-    fn rough_edges_questions_are_sentences_for_the_preview() {
-        for (preview, expected) in [
-            (Some(serde_json::from_value(serde_json::json!({"kind":"command","command":"echo hi","cwd":"/work","description":"Print a greeting"})).unwrap()), "Do you want to run this command?"),
-            (Some(Preview::Url { url: "https://example.test".into() }), "Do you want to fetch this page?"),
-            (None, "Do you want to allow Edit src/lib.rs?"),
-        ] {
-            let interaction = crate::test_support::permission(None, preview);
-            assert_eq!(question(&interaction, "/work").unwrap().to_string().trim(), expected);
-        }
-    }
 
     #[test]
     fn a_pasted_secret_draws_one_fixed_line_whatever_its_length() {

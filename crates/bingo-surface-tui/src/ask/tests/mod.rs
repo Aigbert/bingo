@@ -241,7 +241,6 @@ fn esc_leaves_the_words_first_and_the_ask_second() {
         let (tree, mut ui, now) = scene_for(permission(None, None), true);
         if editing {
             change(&tree, &mut ui, now);
-            assert!(ui.dialog.changing.is_some());
             let screen = draw_tree(108, 30, &tree, &mut ui, now);
             assert!(screen.contains("esc back"), "{screen}");
         } else {
@@ -251,7 +250,6 @@ fn esc_leaves_the_words_first_and_the_ask_second() {
         let left = crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now);
         assert!(left.is_empty(), "{left:?}");
         assert!(ui.dialog.words.is_none());
-        assert!(ui.dialog.changing.is_none());
         assert_eq!(ui.dialog.focus, picked);
         assert!(matches!(
             crate::input::on_key(&mut ui, &tree, key(KeyCode::Esc), now).as_slice(),

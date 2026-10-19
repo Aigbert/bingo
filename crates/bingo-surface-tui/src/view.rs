@@ -262,7 +262,7 @@ fn layers(
             None => layer(tree, ui, frame, above, now),
         },
         None if signing_in(tree) && !crate::sign_in::docked(tree, ui) => {
-            card(tree, ui, frame, regions, now, tools)
+            card(tree, ui, frame, regions, now)
         }
         None => {}
     }
@@ -324,14 +324,7 @@ pub(crate) fn sheet(
 /// or the form's band ([`dialog::shape`]). Its arrival is measured from when
 /// the kernel opened it, so a card that was already up when this client
 /// attached is simply there.
-fn card(
-    tree: &Tree,
-    ui: &Ui,
-    frame: &mut Layout,
-    regions: Regions,
-    now: Now,
-    tools: &crate::tool_rows::Looks,
-) {
+fn card(tree: &Tree, ui: &Ui, frame: &mut Layout, regions: Regions, now: Now) {
     let Some((owner, interaction)) = tree.open_interaction() else {
         return;
     };
@@ -348,7 +341,6 @@ fn card(
     let room = usize::from(above.height).saturating_sub(usize::from(shape.chrome()) + 1);
     let drawing = crate::component::sealed::Site {
         state: owner,
-        tools,
         ui,
         now,
         interaction,

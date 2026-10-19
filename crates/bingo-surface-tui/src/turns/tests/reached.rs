@@ -2,6 +2,16 @@ use super::*;
 use crate::test_support::*;
 use bingo_sdk::Event;
 
+/// A step's row as the ledger draws it.
+fn first_line(step: &bingo_sdk::component::Step) -> String {
+    let drawing = step.drawing(&crate::turns::marks(), 80);
+    crate::views::marked(&drawing, 80, &Default::default())
+        .lines
+        .first()
+        .map(ToString::to_string)
+        .unwrap_or_default()
+}
+
 #[test]
 fn stamps_and_status_decide_whether_a_step_exists() {
     let state = folded(running_turn());
@@ -61,7 +71,7 @@ fn lines(state: &SessionState) -> (String, Vec<String>) {
         let role = roles.of_item(&item.id);
         requested.extend(requests(item, role, &rows).into_iter().map(|(id, _)| id));
         if let Role::Step { step, .. } = role {
-            text.push_str(&crate::transcript::asked(step, 80).to_string());
+            text.push_str(&first_line(step));
             text.push('\n');
         }
     }

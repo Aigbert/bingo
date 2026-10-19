@@ -36,6 +36,7 @@ use crate::component::live;
 pub(crate) mod slots;
 pub mod sparks;
 
+pub mod opened;
 /// What is under a tool row: its output, folded to what a row can spare.
 mod output;
 /// The picture under the words, where the terminal draws one (§5).
@@ -44,8 +45,6 @@ mod pictured;
 pub(crate) mod ran;
 /// A turn's steps and narration at column 3.
 mod steps;
-pub(crate) use steps::asked;
-pub mod opened;
 /// The rows a thought draws, one of them or a run of them (§4, §6).
 mod thinking;
 

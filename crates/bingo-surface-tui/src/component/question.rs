@@ -66,10 +66,8 @@ fn own(site: &super::sealed::Site<'_>, interaction: &Interaction, width: usize) 
         &site.ui.dialog,
         interaction,
         site.agent,
-        &site.state.summary.cwd,
         width,
         site.room.saturating_sub(1),
-        site.tools,
     )
 }
 

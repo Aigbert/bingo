@@ -79,7 +79,6 @@ pub(crate) fn cancel(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         return Vec::new();
     }
     ui.dialog.words = None;
-    ui.dialog.changing = None;
     ui.dialog.aside = false;
     ui.dialog.answered = true;
     ui.stop_asked = owner.turn.as_ref().map(|turn| turn.id.clone());

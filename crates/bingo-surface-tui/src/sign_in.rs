@@ -34,10 +34,8 @@ pub fn prepare(
     }
     let (owner, interaction) = tree.open_interaction()?;
     let width = frame.area().width;
-    let tools = crate::tool_rows::Looks::in_ui(ui);
     let site = crate::component::sealed::Site {
         state: owner,
-        tools: &tools,
         ui,
         interaction,
         agent: None,
