@@ -267,7 +267,18 @@ fn layers(
         over(frame, above, lines);
     }
     match ui.focus.drawn(now) {
-        Some(reveal) => layer(tree, ui, frame, above, reveal, tools, now),
+        Some(reveal) => match crate::browse::reader::current(ui) {
+            Some(reader) => crate::browse::reader::draw(
+                tree,
+                frame,
+                above,
+                reader,
+                reveal,
+                tools,
+                matches!(ui.focus.open(), Open::Browse(_)),
+            ),
+            None => layer(tree, ui, frame, above, now),
+        },
         None if !crate::ask::drawing::inline(tree, ui) => {
             card(tree, ui, frame, regions, now, tools)
         }
@@ -277,15 +288,7 @@ fn layers(
 
 /// The layer a person opened: a sheet over the whole of the frame, or the
 /// switcher's card above the input box.
-fn layer(
-    tree: &Tree,
-    ui: &Ui,
-    frame: &mut Layout,
-    above: Rect,
-    reveal: layers::Reveal,
-    tools: &crate::tool_rows::Looks,
-    now: Now,
-) {
+fn layer(tree: &Tree, ui: &Ui, frame: &mut Layout, above: Rect, now: Now) {
     match ui.focus.open() {
         Open::Nothing
         | Open::Reader(_)
@@ -295,11 +298,7 @@ fn layer(
         | Open::Rewind(_)
         | Open::Sessions(_)
         | Open::Plugins(_) => {}
-        Open::Browse(open) => {
-            if let Some(reader) = &open.reader {
-                crate::browse::reader::draw(tree, frame, above, reader, reveal, tools, true);
-                return;
-            }
+        Open::Browse(_) => {
             let lines = crate::browse::draw(
                 ui,
                 tree,
