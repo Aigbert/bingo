@@ -26,7 +26,7 @@ impl Interceptor for Commands {
         }
         let name = command.name.as_str();
         let args = command.args.trim();
-        if !opens(name, args, &cx.host).await? {
+        if !opens(name, args, cx).await? {
             return next.run(value).await;
         }
         let fallback = fallback(args, &value, next).await;
@@ -68,19 +68,28 @@ fn probe(
         .await;
     });
 }
-async fn opens(name: &str, args: &str, host: &HostHandle) -> Result<bool, KernelError> {
+async fn opens(name: &str, args: &str, cx: &HookContext) -> Result<bool, KernelError> {
     match name {
-        "think" | "models" | "provider" => Ok(args.is_empty()),
-        "login" | "logout" => Ok(args.is_empty()),
+        "think" | "models" | "provider" | "logout" => Ok(args.is_empty()),
+        "login" if args.is_empty() => Ok(!refused(cx).await?),
         "model" if args.is_empty() => Ok(true),
         "model" if filters(args) => {
-            let models = host.catalog(CatalogKind::Models).await?.entries;
+            let models = cx.host.catalog(CatalogKind::Models).await?.entries;
             Ok(!models
                 .iter()
                 .any(|m| m.id == args || m.id.split_once('/').is_some_and(|(_, id)| id == args)))
         }
         _ => Ok(false),
     }
+}
+/// The session's last turn was refused for its credentials: a bare `/login`
+/// then means the provider that refused it.
+async fn refused(cx: &HookContext) -> Result<bool, KernelError> {
+    let attached = crate::bridge::attach(&cx.host, &cx.session).await?;
+    Ok(matches!(
+        attached.snapshot.last_status(),
+        Some(TurnStatus::Failed { error }) if error.code == ErrorCode::AuthRequired
+    ))
 }
 /// A `provider/model` argument names a model outright, listed or not, so it
 /// is the kernel's to switch. A bare word or a `provider/` with nothing after
@@ -270,6 +279,37 @@ mod tests {
                 .unwrap();
             assert_eq!(reply, json!({"text":"original command"}));
         }
+    }
+
+    /// The signed-out line says `/login` signs you in again: to the provider
+    /// that refused the turn, which is the kernel's command, not a list.
+    #[tokio::test]
+    async fn a_bare_login_after_a_refused_turn_signs_in_again() {
+        let (host, command) = crate::test_support::host();
+        host.on_open(|_, _, _| async {
+            Ok(crate::test_support::attachment(
+                crate::test_support::signed_out(),
+            ))
+        });
+        let cx = HookContext {
+            session: command.session,
+            cwd: command.cwd,
+            host: command.host,
+            item: None,
+            turn: None,
+            provider: None,
+            model: None,
+        };
+        let reply = Commands(crate::Shared::default())
+            .chain(
+                catalogue::COMMAND_RUN,
+                &cx,
+                json!({"command":"login","args":"","surface":"terminal"}),
+                Next::new(|_| Box::pin(async { Ok(json!({"text":"signed in"})) })),
+            )
+            .await
+            .unwrap();
+        assert_eq!(reply, json!({"text":"signed in"}));
     }
 
     #[test]

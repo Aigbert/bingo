@@ -5,17 +5,7 @@ use std::sync::Arc;
 
 pub fn host() -> (testing::TestHost, CommandContext) {
     let host = testing::TestHost::default();
-    host.on_open(|_, _, _| async {
-        let snapshot = snapshot();
-        let (tx, rx) = mpsc::unbounded();
-        Ok(Attachment {
-            session: snapshot.summary.id.clone(),
-            snapshot,
-            history: None,
-            events: Box::pin(rx),
-            handle: SessionHandle(Arc::new(AckPort(tx))),
-        })
-    });
+    host.on_open(|_, _, _| async { Ok(attachment(snapshot())) });
     host.on_signal(|_, _, _, _| async { Ok(()) });
     let cx = CommandContext {
         surface: None,
@@ -25,6 +15,49 @@ pub fn host() -> (testing::TestHost, CommandContext) {
         cancel: CancellationToken::new(),
     };
     (host, cx)
+}
+
+pub fn attachment(snapshot: SessionState) -> Attachment {
+    let (tx, rx) = mpsc::unbounded();
+    Attachment {
+        session: snapshot.summary.id.clone(),
+        snapshot,
+        history: None,
+        events: Box::pin(rx),
+        handle: SessionHandle(Arc::new(AckPort(tx))),
+    }
+}
+
+/// The session after its provider refused a turn for its credentials.
+pub fn signed_out() -> SessionState {
+    let mut state = snapshot();
+    let turn = TurnId::from_raw("refused");
+    for (seq, event) in [
+        Event::TurnStarted {
+            turn: turn.clone(),
+            inputs: vec![],
+            origin: TurnOrigin::Submit,
+        },
+        Event::TurnCompleted {
+            turn,
+            status: TurnStatus::Failed {
+                error: KernelError::new(ErrorCode::AuthRequired, "the token expired"),
+            },
+            usage: Usage::default(),
+        },
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        state.apply(&Frame {
+            cause: None,
+            session: state.summary.id.clone(),
+            seq: Seq(seq as u64 + 1),
+            ts: state.summary.created_at,
+            event,
+        });
+    }
+    state
 }
 
 pub fn snapshot() -> SessionState {
