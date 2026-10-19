@@ -132,6 +132,7 @@ pub mod tests {
 
     /// A pid that was real and is not any more: the surest dead pid a test can
     /// name, because a number picked out of the air might be somebody.
+    #[cfg(unix)]
     fn reaped() -> u32 {
         let mut child = std::process::Command::new("true")
             .spawn()
@@ -141,6 +142,8 @@ pub mod tests {
         pid
     }
 
+    // The real table is `kill -0` and `ps`; the gateway is unix-only (ADR-0020).
+    #[cfg(unix)]
     #[test]
     fn the_real_table_knows_this_process_is_here_and_a_reaped_one_is_not() {
         let probe = Kill;
@@ -148,6 +151,8 @@ pub mod tests {
         assert!(!probe.alive(reaped()), "a waited-for child is gone");
     }
 
+    // The real table is `kill -0` and `ps`; the gateway is unix-only (ADR-0020).
+    #[cfg(unix)]
     #[test]
     fn the_real_table_names_the_program_a_live_pid_is_running() {
         let probe = Kill;
