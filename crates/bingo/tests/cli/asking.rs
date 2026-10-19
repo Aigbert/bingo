@@ -155,18 +155,32 @@ impl AtTheTerminal {
     /// Answer, once the kernel's own guard against a keystroke that was
     /// already on its way has run out: an answer inside it is refused as
     /// `NOT_READY`, so the run waits the guard out rather than racing it.
+    ///
+    /// Enter is a carriage return from every terminal: a unix tty turns it
+    /// into the newline a line read ends on, and a ConPTY takes a bare
+    /// newline for ctrl+enter, which ends no line.
     fn answer(&mut self, line: &str) {
         let guard = u64::try_from(bingo_core::session::INTERACTION_GUARD_MS).unwrap_or(400);
         std::thread::sleep(Duration::from_millis(guard * 2));
-        writeln!(self.writer, "{line}").unwrap();
+        write!(self.writer, "{line}\r").unwrap();
         self.writer.flush().unwrap();
     }
 
     /// The run's exit code, or `None` where the platform has no code for how
     /// it ended.
     fn finish(&mut self) -> Option<i32> {
-        let status = self.child.wait().unwrap();
-        i32::try_from(status.exit_code()).ok()
+        let deadline = std::time::Instant::now() + LIMIT;
+        while std::time::Instant::now() < deadline {
+            if let Some(status) = self.child.try_wait().unwrap() {
+                return i32::try_from(status.exit_code()).ok();
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        self.child.kill().unwrap();
+        panic!(
+            "the run did not end within {LIMIT:?}: {}",
+            self.transcript()
+        );
     }
 
     fn transcript(&self) -> String {
