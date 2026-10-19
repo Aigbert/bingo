@@ -29,11 +29,14 @@ fn read(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
             read(&path, out);
             continue;
         }
+        // Joined by `/` on every platform: the names below are spelled so.
         let name = path
             .strip_prefix("src")
             .unwrap_or(&path)
-            .to_string_lossy()
-            .into_owned();
+            .iter()
+            .map(|part| part.to_string_lossy())
+            .collect::<Vec<_>>()
+            .join("/");
         if path.extension().is_none_or(|e| e != "rs")
             || name.starts_with("theme/")
             || name.starts_with("test_support/")

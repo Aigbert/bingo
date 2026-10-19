@@ -167,7 +167,9 @@ mod tests {
             )
             .expect("a file to open")
         };
-        assert_eq!(word("docs/x.png"), "/work/docs/x.png");
+        // Joined the system's way: on Windows the separator is `\`.
+        let relative = Path::new("/work").join("docs/x.png");
+        assert_eq!(word("docs/x.png"), relative.display().to_string());
         assert_eq!(word("~/shots/x.png"), "/home/me/shots/x.png");
         assert_eq!(word("/etc/x.png"), "/etc/x.png");
     }
@@ -298,20 +300,18 @@ mod tests {
         let source = Source::Linked {
             dest: "docs/x.png".into(),
         };
+        let whole = Path::new("/work").join("docs/x.png").display().to_string();
         let (opener, seen) = recording();
-        assert_eq!(
-            open(&opener, &source, None, at).as_deref(),
-            Ok("/work/docs/x.png")
-        );
+        assert_eq!(open(&opener, &source, None, at), Ok(whole.clone()));
         assert_eq!(
             seen.lock().expect("the record").as_slice(),
-            ["/work/docs/x.png".to_string()]
+            std::slice::from_ref(&whole)
         );
 
         let shut: Opener = Arc::new(|_| false);
         assert_eq!(
             open(&shut, &source, None, at),
-            Err("nothing on this machine opened /work/docs/x.png".into())
+            Err(format!("nothing on this machine opened {whole}"))
         );
     }
 }
