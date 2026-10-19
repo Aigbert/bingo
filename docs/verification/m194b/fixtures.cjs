@@ -4,14 +4,18 @@ const vm = require('node:vm');
 const path = require('node:path');
 const root = path.resolve(__dirname, '../../..');
 const dir = path.join(root, 'docs/design/ember/prototype');
+const CLOCK_ORIGIN = 10000000;
+function load(context, names, transform = (_, source) => source) {
+  const sources = names.map(name => transform(name, fs.readFileSync(path.join(dir, name+'.js'), 'utf8')));
+  vm.runInContext(sources.join('\n'), context);
+}
 const context = vm.createContext({});
 vm.runInContext(`let now = 0; let S; const NOW = () => now;
 const markCells = () => []; const blankSession = o => Object.assign({log:[], queued:[], hist:[], mode:0}, o);
 const reportBack = () => {}; const shortTitle = x => x;
 `, context);
 // shortTitle is declared in the model, so use its dependencies only when needed.
-vm.runInContext(fs.readFileSync(path.join(dir, 'p4-model.js'), 'utf8').replace('function shortTitle(p)', 'function unusedShortTitle(p)'), context);
-vm.runInContext(fs.readFileSync(path.join(dir, 'p4b-data.js'), 'utf8'), context);
+load(context, ['p4-model','p4b-data'], (_, source) => source.replace('function shortTitle(p)', 'function unusedShortTitle(p)'));
 for (const scene of ['live','done','stop','steer','steer-landed']) {
  const result = vm.runInContext(`(() => {
    now = 0; S = fresh(); S.log.push(T1());
@@ -34,22 +38,14 @@ fs.writeFileSync(path.join(root, 'crates/bingo-surface-tui/src/test_support/embe
 
 {
 // Additional turn-only samples at the acting capture instants.
-const fs = require('node:fs');
-const vm = require('node:vm');
-const path = require('node:path');
-const root = path.resolve(__dirname, '../../..');
-const proto = path.join(root, 'docs/design/ember/prototype');
 const context = vm.createContext({performance:{now:()=>0}});
-const sources = [];
-for (const name of ['p3-core','p4-model','p4b-data','p4c-act','p4d-crew','p5-stream','p6-dock','p7-input','p8-page']) {
-  let source = fs.readFileSync(path.join(proto, name+'.js'),'utf8');
+load(context, ['p3-core','p4-model','p4b-data','p4c-act','p4d-crew','p5-stream','p6-dock','p7-input','p8-page'], (name, source) => {
   if (name === 'p8-page') {
     source = source.replace(/\ninit\(\);\s*$/, '\n');
     source = source.replace('return { name, t: clock - T0, W: S.W, H: S.H, rows:', 'return { state: JSON.parse(JSON.stringify(S, (key, value) => key === "script" ? undefined : value)), name, t: clock - T0, W: S.W, H: S.H, rows:');
   }
-  sources.push(source);
-}
-vm.runInContext(sources.join('\n'), context);
+  return source;
+});
 vm.runInContext('PAL = PALS.light;', context);
 const names = ['live-steered','live-stopped','stop-resent','shell','shell-ls','image-sent'];
 const index = JSON.parse(fs.readFileSync(path.join(root,'docs/design/ember/scenes/index.json')));
@@ -63,7 +59,7 @@ for (const name of names) {
   const {log} = shot.state;
   const rate = vm.runInContext('RATE_R', context);
   for (const turn of log) {
-    if (turn.state === 'live' && turn.reply) turn.reply.revealed = Math.floor(Math.max(0, 10000000 + shot.t - turn.reply.at) / 1000 * rate);
+    if (turn.state === 'live' && turn.reply) turn.reply.revealed = Math.floor(Math.max(0, CLOCK_ORIGIN + shot.t - turn.reply.at) / 1000 * rate);
   }
   fixtures[name] = log.slice(['stop-resent','image-sent'].includes(name) ? 2 : 1);
 }

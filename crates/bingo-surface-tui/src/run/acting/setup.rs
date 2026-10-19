@@ -22,10 +22,10 @@ pub(super) fn new(capture: &Capture) -> Scene {
     run.clipboard_image = Arc::new(|| Some(bingo_pictures::testing::png_bytes(2, 2)));
     run.data_dir = home.path().into();
     run.replies = replies;
-    run.ui
-        .catalogs
-        .values
-        .insert("tools".into(), story::catalogue());
+    run.reply(
+        Reply::Catalogue("tools".into(), story::catalogue()),
+        &mut None,
+    );
     let host = bingo_sdk::testing::TestHost::default();
     let recorded = session.clone();
     host.on_withdraw(move |_, intent, _| {
