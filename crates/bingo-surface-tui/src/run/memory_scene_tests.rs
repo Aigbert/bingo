@@ -41,10 +41,14 @@ fn listing() -> Listing {
             Loaded {
                 path: "~/.bingo/AGENTS.md".into(),
                 tokens: 900,
+                scope: Scope::User,
+                lines: 12,
             },
             Loaded {
                 path: "./AGENTS.md".into(),
                 tokens: 4200,
+                scope: Scope::Project,
+                lines: 64,
             },
         ],
     }
@@ -58,6 +62,7 @@ fn memory(scope: Scope, name: &str, kind: &str, description: &str, tokens: u64) 
         path: format!("memory/{name}.md").into(),
         tokens,
         error: None,
+        written: None,
     }
 }
 fn entries() -> Vec<EntryRow> {

@@ -19,6 +19,8 @@ workspace = true
 bingo-digest.workspace = true
 # M136: derive the wire faces from their existing Rust payloads.
 schemars.workspace = true
+# M199: a memory carries the day it was written as a civil date.
+jiff.workspace = true
 bingo-sdk.workspace = true
 async-trait.workspace = true
 serde.workspace = true

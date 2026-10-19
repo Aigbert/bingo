@@ -34,14 +34,26 @@ impl InstructionsContributor {
     pub async fn loaded(&self, cwd: &Path) -> Vec<bingo_services::memory::Loaded> {
         let mut loaded = Vec::new();
         for path in self.paths(cwd).await {
-            if let Some(block) = block(&path).await {
-                loaded.push(bingo_services::memory::Loaded {
-                    path,
-                    tokens: crate::estimate::text(&block.text),
-                });
+            if let Some(text) = read(&path).await {
+                loaded.push(self.loaded_one(path, &text));
             }
         }
         loaded
+    }
+
+    fn loaded_one(&self, path: PathBuf, text: &str) -> bingo_services::memory::Loaded {
+        use bingo_services::memory::Scope;
+        let scope = if path.starts_with(&self.config_dir) {
+            Scope::User
+        } else {
+            Scope::Project
+        };
+        bingo_services::memory::Loaded {
+            tokens: crate::estimate::text(&block(&path, text).text),
+            lines: text.lines().count() as u64,
+            scope,
+            path,
+        }
     }
 
     /// The user's file first, then one file per directory from the root down:
@@ -69,13 +81,14 @@ async fn present(dir: &Path) -> Option<PathBuf> {
 
 /// A file that cannot be read is a file that is not there: an unreadable
 /// AGENTS.md must not cost the turn.
-async fn block(path: &Path) -> Option<SystemBlock> {
+async fn read(path: &Path) -> Option<String> {
     let text = tokio::fs::read_to_string(path).await.ok()?;
-    if text.trim().is_empty() {
-        return None;
-    }
+    (!text.trim().is_empty()).then_some(text)
+}
+
+fn block(path: &Path, text: &str) -> SystemBlock {
     let heading = format!("# Instructions from {}", path.display());
-    Some(files::block(&heading, &text, true, files::MAX_LINES))
+    files::block(&heading, text, true, files::MAX_LINES)
 }
 
 #[async_trait]
@@ -92,7 +105,9 @@ impl ContextContributor for InstructionsContributor {
         baseline::contribute(self.id(), query, async {
             let mut blocks = Vec::new();
             for path in self.paths(query.cwd).await {
-                blocks.extend(block(&path).await);
+                if let Some(text) = read(&path).await {
+                    blocks.push(block(&path, &text));
+                }
             }
             blocks
         })
@@ -239,10 +254,14 @@ mod measured_tests {
                 .map(|path| path.canonicalize().unwrap())
                 .collect::<Vec<_>>()
         );
+        let scopes: Vec<_> = loaded.iter().map(|file| file.scope.clone()).collect();
+        use bingo_services::memory::Scope;
+        assert_eq!(scopes, [Scope::User, Scope::Project]);
+        assert!(loaded.iter().all(|file| file.lines == 1));
         for file in loaded {
             assert_eq!(
                 file.tokens,
-                crate::estimate::text(&block(&file.path).await.unwrap().text)
+                crate::estimate::text(&block(&file.path, &read(&file.path).await.unwrap()).text)
             );
         }
     }

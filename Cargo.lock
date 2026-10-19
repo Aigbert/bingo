@@ -1072,6 +1072,7 @@ dependencies = [
  "async-trait",
  "bingo-digest",
  "bingo-sdk",
+ "jiff",
  "schemars 1.2.2",
  "serde",
  "serde_json",

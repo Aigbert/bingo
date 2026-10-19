@@ -223,6 +223,7 @@ mod selection_tests {
                 .iter()
                 .map(|name| crate::rows::Row {
                     label: (*name).into(),
+                    note: String::new(),
                     tokens: 0,
                     target: Target::Instruction((*name).into()),
                 })

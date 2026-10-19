@@ -21,6 +21,8 @@ serde_json.workspace = true
 # M64 (ADR-0044): a memory file that will not parse is a library error, and
 # `thiserror` is already in the workspace tree — no new dependency.
 thiserror.workspace = true
+# M199: a memory is dated by the local day its file was written.
+jiff.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 
@@ -29,9 +31,6 @@ bingo-sdk = { workspace = true, features = ["testing"] }
 # M4: the summary prompt is a wire the model reads, so a wording change is a
 # deliberate diff.
 insta.workspace = true
-# M4: a journal item is stamped with a `jiff::Timestamp`, so writing one down
-# needs one.
-jiff.workspace = true
 # M4: "a cut never splits a tool round" is a property of every journal, not of
 # the three this file writes down.
 proptest.workspace = true

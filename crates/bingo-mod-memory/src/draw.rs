@@ -96,23 +96,19 @@ fn row_view(r: &crate::rows::Row, selected: bool) -> pick::Row {
         Target::Memory { .. } => "memory",
         Target::Experience(_) => "experience",
     };
-    let label = match r.target {
-        Target::Instruction(_) => r.label.clone(),
-        _ => r.target.name(),
-    };
     let name = if selected {
-        pick::bold(label, "fg")
+        pick::bold(&r.label, "fg")
     } else {
-        pick::text(label, "muted")
+        pick::text(&r.label, "muted")
     };
     let row = pick::Row::new(
         r.target.id(),
         pick::line([pick::pad(pick::text(kind, "dim"), 14), name]),
     );
-    if matches!(r.target, Target::Instruction(_)) {
+    if r.note.is_empty() {
         row
     } else {
-        row.right(pick::text(&r.label, "dim"))
+        row.right(pick::text(&r.note, "dim"))
     }
 }
 fn dim(text: impl Into<String>) -> View {

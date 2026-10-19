@@ -26,18 +26,29 @@ struct Owner {
 
 impl Owner {
     /// The project's file sits in the session's folder, the person's own in
-    /// the folder bingo keeps under their home.
-    fn instruction(&self, name: &str, cwd: &std::path::Path) -> Loaded {
-        let path = match name.strip_prefix("~/") {
-            Some(own) => self.home.join(own),
-            None => cwd.join(name),
+    /// the folder bingo keeps under their home; the prototype's note says
+    /// where it speaks and how many lines it has.
+    fn instruction(&self, name: &str, note: &str, cwd: &std::path::Path) -> Loaded {
+        let (path, scope) = match name.strip_prefix("~/") {
+            Some(own) => (self.home.join(own), Scope::User),
+            None => (cwd.join(name), Scope::Project),
         };
-        Loaded { path, tokens: 0 }
+        let lines = note
+            .rsplit(" · ")
+            .next()
+            .and_then(|count| count.trim_end_matches(" lines").parse().ok())
+            .unwrap();
+        Loaded {
+            path,
+            tokens: 0,
+            scope,
+            lines,
+        }
     }
 
-    /// A memory says what it keeps in its name; the world knows no
-    /// description of it and no day it was written.
-    fn memory(&self, name: &str, cwd: &std::path::Path) -> MemoryRow {
+    /// A memory says what it keeps in its name and is dated by the
+    /// prototype's day; the world knows no description of it.
+    fn memory(&self, name: &str, day: &str, cwd: &std::path::Path) -> MemoryRow {
         MemoryRow {
             scope: Scope::Project,
             name: name.into(),
@@ -46,6 +57,7 @@ impl Owner {
             path: cwd.join(".bingo/memory").join(format!("{name}.md")),
             tokens: 0,
             error: None,
+            written: jiff::civil::Date::strptime("%b %d %Y", format!("{day} 2026")).ok(),
         }
     }
 }
@@ -56,13 +68,13 @@ impl memory::Service for Owner {
         let forgotten = self.forgotten.lock().unwrap().clone();
         let mut listing = Listing::default();
         for row in rows("memory") {
-            let name = row["t"].as_str().unwrap();
+            let (name, note) = (row["t"].as_str().unwrap(), row["d"].as_str().unwrap());
             if row["kind"] == "instructions" {
                 listing
                     .instructions
-                    .push(self.instruction(name, &input.cwd));
+                    .push(self.instruction(name, note, &input.cwd));
             } else if !forgotten.iter().any(|gone| gone == name) {
-                listing.memories.push(self.memory(name, &input.cwd));
+                listing.memories.push(self.memory(name, note, &input.cwd));
             }
         }
         Ok(listing)

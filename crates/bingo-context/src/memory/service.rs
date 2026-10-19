@@ -169,6 +169,7 @@ async fn row(path: PathBuf, scope: Scope) -> MemoryRow {
         ),
         Err(error) => (Kind::Malformed, String::new(), Some(error)),
     };
+    let written = written(&path).await;
     MemoryRow {
         scope,
         name,
@@ -177,7 +178,14 @@ async fn row(path: PathBuf, scope: Scope) -> MemoryRow {
         path,
         tokens: 0,
         error,
+        written,
     }
+}
+/// The day the file was last written, in this machine's zone.
+async fn written(path: &std::path::Path) -> Option<jiff::civil::Date> {
+    let modified = tokio::fs::metadata(path).await.ok()?.modified().ok()?;
+    let at = jiff::Timestamp::try_from(modified).ok()?;
+    Some(at.to_zoned(jiff::tz::TimeZone::system()).date())
 }
 pub fn contribution(data: PathBuf, config: PathBuf) -> Contribution {
     let service: Arc<dyn Service> = Arc::new(Memories { data, config });

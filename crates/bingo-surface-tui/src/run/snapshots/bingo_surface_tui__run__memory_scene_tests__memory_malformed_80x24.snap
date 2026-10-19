@@ -4,12 +4,12 @@ expression: "snapshot(width, height, scene)"
 ---
    Memory                                                           4 memories
 
- ▎ instructions  ~/.bingo/AGENTS.md
-   instructions  ./AGENTS.md
-   memory        no-sonnet-workers            missing frontmatter: description
-   memory        a-memory-name-far-past…Rust reviewer, prefers concise answers
-   memory        wire-fixtures                  Fixtures before implementation
-   memory        guide                             Read the architecture first
+ ▎ instructions  ~/.bingo/AGENTS.md                   every project · 12 lines
+   instructions  ./AGENTS.md                           this project · 64 lines
+   memory        Workers are Opus only        missing frontmatter: description
+   memory        Rust reviewer, prefers concise answers
+   memory        Fixtures before implementation
+   memory        Read the architecture first
    exp…01J9ABC  active  fixture before impl for wire formats  3 ok · 0 harmful
    exp…01J9DEF  active  fixture before impl for wire formats  3 ok · 0 harmful
    8 of 9

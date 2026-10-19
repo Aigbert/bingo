@@ -48,11 +48,23 @@ pub struct MemoryRow {
     pub path: PathBuf,
     pub tokens: u64,
     pub error: Option<String>,
+    /// The local day the file was last written; the sheet dates a memory by it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub written: Option<jiff::civil::Date>,
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Loaded {
     pub path: PathBuf,
     pub tokens: u64,
+    /// The person's own file speaks in every project, a project's only there.
+    #[serde(default = "project")]
+    pub scope: Scope,
+    #[serde(default)]
+    pub lines: u64,
+}
+fn project() -> Scope {
+    Scope::Project
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Listing {
