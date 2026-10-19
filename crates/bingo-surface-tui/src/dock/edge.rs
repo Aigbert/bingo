@@ -13,27 +13,8 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
     if state.interactions.iter().any(cautioned) {
         return Drawing::still(vec![super::line(theme::bad(), width)]);
     }
-    // A device code waits on the browser, not on an answer typed here: its
-    // sheet is the whole signal, so the edge keeps its quiet.
-    if state.interactions.iter().any(|open| {
-        !matches!(
-            open.kind,
-            bingo_sdk::InteractionKind::Login {
-                flow: bingo_sdk::LoginFlow::Device { .. },
-                ..
-            }
-        )
-    }) {
-        let ink = theme::blended(
-            "amberGlow",
-            "you",
-            0.35 * clock::breathe(now, Duration::from_millis(1400)),
-        )
-        .unwrap_or_default();
-        return sampled(
-            super::line(ink, width),
-            now.motion.then_some(now.instant + clock::FRAME),
-        );
+    if state.interactions.iter().any(answered_here) {
+        return waiting(width, now);
     }
     if let Some(drawing) = written_in(tree, width, now) {
         return drawing;
@@ -78,6 +59,32 @@ pub fn draw(tree: &Tree, ui: &Ui, width: usize, now: Now) -> Drawing {
         return flash(width, ink, now.past(turn.ended_at), 1100, now);
     }
     Drawing::still(vec![Line::default()])
+}
+
+/// A device code waits on the browser, not on an answer typed here: its
+/// sheet is the whole signal, so the edge keeps its quiet.
+fn answered_here(open: &bingo_sdk::Interaction) -> bool {
+    !matches!(
+        open.kind,
+        bingo_sdk::InteractionKind::Login {
+            flow: bingo_sdk::LoginFlow::Device { .. },
+            ..
+        }
+    )
+}
+
+/// An ask that waits on you breathes the edge in amber.
+fn waiting(width: usize, now: Now) -> Drawing {
+    let ink = theme::blended(
+        "amberGlow",
+        "you",
+        0.35 * clock::breathe(now, Duration::from_millis(1400)),
+    )
+    .unwrap_or_default();
+    sampled(
+        super::line(ink, width),
+        now.motion.then_some(now.instant + clock::FRAME),
+    )
 }
 
 /// An ask that could lose work holds the edge still, in the colour of harm.
