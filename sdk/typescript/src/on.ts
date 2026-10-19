@@ -53,10 +53,18 @@ export function renderMatcher(matcher: Matcher): unknown {
   return typeof component === 'string' ? { component } : {};
 }
 
+// A loop, not recursion: each level of a recursive walk spends native stack
+// out of the runtime's fixed budget, and a deep event would exhaust it. What
+// was seen is skipped, so a hook's own value with a cycle cannot spin it.
 export function frozen<T>(value: T): T {
-  if (value !== null && typeof value === 'object') {
-    Object.values(value).forEach(frozen);
-    Object.freeze(value);
+  const seen = new Set<object>();
+  const pending: unknown[] = [value];
+  while (pending.length > 0) {
+    const next = pending.pop();
+    if (next === null || typeof next !== 'object' || seen.has(next)) continue;
+    seen.add(next);
+    Object.freeze(next);
+    for (const child of Object.values(next)) pending.push(child);
   }
   return value;
 }
