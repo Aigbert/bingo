@@ -250,14 +250,7 @@ fn every_token_is_spent_where_the_design_says() {
                 "transcript/ran.rs",
             ],
         ),
-        (
-            "good",
-            &[
-                "activity.rs",
-                "transcript.rs",
-                "views/badge.rs",
-            ],
-        ),
+        ("good", &["activity.rs", "transcript.rs", "views/badge.rs"]),
         (
             "bad",
             &[

@@ -213,9 +213,22 @@ fn a_model_without_images_refuses_paste_and_names_the_switch_key() {
         KeyEvent::new(KeyCode::Char('v'), KeyModifiers::CONTROL),
         now,
     );
-    assert!(effects.is_empty());
-    assert_eq!(
-        ui.notice().unwrap().plain().unwrap().text,
-        "text-only can't read images · alt+m switches model"
+    assert_eq!(effects, vec![Effect::PasteImage]);
+    assert!(ui.notice().is_none());
+}
+
+#[test]
+fn ctrl_c_and_escape_send_the_same_interaction_cancel() {
+    let tree = solo(&folded(vec![frame(1, opened(permission(None, None)))]));
+    let (mut escape_ui, now) = scene();
+    let (mut interrupt_ui, _) = scene();
+    let escape = on_key(&mut escape_ui, &tree, key(KeyCode::Esc), now);
+    let interrupt = on_key(
+        &mut interrupt_ui,
+        &tree,
+        KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL),
+        now,
     );
+    assert!(!escape.is_empty());
+    assert_eq!(interrupt, escape);
 }

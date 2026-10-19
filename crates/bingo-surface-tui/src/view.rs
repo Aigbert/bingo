@@ -98,12 +98,7 @@ fn pull_activity(state: &SessionState, ui: &Ui, frame: &mut Layout, area: Rect) 
 /// What the frame must make room for before the transcript is given the rest.
 fn demand(draft: &Draft, activity: &[Line<'_>], palette: &[Line<'_>]) -> Demand {
     Demand {
-        composer: u16::try_from(
-            draft.layout.lines.len().clamp(1, COMPOSER_ROWS)
-                + usize::from(draft.layout.lines.len() > COMPOSER_ROWS)
-                + draft.above.len(),
-        )
-        .unwrap_or(u16::MAX),
+        composer: u16::try_from(draft.rows() + draft.above.len()).unwrap_or(u16::MAX),
         activity: u16::try_from(activity.len()).unwrap_or(u16::MAX),
         palette: u16::try_from(palette.len()).unwrap_or(u16::MAX),
     }
@@ -122,6 +117,12 @@ fn palette(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'stat
 struct Draft {
     layout: prompt::Layout,
     above: Vec<Line<'static>>,
+}
+impl Draft {
+    fn rows(&self) -> usize {
+        self.layout.lines.len().clamp(1, COMPOSER_ROWS)
+            + usize::from(self.layout.lines.len() > COMPOSER_ROWS)
+    }
 }
 
 fn composer_above(tree: &Tree, ui: &Ui, frame: &mut Layout, now: Now) -> Vec<Line<'static>> {
@@ -839,8 +840,7 @@ fn render_composer(tree: &Tree, ui: &Ui, frame: &mut Layout, area: Rect, now: No
     if let Some(search) = ui.focus.search() {
         frame.render_widget(Paragraph::new(search::row(search)), inner);
     } else {
-        let rows = draft.layout.lines.len().clamp(1, COMPOSER_ROWS)
-            + usize::from(draft.layout.lines.len() > COMPOSER_ROWS);
+        let rows = draft.rows();
         let above = inner
             .height
             .saturating_sub(rows as u16)

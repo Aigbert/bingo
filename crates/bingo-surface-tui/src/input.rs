@@ -492,10 +492,7 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
     }
     match rung {
         keys::Interrupt::Turn => return ask_to_stop(ui, tree.viewed()),
-        keys::Interrupt::Close => {
-            ui.focus = crate::focus::Focus::Composer;
-            ui.menu.dismissed = true;
-        }
+        keys::Interrupt::Close => return close(ui, tree, now),
         keys::Interrupt::Fold => {
             ui.focus = crate::focus::Focus::Composer;
             ui.folds.clear();
@@ -506,6 +503,25 @@ fn interrupt_or_exit(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
             ui.armed = Some(now.instant);
             ui.notify_for("ctrl+c again to quit", keys::EXIT_WINDOW, now.instant);
         }
+    }
+    Vec::new()
+}
+
+fn close(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
+    use crate::focus::Owner;
+    match crate::focus::owner(ui, tree) {
+        Owner::Layer => ui.focus.close(now.instant),
+        Owner::Search => ui.focus = crate::focus::Focus::Composer,
+        Owner::Interaction => return cancel(ui, tree),
+        Owner::Pane => {
+            return crate::pane::key(
+                ui,
+                tree.viewed(),
+                KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE),
+            );
+        }
+        _ if tree.open_interaction().is_some() => return cancel(ui, tree),
+        _ => ui.menu.dismissed = true,
     }
     Vec::new()
 }
@@ -543,9 +559,9 @@ fn escape(ui: &mut Ui, tree: &Tree, now: Now) -> Vec<Effect> {
         ui.escaped_at = None;
     }
     match rung {
-        Some(keys::Escape::Sheet) => ui.focus.close(now.instant),
-        Some(keys::Escape::Card) => return cancel(ui, tree),
-        Some(keys::Escape::Dropdown) => ui.menu.dismissed = true,
+        Some(keys::Escape::Sheet | keys::Escape::Card | keys::Escape::Dropdown) => {
+            return close(ui, tree, now);
+        }
         Some(keys::Escape::Interrupt) => return ask_to_stop(ui, tree.viewed()),
         Some(keys::Escape::Clear) => {
             clear_draft(ui);
@@ -790,7 +806,7 @@ fn accept(ui: &mut Ui, tree: &Tree) -> Vec<Effect> {
 
 fn editing(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     if key.modifiers.contains(KeyModifiers::CONTROL) {
-        return control(ui, tree, key, now);
+        return control(ui, key);
     }
     if key.modifiers.contains(KeyModifiers::ALT) {
         return alt(ui, key);
@@ -798,7 +814,7 @@ fn editing(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
     plain(ui, tree, key, now)
 }
 
-fn control(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
+fn control(ui: &mut Ui, key: KeyEvent) -> Vec<Effect> {
     match key.code {
         KeyCode::Char('a') => ui.composer.home(),
         KeyCode::Char('e') => ui.composer.end(),
@@ -806,11 +822,7 @@ fn control(ui: &mut Ui, tree: &Tree, key: KeyEvent, now: Now) -> Vec<Effect> {
         KeyCode::Char('w') => edit(ui, |c| c.delete_word_left()),
         KeyCode::Char('u') => edit(ui, |c| c.delete_to_line_start()),
         KeyCode::Char('k') => edit(ui, |c| c.delete_to_line_end()),
-        KeyCode::Char('v') => {
-            if !crate::pictures::refuse(ui, tree.viewed(), now) {
-                return vec![Effect::PasteImage];
-            }
-        }
+        KeyCode::Char('v') => return vec![Effect::PasteImage],
         // Claude Code's own key for its own list (M74): the rows go off the
         // band and come back, and nothing opens.
         KeyCode::Char('t') => ui.activity_hidden = !ui.activity_hidden,
