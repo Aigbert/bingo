@@ -73,7 +73,11 @@ mod tests {
         let cwd = Path::new("/home/ada/work");
         let home = Path::new("/home/ada");
         for (path, expected) in [
-            ("/home/ada/work/src/lib.rs", Path::new("src").join("lib.rs")),
+            // What is left of the path keeps the path's own separators.
+            (
+                "/home/ada/work/src/lib.rs",
+                Path::new("src/lib.rs").to_path_buf(),
+            ),
             ("/home/ada/notes.txt", Path::new("~").join("notes.txt")),
             ("/home/ada", Path::new("~").to_path_buf()),
             (

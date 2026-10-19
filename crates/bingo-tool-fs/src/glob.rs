@@ -232,9 +232,9 @@ mod tests {
         let text = out.parts[0].as_text().expect("text").to_string();
         let lines: Vec<&str> = text.lines().collect();
         assert_eq!(lines.len(), 2, "got {text}");
-        assert!(lines[0].ends_with("src/new.rs"), "got {text}");
-        assert!(lines[1].ends_with("old.rs"), "got {text}");
-        assert!(lines[0].starts_with('/'), "got {text}");
+        assert!(Path::new(lines[0]).ends_with("src/new.rs"), "got {text}");
+        assert!(Path::new(lines[1]).ends_with("old.rs"), "got {text}");
+        assert!(Path::new(lines[0]).is_absolute(), "got {text}");
     }
 
     #[tokio::test]
@@ -269,7 +269,7 @@ mod tests {
             .expect("glob");
         let text = out.parts[0].as_text().expect("text");
         assert_eq!(text.lines().count(), 1, "got {text}");
-        assert!(text.ends_with("src/a.rs"), "got {text}");
+        assert!(Path::new(text.trim()).ends_with("src/a.rs"), "got {text}");
     }
 
     #[tokio::test]
