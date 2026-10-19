@@ -9,12 +9,7 @@ use bingo_sdk::view::TextMotion;
 use ratatui::text::{Line, Span};
 
 pub(super) fn draw(head: &bingo_sdk::Headline, at: i64, width: usize, now: Now) -> Drawing {
-    let motion = TextMotion::Fade {
-        from: "glow".into(),
-        at_ms: at,
-        ms: 400,
-        curve: None,
-    };
+    let motion = arrival(at);
     let parts: Vec<_> = head.parts.iter().map(|part| part.as_str().into()).collect();
     let label = Line::from(crate::tone::parts(
         &parts,
@@ -25,7 +20,40 @@ pub(super) fn draw(head: &bingo_sdk::Headline, at: i64, width: usize, now: Now) 
     divider(label, motion, width, now)
 }
 
-fn divider(mut label: Line<'static>, motion: TextMotion, width: usize, now: Now) -> Drawing {
+/// A notice that says what changed in its own words — a room's head, who
+/// joined — arriving out of glow as every notice does.
+pub(super) fn said(label: Line<'static>, at: i64, width: usize, now: Now) -> Drawing {
+    let motion = arrival(at);
+    let spans = label
+        .spans
+        .into_iter()
+        .map(|span| {
+            let ink = span.style.fg.or(theme::text().fg).unwrap_or_default();
+            let style = views::motion::style(span.style, ink, Some(&motion), Some(now));
+            Span::styled(span.content, style)
+        })
+        .collect::<Vec<_>>();
+    divider(Line::from(spans), motion, width, now)
+}
+
+fn divider(label: Line<'static>, motion: TextMotion, width: usize, now: Now) -> Drawing {
+    Drawing {
+        lines: vec![ruled(label, width)],
+        next: views::motion::next(&motion, now),
+    }
+}
+
+fn arrival(at: i64) -> TextMotion {
+    TextMotion::Fade {
+        from: "glow".into(),
+        at_ms: at,
+        ms: 400,
+        curve: None,
+    }
+}
+
+/// The label between two thin rules, the first two cells long.
+fn ruled(mut label: Line<'static>, width: usize) -> Line<'static> {
     let muted = theme::foreground("muted").unwrap_or_default();
     label.spans.insert(0, Span::styled(" ", muted));
     label.spans.push(Span::styled(" ", muted));
@@ -38,10 +66,7 @@ fn divider(mut label: Line<'static>, motion: TextMotion, width: usize, now: Now)
     line.spans.extend(label.spans);
     let rest = width.saturating_sub(grid::RM + line.width());
     line.spans.push(Span::styled(thin.repeat(rest), faint));
-    Drawing {
-        lines: vec![line],
-        next: views::motion::next(&motion, now),
-    }
+    line
 }
 
 pub(super) fn compacted(

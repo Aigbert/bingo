@@ -298,6 +298,8 @@ struct Entry {
 struct Segment<'a> {
     gap: bool,
     id: Option<&'a ItemId>,
+    /// Which block it is, when it is one.
+    index: Option<usize>,
     lines: &'a [Line<'static>],
 }
 
@@ -315,6 +317,9 @@ pub struct Blocks {
     /// The transcript's height in wrapped lines, counted while the blocks are
     /// brought up to date rather than walked for again.
     height: usize,
+    /// What opens the stream — a room's head — which belongs to no item.
+    head: Vec<Line<'static>>,
+    head_next: Option<Instant>,
     /// What closes the last turn — its failure, its cost — which belongs to
     /// no item.
     tail: Vec<Line<'static>>,
@@ -354,6 +359,9 @@ impl Blocks {
         }
         // Whatever is left behind the last item was rewound away.
         self.blocks.truncate(kept);
+        let head = transcript::opening(state, rows);
+        self.head = head.lines;
+        self.head_next = head.next;
         let tail = transcript::closing(state, rows);
         self.tail = tail.lines;
         // While a turn runs, the tail is its live row, which hangs under the
@@ -388,20 +396,19 @@ impl Blocks {
         self.blocks.iter().any(|entry| entry.motion.moved)
     }
 
+    /// The index of each block on screen in `[from, from + height)`.
     fn visible(&self, from: usize, height: usize) -> impl Iterator<Item = usize> + '_ {
         let mut y = 0;
-        self.segments()
-            .enumerate()
-            .filter_map(move |(index, segment)| {
-                y += usize::from(segment.gap);
-                let start = y;
-                y += segment.lines.len();
-                (height > 0
-                    && segment.id.is_some()
+        self.segments().filter_map(move |segment| {
+            y += usize::from(segment.gap);
+            let start = y;
+            y += segment.lines.len();
+            segment.index.filter(|_| {
+                height > 0
                     && (y > from || (segment.lines.is_empty() && start >= from))
-                    && start < from.saturating_add(height))
-                .then_some(index)
+                    && start < from.saturating_add(height)
             })
+        })
     }
 
     /// Only visible expired drawings are sampled again; history keeps its memo.
@@ -438,9 +445,11 @@ impl Blocks {
             && self.height.max(self.closing_start() + 1) > from)
             .then_some(self.tail_next)
             .flatten();
+        let head = (from < self.head.len()).then_some(self.head_next).flatten();
         self.visible(from, height)
             .filter_map(|index| self.blocks[index].next)
             .chain(tail)
+            .chain(head)
             .min()
     }
 
@@ -655,25 +664,34 @@ impl Blocks {
     /// a receipt from the row it answers, and never one row of a turn from
     /// another of the same turn.
     fn segments(&self) -> impl Iterator<Item = Segment<'_>> {
+        let headed = !self.head.is_empty();
+        let head = headed.then_some(Segment {
+            gap: false,
+            id: None,
+            index: None,
+            lines: self.head.as_slice(),
+        });
         let mut above: Option<&Entry> = None;
-        let blocks = self.blocks.iter().map(move |entry| {
-            let gap = !entry.lines.is_empty() && above.is_some_and(|above| parted(above, entry));
+        let blocks = self.blocks.iter().enumerate().map(move |(index, entry)| {
+            let gap = !entry.lines.is_empty() && above.map_or(headed, |above| parted(above, entry));
             if !entry.lines.is_empty() {
                 above = Some(entry);
             }
             Segment {
                 gap,
                 id: Some(&entry.id),
+                index: Some(index),
                 lines: entry.lines.as_slice(),
             }
         });
-        let opened = !self.blocks.is_empty();
+        let opened = headed || !self.blocks.is_empty();
         let tail = (!self.tail.is_empty()).then_some(Segment {
             gap: opened && self.tail_gap,
             id: None,
+            index: None,
             lines: self.tail.as_slice(),
         });
-        blocks.chain(tail)
+        head.into_iter().chain(blocks).chain(tail)
     }
 }
 

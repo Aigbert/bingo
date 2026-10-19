@@ -21,6 +21,7 @@ pub use history::History;
 mod components;
 /// Someone's words under their name.
 mod post;
+mod room;
 /// What was said into a session: a person's line, a subsystem's notice, a
 /// room's conversation.
 mod said;
@@ -843,6 +844,15 @@ fn calls(item: &Item, tool: &str) -> bool {
     matches!(&item.body, ItemBody::ToolCall { name, .. } if name == tool)
 }
 
+/// What opens a session's stream before anything was said in it: a room's
+/// head. It belongs to no item, as the closing does.
+pub fn opening(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
+    if state.summary.driver == bingo_sdk::Driver::Log {
+        return room::head(rows);
+    }
+    crate::views::Drawing::default()
+}
+
 /// What stands under the last turn once it is over and nothing runs: why it
 /// failed, followed by any informational closing notice. Both are
 /// derived from `last_turn` rather than kept as lines of the surface's own,
@@ -853,7 +863,7 @@ fn calls(item: &Item, tool: &str) -> bool {
 pub fn closing(state: &SessionState, rows: &Rows<'_>) -> crate::views::Drawing {
     let mut out = live::draw(state, rows);
     if state.summary.driver == bingo_sdk::Driver::Log {
-        out.append(said::writers(rows));
+        out.append(room::writers(rows));
     }
     for props in crate::component::closing::props(state) {
         out.append(crate::component::closing::draw(
@@ -1325,6 +1335,8 @@ mod tests {
                 "found it\n\nit was the cursor all along",
             )]),
             vec![
+                HEAD.to_string(),
+                String::new(),
                 "▎  scout      found it".to_string(),
                 "▎".to_string(),
                 "▎             it was the cursor all along".to_string(),
@@ -1340,7 +1352,51 @@ mod tests {
     fn an_unsigned_post_is_the_holders_and_says_so() {
         assert_eq!(
             drawn_in_room(vec![person("itm_1", "then let us ship it")]),
-            vec!["   you        then let us ship it"],
+            vec![HEAD, "", "   you        then let us ship it"],
+        );
+    }
+
+    /// The head every room's stream opens with: its name, and what it is for
+    /// when it says.
+    const HEAD: &str = "   ── #design ────────────────────────────────────────────";
+
+    /// The roster changes a room read are notices where they happened, and a
+    /// post after one starts a voice of its own.
+    #[test]
+    fn a_rooms_moves_are_notices_and_posts_join_by_voice() {
+        let seated = bingo_collab::room::Move::Seated(vec!["scout".into(), "ada".into()]);
+        let closed = bingo_collab::room::Move::Closed {
+            title: "#design".into(),
+            why: Some("shipped".into()),
+        };
+        // Nothing answers a room, so nothing it holds is in a turn.
+        let posted = |id: &str, by: &str, text: &str| Item {
+            turn: None,
+            ..post(id, by, text)
+        };
+        assert_eq!(
+            drawn_in_room(vec![
+                posted("itm_1", "scout", "one"),
+                posted("itm_2", "scout", "two"),
+                posted("itm_3", "parent", &seated.said("parent")),
+                posted("itm_4", "parent", "welcome"),
+                posted("itm_5", "parent", "and again"),
+                posted("itm_6", "parent", &closed.said("parent")),
+            ]),
+            vec![
+                HEAD,
+                "",
+                "▎  scout      one",
+                "▎             two",
+                "",
+                "   ── scout joined ───────────────────────────────────────",
+                "   ── ada joined ─────────────────────────────────────────",
+                "",
+                "   you        welcome",
+                "              and again",
+                "",
+                "   ── closed · shipped ───────────────────────────────────",
+            ],
         );
     }
 
