@@ -2,9 +2,10 @@
 //! from, so a session sees the same skills whichever way it reaches them.
 //!
 //! Every look is guarded by a stamp: the directories and files of the last
-//! scan, with the length and last-write time each had when it was read. An
-//! unchanged tree costs a handful of `stat` calls; a changed one is re-read on
-//! the spot, which is what "an edited SKILL.md needs no restart" means.
+//! scan, with the size and last-write time each had when it was read. An
+//! unchanged tree costs a `stat` per path and a listing per directory; a
+//! changed one is re-read on the spot, which is what "an edited SKILL.md needs
+//! no restart" means.
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -17,8 +18,9 @@ use crate::shelf::Shelf;
 use crate::skill::Skill;
 use crate::{layers, pages, scan};
 
-/// What a path looked like when it was read. The length is there because a
-/// clock can be too coarse to notice a rewrite within its own tick.
+/// What a path looked like when it was read. The size is there because a
+/// clock can be too coarse to notice a change within its own tick: a file's
+/// length, and a directory's count of entries — its own length is 0 on Windows.
 type Mark = Option<(u64, SystemTime)>;
 
 /// The skills of one working directory, and what would make them stale.
@@ -113,7 +115,18 @@ impl Cached {
 /// a directory appearing or vanishing is a change like any other.
 fn mark(path: &Path) -> Mark {
     let meta = std::fs::metadata(path).ok()?;
-    Some((meta.len(), meta.modified().ok()?))
+    let size = if meta.is_dir() {
+        entries(path)
+    } else {
+        meta.len()
+    };
+    Some((size, meta.modified().ok()?))
+}
+
+fn entries(dir: &Path) -> u64 {
+    std::fs::read_dir(dir).map_or(0, |entries| {
+        u64::try_from(entries.count()).unwrap_or(u64::MAX)
+    })
 }
 
 #[cfg(test)]
