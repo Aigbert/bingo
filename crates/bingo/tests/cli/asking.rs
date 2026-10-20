@@ -17,6 +17,10 @@ use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 /// How long any one wait may take before the run is called stalled.
 const LIMIT: Duration = Duration::from_secs(30);
 
+/// The answer every ask line ends on. A terminal may pass a line on in
+/// pieces, so what the line offers is read once this has arrived.
+const WHOLE_ASK: &str = "[n]o";
+
 /// A write a session rule could silence: an ordinary file in the session's
 /// own directory.
 const WRITES_A_NOTE: &str = r#"{"responses":[
@@ -36,7 +40,7 @@ const WRITES_A_HOOK: &str = r#"{"responses":[
 #[test]
 fn a_permission_a_rule_could_silence_offers_the_session_rung() {
     let mut run = AtTheTerminal::open(WRITES_A_NOTE, "write the note");
-    let asked = run.until("[permission]");
+    let asked = run.until(WHOLE_ASK);
     assert!(asked.contains("[a]lways this session"), "{asked}");
     run.answer("y");
     let code = run.finish();
@@ -50,7 +54,7 @@ fn a_permission_a_rule_could_silence_offers_the_session_rung() {
 #[test]
 fn a_permission_no_rule_could_silence_offers_no_session_rung() {
     let mut run = AtTheTerminal::open(WRITES_A_HOOK, "write the hook");
-    let asked = run.until("[permission]");
+    let asked = run.until(WHOLE_ASK);
     assert!(asked.contains("[y]es"), "{asked}");
     assert!(asked.contains("[n]o"), "{asked}");
     assert!(

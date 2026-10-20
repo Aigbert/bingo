@@ -73,18 +73,20 @@ fn log_of(home: &std::path::Path) -> Option<String> {
     std::fs::read_to_string(only).ok()
 }
 
-/// Turn one starts a job and reads the head of it; turn two reads on from the
-/// cursor the first read gave back, then ends the job. The last response is
-/// for the turn the kill's own notification opens.
+/// Turn one starts a job; turn two reads the head of it; turn three reads on
+/// from the cursor the first read gave back, then ends the job. The last
+/// response is for the turn the kill's own notification opens.
 ///
-/// The job's second line waits for a file the test makes, so what each pull
-/// finds is the test's to decide and not the machine's load.
+/// The test opens each read once the job has written what it is meant to
+/// find, and the job's second line waits for a file the test makes, so what
+/// each pull finds is the test's to decide and not the machine's load.
 const PULL_THEN_KILL: &str = r#"{"responses":[
     {"steps":[{"toolCall":{"name":"Bash","input":{
         "command":"echo one; while [ ! -f go ]; do sleep 0.05; done; echo two; sleep 30",
         "background":true}}}]},
-    {"steps":[{"delay":{"ms":400}},{"toolCall":{"name":"BashOutput","input":{"id":"job_"}}}]},
     {"steps":[{"text":"started it"}]},
+    {"steps":[{"toolCall":{"name":"BashOutput","input":{"id":"job_"}}}]},
+    {"steps":[{"text":"read the head"}]},
     {"steps":[{"toolCall":{"name":"BashOutput","input":{"id":"job_","cursor":4}}}]},
     {"steps":[{"toolCall":{"name":"KillShell","input":{"id":"job_"}}}]},
     {"steps":[{"text":"read it and ended it"}]},
@@ -97,7 +99,14 @@ fn a_job_is_pulled_by_cursor_across_two_turns_and_then_killed() {
     let script = script(PULL_THEN_KILL);
     let mut host = Host::start(&mut allowed(dir.path(), &script));
 
-    host.prompt("start it and read the first of it");
+    host.prompt("start it");
+    host.until("result");
+    // The line itself, not a clock: a shell can take longer to start than
+    // any delay a script would wait.
+    until("the job wrote its first line", || {
+        log_of(dir.path()).filter(|log| log.contains("one"))
+    });
+    host.prompt("read the first of it");
     host.until("result");
     // Only now may the job write its second line, so the cursor pull of the
     // next turn has something new to find and the first pull had not.
