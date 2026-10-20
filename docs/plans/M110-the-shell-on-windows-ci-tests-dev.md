@@ -77,7 +77,7 @@ Windows binary the release ships can run the model's commands.
       bingo-hooks-shell --all-targets --target x86_64-pc-windows-msvc`
       exit 0.
 - [x] `ci.yml` has no `continue-on-error`; `dev` is a push trigger.
-- [ ] Windows job: pending the first CI run after a person pushes dev.
+- [x] Windows job: green on CI run 39349416283 at `116f5c00d` (2026-10-20).
 - [x] All gates: host gates and touched-crate Windows cross-check passed.
 
 ## Non-goals
@@ -146,3 +146,6 @@ advisories ok, bans ok, licenses ok, sources ok
 Existing ignores: 100MiB pinned-event stress, opening storyboard play/preview.
 No failure reruns needed. Discipline and deny emitted non-blocking warnings.
 Both old `fn shell` definitions are gone; CI configuration criteria checked.
+
+2026-10-20: the Windows job went green at `116f5c00d` (run 39349416283, all
+eight jobs); v0.7.0 was tagged there. Timing flakes on a loaded runner remain.
