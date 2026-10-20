@@ -245,11 +245,15 @@ fn a_finished_job_opens_a_turn_on_a_headless_run() {
 /// The other side of the wake: a one-shot `--print` run ends at the root's
 /// turn, so there is no later turn for a job's completion to open, and the
 /// job goes with the process (ADR-0018 §4). Its own line is written every
-/// tenth of a second for twenty seconds, which the run does not wait for.
+/// tenth of a second for twenty seconds, which the run does not wait for. The
+/// turn waits until the job's log holds its first line: a shell can take
+/// longer to start than the rest of the turn takes.
 const STARTS_AND_LEAVES: &str = r#"{"responses":[
     {"steps":[{"toolCall":{"name":"Bash","input":{
         "command":"i=0; while [ $i -lt 200 ]; do echo tick; i=$((i+1)); sleep 0.1; done",
         "background":true}}}]},
+    {"steps":[{"toolCall":{"name":"Bash","input":{
+        "command":"until grep -qs tick .bingo/data/bash/*; do sleep 0.05; done"}}}]},
     {"steps":[{"text":"it is running"}]}
 ]}"#;
 
