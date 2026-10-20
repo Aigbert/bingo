@@ -675,6 +675,9 @@ fn esc_twice_opens_the_sheet_then_enter_rewinds_the_turn_and_file() {
     terminal.wait_for("/ commands");
     terminal.send(b"write me a note\r");
     terminal.wait_for("Wrote the note.");
+    // The answer is on the screen before the turn ends, and an escape in a
+    // running turn interrupts it: the bar offers ctrl+o once it has ended.
+    terminal.wait_for("ctrl+o details");
     let note = terminal.home().join("note.md");
     assert!(note.is_file(), "the turn wrote it");
 
