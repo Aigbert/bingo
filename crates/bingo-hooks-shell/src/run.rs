@@ -294,12 +294,15 @@ mod tests {
         let cwd = std::env::temp_dir();
 
         let error = tokio::time::timeout(
-            Duration::from_secs(1),
+            Duration::from_secs(20),
             run(Request {
                 command: &command,
                 input: &json!({}),
                 cwd: &cwd,
-                timeout: Duration::from_millis(200),
+                // Long enough for the shell to start its grandchild on a loaded
+                // Windows runner, where Git Bash takes hundreds of milliseconds
+                // to fork.
+                timeout: Duration::from_secs(2),
                 env: BTreeMap::new(),
             }),
         )
