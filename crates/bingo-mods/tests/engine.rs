@@ -54,7 +54,9 @@ async fn a_loop_is_interrupted_on_the_module_thread() {
     let engine = load(
         "loop.ts",
         Limits {
-            hook_time: Duration::from_millis(50),
+            // The budget bounds registration too: room for a loaded runner to
+            // load the module before the loop is the one that runs it out.
+            hook_time: Duration::from_secs(1),
             ..Limits::default()
         },
     )
